@@ -1,0 +1,389 @@
+{
+  "cases": [
+    {
+      "id": "2026/06/0001",
+      "title": "VA: Abandoned Object @ Siloso Beach",
+      "status": "Active",
+      "createdAt": "2026-06-05T08:15:00+07:00",
+      "closedAt": null,
+      "cmmsTickets": [
+        "CMMS-90812"
+      ],
+      "incident": {
+        "caseId": "2026/06/0001",
+        "title": "VA: Abandoned Object @ Siloso Beach",
+        "dateTime": "2026-06-05T08:15:00+07:00",
+        "type": "Security",
+        "subType": "Abandoned Property",
+        "priority": "Medium",
+        "reporterName": "Video Analytics System",
+        "requestedBy": "IIOC Controller",
+        "createdBy": "system_controller",
+        "status": "Live (On-Site)",
+        "assignedTo": "Ranger John",
+        "location": {
+          "road": "Siloso Beach Walk",
+          "building": "Emerald Pavilion",
+          "levelSpace": "Ground Area near Lifeguard Post 2",
+          "nearAt": "At the seating bench",
+          "commonName": "Siloso Lifeguard Post 2",
+          "postalCode": "098997",
+          "tags": [
+            "Siloso Zone",
+            "Beachfront"
+          ],
+          "lat": 1.2562,
+          "lng": 103.8124
+        },
+        "log": [
+          {
+            "eventNumber": 1,
+            "date": "2026-06-05",
+            "time": "08:15:00",
+            "description": "Video Analytics alert VA-8092 triggered for abandoned black backpack near Siloso Beach seating benches."
+          },
+          {
+            "eventNumber": 2,
+            "date": "2026-06-05",
+            "time": "08:18:00",
+            "description": "Controller acknowledged VA alert and dispatch request. Assigned Ranger John as responder."
+          },
+          {
+            "eventNumber": 3,
+            "date": "2026-06-05",
+            "time": "08:25:00",
+            "description": "Ranger John acknowledged incident dispatch."
+          },
+          {
+            "eventNumber": 4,
+            "date": "2026-06-05",
+            "time": "08:32:00",
+            "description": "Ranger John arrived on site. Commencing initial cordon and scanning area for owner."
+          }
+        ],
+        "emergencyServices": {
+          "policeAtScene": false,
+          "officerNameRank": "",
+          "policeIncidentNo": "",
+          "classification": "",
+          "respondingUnit": "",
+          "ambulanceScdfType": "",
+          "ambulanceOfficerName": "",
+          "ambulanceCallSign": "",
+          "ambulanceRespondingUnit": "",
+          "ambulanceArrivalTime": "",
+          "hospitalConveyedTo": ""
+        },
+        "mediaInvolvement": {
+          "mediaAtScene": false,
+          "mediaName": "",
+          "commsNotified": false
+        },
+        "propertyDamage": {
+          "sdcPropertyDamaged": false,
+          "description": ""
+        },
+        "vehiclesInvolved": [],
+        "personalInjuries": [],
+        "personsInvolved": [],
+        "cctvBwc": [
+          {
+            "cameraNumber": "CAM-SIL-08",
+            "vmsTimestamp": "08:14:30",
+            "vmsBookmark": "VA-ABANDON-08",
+            "bwcNumber": "BWC-R12",
+            "bwcTimestamp": "08:32:00"
+          }
+        ],
+        "summary": "Suspicious black backpack left unattended under a seating bench near Emerald Pavilion. Ranger John deployed. Cordon set up.",
+        "completionRemarks": ""
+      }
+    },
+    {
+      "id": "2026/06/0002",
+      "title": "Medical Emergency @ Resorts World Sentosa",
+      "status": "Closed",
+      "createdAt": "2026-06-05T07:10:00+07:00",
+      "closedAt": "2026-06-05T08:45:00+07:00",
+      "cmmsTickets": [],
+      "incident": {
+        "caseId": "2026/06/0002",
+        "title": "Medical Emergency @ Resorts World Sentosa",
+        "dateTime": "2026-06-05T07:10:00+07:00",
+        "type": "Safety / Medical",
+        "subType": "Fainting/Giddiness",
+        "priority": "High",
+        "reporterName": "Guest Services - RWS",
+        "requestedBy": "RWS Security Desk",
+        "createdBy": "controller_steve",
+        "status": "Closed",
+        "assignedTo": "Ranger Sarah",
+        "location": {
+          "road": "Sentosa Gateway",
+          "building": "RWS Casino Entrance",
+          "levelSpace": "Level 1 VIP Lobby",
+          "nearAt": "Beside taxi stand",
+          "commonName": "RWS Casino VIP Entrance",
+          "postalCode": "098269",
+          "tags": [
+            "Resort Zone",
+            "Indoor"
+          ],
+          "lat": 1.2585,
+          "lng": 103.821
+        },
+        "log": [
+          {
+            "eventNumber": 1,
+            "date": "2026-06-05",
+            "time": "07:10:00",
+            "description": "Received call from RWS Security reporting a guest fainted at VIP Casino lobby."
+          },
+          {
+            "eventNumber": 2,
+            "date": "2026-06-05",
+            "time": "07:12:00",
+            "description": "Ranger Sarah dispatched. Contacted SCDF Ambulance for emergency medical support."
+          },
+          {
+            "eventNumber": 3,
+            "date": "2026-06-05",
+            "time": "07:19:00",
+            "description": "Ranger Sarah arrived on-site. Guest is conscious but weak. Administering first aid."
+          },
+          {
+            "eventNumber": 4,
+            "date": "2026-06-05",
+            "time": "07:25:00",
+            "description": "SCDF Ambulance (Alpha 12) arrived on-site. Paramedics taking over care."
+          },
+          {
+            "eventNumber": 5,
+            "date": "2026-06-05",
+            "time": "07:42:00",
+            "description": "Guest conveyed to Singapore General Hospital by SCDF Ambulance."
+          },
+          {
+            "eventNumber": 6,
+            "date": "2026-06-05",
+            "time": "08:00:00",
+            "description": "Ranger Sarah completed ground activities. Submitting report for review."
+          },
+          {
+            "eventNumber": 7,
+            "date": "2026-06-05",
+            "time": "08:45:00",
+            "description": "Duty Manager reviewed and closed the incident."
+          }
+        ],
+        "emergencyServices": {
+          "policeAtScene": false,
+          "officerNameRank": "",
+          "policeIncidentNo": "",
+          "classification": "",
+          "respondingUnit": "",
+          "ambulanceScdfType": "SCDF",
+          "ambulanceOfficerName": "Sergeant Lee",
+          "ambulanceCallSign": "A12",
+          "ambulanceRespondingUnit": "Bukit Merah Fire Stn",
+          "ambulanceArrivalTime": "07:25:00",
+          "hospitalConveyedTo": "Singapore General Hospital (SGH)"
+        },
+        "mediaInvolvement": {
+          "mediaAtScene": false,
+          "mediaName": "",
+          "commsNotified": false
+        },
+        "propertyDamage": {
+          "sdcPropertyDamaged": false,
+          "description": ""
+        },
+        "vehiclesInvolved": [],
+        "personalInjuries": [
+          {
+            "name": "Jane Doe",
+            "address": "123 Orchard Road, Singapore",
+            "age": 45,
+            "gender": "Female",
+            "contactNumber": "+65 9123 4567",
+            "clinicHospitalAttended": "SGH Accident & Emergency",
+            "msigFormIssued": false,
+            "under16": false,
+            "parentGuardianName": "",
+            "parentGuardianContact": ""
+          }
+        ],
+        "personsInvolved": [
+          {
+            "guestOrNonGuest": "Guest",
+            "type": "Guest",
+            "name": "Jane Doe",
+            "address": "123 Orchard Road, Singapore",
+            "age": 45,
+            "gender": "Female",
+            "contactNumber": "+65 9123 4567",
+            "roleInvolvement": "Victim (Fainted)",
+            "injuryDetails": "Loss of consciousness, dizziness"
+          }
+        ],
+        "cctvBwc": [
+          {
+            "cameraNumber": "CAM-RWS-L1-02",
+            "vmsTimestamp": "07:09:50",
+            "vmsBookmark": "MED-RWS-VIP",
+            "bwcNumber": "BWC-R05",
+            "bwcTimestamp": "07:19:00"
+          }
+        ],
+        "summary": "Female guest fainted at RWS Casino entrance lobby. Ranger Sarah responded. SCDF ambulance called and conveyed patient to SGH. Closed.",
+        "completionRemarks": "Ranger Sarah completed medical assist. SCDF Ambulance took over."
+      }
+    },
+    {
+      "id": "2026-06-05T08:00:00+07:00_TASK_1",
+      "title": "Setup crowd control barrier at Beach Station",
+      "status": "Created",
+      "createdAt": "2026-06-05T08:00:00+07:00",
+      "closedAt": null,
+      "cmmsTickets": [],
+      "task": {
+        "id": "TASK-001",
+        "caseId": "2026/06/0001",
+        "title": "Setup crowd control barrier at Beach Station",
+        "description": "Ranger is requested to setup temporary crowd barriers near Beach Station bus terminal to prepare for afternoon weekend surge.",
+        "assignee": "Ranger Alex",
+        "priority": "Medium",
+        "dueDate": "2026-06-05T12:00:00",
+        "status": "Created",
+        "createdBy": "controller_steve",
+        "createdDate": "2026-06-05T08:00:00+07:00",
+        "attachments": []
+      }
+    },
+    {
+      "id": "2026/06/0003",
+      "title": "12",
+      "status": "Active",
+      "createdAt": "2026-06-05T02:34:12.962Z",
+      "closedAt": null,
+      "cmmsTickets": [],
+      "incident": {
+        "caseId": "2026/06/0003",
+        "title": "12",
+        "dateTime": "2026-06-05T02:34:12.702Z",
+        "type": "Safety / Medical",
+        "subType": "Slip & Fall",
+        "priority": "Medium",
+        "reporterName": "12",
+        "requestedBy": "Guest Call-in",
+        "createdBy": "Controller Steve",
+        "status": "Live (Completed)",
+        "assignedTo": "",
+        "location": {
+          "road": "123",
+          "building": "1233",
+          "levelSpace": "312",
+          "nearAt": "123",
+          "commonName": "12",
+          "postalCode": "231",
+          "tags": [
+            "Beachfront"
+          ],
+          "lat": 1.25,
+          "lng": 103.83
+        },
+        "log": [
+          {
+            "eventNumber": 1,
+            "date": "2026-06-05",
+            "time": "09:34:12",
+            "description": "Incident logged under Case ID 2026/06/0003. Classification: Safety / Medical - Slip & Fall."
+          },
+          {
+            "eventNumber": 2,
+            "date": "2026-06-05",
+            "time": "09:42:29",
+            "description": "Responder assigned responder acknowledged the dispatch."
+          },
+          {
+            "eventNumber": 3,
+            "date": "2026-06-05",
+            "time": "09:42:29",
+            "description": "Responder assigned responder acknowledged the dispatch."
+          },
+          {
+            "eventNumber": 4,
+            "date": "2026-06-05",
+            "time": "09:42:30",
+            "description": "Responder assigned responder confirmed arrival on-site."
+          },
+          {
+            "eventNumber": 5,
+            "date": "2026-06-05",
+            "time": "09:42:33",
+            "description": "Responder assigned responder marked ground activities as completed. Remarks: csacs"
+          }
+        ],
+        "emergencyServices": {
+          "policeAtScene": false,
+          "officerNameRank": "",
+          "policeIncidentNo": "",
+          "classification": "",
+          "respondingUnit": "",
+          "ambulanceScdfType": "",
+          "ambulanceOfficerName": "",
+          "ambulanceCallSign": "",
+          "ambulanceRespondingUnit": "",
+          "ambulanceArrivalTime": "",
+          "hospitalConveyedTo": ""
+        },
+        "mediaInvolvement": {
+          "mediaAtScene": false,
+          "mediaName": "",
+          "commsNotified": false
+        },
+        "propertyDamage": {
+          "sdcPropertyDamaged": false,
+          "description": ""
+        },
+        "vehiclesInvolved": [],
+        "personalInjuries": [],
+        "personsInvolved": [],
+        "cctvBwc": [],
+        "summary": "123132",
+        "completionRemarks": "csacs"
+      }
+    }
+  ],
+  "tasks": [
+    {
+      "id": "TASK-001",
+      "caseId": "2026/06/0001",
+      "title": "Setup crowd control barrier at Beach Station",
+      "description": "Ranger is requested to setup temporary crowd barriers near Beach Station bus terminal to prepare for afternoon weekend surge.",
+      "assignee": "Ranger Alex",
+      "priority": "Medium",
+      "dueDate": "2026-06-05T12:00:00",
+      "status": "In Progress",
+      "createdBy": "controller_steve",
+      "createdDate": "2026-06-05T08:00:00+07:00",
+      "attachments": []
+    }
+  ],
+  "occurrences": [
+    {
+      "id": "OCC-2026-0001",
+      "user": "controller_steve",
+      "dateTime": "2026-06-05T08:30:00+07:00",
+      "topic": "VIP Visit Advisory",
+      "content": "Received notification that diplomatic envoys will visit Palawan Beach Bridge from 14:00 to 15:30. Liaison patrol advised. No active incident required."
+    },
+    {
+      "id": "OCC-2026-0002",
+      "user": "controller_steve",
+      "dateTime": "2026-06-05T09:00:00+07:00",
+      "topic": "Routine Siren Testing",
+      "content": "Completed weekly IIOC warning siren system self-test. All sirens responsive and returned positive self-diagnostic logs."
+    }
+  ]
+}
