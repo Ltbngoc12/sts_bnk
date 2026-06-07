@@ -208,7 +208,7 @@ export const Sidebar: React.FC = () => {
         }
 
         .brand-header {
-          padding: 24px 16px 20px 16px; /* Optimized padding for side-by-side logo layout */
+          padding: 24px 20px 20px 20px; /* Restored left padding to 20px for a clean, non-stretched look */
           border-bottom: 1px solid var(--border-color);
           transition: padding 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
@@ -216,12 +216,12 @@ export const Sidebar: React.FC = () => {
         .brand-logo {
           display: flex;
           align-items: center;
-          gap: 10px;
+          gap: 12px; /* Increased gap for better breathing space */
           font-family: var(--font-body);
         }
 
         .logo-icon {
-          height: 38px; /* Large standalone icon on the left */
+          height: 40px; /* Increased size for a prominent left-side emblem */
           width: auto;
           object-fit: contain;
           mix-blend-mode: multiply;
@@ -232,14 +232,14 @@ export const Sidebar: React.FC = () => {
         .brand-text-group {
           display: flex;
           flex-direction: column;
-          gap: 4px;
+          gap: 3px;
           flex-grow: 1;
-          min-width: 0; /* Prevents text overflow */
+          min-width: 0;
           transition: opacity 0.2s ease, transform 0.2s ease;
         }
 
         .logo-wordmark {
-          height: 20px; /* Wordmark size matching layout */
+          height: 26px; /* Significantly increased from 20px for high readability */
           width: auto;
           object-fit: contain;
           mix-blend-mode: multiply;
@@ -248,10 +248,10 @@ export const Sidebar: React.FC = () => {
 
         .sub-logo {
           font-family: 'Outfit', 'Inter', sans-serif;
-          font-size: 8.2px; /* Refined typography size to fit under wordmark */
-          font-weight: 800;
-          color: var(--color-primary-dark); /* Bold brown matching user's design guide preference */
-          letter-spacing: 0.04em;
+          font-size: 8.5px; /* Refined typography size to fit under wordmark */
+          font-weight: 700;
+          color: var(--text-muted); /* Softer gray-brown to avoid clashing with the orange logo */
+          letter-spacing: 0.06em;
           text-transform: uppercase;
           white-space: nowrap;
           display: block;
