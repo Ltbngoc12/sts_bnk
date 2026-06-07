@@ -62,6 +62,9 @@ export async function PUT(
         currentCase.status = 'Closed';
         currentCase.closedAt = new Date().toISOString();
         milestoneLog = `Incident approved for closure by ${body.username || 'Duty Manager'}. Record is now read-only.`;
+        if (incident.slaveIncidents) {
+          incident.slaveIncidents = incident.slaveIncidents.map(s => ({ ...s, status: 'Closed' }));
+        }
       } else if (body.status === 'Returned') {
         milestoneLog = `Incident returned to Controller by ${body.username || 'Duty Manager'}.`;
       }
@@ -117,6 +120,9 @@ export async function PUT(
     }
     if (body.summary) {
       incident.summary = body.summary;
+    }
+    if (body.slaveIncidents) {
+      incident.slaveIncidents = body.slaveIncidents;
     }
     
     currentCase.incident = incident;

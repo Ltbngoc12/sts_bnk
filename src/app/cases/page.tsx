@@ -12,11 +12,7 @@ export default function CaseLogPage() {
   const [filterStatus, setFilterStatus] = useState<string>('All');
   const [searchTerm, setSearchTerm] = useState<string>('');
   
-  // Create Case form state
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [title, setTitle] = useState('');
-  const [initialStatus, setInitialStatus] = useState('Pending Triage');
-  const [summary, setSummary] = useState('');
+
 
   useEffect(() => {
     fetchCases();
@@ -35,37 +31,7 @@ export default function CaseLogPage() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title.trim()) return;
 
-    const payload = {
-      title,
-      status: initialStatus,
-      username,
-      // No incident object initially - this is a blank triage case
-      incident: null
-    };
-
-    try {
-      const res = await fetch('/api/cases', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (res.ok) {
-        setShowCreateModal(false);
-        setTitle('');
-        setSummary('');
-        fetchCases();
-      } else {
-        alert('Failed to create case.');
-      }
-    } catch (err) {
-      console.error('Error creating case:', err);
-    }
-  };
 
   const filteredCases = cases.filter(c => {
     const matchesSearch = c.id.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -84,14 +50,7 @@ export default function CaseLogPage() {
           <p>Master index of all operational cases (Incidents, Tasks, and CMMS Tickets)</p>
         </div>
         
-        {isController && (
-          <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '18px', height: '18px' }}>
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-            </svg>
-            OPEN NEW CASE
-          </button>
-        )}
+
       </div>
 
       {/* Filter panel */}
@@ -198,63 +157,7 @@ export default function CaseLogPage() {
         )}
       </div>
 
-      {/* Creation Modal */}
-      {showCreateModal && (
-        <div className="modal-backdrop">
-          <div className="create-case-modal glass" style={{ maxHeight: '450px' }}>
-            <div className="modal-header">
-              <h2>OPEN NEW MASTER CASE</h2>
-              <button className="close-btn" onClick={() => setShowCreateModal(false)}>Close</button>
-            </div>
-            
-            <form onSubmit={handleSubmit} className="modal-form">
-              <div className="modal-scroll-area">
-                
-                <div className="form-group">
-                  <label>Case Title *</label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g. Siloso Beach crowd monitoring or general inquiry" 
-                    value={title} 
-                    onChange={(e) => setTitle(e.target.value)} 
-                    required 
-                    className="form-control"
-                  />
-                </div>
 
-                <div className="form-group">
-                  <label>Initial Lifecycle Status</label>
-                  <select 
-                    value={initialStatus} 
-                    onChange={(e) => setInitialStatus(e.target.value)} 
-                    className="form-control select-dark"
-                  >
-                    <option value="Pending Triage">Pending Triage</option>
-                    <option value="Active">Active</option>
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label>Case Notes / Description</label>
-                  <textarea 
-                    placeholder="Enter case folder notes, purpose of logging..." 
-                    value={summary} 
-                    onChange={(e) => setSummary(e.target.value)} 
-                    className="form-control"
-                    rows={3}
-                  />
-                </div>
-
-              </div>
-
-              <div className="modal-actions">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowCreateModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">OPEN CASE CONTAINER</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       <style jsx>{`
         .cases-header-bar {

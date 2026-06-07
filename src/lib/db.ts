@@ -90,6 +90,15 @@ export interface CCTVBWC {
   bwcTimestamp: string;
 }
 
+export interface SlaveIncident {
+  id: string;
+  title: string;
+  dateTime: string;
+  reporterName: string;
+  summary: string;
+  status: string; // Open, Closed
+}
+
 export interface Incident {
   caseId: string;
   title: string;
@@ -113,6 +122,7 @@ export interface Incident {
   cctvBwc: CCTVBWC[];
   summary: string;
   completionRemarks: string;
+  slaveIncidents?: SlaveIncident[];
 }
 
 export interface Case {
