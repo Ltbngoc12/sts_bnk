@@ -32,7 +32,7 @@
   --border-glow: rgba(255, 130, 0, 0.15);
   
   /* Layout sizes */
-  --sidebar-width: 280px;
+  --sidebar-width: 240px;
   
   /* Font Family */
   --font-title: 'Playfair Display', 'Outfit', 'Inter', serif;
@@ -40,7 +40,7 @@
 }
 
 body.sidebar-collapsed {
-  --sidebar-width: 80px;
+  --sidebar-width: 70px;
 }
 
 /* Base resets */

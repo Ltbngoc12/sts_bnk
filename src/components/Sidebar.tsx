@@ -208,38 +208,60 @@ export const Sidebar: React.FC = () => {
         }
 
         .brand-header {
-          padding: 24px 20px 20px 20px; /* Restored left padding to 20px for a clean, non-stretched look */
-          border-bottom: 1px solid var(--border-color);
+          padding: 24px 16px 16px 16px; /* Expanded padding: 16px left/right perfectly aligns with nav menu padding */
           transition: padding 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .brand-logo {
           display: flex;
           align-items: center;
-          gap: 12px; /* Increased gap for better breathing space */
+          gap: 12px;
+          background: rgba(255, 255, 255, 0.45); /* Soft resort-luxury glass card overlay */
+          backdrop-filter: blur(10px);
+          -webkit-backdrop-filter: blur(10px);
+          border: 1px solid rgba(255, 130, 0, 0.08); /* Subtle orange-tinted border to coordinate with brand color */
+          border-radius: 12px;
+          padding: 10px 14px; /* Matches nav-item padding exactly for perfect vertical alignment of elements */
+          box-shadow: 0 4px 12px -2px rgba(43, 31, 29, 0.02), 0 2px 6px -1px rgba(43, 31, 29, 0.01);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          width: 100%;
+          height: 52px;
+          cursor: pointer;
           font-family: var(--font-body);
         }
 
+        .brand-logo:hover {
+          background: rgba(255, 255, 255, 0.75); /* Glow effect on hover */
+          border-color: rgba(255, 130, 0, 0.2);
+          box-shadow: 0 6px 16px -3px rgba(255, 130, 0, 0.06), 0 4px 8px -2px rgba(255, 130, 0, 0.03);
+          transform: translateY(-1px);
+        }
+
         .logo-icon {
-          height: 40px; /* Increased size for a prominent left-side emblem */
+          height: 32px; /* Aligns with text height (18px wordmark + 4px gap + 10px subtitle) */
           width: auto;
           object-fit: contain;
           mix-blend-mode: multiply;
           flex-shrink: 0;
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .brand-logo:hover .logo-icon {
+          transform: scale(1.05); /* Soft, interactive bounce */
         }
 
         .brand-text-group {
           display: flex;
           flex-direction: column;
-          gap: 3px;
+          gap: 4px;
           flex-grow: 1;
           min-width: 0;
+          justify-content: center;
           transition: opacity 0.2s ease, transform 0.2s ease;
         }
 
         .logo-wordmark {
-          height: 26px; /* Significantly increased from 20px for high readability */
+          height: 18px; /* Balanced sizing for a cleaner alignment */
           width: auto;
           object-fit: contain;
           mix-blend-mode: multiply;
@@ -248,13 +270,16 @@ export const Sidebar: React.FC = () => {
 
         .sub-logo {
           font-family: 'Outfit', 'Inter', sans-serif;
-          font-size: 8.5px; /* Refined typography size to fit under wordmark */
+          font-size: 8px; /* Compact luxury editorial typography */
           font-weight: 700;
-          color: var(--text-muted); /* Softer gray-brown to avoid clashing with the orange logo */
-          letter-spacing: 0.06em;
+          color: var(--text-muted);
+          letter-spacing: 0.14em; /* Luxurious wide tracking */
           text-transform: uppercase;
           white-space: nowrap;
           display: block;
+          line-height: 1;
+          margin-top: 1px;
+          opacity: 0.85;
         }
 
         .nav-menu {
@@ -388,7 +413,7 @@ export const Sidebar: React.FC = () => {
         /* Toggle Button */
         .collapse-toggle-btn {
           position: absolute;
-          top: 35px;
+          top: 50px; /* Aligns vertically with the center of the brand card */
           right: -14px;
           width: 28px;
           height: 28px;
@@ -405,31 +430,52 @@ export const Sidebar: React.FC = () => {
           z-index: 110;
           outline: none;
           padding: 0;
+          transform: translateY(-50%);
         }
 
         .collapse-toggle-btn:hover {
           color: var(--color-primary);
           border-color: var(--color-primary);
           background: var(--bg-base);
-          transform: translateY(0) scale(1.1);
+          transform: translateY(-50%) scale(1.1); /* Preserves vertical translate during scaling */
         }
 
         .collapse-toggle-btn:active {
-          transform: scale(0.95);
+          transform: translateY(-50%) scale(0.95);
         }
 
         /* Collapsed Styles */
         .collapsed .brand-header {
-          padding: 24px 0 22px 0;
+          padding: 24px 0 16px 0;
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
         }
 
-        .collapsed .logo-icon {
-          height: 32px; /* Slightly smaller centered icon in collapsed sidebar */
+        .collapsed .brand-logo {
+          width: 48px; /* Clean rounded-square badge for collapsed state */
+          height: 48px;
+          border-radius: 12px;
+          padding: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
           margin: 0 auto;
+          background: rgba(255, 255, 255, 0.45);
+          border: 1px solid rgba(255, 130, 0, 0.08);
+          box-shadow: 0 4px 12px -2px rgba(43, 31, 29, 0.02);
+        }
+
+        .collapsed .brand-logo:hover {
+          background: rgba(255, 255, 255, 0.75);
+          border-color: rgba(255, 130, 0, 0.2);
+          transform: translateY(-1px);
+        }
+
+        .collapsed .logo-icon {
+          height: 28px; /* Perfectly sized inside the 48px card */
+          margin: 0;
         }
 
         .collapsed .brand-text-group {
