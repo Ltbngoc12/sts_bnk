@@ -39,6 +39,10 @@
   --font-body: 'Inter', sans-serif;
 }
 
+body.sidebar-collapsed {
+  --sidebar-width: 80px;
+}
+
 /* Base resets */
 * {
   margin: 0;
@@ -84,6 +88,7 @@ body {
   flex-direction: column;
   gap: 24px;
   min-width: 0; /* Prevents flex overflow */
+  transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Metric Counter Cards - Sleek clean side borders matching design palette */

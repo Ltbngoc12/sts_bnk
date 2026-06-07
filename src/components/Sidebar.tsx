@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useRole, UserRole } from '@/context/RoleContext';
@@ -8,6 +8,31 @@ import { useRole, UserRole } from '@/context/RoleContext';
 export const Sidebar: React.FC = () => {
   const pathname = usePathname();
   const { role, username, setRole } = useRole();
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  // Load state from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem('sidebar_collapsed');
+    if (stored === 'true') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIsCollapsed(true);
+    }
+  }, []);
+
+  // Update body class and localStorage when isCollapsed changes
+  useEffect(() => {
+    if (isCollapsed) {
+      document.body.classList.add('sidebar-collapsed');
+      localStorage.setItem('sidebar_collapsed', 'true');
+    } else {
+      document.body.classList.remove('sidebar-collapsed');
+      localStorage.setItem('sidebar_collapsed', 'false');
+    }
+  }, [isCollapsed]);
+
+  const toggleCollapse = () => {
+    setIsCollapsed(prev => !prev);
+  };
 
   const iconStyle = {
     width: '20px',
@@ -92,13 +117,34 @@ export const Sidebar: React.FC = () => {
   ];
 
   return (
-    <div className="sidebar-container">
+    <div className={`sidebar-container ${isCollapsed ? 'collapsed' : ''}`}>
+      {/* Toggle Button */}
+      <button 
+        className="collapse-toggle-btn" 
+        onClick={toggleCollapse}
+        aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+      >
+        <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round">
+          {isCollapsed ? (
+            <polyline points="9 18 15 12 9 6" />
+          ) : (
+            <polyline points="15 18 9 12 15 6" />
+          )}
+        </svg>
+      </button>
+
       {/* Brand Header */}
       <div className="brand-header">
         <div className="brand-logo">
-          <img src="/logo.png" alt="Sentosa Logo" className="logo-img" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/icon.png" alt="Sentosa Icon" className="logo-icon" />
+          
+          <div className="brand-text-group">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="Sentosa Logo" className="logo-wordmark" />
+            <div className="sub-logo">CASE MANAGEMENT SYSTEM</div>
+          </div>
         </div>
-        <div className="sub-logo">CASE MANAGEMENT SYSTEM</div>
       </div>
 
       {/* Nav Menu */}
@@ -112,7 +158,8 @@ export const Sidebar: React.FC = () => {
               className={`nav-item ${isActive ? 'active' : ''}`}
             >
               {item.icon}
-              <span>{item.name}</span>
+              <span className="nav-label">{item.name}</span>
+              {isCollapsed && <span className="collapsed-tooltip">{item.name}</span>}
             </Link>
           );
         })}
@@ -124,7 +171,7 @@ export const Sidebar: React.FC = () => {
           <div className="avatar">
             {username.charAt(0)}
           </div>
-          <div>
+          <div className="user-details">
             <div className="user-name">{username}</div>
             <div className="user-role">{role}</div>
           </div>
@@ -157,36 +204,56 @@ export const Sidebar: React.FC = () => {
           display: flex;
           flex-direction: column;
           z-index: 100;
+          transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .brand-header {
-          padding: 30px 24px 22px 24px; /* More top padding for breathing room */
+          padding: 24px 16px 20px 16px; /* Optimized padding for side-by-side logo layout */
           border-bottom: 1px solid var(--border-color);
+          transition: padding 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .brand-logo {
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: 10px;
           font-family: var(--font-body);
-          margin-bottom: 10px; /* Generous gap between logo and subtitle */
         }
 
-        .logo-img {
-          height: 38px; /* Refined size for a more sophisticated look */
+        .logo-icon {
+          height: 38px; /* Large standalone icon on the left */
           width: auto;
           object-fit: contain;
           mix-blend-mode: multiply;
+          flex-shrink: 0;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .brand-text-group {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          flex-grow: 1;
+          min-width: 0; /* Prevents text overflow */
+          transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+
+        .logo-wordmark {
+          height: 20px; /* Wordmark size matching layout */
+          width: auto;
+          object-fit: contain;
+          mix-blend-mode: multiply;
+          align-self: flex-start;
         }
 
         .sub-logo {
           font-family: 'Outfit', 'Inter', sans-serif;
-          font-size: 9.5px; /* Smaller, elegant print/editorial size */
-          font-weight: 700;
-          color: var(--text-muted); /* Softer warm gray-brown for luxury editorial contrast */
-          letter-spacing: 0.14em; /* Expanded letter spacing for premium look */
-          padding-left: 4px; /* Slight indent to align exactly with the visual start of logo text */
+          font-size: 8.2px; /* Refined typography size to fit under wordmark */
+          font-weight: 800;
+          color: var(--color-primary-dark); /* Bold brown matching user's design guide preference */
+          letter-spacing: 0.04em;
           text-transform: uppercase;
+          white-space: nowrap;
           display: block;
         }
 
@@ -316,6 +383,131 @@ export const Sidebar: React.FC = () => {
         .role-select-input option {
           background-color: var(--bg-card);
           color: var(--text-main);
+        }
+
+        /* Toggle Button */
+        .collapse-toggle-btn {
+          position: absolute;
+          top: 35px;
+          right: -14px;
+          width: 28px;
+          height: 28px;
+          border-radius: 50%;
+          background: var(--bg-card);
+          border: 1px solid var(--border-color);
+          color: var(--text-muted);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          box-shadow: 0 2px 8px rgba(43, 31, 29, 0.08);
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+          z-index: 110;
+          outline: none;
+          padding: 0;
+        }
+
+        .collapse-toggle-btn:hover {
+          color: var(--color-primary);
+          border-color: var(--color-primary);
+          background: var(--bg-base);
+          transform: translateY(0) scale(1.1);
+        }
+
+        .collapse-toggle-btn:active {
+          transform: scale(0.95);
+        }
+
+        /* Collapsed Styles */
+        .collapsed .brand-header {
+          padding: 24px 0 22px 0;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .collapsed .logo-icon {
+          height: 32px; /* Slightly smaller centered icon in collapsed sidebar */
+          margin: 0 auto;
+        }
+
+        .collapsed .brand-text-group {
+          display: none;
+        }
+
+        .nav-menu {
+          transition: padding 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .collapsed .nav-menu {
+          padding: 20px 8px;
+        }
+
+        .collapsed :global(.nav-item) {
+          justify-content: center;
+          padding: 10px 0;
+          gap: 0;
+          position: relative;
+        }
+
+        .collapsed :global(.nav-item span.nav-label) {
+          display: none;
+        }
+
+        /* Tooltip styling */
+        :global(.collapsed-tooltip) {
+          position: absolute;
+          left: 100%;
+          margin-left: 12px;
+          padding: 6px 12px;
+          background: var(--text-main);
+          color: #ffffff;
+          font-family: var(--font-body);
+          font-size: 12px;
+          font-weight: 500;
+          border-radius: 6px;
+          white-space: nowrap;
+          opacity: 0;
+          pointer-events: none;
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+          transform: translateX(-8px);
+          box-shadow: 0 4px 12px rgba(43, 31, 29, 0.15);
+          z-index: 200;
+        }
+
+        :global(.collapsed-tooltip::before) {
+          content: '';
+          position: absolute;
+          right: 100%;
+          top: 50%;
+          transform: translateY(-50%);
+          border-width: 5px;
+          border-style: solid;
+          border-color: transparent var(--text-main) transparent transparent;
+        }
+
+        :global(.nav-item:hover .collapsed-tooltip) {
+          opacity: 1;
+          transform: translateX(0);
+        }
+
+        .collapsed .sidebar-footer {
+          padding: 20px 0;
+          align-items: center;
+        }
+
+        .collapsed .user-info {
+          justify-content: center;
+          width: 100%;
+        }
+
+        .collapsed .user-details {
+          display: none;
+        }
+
+        .collapsed .role-switcher {
+          display: none;
         }
       `}</style>
     </div>
