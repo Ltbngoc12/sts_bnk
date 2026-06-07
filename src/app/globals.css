@@ -1,35 +1,41 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap');
 
 :root {
-  /* Colors - Enterprise Light Theme */
-  --bg-base: #f8fafc; /* Slate 50 - Clean off-white background */
-  --bg-card: #ffffff; /* Pure white card background */
-  --bg-sidebar: #0f172a; /* Slate 900 - Dark navy sidebar for executive look */
-  --bg-header: #ffffff; /* White header background */
+  /* Colors - Sentosa Warm Resort-Luxury Theme */
+  --bg-base: #f4f1ea; /* Warm sand/cream background */
+  --bg-card: #fbfbfa; /* Off-white warm card background */
+  --bg-sidebar: #f4f1ea; /* Matches base background for seamless editorial layout */
+  --bg-header: #fbfbfa; /* Warm header background */
   
-  --color-primary: #0284c7; /* Sky 600 - Professional corporate blue */
-  --color-primary-hover: #0369a1; /* Sky 700 */
-  --color-primary-glow: rgba(2, 132, 199, 0.06);
+  --color-primary: #ff8200; /* Radiant Sentosa Orange - Energy and light */
+  --color-primary-hover: #e07200;
+  --color-primary-glow: rgba(255, 130, 0, 0.08);
+  --color-primary-dark: #6d3500; /* Chestnut/Chocolate Brown - Grounding dark warm brown */
   
-  --color-accent: #10b981; /* Emerald 500 - Professional success green */
-  --color-accent-glow: rgba(16, 185, 129, 0.06);
+  --color-secondary: #008c95; /* Ocean Teal - Waves, foliage, and nature */
+  --color-secondary-hover: #00767e;
+  --color-secondary-glow: rgba(0, 140, 149, 0.08);
   
-  --color-warning: #f59e0b; /* Amber 500 - Professional alert warning */
-  --color-warning-glow: rgba(245, 158, 11, 0.06);
+  --color-accent: #ff8200; /* Primary accent is our bright brand orange */
+  --color-accent-glow: rgba(255, 130, 0, 0.08);
   
-  --color-danger: #ef4444; /* Red 500 - Professional danger/urgent red */
-  --color-danger-glow: rgba(239, 68, 68, 0.06);
+  --color-warning: #ea580c; /* Warm amber/dark orange for alerts */
+  --color-warning-glow: rgba(234, 88, 12, 0.08);
   
-  --text-main: #1e293b; /* Slate 800 - Main dark text */
-  --text-muted: #64748b; /* Slate 500 - Secondary text */
-  --border-color: #e2e8f0; /* Slate 200 - Clean crisp border */
-  --border-glow: rgba(2, 132, 199, 0.15);
+  --color-danger: #b72025; /* Crimson/terracotta warm red for urgent items */
+  --color-danger-glow: rgba(183, 32, 37, 0.08);
+  
+  --text-main: #2b1f1d; /* Deep warm espresso/dark brown for readable premium text */
+  --text-muted: #7c6e65; /* Warm slate/taupe-gray for secondary text */
+  --border-color: #e6dfd5; /* Warm beige crisp border */
+  --border-color-hover: #cbd2c5;
+  --border-glow: rgba(255, 130, 0, 0.15);
   
   /* Layout sizes */
   --sidebar-width: 280px;
   
   /* Font Family */
-  --font-title: 'Outfit', 'Inter', sans-serif;
+  --font-title: 'Playfair Display', 'Outfit', 'Inter', serif;
   --font-body: 'Inter', sans-serif;
 }
 
@@ -50,18 +56,18 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Enterprise Card System - Soft clean shadows instead of neon glows */
+/* Enterprise Card System - Warm Resort-Luxury Glassmorphic shadows */
 .glass {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
-  border-radius: 10px;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px -2px rgba(43, 31, 29, 0.03), 0 2px 6px -1px rgba(43, 31, 29, 0.02);
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .glass:hover {
-  border-color: #cbd5e1; /* Slate 300 on hover */
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  border-color: var(--border-color-hover);
+  box-shadow: 0 10px 25px -5px rgba(43, 31, 29, 0.05), 0 8px 12px -6px rgba(43, 31, 29, 0.03);
 }
 
 /* Grid & Dashboard layout */
@@ -80,7 +86,7 @@ body {
   min-width: 0; /* Prevents flex overflow */
 }
 
-/* Metric Counter Cards - Sleek clean side borders */
+/* Metric Counter Cards - Sleek clean side borders matching design palette */
 .metrics-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -109,21 +115,21 @@ body {
 
 .metric-card.unclosed-incidents::after { background: var(--color-danger); }
 .metric-card.unclosed-faults::after { background: var(--color-warning); }
-.metric-card.active-tasks::after { background: var(--color-accent); }
+.metric-card.active-tasks::after { background: var(--color-secondary); }
 
 .metric-info h3 {
-  font-family: var(--font-title);
-  font-size: 12px;
-  font-weight: 600;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 700;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
   margin-bottom: 6px;
 }
 
 .metric-value {
   font-family: var(--font-title);
-  font-size: 30px;
+  font-size: 32px;
   font-weight: 700;
   color: var(--text-main);
 }
@@ -132,56 +138,68 @@ body {
   width: 44px;
   height: 44px;
   border-radius: 8px;
-  background: #f1f5f9;
+  background: var(--bg-base);
   display: flex;
   align-items: center;
   justify-content: center;
   border: 1px solid var(--border-color);
+  color: var(--text-muted);
 }
 
 /* Headings */
 h1, h2, h3, h4 {
   font-family: var(--font-title);
   color: var(--text-main);
-  font-weight: 600;
+  font-weight: 700;
 }
 
-/* Buttons - Solid contrast colors */
+/* Buttons - Solid contrast colors matching style board */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 9px 16px;
-  font-family: var(--font-title);
+  padding: 10px 18px;
+  font-family: var(--font-body);
   font-size: 13px;
   font-weight: 600;
   border-radius: 6px;
   border: 1px solid transparent;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   color: #ffffff;
 }
 
 .btn-primary {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
+  background: var(--color-primary-dark);
+  border-color: var(--color-primary-dark);
 }
 .btn-primary:hover {
+  background: #532900;
+  border-color: #532900;
+  transform: translateY(-1px);
+}
+
+.btn-brand, .btn-orange {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #ffffff;
+}
+.btn-brand:hover, .btn-orange:hover {
   background: var(--color-primary-hover);
   border-color: var(--color-primary-hover);
   transform: translateY(-1px);
 }
 
 .btn-secondary {
-  background: #ffffff;
-  border-color: #cbd5e1;
-  color: #334155;
+  background: var(--bg-card);
+  border-color: var(--border-color);
+  color: var(--text-main);
 }
 .btn-secondary:hover {
-  background: #f8fafc;
-  border-color: #94a3b8;
-  color: #0f172a;
+  background: var(--bg-base);
+  border-color: var(--border-color-hover);
+  color: var(--text-main);
 }
 
 .btn-danger {
@@ -189,17 +207,19 @@ h1, h2, h3, h4 {
   border-color: var(--color-danger);
 }
 .btn-danger:hover {
-  background: #dc2626;
-  border-color: #dc2626;
+  background: #96191d;
+  border-color: #96191d;
+  transform: translateY(-1px);
 }
 
 .btn-success {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
+  background: var(--color-secondary);
+  border-color: var(--color-secondary);
 }
 .btn-success:hover {
-  background: #059669;
-  border-color: #059669;
+  background: var(--color-secondary-hover);
+  border-color: var(--color-secondary-hover);
+  transform: translateY(-1px);
 }
 
 .btn:disabled {
@@ -208,25 +228,25 @@ h1, h2, h3, h4 {
   transform: none !important;
 }
 
-/* Status Badges - Soft pill themes */
+/* Status Badges - Warm Resort themes */
 .badge {
   display: inline-flex;
   align-items: center;
-  padding: 3px 9px;
+  padding: 3px 10px;
   border-radius: 9999px;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.05em;
   border: 1px solid transparent;
 }
 
-.badge-live { background: #fee2e2; color: #b91c1c; border-color: #fca5a5; }
-.badge-ack { background: #fef3c7; color: #b45309; border-color: #fcd34d; }
-.badge-onsite { background: #e0f2fe; color: #0369a1; border-color: #bae6fd; }
-.badge-completed { background: #d1fae5; color: #047857; border-color: #a7f3d0; }
-.badge-closed { background: #f1f5f9; color: #475569; border-color: #cbd5e1; }
-.badge-review { background: #f3e8ff; color: #6b21a8; border-color: #e9d5ff; }
+.badge-live { background: var(--color-danger-glow); color: var(--color-danger); border-color: rgba(183, 32, 37, 0.2); }
+.badge-ack { background: var(--color-warning-glow); color: var(--color-warning); border-color: rgba(234, 88, 12, 0.2); }
+.badge-onsite { background: var(--color-secondary-glow); color: var(--color-secondary); border-color: rgba(0, 140, 149, 0.2); }
+.badge-completed { background: rgba(0, 140, 149, 0.05); color: var(--color-secondary); border-color: rgba(0, 140, 149, 0.15); }
+.badge-closed { background: var(--bg-base); color: var(--text-muted); border-color: var(--border-color); }
+.badge-review { background: rgba(74, 20, 140, 0.06); color: var(--color-tertiary); border-color: rgba(74, 20, 140, 0.15); }
 
 /* Form Elements */
 .form-group {
@@ -238,29 +258,29 @@ h1, h2, h3, h4 {
 
 .form-group label {
   font-size: 12px;
-  font-weight: 600;
-  color: #475569;
+  font-weight: 700;
+  color: var(--text-muted);
 }
 
 .form-control {
-  background: #ffffff;
-  border: 1px solid #cbd5e1;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
   border-radius: 6px;
-  padding: 9px 12px;
+  padding: 10px 14px;
   color: var(--text-main);
   font-family: var(--font-body);
   font-size: 14px;
   outline: none;
-  transition: all 0.15s ease;
+  transition: all 0.2s ease;
 }
 
 .form-control:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
+  box-shadow: 0 0 0 3px var(--color-primary-glow);
 }
 
 .form-control::placeholder {
-  color: #94a3b8;
+  color: #aba096;
 }
 
 /* Custom Tables */
@@ -277,17 +297,18 @@ h1, h2, h3, h4 {
 }
 
 .custom-table th {
-  background: #f1f5f9; /* Slate 100 header */
+  background: #ede9e0; /* Warm sand/cream table header */
   padding: 14px 16px;
-  font-family: var(--font-title);
-  color: #475569;
-  font-weight: 600;
-  border-bottom: 1px solid #e2e8f0;
+  font-family: var(--font-body);
+  color: var(--text-muted);
+  font-weight: 700;
+  border-bottom: 1px solid var(--border-color);
+  letter-spacing: 0.03em;
 }
 
 .custom-table td {
   padding: 14px 16px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--border-color);
   color: var(--text-main);
 }
 
@@ -300,7 +321,7 @@ h1, h2, h3, h4 {
 }
 
 .custom-table tbody tr:hover {
-  background-color: #f8fafc;
+  background-color: var(--bg-base);
   cursor: pointer;
 }
 
@@ -335,8 +356,8 @@ h1, h2, h3, h4 {
   height: 12px;
   border-radius: 50%;
   background: var(--color-primary);
-  border: 2px solid #ffffff;
-  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2);
+  border: 2px solid var(--bg-card);
+  box-shadow: 0 0 0 2px var(--color-primary-glow);
 }
 
 .timeline-header {
@@ -345,52 +366,52 @@ h1, h2, h3, h4 {
   font-size: 11px;
   color: var(--text-muted);
   margin-bottom: 4px;
-  font-family: var(--font-title);
-  font-weight: 600;
+  font-family: var(--font-body);
+  font-weight: 700;
 }
 
 .timeline-desc {
   font-size: 13px;
   color: var(--text-main);
-  background: #f8fafc;
+  background: var(--bg-base);
   border: 1px solid var(--border-color);
   padding: 10px 14px;
   border-radius: 6px;
 }
 
-/* Leaflet map styling overrides - Light Theme Map layout */
+/* Leaflet map styling overrides - Warm Theme Map layout */
 .leaflet-container {
   border-radius: 8px;
-  background-color: #f1f5f9 !important;
+  background-color: var(--bg-base) !important;
   border: 1px solid var(--border-color) !important;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
+  box-shadow: 0 1px 3px rgba(43, 31, 29, 0.05) !important;
 }
 
 .leaflet-bar {
-  border: 1px solid #cbd5e1 !important;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
+  border: 1px solid var(--border-color) !important;
+  box-shadow: 0 1px 3px rgba(43, 31, 29, 0.05) !important;
 }
 
 .leaflet-bar a {
-  background-color: #ffffff !important;
-  color: #334155 !important;
-  border-bottom: 1px solid #e2e8f0 !important;
+  background-color: var(--bg-card) !important;
+  color: var(--text-main) !important;
+  border-bottom: 1px solid var(--border-color) !important;
 }
 
 .leaflet-bar a:hover {
-  background-color: #f8fafc !important;
+  background-color: var(--bg-base) !important;
 }
 
 .leaflet-popup-content-wrapper {
-  background: #ffffff !important;
-  color: #1e293b !important;
-  border: 1px solid #cbd5e1 !important;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+  background: var(--bg-card) !important;
+  color: var(--text-main) !important;
+  border: 1px solid var(--border-color) !important;
+  box-shadow: 0 10px 25px -5px rgba(43, 31, 29, 0.08) !important;
 }
 
 .leaflet-popup-tip {
-  background: #ffffff !important;
-  border: 1px solid #cbd5e1 !important;
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border-color) !important;
 }
 
 /* Custom Scrollbar */
@@ -404,10 +425,10 @@ h1, h2, h3, h4 {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: var(--border-color);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: var(--text-muted);
 }

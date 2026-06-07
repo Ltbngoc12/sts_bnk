@@ -78,16 +78,16 @@ const MapComponent: React.FC<MapComponentProps> = ({ cases }) => {
         const { lat, lng, commonName } = c.incident.location;
         if (!lat || !lng) return;
 
-        // Color based on priority or type
-        let color = '#0284c7'; // Primary corporate blue
+        // Color based on priority or type matching the Resort-Luxury style
+        let color = '#008c95'; // Ocean Teal for standard incidents
         if (c.incident.priority === 'High') {
-          color = '#ef4444'; // Corporate danger red
+          color = '#ff8200'; // Radiant Orange for high-priority incidents
         }
         
         // If it's a fault linkage or a fault case, change color
         const isFault = c.cmmsTickets.length > 0;
         if (isFault) {
-          color = '#f59e0b'; // Corporate warning amber
+          color = '#6d3500'; // Chestnut Brown for infrastructure faults
         }
 
         const marker = leafletLib.marker([lat, lng], {
@@ -95,26 +95,26 @@ const MapComponent: React.FC<MapComponentProps> = ({ cases }) => {
         });
 
         const popupContent = `
-          <div style="font-family: var(--font-title); padding: 5px;">
-            <div style="font-weight: 700; font-size: 14px; margin-bottom: 5px; color: #1e293b;">${c.title}</div>
-            <div style="font-size: 11px; color: #64748b; margin-bottom: 8px;">Case ID: ${c.id}</div>
+          <div style="font-family: var(--font-body); padding: 5px;">
+            <div style="font-family: var(--font-title); font-weight: 700; font-size: 15px; margin-bottom: 5px; color: var(--text-main);">${c.title}</div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px;">Case ID: ${c.id}</div>
             <div style="display: flex; gap: 5px; margin-bottom: 8px;">
-              <span class="badge" style="font-size: 9px; padding: 2px 6px; background: rgba(2,132,199,0.08); color: #0284c7; border-radius: 4px; border: 1px solid rgba(2,132,199,0.15); font-weight: 600;">
+              <span class="badge" style="font-size: 9px; padding: 2px 6px; background: rgba(0,140,149,0.08); color: #008c95; border-radius: 4px; border: 1px solid rgba(0,140,149,0.15); font-weight: 700;">
                 ${c.incident.type}
               </span>
-              <span class="badge" style="font-size: 9px; padding: 2px 6px; background: rgba(239,68,68,0.08); color: #ef4444; border-radius: 4px; border: 1px solid rgba(239,68,68,0.15); font-weight: 600;">
+              <span class="badge" style="font-size: 9px; padding: 2px 6px; background: ${c.incident.priority === 'High' ? 'rgba(255,130,0,0.08)' : 'rgba(0,140,149,0.08)'}; color: ${c.incident.priority === 'High' ? '#ff8200' : '#008c95'}; border-radius: 4px; border: 1px solid ${c.incident.priority === 'High' ? 'rgba(255,130,0,0.15)' : 'rgba(0,140,149,0.15)'}; font-weight: 700;">
                 ${c.incident.priority}
               </span>
             </div>
-            <div style="font-size: 12px; color: #475569; margin-bottom: 10px;">
+            <div style="font-size: 12px; color: var(--text-main); margin-bottom: 10px;">
               <strong>Location:</strong> ${commonName || c.incident.location.road}
             </div>
             <a href="/cases/${c.id}" style="
               display: block; 
               text-align: center; 
-              background: #0284c7; 
+              background: var(--color-primary-dark); 
               color: #ffffff; 
-              padding: 6px 12px; 
+              padding: 8px 12px; 
               border-radius: 6px; 
               text-decoration: none; 
               font-weight: 600; 
@@ -206,9 +206,9 @@ const MapComponent: React.FC<MapComponentProps> = ({ cases }) => {
           border-radius: 50%;
         }
 
-        .dot-danger { background: var(--color-danger); box-shadow: 0 0 6px var(--color-danger); }
-        .dot-info { background: var(--color-primary); box-shadow: 0 0 6px var(--color-primary); }
-        .dot-warning { background: var(--color-warning); box-shadow: 0 0 6px var(--color-warning); }
+        .dot-danger { background: var(--color-primary); box-shadow: 0 0 6px var(--color-primary); } /* High Priority is now Orange */
+        .dot-info { background: var(--color-secondary); box-shadow: 0 0 6px var(--color-secondary); } /* Standard is now Teal */
+        .dot-warning { background: var(--color-primary-dark); box-shadow: 0 0 6px var(--color-primary-dark); } /* Fault is now Chestnut Brown */
       `}</style>
     </div>
   );

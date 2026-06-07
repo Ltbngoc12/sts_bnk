@@ -363,10 +363,10 @@ export default function CaseLogPage() {
           border: 1px solid transparent;
         }
 
-        .pill-danger { background: #fee2e2; color: #b91c1c; border-color: #fca5a5; }
-        .pill-accent { background: #d1fae5; color: #047857; border-color: #a7f3d0; }
-        .pill-warning { background: #fef3c7; color: #b45309; border-color: #fcd34d; }
-        .pill-muted { background: #f1f5f9; color: #475569; border-color: #cbd5e1; }
+        .pill-danger { background: var(--color-danger-glow); color: var(--color-danger); border-color: rgba(183, 32, 37, 0.15); }
+        .pill-accent { background: var(--color-secondary-glow); color: var(--color-secondary); border-color: rgba(0, 140, 149, 0.15); }
+        .pill-warning { background: var(--color-warning-glow); color: var(--color-warning); border-color: rgba(234, 88, 12, 0.15); }
+        .pill-muted { background: var(--bg-base); color: var(--text-muted); border-color: var(--border-color); }
 
         .ticket-references {
           display: flex;
@@ -378,7 +378,7 @@ export default function CaseLogPage() {
           font-size: 11px;
           color: var(--color-primary);
           font-family: var(--font-title);
-          font-weight: 600;
+          font-weight: 700;
         }
 
         /* Modal specific layouts */
@@ -388,7 +388,7 @@ export default function CaseLogPage() {
           left: 0;
           width: 100vw;
           height: 100vh;
-          background: rgba(0, 0, 0, 0.4);
+          background: rgba(43, 31, 29, 0.3);
           backdrop-filter: blur(4px);
           display: flex;
           justify-content: center;
@@ -403,9 +403,9 @@ export default function CaseLogPage() {
           flex-direction: column;
           border-radius: 12px;
           overflow: hidden;
-          background: #ffffff;
-          border: 1px solid #cbd5e1;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+          background: var(--bg-card);
+          border: 1px solid var(--border-color);
+          box-shadow: 0 10px 25px -5px rgba(43, 31, 29, 0.1), 0 8px 12px -6px rgba(43, 31, 29, 0.05);
         }
 
         .modal-header {
@@ -448,7 +448,7 @@ export default function CaseLogPage() {
           display: flex;
           justify-content: flex-end;
           gap: 12px;
-          background: #f8fafc;
+          background: var(--bg-base);
         }
       `}</style>
     </>

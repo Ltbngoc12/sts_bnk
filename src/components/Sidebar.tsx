@@ -96,10 +96,7 @@ export const Sidebar: React.FC = () => {
       {/* Brand Header */}
       <div className="brand-header">
         <div className="brand-logo">
-          <svg className="logo-svg" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-          </svg>
-          <span>SENTOSA ISS</span>
+          <img src="/logo.png" alt="Sentosa Logo" className="logo-img" />
         </div>
         <div className="sub-logo">CASE MANAGEMENT SYSTEM</div>
       </div>
@@ -152,7 +149,7 @@ export const Sidebar: React.FC = () => {
         .sidebar-container {
           width: var(--sidebar-width);
           height: 100vh;
-          background: #ffffff;
+          background: var(--bg-sidebar);
           border-right: 1px solid var(--border-color);
           position: fixed;
           left: 0;
@@ -163,35 +160,34 @@ export const Sidebar: React.FC = () => {
         }
 
         .brand-header {
-          padding: 24px;
+          padding: 30px 24px 22px 24px; /* More top padding for breathing room */
           border-bottom: 1px solid var(--border-color);
         }
 
         .brand-logo {
           display: flex;
           align-items: center;
-          gap: 10px;
-          font-family: var(--font-title);
-          font-size: 17px;
-          font-weight: 800;
-          color: var(--text-main);
-          letter-spacing: 0.05em;
+          gap: 8px;
+          font-family: var(--font-body);
+          margin-bottom: 10px; /* Generous gap between logo and subtitle */
         }
 
-        .logo-svg {
-          width: 24px;
-          height: 24px;
-          color: var(--color-primary);
+        .logo-img {
+          height: 38px; /* Refined size for a more sophisticated look */
+          width: auto;
+          object-fit: contain;
+          mix-blend-mode: multiply;
         }
 
         .sub-logo {
-          font-family: var(--font-title);
-          font-size: 10px;
-          font-weight: 600;
-          color: var(--text-muted);
-          letter-spacing: 0.12em;
-          margin-top: 4px;
-          padding-left: 34px;
+          font-family: 'Outfit', 'Inter', sans-serif;
+          font-size: 9.5px; /* Smaller, elegant print/editorial size */
+          font-weight: 700;
+          color: var(--text-muted); /* Softer warm gray-brown for luxury editorial contrast */
+          letter-spacing: 0.14em; /* Expanded letter spacing for premium look */
+          padding-left: 4px; /* Slight indent to align exactly with the visual start of logo text */
+          text-transform: uppercase;
+          display: block;
         }
 
         .nav-menu {
@@ -208,7 +204,7 @@ export const Sidebar: React.FC = () => {
           align-items: center;
           gap: 12px;
           padding: 10px 14px;
-          color: #475569 !important; /* Slate 600 default */
+          color: var(--text-muted) !important;
           text-decoration: none !important;
           font-size: 13.5px;
           font-weight: 600;
@@ -232,21 +228,21 @@ export const Sidebar: React.FC = () => {
 
         :global(.nav-item:hover) {
           color: var(--text-main) !important;
-          background: #f1f5f9;
+          background: rgba(43, 31, 29, 0.04);
           text-decoration: none !important;
         }
 
         :global(.nav-item.active) {
           color: var(--color-primary) !important;
           background: var(--color-primary-glow) !important;
-          border-color: rgba(2, 132, 199, 0.15) !important;
+          border-color: rgba(255, 130, 0, 0.12) !important;
           text-decoration: none !important;
         }
 
         .sidebar-footer {
           padding: 20px;
           border-top: 1px solid var(--border-color);
-          background: #f8fafc;
+          background: rgba(43, 31, 29, 0.01);
           display: flex;
           flex-direction: column;
           gap: 16px;
@@ -263,13 +259,13 @@ export const Sidebar: React.FC = () => {
           height: 36px;
           border-radius: 50%;
           background: var(--color-primary-glow);
-          border: 1px solid rgba(2, 132, 199, 0.2);
+          border: 1px solid rgba(255, 130, 0, 0.2);
           display: flex;
           align-items: center;
           justify-content: center;
           color: var(--color-primary);
           font-weight: 700;
-          font-family: var(--font-title);
+          font-family: var(--font-body);
           font-size: 13px;
         }
 
@@ -293,14 +289,14 @@ export const Sidebar: React.FC = () => {
 
         .role-switcher label {
           font-size: 11px;
-          font-weight: 600;
+          font-weight: 700;
           color: var(--text-muted);
           text-transform: uppercase;
         }
 
         .role-select-input {
-          background: #ffffff;
-          border: 1px solid #cbd5e1;
+          background: var(--bg-card);
+          border: 1px solid var(--border-color);
           border-radius: 6px;
           padding: 7px 10px;
           color: var(--text-main);
@@ -314,11 +310,11 @@ export const Sidebar: React.FC = () => {
 
         .role-select-input:focus {
           border-color: var(--color-primary);
-          box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.1);
+          box-shadow: 0 0 0 3px var(--color-primary-glow);
         }
         
         .role-select-input option {
-          background-color: #ffffff;
+          background-color: var(--bg-card);
           color: var(--text-main);
         }
       `}</style>

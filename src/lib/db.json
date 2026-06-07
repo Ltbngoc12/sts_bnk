@@ -338,7 +338,7 @@
           "hospitalConveyedTo": ""
         },
         "mediaInvolvement": {
-          "mediaAtScene": false,
+          "mediaAtScene": true,
           "mediaName": "",
           "commsNotified": false
         },

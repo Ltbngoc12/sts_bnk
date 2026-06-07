@@ -6,6 +6,9 @@ import { Sidebar } from "@/components/Sidebar";
 export const metadata: Metadata = {
   title: "Sentosa ISS Case Management System",
   description: "Functional Case Management System (CMS) for Sentosa Development Corporation (SDC)",
+  icons: {
+    icon: "/icon.png",
+  },
 };
 
 export default function RootLayout({
