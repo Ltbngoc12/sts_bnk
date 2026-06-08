@@ -1,7 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 
-// Define types for Case, Incident, Task, Occurrence
+// Core entities matching the normalized database structure
+
 export interface Location {
   road: string;
   building: string;
@@ -19,6 +20,7 @@ export interface LogEntry {
   date: string;
   time: string;
   description: string;
+  recordedBy?: string;
 }
 
 export interface EmergencyServices {
@@ -27,7 +29,7 @@ export interface EmergencyServices {
   policeIncidentNo: string;
   classification: string;
   respondingUnit: string;
-  ambulanceScdfType: string;
+  ambulanceScdfType: string; // "Ambulance" | "SCDF" | "None" | ""
   ambulanceOfficerName: string;
   ambulanceCallSign: string;
   ambulanceRespondingUnit: string;
@@ -65,14 +67,15 @@ export interface PersonalInjury {
   contactNumber: string;
   clinicHospitalAttended: string;
   msigFormIssued: boolean;
+  msigSerialNo?: string;
   under16: boolean;
   parentGuardianName?: string;
   parentGuardianContact?: string;
 }
 
 export interface PersonInvolved {
-  guestOrNonGuest: string;
-  type: string;
+  guestOrNonGuest: string; // "Guest" | "Non-Guest"
+  type: string; // "Guest" | "Staff" | "Island Partner" | "Contractor" | "Resident" | "Others"
   name: string;
   address: string;
   age: number;
@@ -91,7 +94,7 @@ export interface CCTVBWC {
 }
 
 export interface SlaveIncident {
-  id: string;
+  id: string; // SEN/IR/YYYYMMDD/NNNN
   title: string;
   dateTime: string;
   reporterName: string;
@@ -100,17 +103,19 @@ export interface SlaveIncident {
 }
 
 export interface Incident {
+  id: string; // SEN/IR/YYYYMMDD/NNNN
   caseId: string;
   title: string;
   dateTime: string;
   type: string;
   subType: string;
-  priority: string;
+  priority: string; // "Normal" | "High"
+  crisisLevel: number; // 1 to 5 (default 4)
   reporterName: string;
   requestedBy: string;
   createdBy: string;
-  status: string; // Live, Live (Acknowledged), Live (On-Site), Live (Returned), Live (Completed), Pending Review, Returned, Closed
-  assignedTo: string;
+  status: string; // Live, Live Acknowledged, Live On-Site, Live Completed, Pending Review, Returned, Closed
+  assignedTo: string; // "Ranger John", etc. (or comma-separated list of Responders)
   location: Location;
   log: LogEntry[];
   emergencyServices: EmergencyServices;
@@ -122,17 +127,55 @@ export interface Incident {
   cctvBwc: CCTVBWC[];
   summary: string;
   completionRemarks: string;
-  slaveIncidents?: SlaveIncident[];
+  slaveIncidents: SlaveIncident[];
+  isDuplicate?: boolean;
+  masterIncidentId?: string;
+  version?: number;
+  // Lifecycle timestamps set by action-oriented API handlers
+  acknowledgedAt?: string;
+  onSiteAt?: string;
+  completedAt?: string;
+  closedAt?: string;
+  closureRemarks?: string;
 }
 
-export interface Case {
-  id: string; // YYYY/MM/NNNN
-  title: string;
-  status: string; // Pending Triage, Active, Closed
+export interface Fault {
+  id: string; // SEN/FR/YYYYMMDD/NNN
+  caseId: string;
+  faultType: string;
+  faultSubType: string;
+  location: Location;
+  description: string;
+  attachments: string[];
+  status: string; // "Created" | "Submitted" | "In Progress" | "Pending Vendor" | "Resolved" | "Closed"
+  cmmsTicketId?: string;
+  createdBy: string;
   createdAt: string;
-  closedAt: string | null;
-  cmmsTickets: string[];
-  incident: Incident | null;
+  submittedAt?: string;
+  resolvedAt?: string;
+  closedBy?: string;
+  closedAt?: string;
+}
+
+export interface TaskChecklistItem {
+  id: string;
+  text: string;
+  isCompleted: boolean;
+}
+
+export interface TaskComment {
+  id: string;
+  user: string;
+  timestamp: string;
+  text: string;
+}
+
+export interface TaskAudit {
+  id: string;
+  timestamp: string;
+  operator: string;
+  action: string;
+  details: string;
 }
 
 export interface Task {
@@ -140,75 +183,401 @@ export interface Task {
   caseId: string;
   title: string;
   description: string;
-  assignee: string;
-  priority: string;
+  assignee: string; // User or Group
+  priority: string; // "Normal" | "High"
   dueDate: string;
-  status: string; // Created, Re-Assigned, Acknowledged, In Progress, Pending, Closed
+  status: string; // Created, Assigned, Acknowledged, In Progress, Pending Further Action, Closed
+  closeReason?: string;
+  checklist?: TaskChecklistItem[];
+  comments?: TaskComment[];
+  audits?: TaskAudit[];
+  recurrenceSchedule?: string;
+  attachments: string[];
   createdBy: string;
   createdDate: string;
-  attachments: string[];
 }
 
 export interface Occurrence {
-  id: string; // OCC-YYYY-NNNN
+  id: string; // OCC-YYYY-NNNN or SEN/ED/YYYYMMDD/NNN
+  caseId: string; // Linkage to Case
   user: string;
   dateTime: string;
   topic: string;
   content: string;
+  attachments?: string[];
+  amendments?: { timestamp: string; amendedBy: string; originalText: string }[];
 }
 
+export interface EventRecord {
+  id: string; // EVT-YYYY-NNNN
+  name: string;
+  startDateTime: string;
+  endDateTime: string;
+  location: string;
+  boundaryCoordinates?: { lat: number; lng: number }[];
+  type: string;
+  description: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface NOPRecord {
+  id: string; // NOP-YYYY-NNNN
+  applicantName: string;
+  companyName: string;
+  workDescription: string;
+  startDateTime: string;
+  endDateTime: string;
+  status: string; // Draft, Pending Review, Approved, Active, Expired, Closed
+  boundaryCoordinates: { lat: number; lng: number }[];
+  documents: { name: string; type: string; fileUrl: string }[];
+}
+
+export interface BroadcastRecord {
+  id: string; // [Case ID]-BC[3-digit sequence]
+  caseId: string;
+  incidentId: string;
+  type: string; // "Closure" | "End-of-Day"
+  recipients: string[];
+  templateUsed: string;
+  contentDispatched: string;
+  sentAt: string;
+  sentBy: string;
+  status: string; // "SENT" | "FAILED"
+  deliveryAttempts: number;
+  lastErrorMessage?: string;
+}
+
+export interface AuditLog {
+  id: string;
+  timestamp: string;
+  user: string;
+  action: string;
+  module: string;
+  details: string;
+  beforeSnapshot?: string; // JSON snapshot
+  afterSnapshot?: string; // JSON snapshot
+  correlationId: string;
+  ipAddress?: string;
+}
+
+// Hydrated Case interface used by Next.js endpoints
+export interface Case {
+  id: string; // SEN/CI/YYYYMMDD/NNN
+  title: string;
+  status: string; // Pending Triage, Active, No Action Required, Closed
+  createdAt: string;
+  createdBy: string;
+  closedAt: string | null;
+  closedBy: string | null;
+  cmmsTickets: string[]; // Dynamically joined from faults table
+  incident: Incident | null; // Dynamically joined from incidents table
+}
+
+// The database schema physically stored on disk (db.json)
+export interface NormalizedDbSchema {
+  cases: Omit<Case, 'cmmsTickets' | 'incident'>[];
+  incidents: Incident[];
+  faults: Fault[];
+  tasks: Task[];
+  occurrences: Occurrence[];
+  events: EventRecord[];
+  nops: NOPRecord[];
+  broadcasts: BroadcastRecord[];
+  auditLogs: AuditLog[];
+}
+
+// The hydrated schema used by the application
 export interface DbSchema {
   cases: Case[];
   tasks: Task[];
   occurrences: Occurrence[];
+  faults?: Fault[]; // Optional, added for module compatibility
+  events?: EventRecord[];
+  nops?: NOPRecord[];
+  broadcasts?: BroadcastRecord[];
+  auditLogs?: AuditLog[];
 }
 
 const DB_PATH = path.join(process.cwd(), 'src', 'lib', 'db.json');
 
-// Helper to check if file exists and read it
+// Helper to check if file exists, read, and run migration/hydration on-the-fly
 export function getDb(): DbSchema {
   try {
     if (!fs.existsSync(DB_PATH)) {
-      // Return empty database schema if file not found
       return { cases: [], tasks: [], occurrences: [] };
     }
     const raw = fs.readFileSync(DB_PATH, 'utf-8');
-    return JSON.parse(raw) as DbSchema;
+    const parsed = JSON.parse(raw);
+
+    // MIGRATION BLOCK: If read JSON has old nested/flat layout, migrate to fully normalized storage
+    let normalizedDb: NormalizedDbSchema;
+    
+    if (parsed.cases && parsed.cases.length > 0 && ('incident' in parsed.cases[0] || 'cmmsTickets' in parsed.cases[0])) {
+      console.log('Migrating legacy nested db.json to normalized relational schema...');
+      normalizedDb = {
+        cases: [],
+        incidents: [],
+        faults: [],
+        tasks: parsed.tasks || [],
+        occurrences: [],
+        events: parsed.events || [],
+        nops: parsed.nops || [],
+        broadcasts: parsed.broadcasts || [],
+        auditLogs: parsed.auditLogs || []
+      };
+
+      // Extract incidents and faults from legacy cases
+      for (const c of parsed.cases) {
+        const { incident, cmmsTickets, ...caseMeta } = c;
+        
+        // Save case metadata
+        normalizedDb.cases.push({
+          id: caseMeta.id,
+          title: caseMeta.title,
+          status: caseMeta.status || 'Active',
+          createdAt: caseMeta.createdAt || new Date().toISOString(),
+          createdBy: caseMeta.createdBy || 'system',
+          closedAt: caseMeta.closedAt || null,
+          closedBy: caseMeta.closedBy || null
+        });
+
+        // Extract and format nested Incident
+        if (incident) {
+          const incidentId = incident.id || `SEN/IR/${incident.dateTime?.split('T')[0].replace(/-/g, '') || new Date().toISOString().split('T')[0].replace(/-/g, '')}/${String(normalizedDb.incidents.length + 1).padStart(4, '0')}`;
+          normalizedDb.incidents.push({
+            id: incidentId,
+            caseId: caseMeta.id,
+            title: incident.title || caseMeta.title,
+            dateTime: incident.dateTime || new Date().toISOString(),
+            type: incident.type || 'Others',
+            subType: incident.subType || 'Others',
+            priority: incident.priority || 'Normal',
+            crisisLevel: incident.crisisLevel || 4,
+            reporterName: incident.reporterName || 'Unknown',
+            requestedBy: incident.requestedBy || 'IIOC Controller',
+            createdBy: incident.createdBy || 'system',
+            status: incident.status || 'Live',
+            assignedTo: incident.assignedTo || '',
+            location: incident.location || {
+              road: '', building: '', levelSpace: '', nearAt: '', commonName: '', postalCode: '000000', tags: [], lat: 1.25, lng: 103.83
+            },
+            log: incident.log || [],
+            emergencyServices: incident.emergencyServices || {
+              policeAtScene: false, officerNameRank: '', policeIncidentNo: '', classification: '', respondingUnit: '',
+              ambulanceScdfType: '', ambulanceOfficerName: '', ambulanceCallSign: '', ambulanceRespondingUnit: '', ambulanceArrivalTime: '', hospitalConveyedTo: ''
+            },
+            mediaInvolvement: incident.mediaInvolvement || { mediaAtScene: false, mediaName: '', commsNotified: false },
+            propertyDamage: incident.propertyDamage || { sdcPropertyDamaged: false, description: '' },
+            vehiclesInvolved: incident.vehiclesInvolved || [],
+            personalInjuries: incident.personalInjuries || [],
+            personsInvolved: incident.personsInvolved || [],
+            cctvBwc: incident.cctvBwc || [],
+            summary: incident.summary || '',
+            completionRemarks: incident.completionRemarks || '',
+            slaveIncidents: incident.slaveIncidents || []
+          });
+        }
+
+        // Extract and format faults
+        if (cmmsTickets && cmmsTickets.length > 0) {
+          cmmsTickets.forEach((tId: string, idx: number) => {
+            const faultId = `SEN/FR/${caseMeta.createdAt?.split('T')[0].replace(/-/g, '') || new Date().toISOString().split('T')[0].replace(/-/g, '')}/${String(normalizedDb.faults.length + 1).padStart(3, '0')}`;
+            normalizedDb.faults.push({
+              id: faultId,
+              caseId: caseMeta.id,
+              faultType: incident?.type || 'Facilities',
+              faultSubType: incident?.subType || 'Others',
+              location: incident?.location || {
+                road: '', building: '', levelSpace: '', nearAt: '', commonName: '', postalCode: '000000', tags: [], lat: 1.25, lng: 103.83
+              },
+              description: incident?.summary || caseMeta.title,
+              attachments: [],
+              status: 'Closed', // Prototype auto-closed
+              cmmsTicketId: tId,
+              createdBy: 'system',
+              createdAt: caseMeta.createdAt || new Date().toISOString(),
+              submittedAt: caseMeta.createdAt || new Date().toISOString()
+            });
+          });
+        }
+      }
+
+      // Map occurrences (e-Diary) flat list. Link to legacy cases if possible, otherwise create dummy cases
+      if (parsed.occurrences) {
+        for (const o of parsed.occurrences) {
+          let linkedCaseId = o.caseId;
+          if (!linkedCaseId) {
+            // Auto-create dummy Case for legacy occurrences
+            linkedCaseId = `SEN/CI/${o.dateTime?.split('T')[0].replace(/-/g, '') || new Date().toISOString().split('T')[0].replace(/-/g, '')}/${String(normalizedDb.cases.length + 1).padStart(3, '0')}`;
+            normalizedDb.cases.push({
+              id: linkedCaseId,
+              title: `e-Diary: ${o.topic}`,
+              status: 'No Action Required',
+              createdAt: o.dateTime || new Date().toISOString(),
+              createdBy: o.user || 'system',
+              closedAt: o.dateTime || new Date().toISOString(),
+              closedBy: o.user || 'system'
+            });
+          }
+          normalizedDb.occurrences.push({
+            id: o.id,
+            caseId: linkedCaseId,
+            user: o.user,
+            dateTime: o.dateTime,
+            topic: o.topic,
+            content: o.content
+          });
+        }
+      }
+
+      // Save legacy migrated database back to disk immediately
+      fs.writeFileSync(DB_PATH, JSON.stringify(normalizedDb, null, 2), 'utf-8');
+      console.log('Legacy db.json successfully normalized and written back to disk.');
+    } else {
+      // It is already normalized structure
+      normalizedDb = {
+        cases: parsed.cases || [],
+        incidents: parsed.incidents || [],
+        faults: parsed.faults || [],
+        tasks: parsed.tasks || [],
+        occurrences: parsed.occurrences || [],
+        events: parsed.events || [],
+        nops: parsed.nops || [],
+        broadcasts: parsed.broadcasts || [],
+        auditLogs: parsed.auditLogs || []
+      };
+    }
+
+    // HYDRATION LOGIC: Join normalized tables into the legacy nested models returned to the app
+    const hydratedCases: Case[] = normalizedDb.cases.map(c => {
+      const caseIncident = normalizedDb.incidents.find(i => i.caseId === c.id) || null;
+      
+      const caseFaults = normalizedDb.faults.filter(f => f.caseId === c.id);
+      const cmmsTickets = caseFaults
+        .map(f => f.cmmsTicketId)
+        .filter((tId): tId is string => !!tId);
+
+      return {
+        ...c,
+        cmmsTickets,
+        incident: caseIncident
+      };
+    });
+
+    return {
+      cases: hydratedCases,
+      tasks: normalizedDb.tasks,
+      occurrences: normalizedDb.occurrences,
+      faults: normalizedDb.faults,
+      events: normalizedDb.events,
+      nops: normalizedDb.nops,
+      broadcasts: normalizedDb.broadcasts,
+      auditLogs: normalizedDb.auditLogs
+    };
   } catch (err) {
     console.error('Error reading database file:', err);
     return { cases: [], tasks: [], occurrences: [] };
   }
 }
 
-// Helper to write database
+// Helper to write database, converting hydrated view structures back to normalized files
 export function saveDb(data: DbSchema): void {
   try {
     const dir = path.dirname(DB_PATH);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
-    fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), 'utf-8');
+
+    // DE-HYDRATION LOGIC: Split the nested structures into flat normalized database tables
+    const normalizedDb: NormalizedDbSchema = {
+      cases: [],
+      incidents: [],
+      faults: data.faults || [],
+      tasks: data.tasks,
+      occurrences: data.occurrences,
+      events: data.events || [],
+      nops: data.nops || [],
+      broadcasts: data.broadcasts || [],
+      auditLogs: data.auditLogs || []
+    };
+
+    for (const c of data.cases) {
+      const { incident, cmmsTickets, ...caseMeta } = c;
+      
+      // Save Case metadata table row
+      normalizedDb.cases.push({
+        id: caseMeta.id,
+        title: caseMeta.title,
+        status: caseMeta.status as any,
+        createdAt: caseMeta.createdAt,
+        createdBy: caseMeta.createdBy || 'system',
+        closedAt: caseMeta.closedAt,
+        closedBy: caseMeta.closedBy
+      });
+
+      // Save Incident table row
+      if (incident) {
+        // Double check incident has correct ID
+        if (!incident.id) {
+          incident.id = `SEN/IR/${incident.dateTime?.split('T')[0].replace(/-/g, '') || new Date().toISOString().split('T')[0].replace(/-/g, '')}/${String(normalizedDb.incidents.length + 1).padStart(4, '0')}`;
+        }
+        normalizedDb.incidents.push({
+          ...incident,
+          caseId: caseMeta.id
+        });
+      }
+
+      // Save/Merge CMMS tickets into faults table
+      if (cmmsTickets && cmmsTickets.length > 0) {
+        cmmsTickets.forEach(ticketId => {
+          // Check if fault row already exists
+          const existingFault = normalizedDb.faults.find(f => f.cmmsTicketId === ticketId);
+          if (!existingFault) {
+            const faultId = `SEN/FR/${caseMeta.createdAt?.split('T')[0].replace(/-/g, '') || new Date().toISOString().split('T')[0].replace(/-/g, '')}/${String(normalizedDb.faults.length + 1).padStart(3, '0')}`;
+            normalizedDb.faults.push({
+              id: faultId,
+              caseId: caseMeta.id,
+              faultType: incident?.type || 'Facilities',
+              faultSubType: incident?.subType || 'Others',
+              location: incident?.location || {
+                road: '', building: '', levelSpace: '', nearAt: '', commonName: '', postalCode: '000000', tags: [], lat: 1.25, lng: 103.83
+              },
+              description: incident?.summary || caseMeta.title,
+              attachments: [],
+              status: 'Closed',
+              cmmsTicketId: ticketId,
+              createdBy: caseMeta.createdBy || 'system',
+              createdAt: caseMeta.createdAt || new Date().toISOString(),
+              submittedAt: new Date().toISOString()
+            });
+          }
+        });
+      }
+    }
+
+    fs.writeFileSync(DB_PATH, JSON.stringify(normalizedDb, null, 2), 'utf-8');
   } catch (err) {
     console.error('Error writing to database file:', err);
   }
 }
 
-// Generate Case ID following the YYYY/MM/NNNN format
+// Generate Case ID following the SEN/CI/YYYYMMDD/NNN format (FRD v0.2)
 export function generateCaseId(db: DbSchema): string {
   const now = new Date();
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, '0');
-  const prefix = `${year}/${month}/`;
+  const day = String(now.getDate()).padStart(2, '0');
+  const prefix = `SEN/CI/${year}${month}${day}/`;
   
-  // Find all cases created in the current month
-  const currentMonthCases = db.cases.filter(c => c.id.startsWith(prefix));
+  // Count cases created today
+  const todayCases = db.cases.filter(c => c.id.startsWith(prefix));
   
   let nextSeq = 1;
-  if (currentMonthCases.length > 0) {
-    // Extract sequence numbers and find the maximum
-    const sequences = currentMonthCases.map(c => {
+  if (todayCases.length > 0) {
+    const sequences = todayCases.map(c => {
       const parts = c.id.split('/');
-      const seqStr = parts[2];
+      const seqStr = parts[parts.length - 1];
       return parseInt(seqStr, 10);
     }).filter(num => !isNaN(num));
     
@@ -217,7 +586,7 @@ export function generateCaseId(db: DbSchema): string {
     }
   }
   
-  const seqStr = String(nextSeq).padStart(4, '0');
+  const seqStr = String(nextSeq).padStart(3, '0');
   return `${prefix}${seqStr}`;
 }
 
@@ -237,23 +606,27 @@ export function generateTaskId(db: DbSchema): string {
   return `TASK-${String(nextSeq).padStart(3, '0')}`;
 }
 
-// Generate Occurrence ID following OCC-YYYY-NNNN format
+// Generate e-Diary/Occurrence ID following SEN/ED/YYYYMMDD/NNN format
 export function generateOccurrenceId(db: DbSchema): string {
-  const year = new Date().getFullYear();
-  const prefix = `OCC-${year}-`;
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const prefix = `SEN/ED/${year}${month}${day}/`;
   
-  const yearOccs = db.occurrences.filter(o => o.id.startsWith(prefix));
+  const todayOccs = db.occurrences.filter(o => o.id.startsWith(prefix));
   
   let nextSeq = 1;
-  if (yearOccs.length > 0) {
-    const sequences = yearOccs.map(o => {
-      const parts = o.id.split('-');
-      return parseInt(parts[2], 10);
+  if (todayOccs.length > 0) {
+    const sequences = todayOccs.map(o => {
+      const parts = o.id.split('/');
+      const seqStr = parts[parts.length - 1];
+      return parseInt(seqStr, 10);
     }).filter(num => !isNaN(num));
     
     if (sequences.length > 0) {
       nextSeq = Math.max(...sequences) + 1;
     }
   }
-  return `${prefix}${String(nextSeq).padStart(4, '0')}`;
+  return `${prefix}${String(nextSeq).padStart(3, '0')}`;
 }

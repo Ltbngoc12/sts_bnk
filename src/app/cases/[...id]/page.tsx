@@ -1,724 +1,568 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Case, Task, LogEntry, PersonalInjury, PersonInvolved, VehicleInvolved } from '@/lib/db';
+import { Case, Task, PersonalInjury, PersonInvolved } from '@/lib/db';
 import { useRole } from '@/context/RoleContext';
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+type ComponentTab = 'incident' | 'tasks' | 'faults';
+type IncidentTab  = 'log' | 'services' | 'media' | 'property' | 'persons' | 'duplicates';
+
+// ─── Helper: incident status → badge class ────────────────────────────────────
+function incBadgeClass(status: string) {
+  return status === 'Live'                ? 'badge badge-live'      :
+         status === 'Live (Acknowledged)' ? 'badge badge-ack'       :
+         status === 'Live (On-Site)'      ? 'badge badge-onsite'    :
+         status === 'Live (Completed)'    ? 'badge badge-completed' :
+         status === 'Pending Review'      ? 'badge badge-review'    : 'badge badge-closed';
+}
+
+// ─── Helper: case status → badge class ───────────────────────────────────────
+function caseBadgeClass(status: string) {
+  return status === 'Active'         ? 'badge badge-onsite' :
+         status === 'Pending Triage' ? 'badge badge-ack'    : 'badge badge-closed';
+}
+
+// ─── SideInfoItem ─────────────────────────────────────────────────────────────
+function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="cd-info-row">
+      <span className="cd-info-label">{label}</span>
+      <span className="cd-info-value">{value}</span>
+    </div>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 export default function CaseDetailsPage() {
-  const router = useRouter();
-  const params = useParams();
+  const params  = useParams();
   const { role, username } = useRole();
-  
-  // Reconstruct Case ID from catch-all path params
+
   const idArray = params?.id as string[];
-  const caseId = idArray ? idArray.join('/') : '';
-  
-  const [caseData, setCaseData] = useState<Case | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [activeComponent, setActiveComponent] = useState<'incident' | 'tasks' | 'faults'>('incident');
-  const [activeTab, setActiveTab] = useState<'log' | 'services' | 'media' | 'property' | 'persons' | 'duplicates'>('log');
-  const [tasks, setTasks] = useState<Task[]>([]);
-  
-  // Slave incident addition states
-  const [slaveTitle, setSlaveTitle] = useState('');
-  const [slaveReporter, setSlaveReporter] = useState('');
-  const [slaveSummary, setSlaveSummary] = useState('');
-  
-  // Interactive action states for Incident
-  const [newLogText, setNewLogText] = useState('');
-  const [rangerActivityText, setRangerActivityText] = useState('');
+  const caseId  = idArray ? idArray.join('/') : '';
+
+  const [caseData, setCaseData]             = useState<Case | null>(null);
+  const [tasks,    setTasks]                = useState<Task[]>([]);
+  const [loading,  setLoading]              = useState(true);
+  const [saving,   setSaving]               = useState(false);
+
+  // Active tabs
+  const [compTab,  setCompTab]  = useState<ComponentTab>('incident');
+  const [incTab,   setIncTab]   = useState<IncidentTab>('log');
+
+  // Log input
+  const [newLogText,       setNewLogText]       = useState('');
+  const [rangerActivityText, setRangerActivity] = useState('');
+
+  // Modals
+  const [showAssignModal,    setShowAssignModal]    = useState(false);
+  const [showCompleteModal,  setShowCompleteModal]  = useState(false);
+  const [showTaskModal,      setShowTaskModal]      = useState(false);
+  const [selectedTask,       setSelectedTask]       = useState<Task | null>(null);
+
+  // Assign modal
   const [assigneeInput, setAssigneeInput] = useState('');
-  const [showAssignModal, setShowAssignModal] = useState(false);
-  const [cmmsLoading, setCmmsLoading] = useState(false);
+
+  // Complete modal
   const [completionRemarks, setCompletionRemarks] = useState('');
-  const [showCompleteModal, setShowCompleteModal] = useState(false);
 
-  // Sub-form additions for Incident
-  const [injuryName, setInjuryName] = useState('');
-  const [injuryAge, setInjuryAge] = useState('');
-  const [injuryContact, setInjuryContact] = useState('');
-  const [injuryHospital, setInjuryHospital] = useState('');
-  const [injuryUnder16, setInjuryUnder16] = useState(false);
-  const [parentName, setParentName] = useState('');
-  const [parentContact, setParentContact] = useState('');
-
-  const [personType, setPersonType] = useState('Guest');
-  const [personName, setPersonName] = useState('');
-  const [personContact, setPersonContact] = useState('');
-  const [personRole, setPersonRole] = useState('Witness');
-
-  // Task creation states inside Case Detail
-  const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
-  const [taskTitle, setTaskTitle] = useState('');
-  const [taskDesc, setTaskDesc] = useState('');
+  // Task create form
+  const [taskTitle,   setTaskTitle]   = useState('');
+  const [taskDesc,    setTaskDesc]    = useState('');
   const [taskAssignee, setTaskAssignee] = useState('Ranger John');
   const [taskPriority, setTaskPriority] = useState('Medium');
-  const [taskDueDate, setTaskDueDate] = useState('');
+  const [taskDueDate,  setTaskDueDate]  = useState('');
 
-  // Selected task detail view states
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  // Task manage
   const [newAssignee, setNewAssignee] = useState('');
 
-  useEffect(() => {
-    if (caseId) {
-      fetchCaseDetails();
-    }
-  }, [caseId]);
+  // Injury form
+  const [injName,    setInjName]    = useState('');
+  const [injAge,     setInjAge]     = useState('');
+  const [injContact, setInjContact] = useState('');
+  const [injHospital,setInjHospital]= useState('');
+  const [injU16,     setInjU16]     = useState(false);
+  const [parentName, setParentName] = useState('');
+  const [parentTel,  setParentTel]  = useState('');
 
-  // Once case data is loaded, determine active component default
-  useEffect(() => {
-    if (caseData) {
-      if (caseData.incident) {
-        setActiveComponent('incident');
-      } else if (caseData.cmmsTickets?.length > 0) {
-        setActiveComponent('faults');
-      } else {
-        setActiveComponent('tasks');
-      }
-    }
-  }, [caseData]);
+  // Person form
+  const [pType,    setPType]    = useState('Guest');
+  const [pName,    setPName]    = useState('');
+  const [pContact, setPContact] = useState('');
+  const [pRole,    setPRole]    = useState('Witness');
 
-  const fetchCaseDetails = async () => {
+  // Slave incident form
+  const [slaveTitle,    setSlaveTitle]    = useState('');
+  const [slaveReporter, setSlaveReporter] = useState('');
+  const [slaveSummary,  setSlaveSummary]  = useState('');
+
+  // CMMS
+  const [cmmsLoading, setCmmsLoading] = useState(false);
+
+  // ─── Data fetching ──────────────────────────────────────────────────────────
+  const refresh = useCallback(async () => {
     try {
-      const res = await fetch(`/api/cases/${caseId}`);
-      if (res.ok) {
-        setCaseData(await res.json());
-      } else {
-        console.error('Case not found');
+      const [caseRes, taskRes] = await Promise.all([
+        fetch(`/api/cases/${caseId}`),
+        fetch('/api/tasks'),
+      ]);
+      if (caseRes.ok) {
+        const c: Case = await caseRes.json();
+        setCaseData(c);
+        if      (c.incident)                   setCompTab('incident');
+        else if ((c.cmmsTickets?.length ?? 0) > 0) setCompTab('faults');
+        else                                   setCompTab('tasks');
       }
-
-      // Fetch tasks for this case
-      const tasksRes = await fetch('/api/tasks');
-      if (tasksRes.ok) {
-        const allTasks = await tasksRes.json() as Task[];
-        setTasks(allTasks.filter(t => t.caseId === caseId));
+      if (taskRes.ok) {
+        const all: Task[] = await taskRes.json();
+        setTasks(all.filter(t => t.caseId === caseId));
       }
-    } catch (err) {
-      console.error('Error fetching case details:', err);
+    } catch (e) {
+      console.error(e);
     } finally {
       setLoading(false);
     }
-  };
+  }, [caseId]);
 
-  const updateIncident = async (payload: any) => {
+  useEffect(() => { if (caseId) refresh(); }, [caseId, refresh]);
+
+  // ─── Action-oriented API helpers ────────────────────────────────────────────
+
+  /** POST /api/incidents/[caseId]/[action] */
+  async function incAction(action: string, payload: Record<string, any> = {}) {
+    setSaving(true);
     try {
-      const res = await fetch(`/api/incidents/${caseId}`, {
+      const res = await fetch(`/api/incidents/${caseId}/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...payload, username }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        alert(`Action failed: ${err.error}`);
+        return false;
+      }
+      await refresh();
+      return true;
+    } catch (e: any) {
+      alert(`Request error: ${e.message}`);
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /** PUT /api/incidents/[caseId] — legacy field update */
+  async function incFieldUpdate(payload: Record<string, any>) {
+    setSaving(true);
+    try {
+      await fetch(`/api/incidents/${caseId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...payload, username })
+        body: JSON.stringify({ ...payload, username }),
       });
-      if (res.ok) {
-        fetchCaseDetails();
-      }
-    } catch (err) {
-      console.error('Failed to update incident:', err);
-    }
-  };
+      await refresh();
+    } catch (e) { console.error(e); }
+    finally { setSaving(false); }
+  }
 
-  const handleCaseStatusTransition = async (status: string) => {
+  /** PUT /api/cases/[caseId] */
+  async function caseUpdate(payload: Record<string, any>) {
+    setSaving(true);
     try {
-      const res = await fetch(`/api/cases/${caseId}`, {
+      await fetch(`/api/cases/${caseId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status })
+        body: JSON.stringify(payload),
       });
-      if (res.ok) {
-        fetchCaseDetails();
-      }
-    } catch (err) {
-      console.error('Failed to transition case status:', err);
-    }
+      await refresh();
+    } catch (e) { console.error(e); }
+    finally { setSaving(false); }
+  }
+
+  // ─── Event handlers ─────────────────────────────────────────────────────────
+
+  const handleAssign = async () => {
+    if (!assigneeInput.trim()) return;
+    const ok = await incAction('assign', { assignedTo: assigneeInput });
+    if (ok) { setAssigneeInput(''); setShowAssignModal(false); }
   };
+
+  const handleAcknowledge  = () => incAction('acknowledge');
+  const handleOnSite        = () => incAction('on-site');
+  const handleSubmitReview  = () => incAction('submit-review');
+  const handleReturn        = () => incAction('return');
+  const handleReopen        = async () => {
+    await incAction('acknowledge'); // resets to Live via legacy PUT
+    // For reopen we use the legacy PUT directly
+    await incFieldUpdate({ status: 'Live' });
+    await caseUpdate({ status: 'Active' });
+  };
+
+  const handleComplete = async () => {
+    if (!completionRemarks.trim()) return;
+    const ok = await incAction('complete', { completionRemarks });
+    if (ok) { setCompletionRemarks(''); setShowCompleteModal(false); }
+  };
+
+  const handleClose = () => incAction('close');
 
   const handleAppendLog = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newLogText.trim()) return;
-    await updateIncident({ newLogEntry: newLogText });
+    await incAction('log', { description: newLogText });
     setNewLogText('');
   };
 
-  const handleAppendRangerActivity = async (e: React.FormEvent) => {
+  const handleRangerActivity = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!rangerActivityText.trim()) return;
-    await updateIncident({ newLogEntry: `[Ranger Log] ${rangerActivityText}` });
-    setRangerActivityText('');
+    await incAction('log', { description: `[Ranger Log] ${rangerActivityText}` });
+    setRangerActivity('');
   };
 
-  const handleAssignResponder = async () => {
-    if (!assigneeInput.trim()) return;
-    await updateIncident({ assignedTo: assigneeInput });
-    setAssigneeInput('');
-    setShowAssignModal(false);
+  const handleAddInjury = async () => {
+    if (!injName || !caseData) return;
+    const injury: PersonalInjury = {
+      name: injName, address: '',
+      age: parseInt(injAge, 10) || 30,
+      gender: 'Other', contactNumber: injContact,
+      clinicHospitalAttended: injHospital,
+      msigFormIssued: false, under16: injU16,
+      parentGuardianName: injU16 ? parentName : undefined,
+      parentGuardianContact: injU16 ? parentTel : undefined,
+    };
+    const updated = [...(caseData.incident?.personalInjuries ?? []), injury];
+    await incFieldUpdate({ personalInjuries: updated });
+    setInjName(''); setInjAge(''); setInjContact(''); setInjHospital(''); setInjU16(false);
   };
 
-  const handleCMMSCreation = async () => {
+  const handleAddPerson = async () => {
+    if (!pName || !caseData) return;
+    const person: PersonInvolved = {
+      guestOrNonGuest: pType === 'Guest' ? 'Guest' : 'Non-Guest',
+      type: pType, name: pName, address: '', age: 30,
+      gender: 'Other', contactNumber: pContact,
+      roleInvolvement: pRole, injuryDetails: '',
+    };
+    const updated = [...(caseData.incident?.personsInvolved ?? []), person];
+    await incFieldUpdate({ personsInvolved: updated });
+    setPName(''); setPContact(''); setPRole('Witness');
+  };
+
+  const handleAddSlave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!slaveTitle.trim() || !caseData?.incident) return;
+    const slave: any = {
+      id: `DUP-${String((caseData.incident.slaveIncidents?.length ?? 0) + 1).padStart(3, '0')}`,
+      title: slaveTitle, dateTime: new Date().toISOString(),
+      reporterName: slaveReporter || 'Anonymous',
+      summary: slaveSummary,
+      status: caseData.incident.status === 'Closed' ? 'Closed' : 'Open',
+    };
+    const updated = [...(caseData.incident.slaveIncidents ?? []), slave];
+    await incFieldUpdate({
+      slaveIncidents: updated,
+      newLogEntry: `[Duplicate] Slave Incident ${slave.id}: "${slaveTitle}" linked to this Master.`,
+    });
+    setSlaveTitle(''); setSlaveReporter(''); setSlaveSummary('');
+  };
+
+  const handleCMMS = async () => {
     if (!caseData || cmmsLoading) return;
     setCmmsLoading(true);
-    
     try {
-      // Mock CMMS call
       const res = await fetch('/api/cmms-mock', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           location: caseData.incident?.location.commonName || caseData.incident?.location.road || 'Sentosa Ground',
-          description: caseData.incident?.summary || caseData.title
-        })
+          description: caseData.incident?.summary || caseData.title,
+        }),
       });
-      
       if (res.ok) {
         const data = await res.json();
-        
-        // Link CMMS Ticket ID back to Case
-        const caseRes = await fetch(`/api/cases/${caseId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cmmsTicketId: data.ticketId })
-        });
-        
-        if (caseRes.ok) {
-          // Log CMMS event if incident is present, otherwise just fetch case details
-          if (caseData.incident) {
-            await updateIncident({
-              newLogEntry: `CMMS Ticket raised in external IFM system: ID ${data.ticketId}. Linkage established on Case.`
-            });
-          } else {
-            fetchCaseDetails();
-          }
+        await caseUpdate({ cmmsTicketId: data.ticketId });
+        if (caseData.incident) {
+          await incAction('log', { description: `CMMS Ticket raised: ${data.ticketId}. Linkage established.` });
         }
       }
-    } catch (err) {
-      console.error('Failed to raise CMMS ticket:', err);
-    } finally {
-      setCmmsLoading(false);
-    }
+    } catch (e) { console.error(e); }
+    finally { setCmmsLoading(false); }
   };
 
-  const handleStatusTransition = async (status: string) => {
-    const payload: any = { status };
-    if (status === 'Live (Completed)') {
-      payload.completionRemarks = completionRemarks;
-      setShowCompleteModal(false);
-    }
-    await updateIncident(payload);
-  };
-
-  const handleAddInjury = async () => {
-    if (!injuryName || !caseData) return;
-    const newInjury: PersonalInjury = {
-      name: injuryName,
-      address: '',
-      age: parseInt(injuryAge, 10) || 30,
-      gender: 'Other',
-      contactNumber: injuryContact,
-      clinicHospitalAttended: injuryHospital,
-      msigFormIssued: false,
-      under16: injuryUnder16,
-      parentGuardianName: injuryUnder16 ? parentName : undefined,
-      parentGuardianContact: injuryUnder16 ? parentContact : undefined
-    };
-    const updatedInjuries = [...(caseData.incident?.personalInjuries || []), newInjury];
-    await updateIncident({ personalInjuries: updatedInjuries });
-    
-    // Reset inputs
-    setInjuryName('');
-    setInjuryAge('');
-    setInjuryContact('');
-    setInjuryHospital('');
-    setInjuryUnder16(false);
-  };
-
-  const handleAddPerson = async () => {
-    if (!personName || !caseData) return;
-    const newPerson: PersonInvolved = {
-      guestOrNonGuest: personType === 'Guest' ? 'Guest' : 'Non-Guest',
-      type: personType,
-      name: personName,
-      address: '',
-      age: 30,
-      gender: 'Other',
-      contactNumber: personContact,
-      roleInvolvement: personRole,
-      injuryDetails: ''
-    };
-    const updatedPersons = [...(caseData.incident?.personsInvolved || []), newPerson];
-    await updateIncident({ personsInvolved: updatedPersons });
-    
-    // Reset inputs
-    setPersonName('');
-    setPersonContact('');
-    setPersonRole('Witness');
-  };
-
-  const handleAddSlaveIncident = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!slaveTitle.trim() || !caseData || !caseData.incident) return;
-    
-    const newSlave: any = {
-      id: `DUP-${String((caseData.incident.slaveIncidents?.length || 0) + 1).padStart(3, '0')}`,
-      title: slaveTitle,
-      dateTime: new Date().toISOString(),
-      reporterName: slaveReporter || 'Anonymous Guest',
-      summary: slaveSummary,
-      status: caseData.incident.status === 'Closed' ? 'Closed' : 'Open'
-    };
-    
-    const updatedSlaves = [...(caseData.incident.slaveIncidents || []), newSlave];
-    
-    await updateIncident({ 
-      slaveIncidents: updatedSlaves,
-      newLogEntry: `[Duplicate Detection] Linked duplicate (Slave) Incident ${newSlave.id}: "${slaveTitle}" was added to this Master Incident.`
-    });
-    
-    // Reset form
-    setSlaveTitle('');
-    setSlaveReporter('');
-    setSlaveSummary('');
-  };
-
-  const handleAddCopsDetails = async (policeAtScene: boolean) => {
-    await updateIncident({ emergencyServices: { policeAtScene } });
-  };
-
-  const handleAddMediaDetails = async (mediaAtScene: boolean) => {
-    await updateIncident({ mediaInvolvement: { mediaAtScene } });
-  };
-
-  const handleReopen = async () => {
-    // Only System Administrator can revert closed incidents (FRD 5.4.1)
-    if (role !== 'System Administrator') return;
-    await updateIncident({ status: 'Live' });
-    
-    // Update Case status back to Active
-    await fetch(`/api/cases/${caseId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'Active' })
-    });
-    
-    fetchCaseDetails();
-  };
-
-  // Task Handlers
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!taskTitle.trim() || !caseId) return;
-
-    const payload = {
-      caseId: caseId,
-      title: taskTitle,
-      description: taskDesc,
-      assignee: taskAssignee,
-      priority: taskPriority,
-      dueDate: taskDueDate,
-      username
-    };
-
+    if (!taskTitle.trim()) return;
     try {
       const res = await fetch('/api/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ caseId, title: taskTitle, description: taskDesc, assignee: taskAssignee, priority: taskPriority, dueDate: taskDueDate, username }),
       });
       if (res.ok) {
-        setShowCreateTaskModal(false);
-        setTaskTitle('');
-        setTaskDesc('');
-        setTaskDueDate('');
-        fetchCaseDetails();
-      } else {
-        alert('Failed to dispatch task.');
+        setShowTaskModal(false);
+        setTaskTitle(''); setTaskDesc(''); setTaskDueDate('');
+        await refresh();
       }
-    } catch (err) {
-      console.error('Error creating task:', err);
-    }
+    } catch (e) { console.error(e); }
   };
 
-  const handleUpdateTaskStatus = async (taskId: string, status: string) => {
-    try {
-      const res = await fetch(`/api/tasks/${taskId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status })
-      });
-      if (res.ok) {
-        setSelectedTask(null);
-        fetchCaseDetails();
-      }
-    } catch (err) {
-      console.error('Error updating task status:', err);
-    }
+  const handleUpdateTask = async (taskId: string, status: string) => {
+    await fetch(`/api/tasks/${taskId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    setSelectedTask(null);
+    await refresh();
   };
 
   const handleReassignTask = async (taskId: string) => {
     if (!newAssignee) return;
-    try {
-      const res = await fetch(`/api/tasks/${taskId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ assignee: newAssignee })
-      });
-      if (res.ok) {
-        setSelectedTask(null);
-        setNewAssignee('');
-        fetchCaseDetails();
-      }
-    } catch (err) {
-      console.error('Error reassigning task:', err);
-    }
+    await fetch(`/api/tasks/${taskId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ assignee: newAssignee }),
+    });
+    setSelectedTask(null); setNewAssignee('');
+    await refresh();
   };
 
-  if (loading) {
-    return <div className="loading-state glass">Loading Case Details...</div>;
-  }
+  // ─── Role checks ─────────────────────────────────────────────────────────────
+  if (loading) return <div className="loading-container glass"><div className="spinner" /><span>Loading Case Details…</span></div>;
+  if (!caseData) return <div className="glass" style={{ padding: 40, textAlign: 'center', color: 'var(--color-critical)' }}>Case not found.</div>;
 
-  if (!caseData) {
-    return <div className="loading-state glass text-danger">Case registry not found.</div>;
-  }
-
-  const inc = caseData.incident;
-
-  // Determine button displays based on the FRD Role and Status action matrix
-  const isRanger = role === 'Responder (Ranger)';
-  const isController = role === 'Controller' || role === 'System Administrator';
-  const isManager = role === 'Duty Manager' || role === 'Duty Officer' || role === 'System Administrator';
+  const inc        = caseData.incident;
+  const isRanger   = role === 'Responder (Ranger)';
+  const isCtrl     = role === 'Controller' || role === 'System Administrator';
+  const isMgr      = role === 'Duty Manager' || role === 'Duty Officer' || role === 'System Administrator';
+  const isClosed   = caseData.status === 'Closed';
+  const incClosed  = inc?.status === 'Closed';
 
   return (
     <>
-      {/* Top Header Grid */}
-      <div className="case-detail-header-card glass">
-        <div className="case-detail-title-sec">
-          <div className="case-id-badge">CASE CONTAINER ID: {caseData.id}</div>
-          <h1>{caseData.title}</h1>
-          <p className="case-timestamp">
-            Logged At: {new Date(caseData.createdAt).toLocaleString()} {inc ? `• Incident Created By: ${inc.createdBy}` : ''}
+      {/* ── Case Header ────────────────────────────────────────────────────── */}
+      <div className="glass" style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+            <Link href="/cases" style={{ color: 'var(--text-faint)', fontSize: 12, textDecoration: 'none' }}>← Case Log</Link>
+            <span className="mono-id">{caseData.id}</span>
+            <span className={caseBadgeClass(caseData.status)}>{caseData.status}</span>
+            {inc && <span className={incBadgeClass(inc.status)}>{inc.status}</span>}
+            {saving && <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>Saving…</span>}
+          </div>
+          <h1 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{caseData.title}</h1>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+            Logged {new Date(caseData.createdAt).toLocaleString('en-SG')}
+            {inc ? ` · Created by ${inc.createdBy}` : ''}
+            {caseData.closedAt ? ` · Closed ${new Date(caseData.closedAt).toLocaleString('en-SG')}` : ''}
           </p>
         </div>
 
-        <div className="case-status-sec">
-          <div className="status-label-group">
-            <span className="label">Case State:</span>
-            <span className={`badge ${
-              caseData.status === 'Pending Triage' ? 'badge-ack' :
-              caseData.status === 'Active' ? 'badge-onsite' : 'badge-closed'
-            }`}>
-              {caseData.status}
-            </span>
+        {/* Action buttons */}
+        <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          {/* Case-level transitions */}
+          {isCtrl && caseData.status === 'Pending Triage' && (
+            <button className="btn btn-success btn-sm" onClick={() => caseUpdate({ status: 'Active' })}>Activate Case</button>
+          )}
+          {role === 'System Administrator' && isClosed && (
+            <button className="btn btn-secondary btn-sm" onClick={() => caseUpdate({ status: 'Active' })}>Reopen Case</button>
+          )}
 
-            {inc && (
-              <>
-                <span className="label" style={{ marginLeft: '12px' }}>Incident Workflow:</span>
-                <span className={`badge ${
-                  inc.status === 'Live' ? 'badge-live' :
-                  inc.status === 'Live (Acknowledged)' ? 'badge-ack' :
-                  inc.status === 'Live (On-Site)' ? 'badge-onsite' :
-                  inc.status === 'Live (Completed)' ? 'badge-completed' :
-                  inc.status === 'Pending Review' ? 'badge-review' : 'badge-closed'
-                }`}>
-                  {inc.status}
-                </span>
-              </>
-            )}
-          </div>
+          {/* Incident workflow buttons */}
+          {inc && !incClosed && (
+            <>
+              {/* Ranger flow */}
+              {isRanger && inc.status === 'Live' && (
+                <button className="btn btn-primary btn-sm" onClick={handleAcknowledge}>Acknowledge</button>
+              )}
+              {isRanger && inc.status === 'Live (Acknowledged)' && (
+                <button className="btn btn-success btn-sm" onClick={handleOnSite}>Arrived On-Site</button>
+              )}
+              {isRanger && ['Live (On-Site)', 'Live (Acknowledged)'].includes(inc.status) && (
+                <button className="btn btn-success btn-sm" onClick={() => setShowCompleteModal(true)}>Notify Completion</button>
+              )}
 
-          {/* Interactive State transitions */}
-          <div className="action-button-row">
-            
-            {/* Case Level Status Transitions */}
-            {isController && caseData.status === 'Pending Triage' && (
-              <button className="btn btn-success" onClick={() => handleCaseStatusTransition('Active')}>
-                ACTIVATE CASE
-              </button>
-            )}
-            {isController && caseData.status === 'Active' && (
-              <button className="btn btn-danger" onClick={() => handleCaseStatusTransition('Closed')}>
-                CLOSE CASE CONTAINER
-              </button>
-            )}
-            {role === 'System Administrator' && caseData.status === 'Closed' && (
-              <button className="btn btn-secondary" onClick={() => handleCaseStatusTransition('Active')}>
-                REOPEN CASE CONTAINER
-              </button>
-            )}
+              {/* Controller flow */}
+              {isCtrl && inc.status !== 'Pending Review' && (
+                <button className="btn btn-secondary btn-sm" onClick={() => setShowAssignModal(true)}>
+                  {inc.assignedTo ? 'Re-Assign Ranger' : 'Assign Ranger'}
+                </button>
+              )}
+              {isCtrl && !['Pending Review', 'Live (Completed)'].includes(inc.status) && (
+                <button className="btn btn-info btn-sm" onClick={handleSubmitReview}>Submit for Review</button>
+              )}
+              {isCtrl && inc.status === 'Live (Completed)' && (
+                <button className="btn btn-info btn-sm" onClick={handleSubmitReview}>Submit for Review</button>
+              )}
 
-            {/* INCIDENT FLOW TRANSITIONS (Only if incident is attached) */}
-            {inc && (
-              <>
-                {/* RANGER FLOW (FRD 3.4.1) */}
-                {isRanger && inc.status === 'Live' && (
-                  <button className="btn btn-primary" onClick={() => handleStatusTransition('Live (Acknowledged)')}>
-                    ACKNOWLEDGE INCIDENT
-                  </button>
-                )}
+              {/* DM/DO flow */}
+              {isMgr && inc.status === 'Pending Review' && (
+                <>
+                  <button className="btn btn-danger btn-sm" onClick={handleReturn}>Return to Controller</button>
+                  <button className="btn btn-success btn-sm" onClick={handleClose}>Approve Closure</button>
+                </>
+              )}
+            </>
+          )}
 
-                {isRanger && inc.status === 'Live (Acknowledged)' && (
-                  <button className="btn btn-success" onClick={() => handleStatusTransition('Live (On-Site)')}>
-                    NOTIFY ARRIVED ON-SITE
-                  </button>
-                )}
-
-                {isRanger && (inc.status === 'Live (On-Site)' || inc.status === 'Live (Returned to Responder)') && (
-                  <button className="btn btn-success" onClick={() => setShowCompleteModal(true)}>
-                    NOTIFY COMPLETION
-                  </button>
-                )}
-
-                {/* CONTROLLER FLOW (FRD 3.4.1) */}
-                {isController && inc.status !== 'Closed' && inc.status !== 'Pending Review' && (
-                  <button className="btn btn-secondary" onClick={() => setShowAssignModal(true)}>
-                    {inc.assignedTo ? 'RE-ASSIGN RANGER' : 'ASSIGN RANGER'}
-                  </button>
-                )}
-
-                {isController && inc.status !== 'Closed' && inc.status !== 'Pending Review' && (
-                  <button className="btn btn-primary" onClick={() => handleStatusTransition('Pending Review')}>
-                    SUBMIT FOR REVIEW
-                  </button>
-                )}
-
-                {/* MANAGER FLOW (FRD 3.4.1) */}
-                {isManager && inc.status === 'Pending Review' && (
-                  <>
-                    <button className="btn btn-danger" onClick={() => handleStatusTransition('Returned')}>
-                      RETURN TO CONTROLLER
-                    </button>
-                    <button className="btn btn-secondary" onClick={() => handleStatusTransition('Live (Returned to Responder)')}>
-                      RETURN TO RANGER
-                    </button>
-                    <button className="btn btn-success" onClick={() => handleStatusTransition('Closed')}>
-                      APPROVE CLOSURE
-                    </button>
-                  </>
-                )}
-
-                {/* SYSTEM ADMIN FLOW */}
-                {role === 'System Administrator' && inc.status === 'Closed' && caseData.status === 'Closed' && (
-                  <button className="btn btn-secondary" onClick={handleReopen}>
-                    REOPEN INCIDENT
-                  </button>
-                )}
-              </>
-            )}
-          </div>
+          {/* System Admin reopen */}
+          {role === 'System Administrator' && incClosed && isClosed && (
+            <button className="btn btn-secondary btn-sm" onClick={handleReopen}>Reopen Incident</button>
+          )}
         </div>
       </div>
 
-      {/* Component Tabs Bar */}
-      <div className="component-tabs">
-        <button 
-          className={`comp-tab-btn ${activeComponent === 'incident' ? 'active' : ''}`}
-          onClick={() => setActiveComponent('incident')}
-        >
-          🚨 Incident Report {inc ? '' : '(Not Attached)'}
-        </button>
-        <button 
-          className={`comp-tab-btn ${activeComponent === 'tasks' ? 'active' : ''}`}
-          onClick={() => setActiveComponent('tasks')}
-        >
-          📋 Ranger Tasks ({tasks.length})
-        </button>
-        <button 
-          className={`comp-tab-btn ${activeComponent === 'faults' ? 'active' : ''}`}
-          onClick={() => setActiveComponent('faults')}
-        >
-          🔧 IFM Faults ({caseData.cmmsTickets?.length || 0})
-        </button>
+      {/* ── Component selector tabs ─────────────────────────────────────────── */}
+      <div style={{ display: 'flex', gap: 10 }}>
+        {(['incident', 'tasks', 'faults'] as ComponentTab[]).map(tab => {
+          const labels: Record<ComponentTab, string> = {
+            incident: `Incident Report${!inc ? ' (None)' : ''}`,
+            tasks:    `Ranger Tasks (${tasks.length})`,
+            faults:   `IFM Faults (${caseData.cmmsTickets?.length ?? 0})`,
+          };
+          return (
+            <button
+              key={tab}
+              className={`comp-tab-btn ${compTab === tab ? 'active' : ''}`}
+              onClick={() => setCompTab(tab)}
+            >
+              {labels[tab]}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Main split grid */}
+      {/* ── Main content grid ────────────────────────────────────────────────── */}
       <div className="case-content-grid">
-        
-        {/* Left column: Render chosen component tab */}
-        <div className="case-main-column">
-          
-          {/* Tab 1: Incident Report */}
-          {activeComponent === 'incident' && (
+
+        {/* ─── Left: Main column ───────────────────────────────────────────── */}
+        <div className="case-main-col">
+
+          {/* ── INCIDENT TAB ────────────────────────────────────────────────── */}
+          {compTab === 'incident' && (
             <>
               {!inc ? (
-                <div className="empty-component-card glass">
-                  <div className="icon">🚨</div>
-                  <h3>No Incident Report Attached</h3>
-                  <p>This case folder was logged as a general operational tracking case and does not contain a specific security or safety incident report details.</p>
+                <div className="glass empty-comp-state">
+                  <div style={{ fontSize: 32, marginBottom: 8 }}>🚨</div>
+                  <h3 style={{ marginBottom: 6 }}>No Incident Report Attached</h3>
+                  <p style={{ color: 'var(--text-muted)', fontSize: 13, maxWidth: 360 }}>
+                    This case folder was logged as a general tracking case and has no security or safety incident attached.
+                  </p>
                 </div>
               ) : (
                 <>
-                  <div className="tab-header glass">
-                    <button className={`tab-btn ${activeTab === 'log' ? 'active' : ''}`} onClick={() => setActiveTab('log')}>INCIDENT LOG</button>
-                    <button className={`tab-btn ${activeTab === 'services' ? 'active' : ''}`} onClick={() => setActiveTab('services')}>EMERGENCY SERVICES</button>
-                    <button className={`tab-btn ${activeTab === 'media' ? 'active' : ''}`} onClick={() => setActiveTab('media')}>MEDIA</button>
-                    <button className={`tab-btn ${activeTab === 'property' ? 'active' : ''}`} onClick={() => setActiveTab('property')}>DAMAGE & VEHICLES</button>
-                    <button className={`tab-btn ${activeTab === 'persons' ? 'active' : ''}`} onClick={() => setActiveTab('persons')}>PERSONS INVOLVED</button>
-                    <button className={`tab-btn ${activeTab === 'duplicates' ? 'active' : ''}`} onClick={() => setActiveTab('duplicates')}>SLAVE INCIDENTS ({inc.slaveIncidents?.length || 0})</button>
+                  {/* Sub-tabs bar */}
+                  <div className="tabs-bar glass">
+                    {(['log', 'services', 'media', 'property', 'persons', 'duplicates'] as IncidentTab[]).map(t => {
+                      const label: Record<IncidentTab, string> = {
+                        log: 'Incident Log', services: 'Emergency Services',
+                        media: 'Media', property: 'Damage & Vehicles',
+                        persons: 'Persons Involved',
+                        duplicates: `Slave Incidents (${inc.slaveIncidents?.length ?? 0})`,
+                      };
+                      return (
+                        <button key={t} className={`tab-btn ${incTab === t ? 'active' : ''}`} onClick={() => setIncTab(t)}>
+                          {label[t]}
+                        </button>
+                      );
+                    })}
                   </div>
 
-                  <div className="tab-body glass">
-                    
-                    {/* 1. Log tab */}
-                    {activeTab === 'log' && (
-                      <div className="log-tab-content">
-                        {/* Event logging form */}
-                        {inc.status !== 'Closed' && (
-                          <form onSubmit={handleAppendLog} className="log-input-form">
-                            <textarea 
-                              placeholder="Add chronological log entry or update..." 
-                              value={newLogText} 
-                              onChange={(e) => setNewLogText(e.target.value)} 
+                  <div className="glass" style={{ padding: '18px 20px' }}>
+
+                    {/* ── LOG TAB ──────────────────────────────────────────── */}
+                    {incTab === 'log' && (
+                      <div>
+                        {!incClosed && (
+                          <form onSubmit={handleAppendLog} style={{ marginBottom: 24, paddingBottom: 20, borderBottom: '1px solid var(--border-color)' }}>
+                            <textarea
                               className="form-control"
+                              placeholder="Add chronological log entry…"
+                              value={newLogText}
+                              onChange={e => setNewLogText(e.target.value)}
                               rows={2}
+                              style={{ marginBottom: 8 }}
                             />
-                            <button type="submit" className="btn btn-primary">ADD LOG ENTRY</button>
+                            <button type="submit" className="btn btn-primary btn-sm" disabled={saving}>Add Log Entry</button>
                           </form>
                         )}
-
-                        {/* Timeline */}
-                        <div className="timeline-section">
-                          <h3>CHRONOLOGICAL LOG</h3>
-                          <div className="timeline">
-                            {[...inc.log].reverse().map((entry) => (
-                              <div className="timeline-item" key={entry.eventNumber}>
-                                <div className="timeline-dot" />
-                                <div className="timeline-header">
-                                  <span>Event #{entry.eventNumber}</span>
-                                  <span>&bull;</span>
-                                  <span>{entry.date} {entry.time}</span>
-                                </div>
-                                <div className="timeline-desc">{entry.description}</div>
+                        <h3 style={{ marginBottom: 14 }}>Chronological Log</h3>
+                        <div className="timeline">
+                          {[...inc.log].reverse().map(entry => (
+                            <div className="timeline-item" key={entry.eventNumber}>
+                              <div className="timeline-dot" />
+                              <div className="timeline-header">
+                                <span>Event #{entry.eventNumber}</span>
+                                <span>·</span>
+                                <span>{entry.date} {entry.time}</span>
                               </div>
-                            ))}
-                          </div>
+                              <div className="timeline-desc">{entry.description}</div>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     )}
 
-                    {/* 2. Emergency Services tab */}
-                    {activeTab === 'services' && (
-                      <div className="services-tab-content">
-                        <div className="subform-grid">
-                          <div className="subform-card">
-                            <h3>POLICE DISPATCH</h3>
-                            <div className="checkbox-row">
-                              <input 
-                                type="checkbox" 
-                                id="cops-scene" 
-                                checked={inc.emergencyServices.policeAtScene} 
-                                onChange={(e) => handleAddCopsDetails(e.target.checked)}
-                                disabled={inc.status === 'Closed'}
-                              />
-                              <label htmlFor="cops-scene">Police present at scene</label>
-                            </div>
-                            {inc.emergencyServices.policeAtScene && (
-                              <div className="fields">
-                                <div className="form-group">
-                                  <label>Officer Name & Rank</label>
-                                  <input 
-                                    type="text" 
-                                    value={inc.emergencyServices.officerNameRank} 
-                                    onChange={(e) => updateIncident({ emergencyServices: { officerNameRank: e.target.value } })}
-                                    disabled={inc.status === 'Closed'}
-                                    className="form-control"
-                                  />
-                                </div>
-                                <div className="form-group">
-                                  <label>Police Incident Report ID</label>
-                                  <input 
-                                    type="text" 
-                                    value={inc.emergencyServices.policeIncidentNo} 
-                                    onChange={(e) => updateIncident({ emergencyServices: { policeIncidentNo: e.target.value } })}
-                                    disabled={inc.status === 'Closed'}
-                                    className="form-control"
-                                  />
-                                </div>
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="subform-card">
-                            <h3>AMBULANCE & SCDF</h3>
-                            <div className="form-group">
-                              <label>Responder Type</label>
-                              <select 
-                                value={inc.emergencyServices.ambulanceScdfType} 
-                                onChange={(e) => updateIncident({ emergencyServices: { ambulanceScdfType: e.target.value } })}
-                                disabled={inc.status === 'Closed'}
-                                className="form-control select-dark"
-                              >
-                                <option value="">None</option>
-                                <option value="SCDF">SCDF Ambulance</option>
-                                <option value="Private">Private Ambulance</option>
-                              </select>
-                            </div>
-                            {inc.emergencyServices.ambulanceScdfType && (
-                              <div className="fields">
-                                <div className="form-group">
-                                  <label>Call Sign</label>
-                                  <input 
-                                    type="text" 
-                                    value={inc.emergencyServices.ambulanceCallSign} 
-                                    onChange={(e) => updateIncident({ emergencyServices: { ambulanceCallSign: e.target.value } })}
-                                    disabled={inc.status === 'Closed'}
-                                    className="form-control"
-                                  />
-                                </div>
-                                <div className="form-group">
-                                  <label>Hospital Conveyed To</label>
-                                  <input 
-                                    type="text" 
-                                    value={inc.emergencyServices.hospitalConveyedTo} 
-                                    onChange={(e) => updateIncident({ emergencyServices: { hospitalConveyedTo: e.target.value } })}
-                                    disabled={inc.status === 'Closed'}
-                                    className="form-control"
-                                  />
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 3. Media tab */}
-                    {activeTab === 'media' && (
-                      <div className="media-tab-content">
+                    {/* ── SERVICES TAB ─────────────────────────────────────── */}
+                    {incTab === 'services' && (
+                      <div className="subform-grid">
+                        {/* Police */}
                         <div className="subform-card">
-                          <h3>MEDIA PRESENCE AT SCENE</h3>
-                          <div className="checkbox-row">
-                            <input 
-                              type="checkbox" 
-                              id="media-present" 
-                              checked={inc.mediaInvolvement.mediaAtScene} 
-                              onChange={(e) => handleAddMediaDetails(e.target.checked)}
-                              disabled={inc.status === 'Closed'}
-                            />
-                            <label htmlFor="media-present">Press/Media present at the scene</label>
-                          </div>
-                          
-                          {inc.mediaInvolvement.mediaAtScene && (
-                            <div className="fields">
-                              <div className="form-group">
-                                <label>Media Outlet Name</label>
-                                <input 
-                                  type="text" 
-                                  value={inc.mediaInvolvement.mediaName} 
-                                  onChange={(e) => updateIncident({ mediaInvolvement: { mediaName: e.target.value } })}
-                                  disabled={inc.status === 'Closed'}
-                                  className="form-control"
-                                />
+                          <h3 style={{ color: 'var(--color-critical)', marginBottom: 12 }}>Police Dispatch</h3>
+                          <label className="checkbox-row">
+                            <input type="checkbox" checked={inc.emergencyServices.policeAtScene}
+                              onChange={e => incFieldUpdate({ emergencyServices: { policeAtScene: e.target.checked } })}
+                              disabled={incClosed} />
+                            Police present at scene
+                          </label>
+                          {inc.emergencyServices.policeAtScene && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
+                              <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label>Officer Name & Rank</label>
+                                <input className="form-control" type="text" value={inc.emergencyServices.officerNameRank}
+                                  onChange={e => incFieldUpdate({ emergencyServices: { officerNameRank: e.target.value } })}
+                                  disabled={incClosed} />
                               </div>
-                              
-                              <div className="sdc-comms-prompt glass warning-prompt">
-                                <p>⚠️ <strong>CRITICAL PROMPT:</strong> Media presence has been flagged. Please ensure you notify the SDC Communications Team immediately.</p>
-                                <div className="checkbox-row" style={{ marginTop: '10px' }}>
-                                  <input 
-                                    type="checkbox" 
-                                    id="comms-notified" 
-                                    checked={inc.mediaInvolvement.commsNotified} 
-                                    onChange={(e) => updateIncident({ mediaInvolvement: { commsNotified: e.target.checked } })}
-                                    disabled={inc.status === 'Closed'}
-                                  />
-                                  <label htmlFor="comms-notified">Confirm SDC Comms Team Notified</label>
-                                </div>
+                              <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label>Police Report ID</label>
+                                <input className="form-control" type="text" value={inc.emergencyServices.policeIncidentNo}
+                                  onChange={e => incFieldUpdate({ emergencyServices: { policeIncidentNo: e.target.value } })}
+                                  disabled={incClosed} />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Ambulance */}
+                        <div className="subform-card">
+                          <h3 style={{ color: 'var(--color-active)', marginBottom: 12 }}>Ambulance / SCDF</h3>
+                          <div className="form-group" style={{ marginBottom: 10 }}>
+                            <label>Responder Type</label>
+                            <select className="form-control" value={inc.emergencyServices.ambulanceScdfType}
+                              onChange={e => incFieldUpdate({ emergencyServices: { ambulanceScdfType: e.target.value } })}
+                              disabled={incClosed}>
+                              <option value="">None</option>
+                              <option value="SCDF">SCDF Ambulance</option>
+                              <option value="Private">Private Ambulance</option>
+                            </select>
+                          </div>
+                          {inc.emergencyServices.ambulanceScdfType && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                              <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label>Call Sign</label>
+                                <input className="form-control" type="text" value={inc.emergencyServices.ambulanceCallSign}
+                                  onChange={e => incFieldUpdate({ emergencyServices: { ambulanceCallSign: e.target.value } })}
+                                  disabled={incClosed} />
+                              </div>
+                              <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label>Hospital Conveyed To</label>
+                                <input className="form-control" type="text" value={inc.emergencyServices.hospitalConveyedTo}
+                                  onChange={e => incFieldUpdate({ emergencyServices: { hospitalConveyedTo: e.target.value } })}
+                                  disabled={incClosed} />
                               </div>
                             </div>
                           )}
@@ -726,289 +570,191 @@ export default function CaseDetailsPage() {
                       </div>
                     )}
 
-                    {/* 4. Damage & Vehicles tab */}
-                    {activeTab === 'property' && (
-                      <div className="property-tab-content">
-                        <div className="subform-grid">
-                          <div className="subform-card">
-                            <h3>SDC PROPERTY DAMAGE</h3>
-                            <div className="checkbox-row">
-                              <input 
-                                type="checkbox" 
-                                id="prop-damage" 
-                                checked={inc.propertyDamage.sdcPropertyDamaged} 
-                                onChange={(e) => updateIncident({ propertyDamage: { sdcPropertyDamaged: e.target.checked } })}
-                                disabled={inc.status === 'Closed'}
-                              />
-                              <label htmlFor="prop-damage">SDC Property Damaged</label>
+                    {/* ── MEDIA TAB ────────────────────────────────────────── */}
+                    {incTab === 'media' && (
+                      <div className="subform-card">
+                        <h3 style={{ color: 'var(--color-review)', marginBottom: 12 }}>Media Presence at Scene</h3>
+                        <label className="checkbox-row">
+                          <input type="checkbox" checked={inc.mediaInvolvement.mediaAtScene}
+                            onChange={e => incFieldUpdate({ mediaInvolvement: { mediaAtScene: e.target.checked } })}
+                            disabled={incClosed} />
+                          Press/Media present at the scene
+                        </label>
+                        {inc.mediaInvolvement.mediaAtScene && (
+                          <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                            <div className="form-group" style={{ marginBottom: 0 }}>
+                              <label>Media Outlet Name</label>
+                              <input className="form-control" type="text" value={inc.mediaInvolvement.mediaName}
+                                onChange={e => incFieldUpdate({ mediaInvolvement: { mediaName: e.target.value } })}
+                                disabled={incClosed} />
                             </div>
-                            {inc.propertyDamage.sdcPropertyDamaged && (
-                              <div className="form-group">
-                                <label>Damage Description</label>
-                                <textarea 
-                                  value={inc.propertyDamage.description} 
-                                  onChange={(e) => updateIncident({ propertyDamage: { description: e.target.value } })}
-                                  disabled={inc.status === 'Closed'}
-                                  className="form-control"
-                                  rows={3}
-                                />
-                              </div>
-                            )}
-                          </div>
-                          
-                          <div className="subform-card">
-                            <h3>VEHICLES INVOLVED</h3>
-                            <p className="sub-desc">SDC or private guest vehicle particulars details.</p>
-                            <div className="checkbox-row">
-                              <input type="checkbox" id="sdc-veh" disabled />
-                              <label htmlFor="sdc-veh">SDC Vehicle Involved</label>
+                            <div style={{ background: 'rgba(234,88,12,0.08)', border: '1px solid rgba(234,88,12,0.25)', borderRadius: 6, padding: '10px 14px', fontSize: 12, color: 'var(--color-high)' }}>
+                              <strong>⚠ CRITICAL:</strong> Media presence flagged. Notify SDC Communications Team immediately.
+                              <label className="checkbox-row" style={{ marginTop: 8 }}>
+                                <input type="checkbox" id="comms-notified" checked={inc.mediaInvolvement.commsNotified}
+                                  onChange={e => incFieldUpdate({ mediaInvolvement: { commsNotified: e.target.checked } })}
+                                  disabled={incClosed} />
+                                SDC Comms Team Notified
+                              </label>
                             </div>
                           </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* ── PROPERTY TAB ─────────────────────────────────────── */}
+                    {incTab === 'property' && (
+                      <div className="subform-grid">
+                        <div className="subform-card">
+                          <h3 style={{ marginBottom: 12 }}>SDC Property Damage</h3>
+                          <label className="checkbox-row">
+                            <input type="checkbox" id="prop-damage" checked={inc.propertyDamage.sdcPropertyDamaged}
+                              onChange={e => incFieldUpdate({ propertyDamage: { sdcPropertyDamaged: e.target.checked } })}
+                              disabled={incClosed} />
+                            SDC Property Damaged
+                          </label>
+                          {inc.propertyDamage.sdcPropertyDamaged && (
+                            <div className="form-group" style={{ marginTop: 12, marginBottom: 0 }}>
+                              <label>Damage Description</label>
+                              <textarea className="form-control" rows={3} value={inc.propertyDamage.description}
+                                onChange={e => incFieldUpdate({ propertyDamage: { description: e.target.value } })}
+                                disabled={incClosed} />
+                            </div>
+                          )}
+                        </div>
+                        <div className="subform-card">
+                          <h3 style={{ marginBottom: 12 }}>Vehicles Involved</h3>
+                          <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Vehicle particulars recording — coming soon.</p>
                         </div>
                       </div>
                     )}
 
-                    {/* 5. Persons Involved tab */}
-                    {activeTab === 'persons' && (
-                      <div className="persons-tab-content">
-                        <div className="subform-grid">
-                          
-                          {/* Injuries Logger */}
-                          <div className="subform-card">
-                            <h3>PERSONAL INJURIES LOG</h3>
-                            
-                            {inc.status !== 'Closed' && (
-                              <div className="add-log-box">
-                                <div className="form-group">
-                                  <label>Full Name</label>
-                                  <input type="text" value={injuryName} onChange={e => setInjuryName(e.target.value)} className="form-control" />
+                    {/* ── PERSONS TAB ──────────────────────────────────────── */}
+                    {incTab === 'persons' && (
+                      <div className="subform-grid">
+                        {/* Injuries */}
+                        <div className="subform-card">
+                          <h3 style={{ marginBottom: 12 }}>Personal Injuries Log</h3>
+                          {!incClosed && (
+                            <div style={{ border: '1px dashed var(--border-color)', borderRadius: 6, padding: 12, marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                              <div className="form-group" style={{ marginBottom: 0 }}><label>Full Name</label><input className="form-control" value={injName} onChange={e => setInjName(e.target.value)} /></div>
+                              <div className="form-group" style={{ marginBottom: 0 }}><label>Age</label><input className="form-control" type="number" value={injAge} onChange={e => setInjAge(e.target.value)} /></div>
+                              <div className="form-group" style={{ marginBottom: 0 }}><label>Contact Number</label><input className="form-control" value={injContact} onChange={e => setInjContact(e.target.value)} /></div>
+                              <div className="form-group" style={{ marginBottom: 0 }}><label>Hospital / Clinic</label><input className="form-control" value={injHospital} onChange={e => setInjHospital(e.target.value)} /></div>
+                              <label className="checkbox-row" style={{ fontSize: 12 }}>
+                                <input type="checkbox" checked={injU16} onChange={e => setInjU16(e.target.checked)} />
+                                Under 16 years old
+                              </label>
+                              {injU16 && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '8px 10px', background: 'var(--bg-inset)', borderRadius: 5 }}>
+                                  <div className="form-group" style={{ marginBottom: 0 }}><label>Guardian Name</label><input className="form-control" value={parentName} onChange={e => setParentName(e.target.value)} /></div>
+                                  <div className="form-group" style={{ marginBottom: 0 }}><label>Guardian Contact</label><input className="form-control" value={parentTel} onChange={e => setParentTel(e.target.value)} /></div>
                                 </div>
-                                <div className="form-group">
-                                  <label>Age</label>
-                                  <input type="number" value={injuryAge} onChange={e => setInjuryAge(e.target.value)} className="form-control" />
-                                </div>
-                                <div className="form-group">
-                                  <label>Contact Number</label>
-                                  <input type="text" value={injuryContact} onChange={e => setInjuryContact(e.target.value)} className="form-control" />
-                                </div>
-                                <div className="form-group">
-                                  <label>Hospital/Clinic Conveyed</label>
-                                  <input type="text" value={injuryHospital} onChange={e => setInjuryHospital(e.target.value)} className="form-control" />
-                                </div>
-                                
-                                <div className="checkbox-row">
-                                  <input type="checkbox" id="under-16" checked={injuryUnder16} onChange={e => setInjuryUnder16(e.target.checked)} />
-                                  <label htmlFor="under-16">Injured person is Under 16 years old</label>
-                                </div>
-
-                                {injuryUnder16 && (
-                                  <div className="under-16-fields glass">
-                                    <div className="form-group">
-                                      <label>Parent/Guardian Name</label>
-                                      <input type="text" value={parentName} onChange={e => setParentName(e.target.value)} className="form-control" />
-                                    </div>
-                                    <div className="form-group">
-                                      <label>Parent/Guardian Contact</label>
-                                      <input type="text" value={parentContact} onChange={e => setParentContact(e.target.value)} className="form-control" />
-                                    </div>
-                                  </div>
-                                )}
-                                <button type="button" onClick={handleAddInjury} className="btn btn-primary" style={{ marginTop: '10px' }}>
-                                  ADD INJURY ENTRY
-                                </button>
-                              </div>
-                            )}
-
-                            <div className="logged-items-list" style={{ marginTop: '20px' }}>
-                              <h4>RECORDED INJURIES</h4>
-                              {inc.personalInjuries.length === 0 ? (
-                                <p className="empty">No injuries recorded.</p>
-                              ) : (
-                                inc.personalInjuries.map((inj, i) => (
-                                  <div className="logged-item glass" key={i}>
-                                    <div className="name">{inj.name} (Age: {inj.age}) {inj.under16 && <span className="under-16-indicator">[Under-16]</span>}</div>
-                                    <div className="details">Hospital: {inj.clinicHospitalAttended || 'None'} &bull; Tel: {inj.contactNumber}</div>
-                                    {inj.under16 && (
-                                      <div className="guardian">Guardian: {inj.parentGuardianName} ({inj.parentGuardianContact})</div>
-                                    )}
-                                  </div>
-                                ))
                               )}
+                              <button type="button" className="btn btn-primary btn-sm" onClick={handleAddInjury}>Add Entry</button>
                             </div>
-                          </div>
-
-                          {/* General Persons Involved */}
-                          <div className="subform-card">
-                            <h3>OTHER PERSONS INVOLVED</h3>
-                            
-                            {inc.status !== 'Closed' && (
-                              <div className="add-log-box">
-                                <div className="form-group">
-                                  <label>Person Type</label>
-                                  <select value={personType} onChange={e => setPersonType(e.target.value)} className="form-control select-dark">
-                                    <option value="Guest">Guest</option>
-                                    <option value="Staff">Staff</option>
-                                    <option value="Island Partner">Island Partner</option>
-                                    <option value="Contractor">Contractor</option>
-                                  </select>
-                                </div>
-                                <div className="form-group">
-                                  <label>Full Name</label>
-                                  <input type="text" value={personName} onChange={e => setPersonName(e.target.value)} className="form-control" />
-                                </div>
-                                <div className="form-group">
-                                  <label>Contact Number</label>
-                                  <input type="text" value={personContact} onChange={e => setPersonContact(e.target.value)} className="form-control" />
-                                </div>
-                                <div className="form-group">
-                                  <label>Role/Involvement</label>
-                                  <select value={personRole} onChange={e => setPersonRole(e.target.value)} className="form-control select-dark">
-                                    <option value="Witness">Witness</option>
-                                    <option value="Bystander">Bystander</option>
-                                    <option value="Subject">Subject/Actor</option>
-                                    <option value="Other">Other</option>
-                                  </select>
-                                </div>
-                                <button type="button" onClick={handleAddPerson} className="btn btn-primary" style={{ marginTop: '10px' }}>
-                                  ADD PERSON ENTRY
-                                </button>
+                          )}
+                          {inc.personalInjuries.length === 0 ? (
+                            <p style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', padding: '12px 0' }}>No injuries recorded.</p>
+                          ) : inc.personalInjuries.map((inj, i) => (
+                            <div key={i} className="glass" style={{ padding: '10px 14px', marginBottom: 8 }}>
+                              <div style={{ fontWeight: 600, fontSize: 13 }}>
+                                {inj.name} (Age: {inj.age})
+                                {inj.under16 && <span style={{ marginLeft: 6, fontSize: 9, background: 'var(--color-critical-bg)', color: 'var(--color-critical)', padding: '2px 6px', borderRadius: 3, fontWeight: 700 }}>UNDER-16</span>}
                               </div>
-                            )}
-
-                            <div className="logged-items-list" style={{ marginTop: '20px' }}>
-                              <h4>RECORDED INDIVIDUALS</h4>
-                              {inc.personsInvolved.length === 0 ? (
-                                <p className="empty">No other persons recorded.</p>
-                              ) : (
-                                inc.personsInvolved.map((p, i) => (
-                                  <div className="logged-item glass" key={i}>
-                                    <div className="name">{p.name} ({p.type})</div>
-                                    <div className="details">Role: {p.roleInvolvement} &bull; Tel: {p.contactNumber}</div>
-                                  </div>
-                                ))
-                              )}
+                              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>Hospital: {inj.clinicHospitalAttended || '—'} · Tel: {inj.contactNumber}</div>
+                              {inj.under16 && <div style={{ fontSize: 10, color: 'var(--text-faint)', marginTop: 4 }}>Guardian: {inj.parentGuardianName} ({inj.parentGuardianContact})</div>}
                             </div>
-                          </div>
+                          ))}
+                        </div>
+
+                        {/* Other persons */}
+                        <div className="subform-card">
+                          <h3 style={{ marginBottom: 12 }}>Other Persons Involved</h3>
+                          {!incClosed && (
+                            <div style={{ border: '1px dashed var(--border-color)', borderRadius: 6, padding: 12, marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                              <div className="form-group" style={{ marginBottom: 0 }}><label>Person Type</label>
+                                <select className="form-control" value={pType} onChange={e => setPType(e.target.value)}>
+                                  {['Guest','Staff','Island Partner','Contractor'].map(o => <option key={o}>{o}</option>)}
+                                </select>
+                              </div>
+                              <div className="form-group" style={{ marginBottom: 0 }}><label>Full Name</label><input className="form-control" value={pName} onChange={e => setPName(e.target.value)} /></div>
+                              <div className="form-group" style={{ marginBottom: 0 }}><label>Contact Number</label><input className="form-control" value={pContact} onChange={e => setPContact(e.target.value)} /></div>
+                              <div className="form-group" style={{ marginBottom: 0 }}><label>Role / Involvement</label>
+                                <select className="form-control" value={pRole} onChange={e => setPRole(e.target.value)}>
+                                  {['Witness','Bystander','Subject','Other'].map(o => <option key={o}>{o}</option>)}
+                                </select>
+                              </div>
+                              <button type="button" className="btn btn-primary btn-sm" onClick={handleAddPerson}>Add Person</button>
+                            </div>
+                          )}
+                          {inc.personsInvolved.length === 0 ? (
+                            <p style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', padding: '12px 0' }}>No persons recorded.</p>
+                          ) : inc.personsInvolved.map((p, i) => (
+                            <div key={i} className="glass" style={{ padding: '10px 14px', marginBottom: 8 }}>
+                              <div style={{ fontWeight: 600, fontSize: 13 }}>{p.name} ({p.type})</div>
+                              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>Role: {p.roleInvolvement} · Tel: {p.contactNumber}</div>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     )}
 
-                    {/* 6. Slave Incidents / Duplicates tab */}
-                    {activeTab === 'duplicates' && (
-                      <div className="duplicates-tab-content">
-                        <div className="subform-grid">
-                          
-                          {/* Logger */}
-                          <div className="subform-card">
-                            <h3>LINK DUPLICATE INCIDENT (SLAVE)</h3>
-                            <p className="sub-desc">Log a duplicate report for this incident. Duplicate reports are linked as slaves and do not trigger separate ranger deployments.</p>
-                            
-                            {inc.status !== 'Closed' ? (
-                              <form onSubmit={handleAddSlaveIncident} className="add-log-box" style={{ borderStyle: 'solid', borderWidth: '1px' }}>
-                                <div className="form-group">
-                                  <label>Duplicate Report Title *</label>
-                                  <input 
-                                    type="text" 
-                                    value={slaveTitle} 
-                                    onChange={e => setSlaveTitle(e.target.value)} 
-                                    placeholder="e.g. Another caller reporting the same bag" 
-                                    required 
-                                    className="form-control" 
-                                  />
-                                </div>
-                                <div className="form-group">
-                                  <label>Reporter Name</label>
-                                  <input 
-                                    type="text" 
-                                    value={slaveReporter} 
-                                    onChange={e => setSlaveReporter(e.target.value)} 
-                                    placeholder="Reporter's name or contact number" 
-                                    className="form-control" 
-                                  />
-                                </div>
-                                <div className="form-group">
-                                  <label>Duplicate Incident Summary</label>
-                                  <textarea 
-                                    value={slaveSummary} 
-                                    onChange={e => setSlaveSummary(e.target.value)} 
-                                    placeholder="Brief notes from caller..." 
-                                    className="form-control" 
-                                    rows={3} 
-                                  />
-                                </div>
-                                <button type="submit" className="btn btn-primary" style={{ marginTop: '10px' }}>
-                                  LINK DUPLICATE REPORT
-                                </button>
-                              </form>
-                            ) : (
-                              <p className="empty">This Master Incident is Closed. No new duplicates can be linked.</p>
-                            )}
-                          </div>
+                    {/* ── SLAVE/DUPLICATES TAB ─────────────────────────────── */}
+                    {incTab === 'duplicates' && (
+                      <div className="subform-grid">
+                        <div className="subform-card">
+                          <h3 style={{ marginBottom: 8 }}>Link Duplicate (Slave) Incident</h3>
+                          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
+                            Duplicate reports are linked as slaves and do not trigger separate ranger deployments.
+                          </p>
+                          {!incClosed ? (
+                            <form onSubmit={handleAddSlave} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                              <div className="form-group" style={{ marginBottom: 0 }}><label>Report Title *</label><input className="form-control" required value={slaveTitle} onChange={e => setSlaveTitle(e.target.value)} placeholder="e.g. Another caller reporting the same bag" /></div>
+                              <div className="form-group" style={{ marginBottom: 0 }}><label>Reporter Name</label><input className="form-control" value={slaveReporter} onChange={e => setSlaveReporter(e.target.value)} /></div>
+                              <div className="form-group" style={{ marginBottom: 0 }}><label>Summary</label><textarea className="form-control" rows={2} value={slaveSummary} onChange={e => setSlaveSummary(e.target.value)} /></div>
+                              <button type="submit" className="btn btn-primary btn-sm">Link Duplicate</button>
+                            </form>
+                          ) : <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Incident is Closed. No new duplicates can be linked.</p>}
+                        </div>
 
-                          {/* Records */}
-                          <div className="subform-card">
-                            <h3>LINKED SLAVE INCIDENTS</h3>
-                            <div className="logged-items-list" style={{ marginTop: '0px' }}>
-                              {!inc.slaveIncidents || inc.slaveIncidents.length === 0 ? (
-                                <p className="empty">No duplicate records linked to this incident.</p>
-                              ) : (
-                                inc.slaveIncidents.map((s, i) => (
-                                  <div className="logged-item glass" key={i} style={{ marginBottom: '12px', padding: '14px' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                      <span className="name" style={{ color: 'var(--color-primary-dark)', fontWeight: 'bold' }}>{s.id}: {s.title}</span>
-                                      <span className={`badge ${s.status === 'Closed' ? 'badge-closed' : 'badge-live'}`}>
-                                        {s.status}
-                                      </span>
-                                    </div>
-                                    <div className="details" style={{ margin: '6px 0 8px 0', fontSize: '11px', color: 'var(--text-muted)' }}>
-                                      Reporter: <strong>{s.reporterName}</strong> &bull; Logged: {new Date(s.dateTime).toLocaleString()}
-                                    </div>
-                                    {s.summary && (
-                                      <p className="sub-desc" style={{ padding: '8px', background: 'var(--bg-base)', borderRadius: '4px', fontSize: '11px' }}>
-                                        {s.summary}
-                                      </p>
-                                    )}
-                                  </div>
-                                ))
-                              )}
+                        <div className="subform-card">
+                          <h3 style={{ marginBottom: 12 }}>Linked Slave Incidents</h3>
+                          {!inc.slaveIncidents?.length ? (
+                            <p style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', padding: '16px 0' }}>No duplicate records linked.</p>
+                          ) : inc.slaveIncidents.map((s: any, i: number) => (
+                            <div key={i} className="glass" style={{ padding: '12px 14px', marginBottom: 10 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--color-info)' }}>{s.id}: {s.title}</span>
+                                <span className={s.status === 'Closed' ? 'badge badge-closed' : 'badge badge-live'}>{s.status}</span>
+                              </div>
+                              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Reporter: <strong>{s.reporterName}</strong> · {new Date(s.dateTime).toLocaleString('en-SG')}</div>
+                              {s.summary && <p style={{ marginTop: 6, fontSize: 11, color: 'var(--text-sub)', background: 'var(--bg-inset)', padding: '6px 8px', borderRadius: 4 }}>{s.summary}</p>}
                             </div>
-                          </div>
-
+                          ))}
                         </div>
                       </div>
                     )}
-
                   </div>
 
-                  {/* Ground Ranger Updates */}
-                  {inc.status !== 'Closed' && (
-                    <div className="ranger-activity-card glass" style={{ marginTop: '20px' }}>
-                      <div className="card-header">
-                        <h2>RESPONDER ACTIVITY UPDATES</h2>
+                  {/* Ranger Activity Updater */}
+                  {!incClosed && (
+                    <div className="glass" style={{ padding: '14px 18px' }}>
+                      <div className="card-header" style={{ paddingLeft: 0, paddingRight: 0, paddingTop: 0 }}>
+                        <h2>Responder Activity Updates</h2>
                       </div>
-                      <div className="ranger-activity-body">
-                        <p className="activity-desc">Rangers log immediate updates on-scene (e.g. cordon established, area cleared).</p>
-                        <form onSubmit={handleAppendRangerActivity} className="activity-form">
-                          <input 
-                            type="text" 
-                            placeholder="e.g. Medical team is currently stabilizing the subject." 
-                            value={rangerActivityText} 
-                            onChange={(e) => setRangerActivityText(e.target.value)} 
-                            className="form-control"
-                          />
-                          
-                          <div className="quick-selects">
-                            <button type="button" className="quick-btn" onClick={() => setRangerActivityText('Cordon established around the site.')}>Cordon set</button>
-                            <button type="button" className="quick-btn" onClick={() => setRangerActivityText('Commenced search operations in the immediate vicinity.')}>Search started</button>
-                            <button type="button" className="quick-btn" onClick={() => setRangerActivityText('First-aid administered. Subject responsive.')}>First aid done</button>
-                            <button type="button" className="quick-btn" onClick={() => setRangerActivityText('Area cleared and returned to standard operational state.')}>Area cleared</button>
-                          </div>
-                          
-                          <button type="submit" className="btn btn-secondary" style={{ marginTop: '10px' }}>
-                            LOG ACTIVITY UPDATE
-                          </button>
-                        </form>
-                      </div>
+                      <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>Rangers log immediate on-scene updates.</p>
+                      <form onSubmit={handleRangerActivity} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <input className="form-control" type="text" placeholder="e.g. Medical team is stabilizing the subject."
+                          value={rangerActivityText} onChange={e => setRangerActivity(e.target.value)} />
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          {['Cordon established.', 'Search operations commenced.', 'First aid administered.', 'Area cleared and normal.'].map(q => (
+                            <button key={q} type="button" onClick={() => setRangerActivity(q)}
+                              className="btn btn-secondary btn-xs">{q.slice(0, 20)}…</button>
+                          ))}
+                        </div>
+                        <button type="submit" className="btn btn-secondary btn-sm" disabled={saving}>Log Activity Update</button>
+                      </form>
                     </div>
                   )}
                 </>
@@ -1016,64 +762,31 @@ export default function CaseDetailsPage() {
             </>
           )}
 
-          {/* Tab 2: Ground Tasks */}
-          {activeComponent === 'tasks' && (
-            <div className="tasks-tab-content">
-              <div className="tasks-list-header">
-                <div>
-                  <h3>Linked Ground Tasks</h3>
-                  <p className="sub-desc" style={{ marginTop: '2px' }}>{tasks.length} task(s) dispatched for this Case</p>
-                </div>
-                {isController && caseData.status !== 'Closed' && (
-                  <button className="btn btn-primary" onClick={() => setShowCreateTaskModal(true)}>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '14px', height: '14px' }}>
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-                    </svg>
-                    DISPATCH NEW TASK
-                  </button>
+          {/* ── TASKS TAB ───────────────────────────────────────────────────── */}
+          {compTab === 'tasks' && (
+            <div className="glass" style={{ overflow: 'hidden' }}>
+              <div className="card-header">
+                <h2>Ground Tasks ({tasks.length})</h2>
+                {isCtrl && !isClosed && (
+                  <button className="btn btn-primary btn-sm" onClick={() => setShowTaskModal(true)}>+ Dispatch Task</button>
                 )}
               </div>
-
               {tasks.length === 0 ? (
-                <div className="empty-component-card glass">
-                  <div className="icon">📋</div>
-                  <h3>No Tasks Dispatched</h3>
-                  <p>No ground responder tasks are currently linked to this case folder.</p>
-                  {isController && caseData.status !== 'Closed' && (
-                    <button className="btn btn-secondary" style={{ marginTop: '12px' }} onClick={() => setShowCreateTaskModal(true)}>
-                      Dispatch First Task
-                    </button>
-                  )}
+                <div className="empty-state">
+                  No tasks dispatched for this case.
+                  {isCtrl && !isClosed && <button className="btn btn-secondary btn-sm" style={{ marginTop: 10, display: 'block' }} onClick={() => setShowTaskModal(true)}>Dispatch First Task</button>}
                 </div>
               ) : (
-                <div className="task-list-cards">
-                  {tasks.map((t) => (
-                    <div key={t.id} className="task-list-card glass" onClick={() => { setSelectedTask(t); setNewAssignee(t.assignee); }}>
-                      <div className="task-info-main">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span className="task-title-text">{t.title}</span>
-                          <span className={`badge ${
-                            t.status === 'Closed' ? 'badge-closed' :
-                            t.status === 'In Progress' ? 'badge-onsite' :
-                            t.status === 'Acknowledged' ? 'badge-ack' : 'badge-live'
-                          }`}>
-                            {t.status}
-                          </span>
-                        </div>
-                        <p className="sub-desc" style={{ display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden', margin: '4px 0' }}>
-                          {t.description || 'No description provided.'}
-                        </p>
-                        <div className="task-meta-text">
-                          <span>ID: <strong>{t.id}</strong></span>
-                          <span>Assignee: <strong>👤 {t.assignee}</strong></span>
-                          <span>Priority: <strong>⚡ {t.priority}</strong></span>
-                          {t.dueDate && (
-                            <span>Due: <strong>📅 {new Date(t.dueDate).toLocaleString()}</strong></span>
-                          )}
-                        </div>
+                <div>
+                  {tasks.map(t => (
+                    <div key={t.id} className="active-case-item" onClick={() => { setSelectedTask(t); setNewAssignee(t.assignee); }}>
+                      <div className="active-case-info">
+                        <span className="case-id">{t.id}</span>
+                        <span className="case-title">{t.title}</span>
+                        <span className="case-meta">Assignee: {t.assignee} · Priority: {t.priority}{t.dueDate ? ` · Due: ${new Date(t.dueDate).toLocaleString('en-SG')}` : ''}</span>
                       </div>
-                      <div className="btn btn-secondary btn-sm" style={{ padding: '6px 12px', fontSize: '11px' }}>
-                        Manage Task
+                      <div className="active-case-status">
+                        <span className={t.status === 'Closed' ? 'badge badge-closed' : t.status === 'In Progress' ? 'badge badge-onsite' : t.status === 'Acknowledged' ? 'badge badge-ack' : 'badge badge-live'}>{t.status}</span>
                       </div>
                     </div>
                   ))}
@@ -1082,1140 +795,329 @@ export default function CaseDetailsPage() {
             </div>
           )}
 
-          {/* Tab 3: IFM CMMS Faults */}
-          {activeComponent === 'faults' && (
-            <div className="faults-tab-content">
-              <div className="tasks-list-header">
-                <div>
-                  <h3>IFM Infrastructure Faults</h3>
-                  <p className="sub-desc" style={{ marginTop: '2px' }}>Linked CMMS maintenance tickets</p>
-                </div>
-                {caseData.cmmsTickets.length === 0 && caseData.status !== 'Closed' && (
-                  <button 
-                    type="button" 
-                    onClick={handleCMMSCreation} 
-                    disabled={cmmsLoading}
-                    className="btn btn-primary"
-                  >
-                    {cmmsLoading ? 'LINKING...' : 'RAISE LINKED CMMS FAULT'}
+          {/* ── FAULTS TAB ──────────────────────────────────────────────────── */}
+          {compTab === 'faults' && (
+            <div className="glass" style={{ overflow: 'hidden' }}>
+              <div className="card-header">
+                <h2>IFM Infrastructure Faults</h2>
+                {(caseData.cmmsTickets?.length ?? 0) === 0 && !isClosed && (
+                  <button className="btn btn-info btn-sm" onClick={handleCMMS} disabled={cmmsLoading}>
+                    {cmmsLoading ? 'Raising…' : 'Raise CMMS Ticket'}
                   </button>
                 )}
               </div>
-
-              {caseData.cmmsTickets.length === 0 ? (
-                <div className="empty-component-card glass">
-                  <div className="icon">🔧</div>
-                  <h3>No Infrastructure Faults Linked</h3>
-                  <p>No active CMMS tickets are raised or linked to this case folder.</p>
-                  {caseData.status !== 'Closed' && (
-                    <button 
-                      type="button" 
-                      onClick={handleCMMSCreation} 
-                      disabled={cmmsLoading}
-                      className="btn btn-secondary"
-                      style={{ marginTop: '12px' }}
-                    >
-                      {cmmsLoading ? 'Raising Ticket...' : 'Raise CMMS Maintenance Ticket'}
+              {(caseData.cmmsTickets?.length ?? 0) === 0 ? (
+                <div className="empty-state">
+                  No CMMS tickets linked to this case.
+                  {!isClosed && (
+                    <button className="btn btn-secondary btn-sm" style={{ marginTop: 10, display: 'block' }} onClick={handleCMMS} disabled={cmmsLoading}>
+                      {cmmsLoading ? 'Raising…' : 'Raise Maintenance Ticket'}
                     </button>
                   )}
                 </div>
               ) : (
-                <div className="linked-tickets-list glass" style={{ padding: '20px' }}>
-                  <p className="success-txt" style={{ marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span className="dot dot-warning" />
-                    Active CMMS Tickets Linked:
-                  </p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {caseData.cmmsTickets.map((t, idx) => (
-                      <div className="cmms-ticket-pill" key={idx}>
-                        <div>
-                          <strong>{t}</strong>
-                          <span className="status-lbl" style={{ marginLeft: '12px', fontSize: '11px' }}>(Active in CMMS)</span>
-                        </div>
-                        <span className="badge badge-ack">Active</span>
-                      </div>
-                    ))}
-                  </div>
-                  <p className="ticket-desc-meta" style={{ marginTop: '16px' }}>
-                    Fault status updates are fetched via API. You may close this Case without waiting for CMMS resolution.
-                  </p>
+                <div style={{ padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {caseData.cmmsTickets.map((t, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: 'var(--color-info-bg)', border: '1px solid var(--color-info-border)', borderRadius: 6 }}>
+                      <code style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600, color: 'var(--color-info)' }}>{t}</code>
+                      <span className="badge badge-info">Active in CMMS</span>
+                    </div>
+                  ))}
+                  <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>Fault status updates are fetched via API callback. You may close this case without waiting for CMMS resolution.</p>
                 </div>
               )}
             </div>
           )}
-
         </div>
 
-        {/* Right column: Case Overview sidebar */}
-        <div className="case-sidebar-column">
-          
-          {/* Active Components Overview */}
-          <div className="side-card glass">
-            <h3>Case Components</h3>
-            <div className="info-list">
-              <div className="info-item">
-                <span className="label">🚨 Incident Report:</span>
-                <span className="value font-semibold">
-                  {inc ? (
-                    <span className="badge badge-live">Active</span>
-                  ) : (
-                    <span className="text-muted">Not Attached</span>
-                  )}
-                </span>
-              </div>
-              <div className="info-item">
-                <span className="label">📋 Ground Tasks:</span>
-                <span className="value font-semibold">
-                  {tasks.length > 0 ? (
-                    <span className="badge badge-onsite">{tasks.length} Tasks</span>
-                  ) : (
-                    <span className="text-muted">None</span>
-                  )}
-                </span>
-              </div>
-              <div className="info-item">
-                <span className="label">🔧 CMMS Faults:</span>
-                <span className="value font-semibold">
-                  {caseData.cmmsTickets?.length > 0 ? (
-                    <span className="badge badge-ack">{caseData.cmmsTickets.length} Linked</span>
-                  ) : (
-                    <span className="text-muted">None</span>
-                  )}
-                </span>
-              </div>
-            </div>
+        {/* ─── Right: Sidebar ──────────────────────────────────────────────── */}
+        <div className="case-side-col">
+
+          {/* Case Components overview */}
+          <div className="glass" style={{ padding: '14px 16px' }}>
+            <h3 className="section-title">Case Components</h3>
+            <InfoRow label="Incident Report" value={inc ? <span className="badge badge-live">Attached</span> : <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>Not Attached</span>} />
+            <InfoRow label="Ground Tasks"    value={tasks.length > 0 ? <span className="badge badge-onsite">{tasks.length} Tasks</span> : <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>None</span>} />
+            <InfoRow label="CMMS Faults"     value={(caseData.cmmsTickets?.length ?? 0) > 0 ? <span className="badge badge-ack">{caseData.cmmsTickets.length} Linked</span> : <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>None</span>} />
           </div>
 
-          {/* General Case Info */}
-          <div className="side-card glass">
-            <h3>CASE INFORMATION</h3>
-            <div className="info-list">
-              <div className="info-item">
-                <span className="label">Priority:</span>
-                <span className="value font-title font-semibold">{inc?.priority || 'Medium'}</span>
-              </div>
-              <div className="info-item">
-                <span className="label">Category:</span>
-                <span className="value">{inc ? `${inc.type} • ${inc.subType}` : 'General Case Folder'}</span>
-              </div>
-              <div className="info-item">
-                <span className="label">Assigned Responder:</span>
-                <span className="value font-semibold text-primary">{inc?.assignedTo || 'None'}</span>
-              </div>
-              {inc && (
-                <div className="info-item">
-                  <span className="label">Reporter:</span>
-                  <span className="value">{inc.reporterName}</span>
-                </div>
-              )}
-              {caseData.closedAt && (
-                <div className="info-item">
-                  <span className="label">Closed Date:</span>
-                  <span className="value text-muted" style={{ fontSize: '11px' }}>{new Date(caseData.closedAt).toLocaleString()}</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Location details card */}
-          <div className="side-card glass">
-            <h3>LOCATION GEOGRAPHY</h3>
-            {inc ? (
-              <div className="info-list">
-                <div className="info-item">
-                  <span className="label">Common Name:</span>
-                  <span className="value font-semibold">{inc.location.commonName}</span>
-                </div>
-                <div className="info-item">
-                  <span className="label">Road:</span>
-                  <span className="value">{inc.location.road}</span>
-                </div>
-                {inc.location.building && (
-                  <div className="info-item">
-                    <span className="label">Building:</span>
-                    <span className="value">{inc.location.building}</span>
-                  </div>
-                )}
-                {inc.location.levelSpace && (
-                  <div className="info-item">
-                    <span className="label">Level & Space:</span>
-                    <span className="value">{inc.location.levelSpace}</span>
-                  </div>
-                )}
-                <div className="info-item">
-                  <span className="label">Postal Code:</span>
-                  <span className="value">{inc.location.postalCode}</span>
-                </div>
-                <div className="info-item">
-                  <span className="label">Coordinates:</span>
-                  <span className="value font-mono text-muted">{inc.location.lat.toFixed(4)}, {inc.location.lng.toFixed(4)}</span>
-                </div>
-              </div>
-            ) : (
-              <div className="sidebar-empty-location text-muted" style={{ fontSize: '12px', textAlign: 'center', padding: '16px 0' }}>
-                <p>General Case Container</p>
-                <span style={{ fontSize: '11px', display: 'block', marginTop: '6px' }}>No geolocated incident report is linked. Location is inherited from linked tasks.</span>
-              </div>
-            )}
-          </div>
-
-          {/* CCTV references (only if incident is present) */}
+          {/* Incident Info */}
           {inc && (
-            <div className="side-card glass">
-              <h3>CCTV & CAMERA REFERENCES</h3>
-              <div className="camera-list">
-                {inc.cctvBwc.length === 0 ? (
-                  <p className="empty">No camera bookmarks logged.</p>
-                ) : (
-                  inc.cctvBwc.map((cam, i) => (
-                    <div className="camera-item" key={i}>
-                      <div className="label">Camera: {cam.cameraNumber || 'None'}</div>
-                      <div className="val">Timestamp: {cam.vmsTimestamp} &bull; Bookmark: {cam.vmsBookmark || '-'}</div>
-                      <div className="label" style={{ marginTop: '4px' }}>BWC (Body Cam): {cam.bwcNumber || '-'}</div>
-                    </div>
-                  ))
-                )}
-              </div>
+            <div className="glass" style={{ padding: '14px 16px' }}>
+              <h3 className="section-title">Incident Details</h3>
+              <InfoRow label="Priority"  value={<strong>{inc.priority}</strong>} />
+              <InfoRow label="Type"      value={`${inc.type} · ${inc.subType}`} />
+              <InfoRow label="Reporter"  value={inc.reporterName} />
+              <InfoRow label="Requested by" value={inc.requestedBy} />
+              <InfoRow label="Responder" value={inc.assignedTo ? <strong style={{ color: 'var(--color-info)' }}>{inc.assignedTo}</strong> : <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>Unassigned</span>} />
             </div>
           )}
 
-          {/* Combined Audit timeline */}
-          <div className="side-card glass">
-            <h3>CASE AUDIT TRAIL</h3>
-            <div className="timeline-section" style={{ marginTop: '8px' }}>
-              <div className="timeline">
-                {caseData.closedAt && (
-                  <div className="timeline-item">
-                    <div className="timeline-dot" style={{ backgroundColor: 'var(--text-muted)' }} />
-                    <div className="timeline-header">
-                      <span>{new Date(caseData.closedAt).toLocaleDateString()}</span>
-                    </div>
-                    <div className="timeline-desc" style={{ fontSize: '11px', padding: '6px 10px' }}>Case container marked Closed.</div>
-                  </div>
-                )}
-                {inc?.log && [...inc.log].reverse().map((entry) => (
-                  <div className="timeline-item" key={entry.eventNumber}>
-                    <div className="timeline-dot" />
-                    <div className="timeline-header">
-                      <span>{entry.date} {entry.time}</span>
-                    </div>
-                    <div className="timeline-desc" style={{ fontSize: '11px', padding: '6px 10px' }}>{entry.description}</div>
-                  </div>
-                ))}
-                <div className="timeline-item">
-                  <div className="timeline-dot" style={{ backgroundColor: 'var(--color-primary)' }} />
-                  <div className="timeline-header">
-                    <span>{new Date(caseData.createdAt).toLocaleDateString()}</span>
-                  </div>
-                  <div className="timeline-desc" style={{ fontSize: '11px', padding: '6px 10px' }}>Case container established.</div>
+          {/* Location */}
+          {inc && (
+            <div className="glass" style={{ padding: '14px 16px' }}>
+              <h3 className="section-title">Location</h3>
+              <InfoRow label="Common Name" value={<strong>{inc.location.commonName || '—'}</strong>} />
+              <InfoRow label="Road"        value={inc.location.road || '—'} />
+              {inc.location.building   && <InfoRow label="Building"   value={inc.location.building} />}
+              {inc.location.levelSpace && <InfoRow label="Level/Space" value={inc.location.levelSpace} />}
+              <InfoRow label="Postal Code" value={inc.location.postalCode} />
+              <InfoRow label="Coordinates" value={<code style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>{inc.location.lat.toFixed(4)}, {inc.location.lng.toFixed(4)}</code>} />
+            </div>
+          )}
+
+          {/* CCTV / BWC */}
+          {inc && inc.cctvBwc.length > 0 && (
+            <div className="glass" style={{ padding: '14px 16px' }}>
+              <h3 className="section-title">CCTV & Camera References</h3>
+              {inc.cctvBwc.map((cam, i) => (
+                <div key={i} style={{ padding: '8px 10px', background: 'var(--bg-inset)', border: '1px solid var(--border-color)', borderRadius: 5, marginBottom: 8, fontSize: 12 }}>
+                  <div style={{ fontWeight: 600 }}>Camera: {cam.cameraNumber || '—'}</div>
+                  <div style={{ color: 'var(--text-muted)', marginTop: 3 }}>{cam.vmsTimestamp} · Bookmark: {cam.vmsBookmark || '—'}</div>
+                  <div style={{ color: 'var(--text-muted)' }}>BWC: {cam.bwcNumber || '—'}</div>
                 </div>
+              ))}
+            </div>
+          )}
+
+          {/* Audit trail */}
+          <div className="glass" style={{ padding: '14px 16px' }}>
+            <h3 className="section-title">Case Audit Trail</h3>
+            <div className="timeline" style={{ maxHeight: 280, overflowY: 'auto' }}>
+              {caseData.closedAt && (
+                <div className="timeline-item">
+                  <div className="timeline-dot" style={{ background: 'var(--color-closed)' }} />
+                  <div className="timeline-header"><span>{new Date(caseData.closedAt).toLocaleDateString('en-SG')}</span></div>
+                  <div className="timeline-desc" style={{ fontSize: 11, padding: '6px 10px' }}>Case container closed.</div>
+                </div>
+              )}
+              {inc?.log && [...inc.log].reverse().map(entry => (
+                <div className="timeline-item" key={entry.eventNumber}>
+                  <div className="timeline-dot" />
+                  <div className="timeline-header"><span>{entry.date} {entry.time}</span></div>
+                  <div className="timeline-desc" style={{ fontSize: 11, padding: '6px 10px' }}>{entry.description}</div>
+                </div>
+              ))}
+              <div className="timeline-item">
+                <div className="timeline-dot" style={{ background: 'var(--color-primary)' }} />
+                <div className="timeline-header"><span>{new Date(caseData.createdAt).toLocaleDateString('en-SG')}</span></div>
+                <div className="timeline-desc" style={{ fontSize: 11, padding: '6px 10px' }}>Case container established.</div>
               </div>
             </div>
           </div>
-
         </div>
-
       </div>
 
-      {/* MODALS */}
+      {/* ─── MODALS ──────────────────────────────────────────────────────────── */}
 
-      {/* Assign Responder Dialog */}
+      {/* Assign Ranger */}
       {showAssignModal && inc && (
-        <div className="modal-backdrop">
-          <div className="create-case-modal glass" style={{ maxHeight: '300px' }}>
-            <div className="modal-header">
-              <h2>ASSIGN FIELD RESPONDER (RANGER)</h2>
-              <button className="close-btn" onClick={() => setShowAssignModal(false)}>Close</button>
+        <div className="modal-overlay">
+          <div className="modal-box">
+            <div className="modal-title">Assign Field Responder (Ranger)</div>
+            <div className="form-group">
+              <label>Select Ranger</label>
+              <select className="form-control" value={assigneeInput} onChange={e => setAssigneeInput(e.target.value)}>
+                <option value="">— Choose Ranger —</option>
+                {['Ranger John (Siloso Zone)', 'Ranger Sarah (RWS Zone)', 'Ranger Alex (Imbiah Zone)', 'Ranger Tommy (Cove Zone)'].map(r => (
+                  <option key={r} value={r.split(' (')[0]}>{r}</option>
+                ))}
+              </select>
             </div>
-            <div className="modal-form" style={{ padding: '20px' }}>
-              <div className="form-group">
-                <label>Select Responder / Ranger Name</label>
-                <select 
-                  value={assigneeInput} 
-                  onChange={(e) => setAssigneeInput(e.target.value)} 
-                  className="form-control select-dark"
-                >
-                  <option value="">-- Choose Ranger --</option>
-                  <option value="Ranger John">Ranger John (Siloso Zone)</option>
-                  <option value="Ranger Sarah">Ranger Sarah (RWS Zone)</option>
-                  <option value="Ranger Alex">Ranger Alex (Imbiah Zone)</option>
-                  <option value="Ranger Tommy">Ranger Tommy (Cove Zone)</option>
-                </select>
-              </div>
-              <div className="modal-actions" style={{ padding: '10px 0 0 0', background: 'none' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowAssignModal(false)}>Cancel</button>
-                <button type="button" className="btn btn-primary" onClick={handleAssignResponder}>CONFIRM ASSIGNMENT</button>
-              </div>
+            <div className="modal-actions">
+              <button className="btn btn-secondary" onClick={() => setShowAssignModal(false)}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleAssign} disabled={!assigneeInput || saving}>Confirm Assignment</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Complete Ground Activities Dialog */}
+      {/* Completion Remarks */}
       {showCompleteModal && (
-        <div className="modal-backdrop">
-          <div className="create-case-modal glass" style={{ maxHeight: '350px' }}>
-            <div className="modal-header">
-              <h2>NOTIFY GROUND COMPLETION</h2>
-              <button className="close-btn" onClick={() => setShowCompleteModal(false)}>Close</button>
+        <div className="modal-overlay">
+          <div className="modal-box">
+            <div className="modal-title">Notify Ground Completion</div>
+            <div className="form-group">
+              <label>Ground Completion Remarks *</label>
+              <textarea className="form-control" rows={3} value={completionRemarks}
+                onChange={e => setCompletionRemarks(e.target.value)}
+                placeholder="Summarize actions taken on ground…" required />
             </div>
-            <div className="modal-form" style={{ padding: '20px' }}>
-              <div className="form-group">
-                <label>Ground Completion Remarks *</label>
-                <textarea 
-                  value={completionRemarks} 
-                  onChange={(e) => setCompletionRemarks(e.target.value)} 
-                  className="form-control"
-                  rows={3}
-                  required
-                  placeholder="Summarize actions taken on ground..."
-                />
-              </div>
-              <div className="modal-actions" style={{ padding: '10px 0 0 0', background: 'none' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowCompleteModal(false)}>Cancel</button>
-                <button 
-                  type="button" 
-                  className="btn btn-success" 
-                  onClick={() => handleStatusTransition('Live (Completed)')}
-                  disabled={!completionRemarks.trim()}
-                >
-                  SUBMIT COMPLETION
-                </button>
-              </div>
+            <div className="modal-actions">
+              <button className="btn btn-secondary" onClick={() => setShowCompleteModal(false)}>Cancel</button>
+              <button className="btn btn-success" onClick={handleComplete} disabled={!completionRemarks.trim() || saving}>Submit Completion</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Create Task Modal */}
-      {showCreateTaskModal && (
-        <div className="modal-backdrop">
-          <div className="create-case-modal glass">
-            <div className="modal-header">
-              <h2>CREATE TASK FOR CASE {caseId}</h2>
-              <button className="close-btn" onClick={() => setShowCreateTaskModal(false)}>Close</button>
-            </div>
-            
-            <form onSubmit={handleCreateTask} className="modal-form">
-              <div className="modal-scroll-area">
-                
+      {/* Create Task */}
+      {showTaskModal && (
+        <div className="modal-overlay">
+          <div className="modal-box" style={{ maxWidth: 560 }}>
+            <div className="modal-title">Dispatch New Task — {caseId}</div>
+            <form onSubmit={handleCreateTask}>
+              <div className="form-group"><label>Task Title *</label><input className="form-control" required value={taskTitle} onChange={e => setTaskTitle(e.target.value)} placeholder="e.g. Escort contractor to substation" /></div>
+              <div className="form-group"><label>Description</label><textarea className="form-control" rows={2} value={taskDesc} onChange={e => setTaskDesc(e.target.value)} placeholder="Ground activities needed…" /></div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div className="form-group">
-                  <label>Task Title *</label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g. Escort contractor to substation" 
-                    value={taskTitle} 
-                    onChange={e => setTaskTitle(e.target.value)} 
-                    required 
-                    className="form-control"
-                  />
+                  <label>Assignee</label>
+                  <select className="form-control" value={taskAssignee} onChange={e => setTaskAssignee(e.target.value)}>
+                    {['Ranger John','Ranger Sarah','Ranger Alex','Ranger Tommy'].map(r => <option key={r}>{r}</option>)}
+                  </select>
                 </div>
-
                 <div className="form-group">
-                  <label>Task Description</label>
-                  <textarea 
-                    placeholder="Provide details on ground activities needed..." 
-                    value={taskDesc} 
-                    onChange={e => setTaskDesc(e.target.value)} 
-                    className="form-control"
-                    rows={3}
-                  />
+                  <label>Priority</label>
+                  <select className="form-control" value={taskPriority} onChange={e => setTaskPriority(e.target.value)}>
+                    {['High','Medium','Low'].map(p => <option key={p}>{p}</option>)}
+                  </select>
                 </div>
-
-                <div className="form-grid">
-                  <div className="form-group">
-                    <label>Assignee (Ranger / Staff)</label>
-                    <select 
-                      value={taskAssignee} 
-                      onChange={e => setTaskAssignee(e.target.value)} 
-                      className="form-control select-dark"
-                    >
-                      <option value="Ranger John">Ranger John</option>
-                      <option value="Ranger Sarah">Ranger Sarah</option>
-                      <option value="Ranger Alex">Ranger Alex</option>
-                      <option value="Ranger Tommy">Ranger Tommy</option>
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label>Priority</label>
-                    <select 
-                      value={taskPriority} 
-                      onChange={e => setTaskPriority(e.target.value)} 
-                      className="form-control select-dark"
-                    >
-                      <option value="High">High</option>
-                      <option value="Medium">Medium</option>
-                      <option value="Low">Low</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <label>Due Date & Time (Target completion)</label>
-                  <input 
-                    type="datetime-local" 
-                    value={taskDueDate} 
-                    onChange={e => setTaskDueDate(e.target.value)} 
-                    className="form-control"
-                  />
-                </div>
-
               </div>
-              
+              <div className="form-group"><label>Due Date & Time</label><input className="form-control" type="datetime-local" value={taskDueDate} onChange={e => setTaskDueDate(e.target.value)} /></div>
               <div className="modal-actions">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowCreateTaskModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">DISPATCH TASK</button>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowTaskModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary">Dispatch Task</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* Task detail popup */}
+      {/* Task Detail */}
       {selectedTask && (
-        <div className="modal-backdrop">
-          <div className="create-case-modal glass" style={{ maxHeight: '480px' }}>
-            <div className="modal-header">
-              <h2>TASK ID: {selectedTask.id} ({selectedTask.status})</h2>
-              <button className="close-btn" onClick={() => setSelectedTask(null)}>Close</button>
+        <div className="modal-overlay">
+          <div className="modal-box" style={{ maxWidth: 520 }}>
+            <div className="modal-title">
+              <span className="mono-id" style={{ fontSize: 11 }}>{selectedTask.id}</span>
+              {' '}— {selectedTask.title}
             </div>
-            
-            <div className="task-detail-body">
-              <div className="detail-meta-row">
-                <div><strong>Parent Case:</strong> {selectedTask.caseId}</div>
-                <div><strong>Priority:</strong> {selectedTask.priority}</div>
-              </div>
-              <div className="detail-title">{selectedTask.title}</div>
-              <p className="detail-desc">{selectedTask.description || 'No description provided.'}</p>
-              
-              <div className="assignee-row glass">
-                <div className="curr-assignee">Assigned to: <strong>{selectedTask.assignee}</strong></div>
-                {/* Controller Reassign */}
-                {isController && caseData.status !== 'Closed' && (
-                  <div className="reassign-inputs">
-                    <select 
-                      value={newAssignee} 
-                      onChange={(e) => setNewAssignee(e.target.value)}
-                      className="form-control select-dark"
-                      style={{ padding: '6px', height: '34px', fontSize: '12px' }}
-                    >
-                      <option value="Ranger John">Ranger John</option>
-                      <option value="Ranger Sarah">Ranger Sarah</option>
-                      <option value="Ranger Alex">Ranger Alex</option>
-                      <option value="Ranger Tommy">Ranger Tommy</option>
-                    </select>
-                    <button 
-                      className="btn btn-secondary" 
-                      onClick={() => handleReassignTask(selectedTask.id)}
-                      style={{ padding: '6px 12px' }}
-                    >
-                      Reassign
-                    </button>
-                  </div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12, display: 'flex', gap: 12 }}>
+              <span>Parent: <strong>{selectedTask.caseId}</strong></span>
+              <span>Priority: <strong>{selectedTask.priority}</strong></span>
+              {selectedTask.dueDate && <span>Due: <strong>{new Date(selectedTask.dueDate).toLocaleString('en-SG')}</strong></span>}
+            </div>
+            {selectedTask.description && <p style={{ fontSize: 13, color: 'var(--text-sub)', marginBottom: 14 }}>{selectedTask.description}</p>}
+
+            {/* Assignee row */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: 'var(--bg-inset)', border: '1px solid var(--border-color)', borderRadius: 6, marginBottom: 14 }}>
+              <span style={{ fontSize: 13 }}>Assigned to: <strong>{selectedTask.assignee}</strong></span>
+              {isCtrl && !isClosed && (
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <select className="form-control" style={{ width: 'auto', height: 32, fontSize: 12, padding: '0 8px' }}
+                    value={newAssignee} onChange={e => setNewAssignee(e.target.value)}>
+                    {['Ranger John','Ranger Sarah','Ranger Alex','Ranger Tommy'].map(r => <option key={r}>{r}</option>)}
+                  </select>
+                  <button className="btn btn-secondary btn-xs" onClick={() => handleReassignTask(selectedTask.id)}>Reassign</button>
+                </div>
+              )}
+            </div>
+
+            {/* State transitions */}
+            <div>
+              <h3 style={{ marginBottom: 10 }}>Update Task State</h3>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {selectedTask.status !== 'Closed' && !isClosed && (
+                  <>
+                    {(isRanger || isCtrl) && ['Created','Re-Assigned'].includes(selectedTask.status) && (
+                      <button className="btn btn-secondary btn-sm" onClick={() => handleUpdateTask(selectedTask.id, 'Acknowledged')}>Acknowledge</button>
+                    )}
+                    {(isRanger || isCtrl) && ['Acknowledged','Created'].includes(selectedTask.status) && (
+                      <button className="btn btn-primary btn-sm" onClick={() => handleUpdateTask(selectedTask.id, 'In Progress')}>Start Work</button>
+                    )}
+                    {(isRanger || isCtrl) && selectedTask.status === 'In Progress' && (
+                      <button className="btn btn-secondary btn-sm" onClick={() => handleUpdateTask(selectedTask.id, 'Pending')}>Set to Pending</button>
+                    )}
+                    {(isRanger || isCtrl) && (
+                      <button className="btn btn-success btn-sm" onClick={() => handleUpdateTask(selectedTask.id, 'Closed')}>Close Task</button>
+                    )}
+                  </>
+                )}
+                {selectedTask.status === 'Closed' && isCtrl && !isClosed && (
+                  <button className="btn btn-danger btn-sm" onClick={() => handleUpdateTask(selectedTask.id, 'Created')}>Reopen Task</button>
                 )}
               </div>
+            </div>
 
-              {/* Status transition controls */}
-              <div className="modal-actions-wrapper">
-                <h4>UPDATE TASK STATE</h4>
-                <div className="state-btns">
-                  {selectedTask.status !== 'Closed' && caseData.status !== 'Closed' && (
-                    <>
-                      {/* Assignee / Ranger flows */}
-                      {(isRanger || isController) && (selectedTask.status === 'Created' || selectedTask.status === 'Re-Assigned') && (
-                        <button className="btn btn-secondary" onClick={() => handleUpdateTaskStatus(selectedTask.id, 'Acknowledged')}>
-                          Acknowledge Receipt
-                        </button>
-                      )}
-                      
-                      {(isRanger || isController) && (selectedTask.status === 'Acknowledged' || selectedTask.status === 'Created') && (
-                        <button className="btn btn-primary" onClick={() => handleUpdateTaskStatus(selectedTask.id, 'In Progress')}>
-                          Start Work (In Progress)
-                        </button>
-                      )}
-                      
-                      {(isRanger || isController) && selectedTask.status === 'In Progress' && (
-                        <button className="btn btn-secondary" onClick={() => handleUpdateTaskStatus(selectedTask.id, 'Pending')}>
-                          Set to Pending/Hold
-                        </button>
-                      )}
-
-                      {(isRanger || isController) && (
-                        <button className="btn btn-success" onClick={() => handleUpdateTaskStatus(selectedTask.id, 'Closed')}>
-                          Close Task (Completed)
-                        </button>
-                      )}
-                    </>
-                  )}
-                  {selectedTask.status === 'Closed' && isController && caseData.status !== 'Closed' && (
-                    <button className="btn btn-danger" onClick={() => handleUpdateTaskStatus(selectedTask.id, 'Created')}>
-                      Reopen Task
-                    </button>
-                  )}
-                </div>
-              </div>
+            <div className="modal-actions">
+              <button className="btn btn-secondary" onClick={() => setSelectedTask(null)}>Close</button>
             </div>
           </div>
         </div>
       )}
 
       <style jsx>{`
-        .case-detail-header-card {
-          padding: 24px;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 8px;
-        }
-
-        .case-detail-title-sec {
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-        }
-
-        .case-id-badge {
-          font-family: var(--font-title);
-          font-size: 11px;
-          font-weight: 800;
-          color: var(--color-primary);
-          letter-spacing: 0.05em;
-        }
-
-        .case-detail-title-sec h1 {
-          font-family: var(--font-title);
-          font-size: 22px;
-          font-weight: 800;
-          color: var(--text-main);
-        }
-
-        .case-timestamp {
-          font-size: 12px;
-          color: var(--text-muted);
-        }
-
-        .case-status-sec {
-          display: flex;
-          flex-direction: column;
-          align-items: flex-end;
-          gap: 12px;
-        }
-
-        .status-label-group {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
-
-        .status-label-group .label {
-          font-size: 11px;
-          color: var(--text-muted);
-          font-weight: 700;
-          text-transform: uppercase;
-        }
-
-        .action-button-row {
-          display: flex;
-          gap: 8px;
-        }
-
-        /* Component Tab Selector */
-        .component-tabs {
-          display: flex;
-          gap: 12px;
-          margin-bottom: 8px;
-        }
-
+        /* ── Component tab buttons ────────────────────────────────────── */
         .comp-tab-btn {
           flex: 1;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          padding: 14px 16px;
-          background: rgba(255, 255, 255, 0.03);
+          padding: 12px 14px;
+          background: var(--bg-card);
           border: 1px solid var(--border-color);
-          border-radius: 8px;
+          border-radius: var(--radius-md);
           color: var(--text-muted);
-          font-family: var(--font-title);
-          font-size: 14px;
-          font-weight: 700;
+          font-family: var(--font-body);
+          font-size: 13px;
+          font-weight: 600;
           cursor: pointer;
-          transition: all 0.25s ease;
+          transition: all 0.15s ease;
+          text-align: center;
         }
+        .comp-tab-btn:hover  { color: var(--text-main); border-color: var(--border-color-hover); background: var(--bg-hover); }
+        .comp-tab-btn.active { color: var(--color-info); border-color: var(--color-info-border); background: var(--color-info-bg); }
 
-        .comp-tab-btn:hover {
-          background: rgba(255, 255, 255, 0.08);
-          color: var(--text-main);
-          border-color: var(--border-color-hover);
-        }
-
-        .comp-tab-btn.active {
-          background: var(--color-primary-glow);
-          color: var(--color-primary-dark);
-          border-color: var(--color-primary);
-          box-shadow: 0 0 12px var(--color-primary-glow);
-        }
-
-        /* Split grid */
+        /* ── Case detail layout ───────────────────────────────────────── */
         .case-content-grid {
           display: grid;
-          grid-template-columns: 2fr 1fr;
-          gap: 20px;
+          grid-template-columns: 1fr 280px;
+          gap: 16px;
+          align-items: start;
         }
+        .case-main-col { display: flex; flex-direction: column; gap: 14px; }
+        .case-side-col { display: flex; flex-direction: column; gap: 12px; }
 
-        .case-main-column {
-          display: flex;
-          flex-direction: column;
-          gap: 20px;
-        }
-
-        /* Tabs inside Incident Tab */
-        .tab-header {
-          display: flex;
-          border-bottom: 1px solid var(--border-color);
-          padding: 0 10px;
-          height: 50px;
-        }
-
-        .tab-btn {
-          padding: 0 20px;
-          background: none;
-          border: none;
-          color: var(--text-muted);
-          font-family: var(--font-title);
-          font-size: 13px;
-          font-weight: 600;
-          cursor: pointer;
-          border-bottom: 2px solid transparent;
-          transition: all 0.2s ease;
-        }
-
-        .tab-btn:hover {
-          color: var(--text-main);
-        }
-
-        .tab-btn.active {
-          color: var(--color-primary);
-          border-bottom-color: var(--color-primary);
-        }
-
-        .tab-body {
-          padding: 24px;
-        }
-
-        /* Empty states */
-        .empty-component-card {
-          padding: 60px 40px;
+        /* ── Empty component state ────────────────────────────────────── */
+        .empty-comp-state {
+          padding: 48px 32px;
           text-align: center;
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          gap: 16px;
-          background: var(--bg-card);
-          border: 1px dashed var(--border-color);
-          border-radius: 12px;
+          gap: 8px;
+          border-style: dashed;
         }
 
-        .empty-component-card .icon {
-          font-size: 44px;
-        }
-
-        .empty-component-card h3 {
-          font-size: 16px;
-          font-weight: 800;
-          color: var(--text-main);
-        }
-
-        .empty-component-card p {
-          font-size: 13px;
-          color: var(--text-muted);
-          max-width: 400px;
-          line-height: 1.5;
-        }
-
-        /* Tasks specific style */
-        .tasks-list-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 16px;
-          background: var(--bg-card);
-          border: 1px solid var(--border-color);
-          padding: 16px 20px;
-          border-radius: 12px;
-        }
-
-        .tasks-list-header h3 {
-          font-size: 15px;
-          font-weight: 800;
-          letter-spacing: 0.02em;
-        }
-
-        .task-list-cards {
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-
-        .task-list-card {
-          padding: 16px 20px;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          cursor: pointer;
-          transition: all 0.2s ease;
-        }
-
-        .task-list-card:hover {
-          transform: translateY(-2px);
-          border-color: var(--color-primary);
-          box-shadow: 0 4px 12px rgba(255, 130, 0, 0.05);
-        }
-
-        .task-info-main {
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-          flex-grow: 1;
-        }
-
-        .task-title-text {
-          font-size: 14px;
-          font-weight: 700;
-          color: var(--text-main);
-        }
-
-        .task-meta-text {
-          display: flex;
-          gap: 16px;
-          font-size: 11px;
-          color: var(--text-muted);
-          margin-top: 4px;
-          border-top: 1px dashed var(--border-color);
-          padding-top: 4px;
-        }
-
-        .log-input-form {
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-          margin-bottom: 24px;
-          padding-bottom: 24px;
-          border-bottom: 1px solid var(--border-color);
-        }
-
-        .timeline-section h3 {
-          font-size: 13px;
-          color: var(--text-muted);
-          margin-bottom: 16px;
-          letter-spacing: 0.05em;
-        }
-
-        /* Emergency services subforms */
+        /* ── Subform layout ──────────────────────────────────────────── */
         .subform-grid {
           display: grid;
-          grid-template-columns: repeat(2, 1fr);
-          gap: 20px;
+          grid-template-columns: 1fr 1fr;
+          gap: 16px;
         }
-
         .subform-card {
-          padding: 16px;
-          background: rgba(255, 255, 255, 0.01);
+          padding: 14px 16px;
+          background: var(--bg-inset);
           border: 1px solid var(--border-color);
-          border-radius: 8px;
+          border-radius: var(--radius-md);
           display: flex;
           flex-direction: column;
-          gap: 16px;
+          gap: 10px;
         }
 
-        .subform-card h3 {
-          font-family: var(--font-title);
-          font-size: 13px;
-          color: var(--color-primary);
-          text-transform: uppercase;
-        }
-
+        /* ── Checkbox rows ───────────────────────────────────────────── */
         .checkbox-row {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          font-size: 13px;
+          display: flex; align-items: center; gap: 8px;
+          font-size: 13px; cursor: pointer;
         }
+        .checkbox-row input { width: 15px; height: 15px; cursor: pointer; }
 
-        .checkbox-row input {
-          width: 16px;
-          height: 16px;
-          cursor: pointer;
-        }
-
-        .fields {
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-
-        .warning-prompt {
-          padding: 12px;
-          background: rgba(255, 184, 0, 0.1) !important;
-          border: 1px solid rgba(255, 184, 0, 0.3) !important;
-          border-radius: 8px;
-          color: var(--text-main);
-          font-size: 12px;
-        }
-
-        .sub-desc {
-          font-size: 12px;
-          color: var(--text-muted);
-        }
-
-        /* Injuries details */
-        .add-log-box {
-          padding: 12px;
-          border: 1px dashed var(--border-color);
-          border-radius: 8px;
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-        }
-
-        .under-16-fields {
-          padding: 12px;
-          border-radius: 6px;
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-
-        .logged-items-list h4 {
-          font-size: 11px;
-          color: var(--text-muted);
-          margin-bottom: 10px;
-          letter-spacing: 0.05em;
-        }
-
-        .logged-item {
-          padding: 10px 14px;
-          border-radius: 8px;
-          margin-bottom: 8px;
-        }
-
-        .logged-item .name {
-          font-size: 13px;
-          font-weight: 700;
-        }
-
-        .logged-item .details {
-          font-size: 11px;
-          color: var(--text-muted);
-          margin-top: 2px;
-        }
-
-        .under-16-indicator {
-          font-size: 9px;
-          background: var(--color-danger-glow);
-          color: var(--color-danger);
-          padding: 2px 6px;
-          border-radius: 4px;
-          margin-left: 6px;
-        }
-
-        .guardian {
-          font-size: 10px;
-          color: var(--text-muted);
-          margin-top: 4px;
-          padding-top: 4px;
-          border-top: 1px dashed var(--border-color);
-        }
-
-        .empty {
-          font-size: 12px;
-          color: var(--text-muted);
-          text-align: center;
-          padding: 20px 0;
-        }
-
-        /* Ranger activity updater */
-        .ranger-activity-card {
-          padding: 20px;
-        }
-
-        .activity-desc {
-          font-size: 12px;
-          color: var(--text-muted);
-          margin-bottom: 12px;
-        }
-
-        .activity-form {
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-        }
-
-        .quick-selects {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 8px;
-        }
-
-        .quick-btn {
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid var(--border-color);
-          padding: 4px 10px;
-          border-radius: 6px;
-          color: var(--text-muted);
-          font-size: 11px;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-
-        .quick-btn:hover {
-          color: var(--text-main);
-          background: rgba(255, 255, 255, 0.08);
-          border-color: rgba(255,255,255,0.2);
-        }
-
-        /* Right sidebar column */
-        .case-sidebar-column {
-          display: flex;
-          flex-direction: column;
-          gap: 20px;
-        }
-
-        .side-card {
-          padding: 20px;
-        }
-
-        .side-card h3 {
-          font-family: var(--font-title);
-          font-size: 12px;
-          font-weight: 700;
-          color: var(--text-muted);
-          text-transform: uppercase;
-          letter-spacing: 0.06em;
-          margin-bottom: 14px;
+        /* ── Side info rows ──────────────────────────────────────────── */
+        .cd-info-row {
+          display: flex; justify-content: space-between; align-items: center;
+          font-size: 12.5px; padding: 6px 0;
           border-bottom: 1px solid var(--border-color);
-          padding-bottom: 6px;
         }
-
-        .info-list {
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-
-        .info-item {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          font-size: 13px;
-        }
-
-        .info-item .label {
-          color: var(--text-muted);
-        }
-
-        .info-item .value {
-          text-align: right;
-          color: var(--text-main);
-        }
-
-        .font-semibold { font-weight: 600; }
-        .font-mono { font-family: monospace; }
-
-        .camera-list {
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-
-        .camera-item {
-          padding: 10px;
-          background: rgba(255, 255, 255, 0.01);
-          border: 1px solid var(--border-color);
-          border-radius: 6px;
-        }
-
-        .camera-item .label {
-          font-size: 12px;
-          font-weight: 700;
-          color: var(--text-main);
-        }
-
-        .camera-item .val {
-          font-size: 11px;
-          color: var(--text-muted);
-          margin-top: 2px;
-        }
-
-        /* CMMS Linked Fault */
-        .cmms-ticket-pill {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 8px 12px;
-          background: rgba(255, 130, 0, 0.05);
-          border: 1px solid rgba(255, 130, 0, 0.15);
-          border-radius: 6px;
-          color: var(--text-main);
-          font-family: var(--font-title);
-        }
-
-        .ticket-desc-meta {
-          font-size: 11px;
-          color: var(--text-muted);
-          line-height: 1.4;
-        }
-
-        /* Modal specific overrides */
-        .modal-backdrop {
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100vw;
-          height: 100vh;
-          background: rgba(0, 0, 0, 0.6);
-          backdrop-filter: blur(8px);
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          z-index: 10000;
-        }
-
-        .create-case-modal {
-          width: 100%;
-          max-width: 550px;
-          max-height: 520px;
-          display: flex;
-          flex-direction: column;
-          border-radius: 12px;
-          overflow: hidden;
-          background: var(--bg-card);
-          border: 1px solid var(--border-color);
-          box-shadow: 0 12px 30px rgba(0,0,0,0.15);
-        }
-
-        .modal-header {
-          padding: 16px 20px;
-          border-bottom: 1px solid var(--border-color);
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-
-        .modal-header h2 {
-          font-family: var(--font-title);
-          font-size: 14px;
-          font-weight: 800;
-          letter-spacing: 0.05em;
-        }
-
-        .close-btn {
-          background: none;
-          border: none;
-          color: var(--text-muted);
-          cursor: pointer;
-          font-weight: 700;
-        }
-
-        .modal-form {
-          display: flex;
-          flex-direction: column;
-          height: calc(100% - 50px);
-        }
-
-        .modal-scroll-area {
-          padding: 20px;
-          overflow-y: auto;
-          flex-grow: 1;
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-        }
-
-        .form-grid {
-          display: grid;
-          grid-template-columns: repeat(2, 1fr);
-          gap: 16px;
-        }
-
-        .modal-actions {
-          padding: 16px 20px;
-          border-top: 1px solid var(--border-color);
-          display: flex;
-          justify-content: flex-end;
-          gap: 12px;
-          background: var(--bg-base);
-        }
-
-        /* Task Details dialog styles */
-        .task-detail-body {
-          padding: 24px;
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-        }
-
-        .detail-meta-row {
-          display: flex;
-          justify-content: space-between;
-          font-size: 12px;
-          color: var(--text-muted);
-        }
-
-        .detail-title {
-          font-family: var(--font-title);
-          font-size: 16px;
-          font-weight: 700;
-          color: var(--text-main);
-        }
-
-        .detail-desc {
-          font-size: 13px;
-          color: var(--text-muted);
-          line-height: 1.5;
-        }
-
-        .assignee-row {
-          padding: 12px 16px;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-
-        .curr-assignee {
-          font-size: 13px;
-        }
-
-        .reassign-inputs {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-
-        .modal-actions-wrapper h4 {
-          font-family: var(--font-title);
-          font-size: 11px;
-          color: var(--text-muted);
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-          margin-bottom: 10px;
-        }
-
-        .state-btns {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 10px;
-        }
-
-        .loading-state {
-          padding: 80px;
-          text-align: center;
-          font-weight: 600;
-          color: var(--text-muted);
-        }
+        .cd-info-row:last-child { border-bottom: none; }
+        .cd-info-label { color: var(--text-muted); font-weight: 500; }
+        .cd-info-value { text-align: right; color: var(--text-main); font-weight: 500; }
       `}</style>
     </>
   );

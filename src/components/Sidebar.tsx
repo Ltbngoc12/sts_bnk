@@ -5,21 +5,61 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useRole, UserRole } from '@/context/RoleContext';
 
+// Icons as SVG components
+const Icon = ({ d, d2 }: { d: string; d2?: string }) => (
+  <svg viewBox="0 0 24 24" width="16" height="16" fill="none"
+    stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
+    style={{ flexShrink: 0 }}>
+    <path d={d} />
+    {d2 && <path d={d2} />}
+  </svg>
+);
+
+// Nav structure with groups
+const NAV_GROUPS = [
+  {
+    label: 'Operations',
+    items: [
+      { name: 'Dashboard',       path: '/',            d: 'M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z', d2: 'M9 22V12h6v10' },
+      { name: 'Case Log',        path: '/cases',        d: 'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z' },
+      { name: 'Incident Log',    path: '/incidents',    d: 'M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z', d2: 'M12 9v4M12 17h.01' },
+      { name: 'Fault Log',       path: '/faults',       d: 'M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z' },
+      { name: 'Task Board',      path: '/tasks',        d: 'M9 11l3 3L22 4', d2: 'M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11' },
+      { name: 'e-Diary',         path: '/occurrences',  d: 'M4 19.5A2.5 2.5 0 0 1 6.5 17H20', d2: 'M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z' },
+    ]
+  },
+  {
+    label: 'Planning',
+    items: [
+      { name: 'Events',          path: '/events',       d: 'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z' },
+      { name: 'Permits (NOP)',   path: '/nops',         d: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z', d2: 'M14 2v6h6M16 13H8M16 17H8M10 9H8' },
+    ]
+  },
+  {
+    label: 'Communications',
+    items: [
+      { name: 'Broadcasts',      path: '/broadcasts',   d: 'M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.64 3.45a2 2 0 0 1 1.97-2.18H6.5c.47 0 .87.33.94.79.1.6.28 1.18.53 1.73a2 2 0 0 1-.45 2.11L6.15 7.57' },
+    ]
+  },
+  {
+    label: 'Analytics',
+    items: [
+      { name: 'Statistics',      path: '/statistics',   d: 'M18 20V10M12 20V4M6 20v-6' },
+    ]
+  }
+];
+
 export const Sidebar: React.FC = () => {
   const pathname = usePathname();
   const { role, username, setRole } = useRole();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isDOElevated, setIsDOElevated] = useState(false);
 
-  // Load state from localStorage on mount
   useEffect(() => {
     const stored = localStorage.getItem('sidebar_collapsed');
-    if (stored === 'true') {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setIsCollapsed(true);
-    }
+    if (stored === 'true') setIsCollapsed(true);
   }, []);
 
-  // Update body class and localStorage when isCollapsed changes
   useEffect(() => {
     if (isCollapsed) {
       document.body.classList.add('sidebar-collapsed');
@@ -30,166 +70,114 @@ export const Sidebar: React.FC = () => {
     }
   }, [isCollapsed]);
 
-  const toggleCollapse = () => {
-    setIsCollapsed(prev => !prev);
-  };
-
-  const iconStyle = {
-    width: '20px',
-    height: '20px',
-    flexShrink: 0,
-    strokeWidth: 2,
-    stroke: 'currentColor',
-    fill: 'none'
-  };
-
-  const navItems = [
-    { 
-      name: 'Dashboard', 
-      path: '/', 
-      icon: (
-        <svg style={iconStyle} viewBox="0 0 24 24">
-          <rect x="3" y="3" width="7" height="7" rx="1" />
-          <rect x="14" y="3" width="7" height="7" rx="1" />
-          <rect x="14" y="14" width="7" height="7" rx="1" />
-          <rect x="3" y="14" width="7" height="7" rx="1" />
-        </svg>
-      )
-    },
-    { 
-      name: 'Case Log', 
-      path: '/cases', 
-      icon: (
-        <svg style={iconStyle} viewBox="0 0 24 24">
-          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-        </svg>
-      )
-    },
-    { 
-      name: 'Incident Log', 
-      path: '/incidents', 
-      icon: (
-        <svg style={iconStyle} viewBox="0 0 24 24">
-          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-          <line x1="12" y1="8" x2="12" y2="12" />
-          <line x1="12" y1="16" x2="12.01" y2="16" />
-        </svg>
-      )
-    },
-    { 
-      name: 'Fault Log (CMMS)', 
-      path: '/faults', 
-      icon: (
-        <svg style={iconStyle} viewBox="0 0 24 24">
-          <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
-        </svg>
-      )
-    },
-    { 
-      name: 'Task Management', 
-      path: '/tasks', 
-      icon: (
-        <svg style={iconStyle} viewBox="0 0 24 24">
-          <path d="M9 11l3 3L22 4" />
-          <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
-        </svg>
-      )
-    },
-    { 
-      name: 'Occurrence Log', 
-      path: '/occurrences', 
-      icon: (
-        <svg style={iconStyle} viewBox="0 0 24 24">
-          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-        </svg>
-      )
-    }
-  ];
-
   const roles: UserRole[] = [
-    'Controller',
-    'Duty Manager',
-    'Duty Officer',
-    'Responder (Ranger)',
-    'System Administrator',
-    'Stakeholder'
+    'Controller', 'Duty Manager', 'Duty Officer',
+    'Responder (Ranger)', 'System Administrator', 'Stakeholder'
   ];
+
+  const isActive = (path: string) =>
+    path === '/' ? pathname === '/' : pathname?.startsWith(path);
 
   return (
     <div className={`sidebar-container ${isCollapsed ? 'collapsed' : ''}`}>
-      {/* Toggle Button */}
-      <button 
-        className="collapse-toggle-btn" 
-        onClick={toggleCollapse}
-        aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+      {/* Collapse toggle */}
+      <button
+        className="collapse-btn"
+        onClick={() => setIsCollapsed(p => !p)}
+        aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
       >
-        <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round">
-          {isCollapsed ? (
-            <polyline points="9 18 15 12 9 6" />
-          ) : (
-            <polyline points="15 18 9 12 15 6" />
-          )}
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="none"
+          stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          {isCollapsed
+            ? <polyline points="9 18 15 12 9 6" />
+            : <polyline points="15 18 9 12 15 6" />}
         </svg>
       </button>
 
-      {/* Brand Header */}
-      <div className="brand-header">
-        <div className="brand-logo">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/icon.png" alt="Sentosa Icon" className="logo-icon" />
-          
-          <div className="brand-text-group">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="Sentosa Logo" className="logo-wordmark" />
-            <div className="sub-logo">CASE MANAGEMENT SYSTEM</div>
-          </div>
+      {/* Brand */}
+      <div className="brand-area">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/icon.png" alt="SDC" className="brand-icon" />
+        <div className="brand-text">
+          <div className="brand-name">SDC IIOC</div>
+          <div className="brand-sub">Case Management System</div>
         </div>
       </div>
 
-      {/* Nav Menu */}
-      <nav className="nav-menu">
-        {navItems.map((item) => {
-          const isActive = pathname === item.path || (item.path !== '/' && pathname?.startsWith(item.path));
-          return (
-            <Link 
-              key={item.name} 
-              href={item.path}
-              className={`nav-item ${isActive ? 'active' : ''}`}
-            >
-              {item.icon}
-              <span className="nav-label">{item.name}</span>
-              {isCollapsed && <span className="collapsed-tooltip">{item.name}</span>}
-            </Link>
-          );
-        })}
+      {/* Nav */}
+      <nav className="nav-scroll">
+        {NAV_GROUPS.map(group => (
+          <div key={group.label} className="nav-group">
+            {!isCollapsed && <div className="nav-group-label">{group.label}</div>}
+            {group.items.map(item => (
+              <Link
+                key={item.path}
+                href={item.path}
+                className={`nav-item ${isActive(item.path) ? 'active' : ''}`}
+              >
+                <Icon d={item.d} d2={item.d2} />
+                <span className="nav-label">{item.name}</span>
+                {isCollapsed && <span className="nav-tooltip">{item.name}</span>}
+              </Link>
+            ))}
+          </div>
+        ))}
       </nav>
 
-      {/* User Context & Role Switcher */}
+      {/* Footer */}
       <div className="sidebar-footer">
-        <div className="user-info">
-          <div className="avatar">
-            {username.charAt(0)}
+        {/* DO Elevation toggle */}
+        {role === 'Duty Officer' && (
+          <div className="elevation-toggle">
+            <label className="toggle-label">
+              <span>DO → DM Elevation</span>
+              <button
+                className={`toggle-switch ${isDOElevated ? 'on' : ''}`}
+                onClick={() => setIsDOElevated(p => !p)}
+                aria-pressed={isDOElevated}
+              >
+                <span className="toggle-thumb" />
+              </button>
+            </label>
+            {isDOElevated && !isCollapsed && (
+              <div className="elevation-badge">Elevated to DM</div>
+            )}
           </div>
-          <div className="user-details">
+        )}
+
+        {/* User info */}
+        <div className="user-row">
+          <div className="avatar">{username.charAt(0).toUpperCase()}</div>
+          <div className="user-info">
             <div className="user-name">{username}</div>
-            <div className="user-role">{role}</div>
+            <div className="user-role-label">
+              {isDOElevated && role === 'Duty Officer' ? 'Duty Manager (Elevated)' : role}
+            </div>
           </div>
         </div>
 
-        <div className="role-switcher">
-          <label htmlFor="role-select">Switch Role (Testing):</label>
-          <select 
-            id="role-select" 
-            value={role} 
-            onChange={(e) => setRole(e.target.value as UserRole)}
-            className="role-select-input"
-          >
-            {roles.map((r) => (
-              <option key={r} value={r}>{r}</option>
-            ))}
-          </select>
-        </div>
+        {/* Role switcher (dev/test only) */}
+        {!isCollapsed && (
+          <div className="role-switcher">
+            <label className="switcher-label" htmlFor="role-select">Switch Role</label>
+            <select
+              id="role-select"
+              value={role}
+              onChange={e => setRole(e.target.value as UserRole)}
+              className="role-select"
+            >
+              {roles.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </div>
+        )}
+
+        {/* System Config link (admin only) */}
+        {(role === 'System Administrator') && (
+          <Link href="/admin" className={`nav-item ${isActive('/admin') ? 'active' : ''}`} style={{ marginTop: 4 }}>
+            <Icon d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" d2="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            <span className="nav-label">System Config</span>
+          </Link>
+        )}
       </div>
 
       <style jsx>{`
@@ -197,363 +185,223 @@ export const Sidebar: React.FC = () => {
           width: var(--sidebar-width);
           height: 100vh;
           background: var(--bg-sidebar);
-          border-right: 1px solid var(--border-color);
-          position: fixed;
-          left: 0;
-          top: 0;
-          display: flex;
-          flex-direction: column;
+          position: fixed; left: 0; top: 0;
+          display: flex; flex-direction: column;
           z-index: 100;
-          transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          transition: width 0.25s ease;
+          overflow: hidden;
         }
 
-        .brand-header {
-          padding: 24px 16px 16px 16px; /* Expanded padding: 16px left/right perfectly aligns with nav menu padding */
-          transition: padding 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .brand-logo {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          background: rgba(255, 255, 255, 0.45); /* Soft resort-luxury glass card overlay */
-          backdrop-filter: blur(10px);
-          -webkit-backdrop-filter: blur(10px);
-          border: 1px solid rgba(255, 130, 0, 0.08); /* Subtle orange-tinted border to coordinate with brand color */
-          border-radius: 12px;
-          padding: 10px 14px; /* Matches nav-item padding exactly for perfect vertical alignment of elements */
-          box-shadow: 0 4px 12px -2px rgba(43, 31, 29, 0.02), 0 2px 6px -1px rgba(43, 31, 29, 0.01);
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          width: 100%;
-          height: 52px;
-          cursor: pointer;
-          font-family: var(--font-body);
-        }
-
-        .brand-logo:hover {
-          background: rgba(255, 255, 255, 0.75); /* Glow effect on hover */
-          border-color: rgba(255, 130, 0, 0.2);
-          box-shadow: 0 6px 16px -3px rgba(255, 130, 0, 0.06), 0 4px 8px -2px rgba(255, 130, 0, 0.03);
-          transform: translateY(-1px);
-        }
-
-        .logo-icon {
-          height: 32px; /* Aligns with text height (18px wordmark + 4px gap + 10px subtitle) */
-          width: auto;
-          object-fit: contain;
-          mix-blend-mode: multiply;
-          flex-shrink: 0;
-          transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .brand-logo:hover .logo-icon {
-          transform: scale(1.05); /* Soft, interactive bounce */
-        }
-
-        .brand-text-group {
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-          flex-grow: 1;
-          min-width: 0;
-          justify-content: center;
-          transition: opacity 0.2s ease, transform 0.2s ease;
-        }
-
-        .logo-wordmark {
-          height: 18px; /* Balanced sizing for a cleaner alignment */
-          width: auto;
-          object-fit: contain;
-          mix-blend-mode: multiply;
-          align-self: flex-start;
-        }
-
-        .sub-logo {
-          font-family: 'Outfit', 'Inter', sans-serif;
-          font-size: 8px; /* Compact luxury editorial typography */
-          font-weight: 700;
-          color: var(--text-muted);
-          letter-spacing: 0.14em; /* Luxurious wide tracking */
-          text-transform: uppercase;
-          white-space: nowrap;
-          display: block;
-          line-height: 1;
-          margin-top: 1px;
-          opacity: 0.85;
-        }
-
-        .nav-menu {
-          padding: 20px 16px;
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-          flex-grow: 1;
-        }
-
-        /* Using global selectors to override default link rendering behaviors */
-        :global(.nav-item) {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          padding: 10px 14px;
-          color: var(--text-muted) !important;
-          text-decoration: none !important;
-          font-size: 13.5px;
-          font-weight: 600;
-          border-radius: 6px;
+        .collapse-btn {
+          position: absolute; top: 48px; right: -12px;
+          width: 24px; height: 24px; border-radius: 50%;
+          background: #1F2937; border: 1px solid rgba(255,255,255,0.12);
+          color: rgba(255,255,255,0.5);
+          display: flex; align-items: center; justify-content: center;
+          cursor: pointer; z-index: 110;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.3);
           transition: all 0.15s ease;
-          border: 1px solid transparent;
+          padding: 0;
         }
+        .collapse-btn:hover { color: #fff; border-color: rgba(255,255,255,0.3); }
 
-        :global(.nav-item svg) {
-          width: 20px !important;
-          height: 20px !important;
-          stroke: currentColor;
-          fill: none;
+        .brand-area {
+          display: flex; align-items: center; gap: 10px;
+          padding: 18px 14px 14px;
+          border-bottom: 1px solid var(--sidebar-divider);
           flex-shrink: 0;
+          overflow: hidden;
         }
 
-        :global(.nav-item span) {
-          color: inherit;
+        .brand-icon {
+          width: 28px; height: 28px; flex-shrink: 0;
+          object-fit: contain;
+          filter: brightness(10);
+          mix-blend-mode: normal;
+        }
+
+        .brand-text { overflow: hidden; white-space: nowrap; min-width: 0; }
+
+        .brand-name {
+          font-size: 12px; font-weight: 700;
+          color: rgba(255,255,255,0.95);
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+        }
+
+        .brand-sub {
+          font-size: 9.5px; color: rgba(255,255,255,0.40);
+          margin-top: 2px; letter-spacing: 0.04em;
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+
+        .nav-scroll {
+          flex: 1; overflow-y: auto; overflow-x: hidden;
+          padding: 8px 8px 12px;
+          scrollbar-width: thin;
+          scrollbar-color: rgba(255,255,255,0.1) transparent;
+        }
+
+        .nav-group { margin-bottom: 6px; }
+
+        .nav-group-label {
+          font-size: 9.5px; font-weight: 700;
+          color: rgba(255,255,255,0.25);
+          text-transform: uppercase; letter-spacing: 0.10em;
+          padding: 10px 8px 4px;
+          white-space: nowrap;
+        }
+
+        :global(.nav-item) {
+          display: flex; align-items: center; gap: 9px;
+          padding: 8px 8px;
+          border-radius: 6px;
+          color: var(--sidebar-text) !important;
           text-decoration: none !important;
+          font-size: 12.5px; font-weight: 500;
+          cursor: pointer; border: 1px solid transparent;
+          transition: all 0.12s ease;
+          position: relative;
+          white-space: nowrap;
+          overflow: hidden;
         }
 
         :global(.nav-item:hover) {
-          color: var(--text-main) !important;
-          background: rgba(43, 31, 29, 0.04);
-          text-decoration: none !important;
+          color: var(--sidebar-text-hover) !important;
+          background: rgba(255,255,255,0.06);
         }
 
         :global(.nav-item.active) {
-          color: var(--color-primary) !important;
-          background: var(--color-primary-glow) !important;
-          border-color: rgba(255, 130, 0, 0.12) !important;
-          text-decoration: none !important;
+          color: #fff !important;
+          background: var(--sidebar-active-bg);
+          border-color: var(--sidebar-active-border);
+          font-weight: 600;
         }
 
+        :global(.nav-label) {
+          overflow: hidden; text-overflow: ellipsis;
+          white-space: nowrap; flex: 1;
+        }
+
+        /* Tooltip for collapsed */
+        :global(.nav-tooltip) {
+          position: absolute; left: 100%; top: 50%;
+          transform: translateY(-50%) translateX(8px);
+          margin-left: 8px;
+          background: #111827; color: #fff;
+          font-size: 12px; font-weight: 500;
+          padding: 5px 10px; border-radius: 5px;
+          white-space: nowrap;
+          opacity: 0; pointer-events: none;
+          transition: all 0.15s ease;
+          z-index: 200;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        :global(.nav-item:hover .nav-tooltip) {
+          opacity: 1; transform: translateY(-50%) translateX(0);
+        }
+
+        /* Collapsed state */
+        .collapsed .brand-text  { display: none; }
+        .collapsed .brand-area  { justify-content: center; padding: 18px 0 14px; }
+        .collapsed .nav-scroll  { padding: 8px 6px; }
+        .collapsed .nav-group-label { display: none; }
+
+        :global(.collapsed .nav-item) {
+          justify-content: center; padding: 9px 0; gap: 0;
+        }
+        :global(.collapsed .nav-label) { display: none; }
+
+        /* Footer */
         .sidebar-footer {
-          padding: 20px;
-          border-top: 1px solid var(--border-color);
-          background: rgba(43, 31, 29, 0.01);
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
+          border-top: 1px solid var(--sidebar-divider);
+          padding: 12px 10px;
+          display: flex; flex-direction: column; gap: 10px;
+          flex-shrink: 0;
         }
 
-        .user-info {
-          display: flex;
-          align-items: center;
-          gap: 12px;
+        .user-row {
+          display: flex; align-items: center; gap: 9px; overflow: hidden;
         }
 
         .avatar {
-          width: 36px;
-          height: 36px;
-          border-radius: 50%;
-          background: var(--color-primary-glow);
-          border: 1px solid rgba(255, 130, 0, 0.2);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: var(--color-primary);
-          font-weight: 700;
-          font-family: var(--font-body);
-          font-size: 13px;
+          width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+          background: rgba(255,255,255,0.12);
+          border: 1px solid rgba(255,255,255,0.15);
+          color: rgba(255,255,255,0.85); font-size: 12px; font-weight: 700;
+          display: flex; align-items: center; justify-content: center;
         }
+
+        .user-info { overflow: hidden; white-space: nowrap; min-width: 0; }
 
         .user-name {
-          font-size: 13px;
-          font-weight: 600;
-          color: var(--text-main);
+          font-size: 12px; font-weight: 600;
+          color: rgba(255,255,255,0.85);
+          overflow: hidden; text-overflow: ellipsis;
         }
 
-        .user-role {
-          font-size: 11px;
-          color: var(--text-muted);
-          margin-top: 1px;
+        .user-role-label {
+          font-size: 10.5px; color: rgba(255,255,255,0.40);
+          margin-top: 1px; overflow: hidden; text-overflow: ellipsis;
         }
 
+        .collapsed .user-info { display: none; }
+
+        /* Role switcher */
         .role-switcher {
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
+          display: flex; flex-direction: column; gap: 4px;
         }
 
-        .role-switcher label {
-          font-size: 11px;
-          font-weight: 700;
-          color: var(--text-muted);
-          text-transform: uppercase;
+        .switcher-label {
+          font-size: 9.5px; font-weight: 700;
+          color: rgba(255,255,255,0.25);
+          text-transform: uppercase; letter-spacing: 0.10em;
         }
 
-        .role-select-input {
-          background: var(--bg-card);
-          border: 1px solid var(--border-color);
-          border-radius: 6px;
-          padding: 7px 10px;
-          color: var(--text-main);
-          font-family: var(--font-body);
-          font-size: 12px;
-          outline: none;
-          cursor: pointer;
-          transition: all 0.15s ease;
-          width: 100%;
+        .role-select {
+          background: rgba(255,255,255,0.06);
+          border: 1px solid rgba(255,255,255,0.12);
+          border-radius: 5px; padding: 5px 8px;
+          color: rgba(255,255,255,0.75);
+          font-family: var(--font-body); font-size: 11.5px;
+          outline: none; cursor: pointer; width: 100%;
+          transition: border-color 0.15s;
+        }
+        .role-select:focus { border-color: rgba(255,255,255,0.3); }
+        .role-select option { background: #1F2937; color: #fff; }
+
+        /* DO Elevation Toggle */
+        .elevation-toggle {
+          display: flex; flex-direction: column; gap: 5px;
         }
 
-        .role-select-input:focus {
-          border-color: var(--color-primary);
-          box-shadow: 0 0 0 3px var(--color-primary-glow);
-        }
-        
-        .role-select-input option {
-          background-color: var(--bg-card);
-          color: var(--text-main);
+        .toggle-label {
+          display: flex; align-items: center; justify-content: space-between;
+          font-size: 11px; color: rgba(255,255,255,0.55); cursor: pointer;
         }
 
-        /* Toggle Button */
-        .collapse-toggle-btn {
-          position: absolute;
-          top: 50px; /* Aligns vertically with the center of the brand card */
-          right: -14px;
-          width: 28px;
-          height: 28px;
-          border-radius: 50%;
-          background: var(--bg-card);
-          border: 1px solid var(--border-color);
-          color: var(--text-muted);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          box-shadow: 0 2px 8px rgba(43, 31, 29, 0.08);
-          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-          z-index: 110;
-          outline: none;
-          padding: 0;
-          transform: translateY(-50%);
+        .toggle-switch {
+          width: 32px; height: 18px; border-radius: 9px;
+          background: rgba(255,255,255,0.15); border: none;
+          cursor: pointer; position: relative;
+          transition: background 0.2s;
+          padding: 0; flex-shrink: 0;
         }
+        .toggle-switch.on { background: #16A34A; }
 
-        .collapse-toggle-btn:hover {
-          color: var(--color-primary);
-          border-color: var(--color-primary);
-          background: var(--bg-base);
-          transform: translateY(-50%) scale(1.1); /* Preserves vertical translate during scaling */
+        .toggle-thumb {
+          position: absolute; top: 2px; left: 2px;
+          width: 14px; height: 14px; border-radius: 50%;
+          background: #fff;
+          transition: transform 0.2s;
+          display: block;
         }
+        .toggle-switch.on .toggle-thumb { transform: translateX(14px); }
 
-        .collapse-toggle-btn:active {
-          transform: translateY(-50%) scale(0.95);
-        }
-
-        /* Collapsed Styles */
-        .collapsed .brand-header {
-          padding: 24px 0 16px 0;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .collapsed .brand-logo {
-          width: 48px; /* Clean rounded-square badge for collapsed state */
-          height: 48px;
-          border-radius: 12px;
-          padding: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          margin: 0 auto;
-          background: rgba(255, 255, 255, 0.45);
-          border: 1px solid rgba(255, 130, 0, 0.08);
-          box-shadow: 0 4px 12px -2px rgba(43, 31, 29, 0.02);
-        }
-
-        .collapsed .brand-logo:hover {
-          background: rgba(255, 255, 255, 0.75);
-          border-color: rgba(255, 130, 0, 0.2);
-          transform: translateY(-1px);
-        }
-
-        .collapsed .logo-icon {
-          height: 28px; /* Perfectly sized inside the 48px card */
-          margin: 0;
-        }
-
-        .collapsed .brand-text-group {
-          display: none;
-        }
-
-        .nav-menu {
-          transition: padding 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .collapsed .nav-menu {
-          padding: 20px 8px;
-        }
-
-        .collapsed :global(.nav-item) {
-          justify-content: center;
-          padding: 10px 0;
-          gap: 0;
-          position: relative;
-        }
-
-        .collapsed :global(.nav-item span.nav-label) {
-          display: none;
-        }
-
-        /* Tooltip styling */
-        :global(.collapsed-tooltip) {
-          position: absolute;
-          left: 100%;
-          margin-left: 12px;
-          padding: 6px 12px;
-          background: var(--text-main);
-          color: #ffffff;
-          font-family: var(--font-body);
-          font-size: 12px;
-          font-weight: 500;
-          border-radius: 6px;
-          white-space: nowrap;
-          opacity: 0;
-          pointer-events: none;
-          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-          transform: translateX(-8px);
-          box-shadow: 0 4px 12px rgba(43, 31, 29, 0.15);
-          z-index: 200;
-        }
-
-        :global(.collapsed-tooltip::before) {
-          content: '';
-          position: absolute;
-          right: 100%;
-          top: 50%;
-          transform: translateY(-50%);
-          border-width: 5px;
-          border-style: solid;
-          border-color: transparent var(--text-main) transparent transparent;
-        }
-
-        :global(.nav-item:hover .collapsed-tooltip) {
-          opacity: 1;
-          transform: translateX(0);
-        }
-
-        .collapsed .sidebar-footer {
-          padding: 20px 0;
-          align-items: center;
-        }
-
-        .collapsed .user-info {
-          justify-content: center;
-          width: 100%;
-        }
-
-        .collapsed .user-details {
-          display: none;
-        }
-
-        .collapsed .role-switcher {
-          display: none;
+        .elevation-badge {
+          font-size: 9.5px; font-weight: 700; letter-spacing: 0.06em;
+          color: #16A34A; text-transform: uppercase;
         }
       `}</style>
     </div>

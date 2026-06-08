@@ -5,25 +5,26 @@ import Link from 'next/link';
 import { Case } from '@/lib/db';
 import { useRole } from '@/context/RoleContext';
 
+function StatusBadge({ status }: { status: string }) {
+  const cls =
+    status === 'Active'         ? 'badge badge-onsite' :
+    status === 'Pending Triage' ? 'badge badge-ack'    : 'badge badge-closed';
+  return <span className={cls}>{status}</span>;
+}
+
 export default function CaseLogPage() {
-  const { role, username } = useRole();
+  const { role } = useRole();
   const [cases, setCases] = useState<Case[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterStatus, setFilterStatus] = useState<string>('All');
-  const [searchTerm, setSearchTerm] = useState<string>('');
-  
+  const [filterStatus, setFilterStatus] = useState('All');
+  const [searchTerm, setSearchTerm] = useState('');
 
-
-  useEffect(() => {
-    fetchCases();
-  }, []);
+  useEffect(() => { fetchCases(); }, []);
 
   const fetchCases = async () => {
     try {
       const res = await fetch('/api/cases');
-      if (res.ok) {
-        setCases(await res.json());
-      }
+      if (res.ok) setCases(await res.json());
     } catch (err) {
       console.error('Error fetching cases:', err);
     } finally {
@@ -31,58 +32,89 @@ export default function CaseLogPage() {
     }
   };
 
-
-
-  const filteredCases = cases.filter(c => {
-    const matchesSearch = c.id.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          c.title.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = filterStatus === 'All' || c.status === filterStatus;
-    return matchesSearch && matchesStatus;
+  const filtered = cases.filter(c => {
+    const q = searchTerm.toLowerCase();
+    const matchSearch = c.id.toLowerCase().includes(q) || c.title.toLowerCase().includes(q);
+    const matchStatus = filterStatus === 'All' || c.status === filterStatus;
+    return matchSearch && matchStatus;
   });
 
-  const isController = role === 'Controller' || role === 'Duty Manager' || role === 'Duty Officer' || role === 'System Administrator';
+  const stats = {
+    total: cases.length,
+    active: cases.filter(c => c.status === 'Active').length,
+    triage: cases.filter(c => c.status === 'Pending Triage').length,
+    closed: cases.filter(c => c.status === 'Closed').length,
+  };
 
   return (
     <>
-      <div className="cases-header-bar glass">
-        <div className="title-section">
-          <h1>CASE REGISTRY LOG</h1>
-          <p>Master index of all operational cases (Incidents, Tasks, and CMMS Tickets)</p>
+      {/* Page header */}
+      <div className="page-header glass">
+        <div className="page-header-left">
+          <h1>Case Registry Log</h1>
+          <p>Master index of all operational cases — Incidents, Tasks, and CMMS Tickets</p>
         </div>
-        
-
-      </div>
-
-      {/* Filter panel */}
-      <div className="filter-panel glass">
-        <div className="search-group">
-          <input 
-            type="text" 
-            placeholder="Search by Case ID or Case Title..." 
-            value={searchTerm} 
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="form-control"
-          />
-        </div>
-        <div className="select-filters">
-          <div className="filter-select-group">
-            <label>Case Status:</label>
-            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="form-control select-dark">
-              <option value="All">All Statuses</option>
-              <option value="Pending Triage">Pending Triage</option>
-              <option value="Active">Active</option>
-              <option value="Closed">Closed</option>
-            </select>
+        <div className="page-header-stats">
+          <div className="stat-chip">
+            <span className="stat-val">{stats.total}</span>
+            <span className="stat-lbl">Total</span>
+          </div>
+          <div className="stat-chip stat-chip-active">
+            <span className="stat-val">{stats.active}</span>
+            <span className="stat-lbl">Active</span>
+          </div>
+          <div className="stat-chip stat-chip-warn">
+            <span className="stat-val">{stats.triage}</span>
+            <span className="stat-lbl">Triage</span>
+          </div>
+          <div className="stat-chip stat-chip-muted">
+            <span className="stat-val">{stats.closed}</span>
+            <span className="stat-lbl">Closed</span>
           </div>
         </div>
       </div>
 
-      {/* Log list */}
-      <div className="cases-list-container glass">
+      {/* Filter bar */}
+      <div className="filter-bar glass">
+        <div className="filter-search">
+          <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{ color: 'var(--text-faint)', flexShrink: 0 }}>
+            <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Search Case ID or title…"
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            className="filter-search-input"
+            id="case-search"
+          />
+        </div>
+        <div className="filter-selects">
+          <label htmlFor="status-filter" className="filter-label">Status:</label>
+          <select
+            id="status-filter"
+            value={filterStatus}
+            onChange={e => setFilterStatus(e.target.value)}
+            className="form-control"
+            style={{ width: 'auto', height: '36px', fontSize: '13px', padding: '0 10px' }}
+          >
+            <option value="All">All Statuses</option>
+            <option value="Pending Triage">Pending Triage</option>
+            <option value="Active">Active</option>
+            <option value="Closed">Closed</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="glass" style={{ overflow: 'hidden' }}>
         {loading ? (
-          <div className="cases-loading">Loading master case log...</div>
-        ) : filteredCases.length === 0 ? (
-          <div className="empty-cases">No cases logged matching filters.</div>
+          <div className="loading-container">
+            <div className="spinner" />
+            <span>Loading case registry…</span>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="empty-state">No cases match the current filters.</div>
         ) : (
           <div className="table-container">
             <table className="custom-table">
@@ -90,65 +122,69 @@ export default function CaseLogPage() {
                 <tr>
                   <th>Case ID</th>
                   <th>Case Title</th>
-                  <th>Case Status</th>
-                  <th>Contains Components</th>
+                  <th>Status</th>
+                  <th>Components</th>
                   <th>CMMS Tickets</th>
+                  <th>Incident Status</th>
                   <th>Date Logged</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredCases.map((c) => (
+                {filtered.map(c => (
                   <tr key={c.id} onClick={() => window.location.href = `/cases/${c.id}`}>
-                    <td className="case-id-cell">{c.id}</td>
-                    <td className="case-title-cell">{c.title}</td>
                     <td>
-                      <span className={`badge ${
-                        c.status === 'Pending Triage' ? 'badge-ack' :
-                        c.status === 'Active' ? 'badge-onsite' : 'badge-closed'
-                      }`}>
-                        {c.status}
-                      </span>
+                      <span className="mono-id">{c.id}</span>
                     </td>
+                    <td style={{ fontWeight: 600, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {c.title}
+                    </td>
+                    <td><StatusBadge status={c.status} /></td>
                     <td>
-                      <div className="components-pills">
-                        {c.incident ? (
-                          <span className="pill pill-danger" title="Security or Safety Incident">
-                            🚨 Incident
-                          </span>
-                        ) : null}
-                        
-                        {/* We don't store task counts in Case object directly, so let's mock or fetch. For simplicity, if Case contains _TASK_ or has a task in our state, show task pill */}
-                        {c.id.includes('TASK') ? (
-                          <span className="pill pill-accent" title="Ranger Ground Tasks">
-                            📋 Task
-                          </span>
-                        ) : null}
-
-                        {c.cmmsTickets?.length > 0 ? (
-                          <span className="pill pill-warning" title="IFM Contractor Faults">
-                            🔧 Fault ({c.cmmsTickets.length})
-                          </span>
-                        ) : null}
-
-                        {!c.incident && !c.id.includes('TASK') && c.cmmsTickets?.length === 0 ? (
-                          <span className="pill pill-muted" title="Blank Triage Case Container">
-                            📁 General
-                          </span>
-                        ) : null}
+                      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                        {c.incident && (
+                          <span className="badge badge-live" style={{ fontSize: '10px' }}>Incident</span>
+                        )}
+                        {(c.cmmsTickets?.length ?? 0) > 0 && (
+                          <span className="badge badge-ack" style={{ fontSize: '10px' }}>Fault ({c.cmmsTickets.length})</span>
+                        )}
+                        {!c.incident && (c.cmmsTickets?.length ?? 0) === 0 && (
+                          <span className="badge badge-closed" style={{ fontSize: '10px' }}>General</span>
+                        )}
                       </div>
                     </td>
                     <td>
-                      {c.cmmsTickets?.length > 0 ? (
-                        <div className="ticket-references">
-                          {c.cmmsTickets.map(t => (
-                            <span key={t} className="ticket-label">{t}</span>
+                      {(c.cmmsTickets?.length ?? 0) > 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          {c.cmmsTickets.slice(0, 2).map(t => (
+                            <code key={t} style={{ fontSize: '11px', color: 'var(--color-info)', background: 'var(--color-info-bg)', padding: '1px 6px', borderRadius: 3 }}>{t}</code>
                           ))}
+                          {c.cmmsTickets.length > 2 && (
+                            <span style={{ fontSize: '10px', color: 'var(--text-faint)' }}>+{c.cmmsTickets.length - 2} more</span>
+                          )}
                         </div>
                       ) : (
-                        <span className="text-muted" style={{ fontSize: '12px' }}>-</span>
+                        <span style={{ color: 'var(--text-faint)', fontSize: '12px' }}>—</span>
                       )}
                     </td>
-                    <td className="date-cell">{new Date(c.createdAt).toLocaleDateString('en-US')} {new Date(c.createdAt).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })}</td>
+                    <td>
+                      {c.incident ? (
+                        <span className={`badge ${
+                          c.incident.status === 'Live'                ? 'badge-live'      :
+                          c.incident.status === 'Live (Acknowledged)' ? 'badge-ack'       :
+                          c.incident.status === 'Live (On-Site)'      ? 'badge-onsite'    :
+                          c.incident.status === 'Live (Completed)'    ? 'badge-completed' :
+                          c.incident.status === 'Pending Review'      ? 'badge-review'    : 'badge-closed'
+                        }`}>
+                          {c.incident.status}
+                        </span>
+                      ) : (
+                        <span style={{ color: 'var(--text-faint)', fontSize: '12px' }}>—</span>
+                      )}
+                    </td>
+                    <td style={{ whiteSpace: 'nowrap', fontSize: '12px', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>
+                      {new Date(c.createdAt).toLocaleDateString('en-SG')}{' '}
+                      {new Date(c.createdAt).toLocaleTimeString('en-SG', { hour12: false, hour: '2-digit', minute: '2-digit' })}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -157,202 +193,50 @@ export default function CaseLogPage() {
         )}
       </div>
 
-
-
       <style jsx>{`
-        .cases-header-bar {
-          padding: 20px 24px;
+        .page-header {
+          padding: 16px 20px;
           display: flex;
           justify-content: space-between;
           align-items: center;
-          margin-bottom: 8px;
         }
+        .page-header-left h1 { font-size: 15px; font-weight: 700; }
+        .page-header-left p  { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
 
-        .title-section h1 {
-          font-family: var(--font-title);
-          font-size: 20px;
-          font-weight: 800;
-          letter-spacing: 0.03em;
+        .page-header-stats {
+          display: flex; gap: 10px;
         }
-
-        .title-section p {
-          font-size: 12px;
-          color: var(--text-muted);
-          margin-top: 2px;
+        .stat-chip {
+          display: flex; flex-direction: column; align-items: center;
+          padding: 6px 14px; border-radius: var(--radius-md);
+          background: var(--bg-inset); border: 1px solid var(--border-color);
+          min-width: 56px;
         }
+        .stat-chip.stat-chip-active { border-color: var(--color-active-border); background: var(--color-active-bg); }
+        .stat-chip.stat-chip-warn   { border-color: var(--color-high-border);   background: var(--color-high-bg); }
+        .stat-chip.stat-chip-muted  { border-color: var(--border-color); }
 
-        .filter-panel {
-          padding: 16px 24px;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 20px;
+        .stat-val { font-family: var(--font-mono); font-size: 18px; font-weight: 600; line-height: 1; color: var(--text-main); }
+        .stat-lbl { font-size: 10px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 2px; }
+
+        .filter-bar {
+          padding: 12px 16px;
+          display: flex; align-items: center; gap: 16px;
         }
-
-        .search-group {
-          flex-grow: 1;
-          max-width: 450px;
+        .filter-search {
+          display: flex; align-items: center; gap: 8px;
+          flex: 1; max-width: 400px;
+          background: var(--bg-inset); border: 1px solid var(--border-color);
+          border-radius: var(--radius-md); padding: 0 12px; height: 36px;
         }
-
-        .select-filters {
-          display: flex;
-          gap: 16px;
-        }
-
-        .filter-select-group {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-
-        .filter-select-group label {
-          font-size: 12px;
-          color: var(--text-muted);
-          font-weight: 600;
-          white-space: nowrap;
-        }
-
-        .select-dark {
-          background-color: #ffffff;
-          border: 1px solid var(--border-color);
-          color: var(--text-main);
-          font-size: 13px;
-          padding: 8px 12px;
-          height: 38px;
-          cursor: pointer;
-        }
-
-        .cases-list-container {
-          padding: 20px;
-        }
-
-        .cases-loading, .empty-cases {
-          padding: 60px;
-          text-align: center;
-          color: var(--text-muted);
-          font-weight: 500;
-        }
-
-        .case-id-cell {
-          font-family: var(--font-title);
-          font-weight: 700;
-          color: var(--color-primary);
-          white-space: nowrap;
-        }
-
-        .case-title-cell {
-          font-weight: 600;
-        }
-
-        .date-cell {
-          font-size: 12px;
-          color: var(--text-muted);
-          white-space: nowrap;
-        }
-
-        .components-pills {
-          display: flex;
-          gap: 6px;
-          flex-wrap: wrap;
-        }
-
-        .pill {
-          display: inline-flex;
-          align-items: center;
-          padding: 3px 8px;
-          border-radius: 4px;
-          font-size: 11px;
-          font-weight: 600;
-          border: 1px solid transparent;
-        }
-
-        .pill-danger { background: var(--color-danger-glow); color: var(--color-danger); border-color: rgba(183, 32, 37, 0.15); }
-        .pill-accent { background: var(--color-secondary-glow); color: var(--color-secondary); border-color: rgba(0, 140, 149, 0.15); }
-        .pill-warning { background: var(--color-warning-glow); color: var(--color-warning); border-color: rgba(234, 88, 12, 0.15); }
-        .pill-muted { background: var(--bg-base); color: var(--text-muted); border-color: var(--border-color); }
-
-        .ticket-references {
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-        }
-
-        .ticket-label {
-          font-size: 11px;
-          color: var(--color-primary);
-          font-family: var(--font-title);
-          font-weight: 700;
-        }
-
-        /* Modal specific layouts */
-        .modal-backdrop {
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100vw;
-          height: 100vh;
-          background: rgba(43, 31, 29, 0.3);
-          backdrop-filter: blur(4px);
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          z-index: 10000;
-        }
-
-        .create-case-modal {
+        .filter-search-input {
+          border: none; background: none; outline: none;
+          font-family: var(--font-body); font-size: 13px; color: var(--text-main);
           width: 100%;
-          max-width: 500px;
-          display: flex;
-          flex-direction: column;
-          border-radius: 12px;
-          overflow: hidden;
-          background: var(--bg-card);
-          border: 1px solid var(--border-color);
-          box-shadow: 0 10px 25px -5px rgba(43, 31, 29, 0.1), 0 8px 12px -6px rgba(43, 31, 29, 0.05);
         }
-
-        .modal-header {
-          padding: 16px 20px;
-          border-bottom: 1px solid var(--border-color);
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-
-        .modal-header h2 {
-          font-family: var(--font-title);
-          font-size: 14px;
-          font-weight: 800;
-          letter-spacing: 0.05em;
-        }
-
-        .close-btn {
-          background: none;
-          border: none;
-          color: var(--text-muted);
-          cursor: pointer;
-        }
-
-        .modal-form {
-          display: flex;
-          flex-direction: column;
-        }
-
-        .modal-scroll-area {
-          padding: 20px;
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-        }
-
-        .modal-actions {
-          padding: 16px 20px;
-          border-top: 1px solid var(--border-color);
-          display: flex;
-          justify-content: flex-end;
-          gap: 12px;
-          background: var(--bg-base);
-        }
+        .filter-search-input::placeholder { color: var(--text-faint); }
+        .filter-selects { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+        .filter-label   { font-size: 12px; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
       `}</style>
     </>
   );

@@ -1,0 +1,2039 @@
+
+
+Integrated Security System (ISS)
+For
+Sentosa Development Corporation (SDC)
+
+
+Functional Requirements Document (FRD)
+Case Management System
+(Version 0.2)
+
+
+Name
+Designation / Company
+Signature
+Prepared By
+:
+Wong Shin Feng
+Business Analyst (SJ)
+
+
+
+
+
+
+Reviewed By
+:
+Gan Kian Teck
+Application Lead (SJ)
+
+
+
+Valerie Shao
+Project Manager (NCS)
+
+
+
+
+
+
+Approved By
+:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Table of Contents
+1.Document Control7
+1.1Version History7
+1.2Definitions, Abbreviations, Acronyms7
+2.Overview9
+2.1Purpose and Scope9
+2.2CMS Modules9
+2.3Authentication and Access Control10
+2.3.1Authentication Method10
+2.4CMS Dashboard11
+2.4.1Landing Page and Navigation11
+2.4.2Summary Metrics12
+2.4.3Events Masterlist12
+2.4.42D Island Map13
+2.5Integration with Unified Command System15
+2.5.1Live Metric Feed to UCS Dashboard15
+2.5.2Embedded CMS Functions within UCS15
+2.5.3Navigation from UCS to CMS17
+2.5.4Incident Creation from UCS17
+3.User Roles and Permissions18
+3.1System Level Role Definitions18
+3.2Duty Officer Role Elevation20
+3.3Role and Status Action Matrix21
+3.3.1Incident Management21
+3.3.2Task Management23
+3.3.3e-Diary Management24
+3.4Record Data Retention25
+3.5Stakeholder Incident Record Access25
+4.Case Data Model26
+4.1Entity Structure and Relationships26
+4.2Case Entity Relationship26
+4.3Case Creation28
+4.3.1Case Field Design28
+4.3.2Case Status Definitions29
+4.3.3High-Level Case Process Flow30
+5.Incident Management Module31
+5.1Incident Classification31
+5.1.1Incident Types31
+5.1.2Incident Categories31
+5.2Crisis Incident Level Classification32
+5.3Incident Field Design32
+5.3.1General Information32
+5.3.2Location33
+5.3.3Incident Log35
+5.3.4Emergency Services36
+5.3.5Media Involvement36
+5.3.6Property and Vehicles37
+5.3.7Personal Injuries38
+5.3.8Persons Involved38
+5.3.9CCTV and Body Worn Camera39
+5.3.10Attachments40
+5.3.11Summary and Closure40
+5.4Incident Lifecycle40
+5.4.1Incident Status Definitions41
+5.4.2High-Level Incident Process Flow43
+5.4.3Incident Ageing Alerts44
+5.5Incident Reporting Sources44
+5.6Responder Assignment and Response Tracking45
+5.6.1Assignment45
+5.6.2Response Milestone Tracking46
+5.6.3Incident Logging46
+5.7Duplicate Incident Detection and Handling47
+5.8Incident Record Save and Concurrent Editing47
+5.8.1Save Mechanism47
+5.8.2Concurrent Editing47
+5.9Linked Fault Creation48
+5.10False Alarm Handling48
+5.11Incident Closure and Reopening48
+5.12Broadcasting Triggers49
+5.12.1Closure Broadcast49
+5.12.2End-of-Day Interim Broadcast49
+6.Fault Reporting Module50
+6.1Fault Entry Points50
+6.2CMMS Ticket Creation50
+6.2.1Requirements50
+6.2.2Fault Field Design51
+6.2.3High-Level CMMS Ticket Process Flow51
+6.3Fault Status and Information Retrieval52
+6.3.1Fault Case Status52
+6.4Non-IFM Fault Handling53
+6.5Case Linkage and Closure53
+7.Task Management Module54
+7.1Task Creation54
+7.1.1Requirements54
+7.1.2Task Field Design54
+7.2Task Assignment and Notifications55
+7.3Task Process56
+7.3.1Requirements56
+7.3.2Task Statuses56
+7.3.3High-Level Task Process Flow58
+8.e-Diary Module59
+8.1Requirements59
+8.2 e-Diary Field Design59
+8.3E-Diary Creation60
+8.4Retrieval and Filtering60
+8.5UCS Integration60
+9.Broadcast and Notification Framework61
+9.1Broadcast Types61
+9.2Delivery Channels61
+9.3Recipient Group62
+9.4Broadcast Templates62
+9.5System Notifications62
+9.6Broadcast Matrix64
+9.7End-of-Day Interim Broadcast64
+9.8SDC Communications Team Notification64
+9.9Broadcast Record and Export64
+10.Crisis Management and Emergency Recall65
+10.1Crisis Level Classification and Routing65
+10.2Crisis Recall65
+10.3Delivery Channels66
+10.4SMS Recall Workflow66
+11.Reporting and Data Export67
+11.1Operational Statistics Module67
+11.2Incident Report Export67
+11.3Case Summary Export68
+11.4Data Export for Analytics68
+12.System Configuration and Administration69
+12.1User and Role Management69
+12.2System Reference Data Configuration69
+12.3Broadcast Configuration70
+12.4Audit Log70
+13.Non-Functional Requirements71
+13.1Availability71
+13.2Performance71
+13.3Concurrent Users71
+13.4Security71
+13.5Session Management71
+13.6Audit and Compliance71
+13.7Data Retentional and Archival71
+14.Open Items72
+14.1UCS72
+14.2Incident72
+14.3Broadcast72
+15.Appendix73
+
+
+Document Control
+
+Version History
+Version
+Date
+Description
+0.1
+18 May 2026
+Initial Draft
+0.2
+5 June 2026
+Revised draft updating
+
+Definitions, Abbreviations, Acronyms
+Term
+Definition
+2FA
+Two-Factor Authentication
+AD
+Active Directory
+BWC
+Body Worn Camera
+CMS
+Case Management System
+CMMS
+Computerised Maintenance Management System
+DM
+Duty Manager
+DO
+Duty Officer
+FM
+Facilities Management
+FRD
+Functional Requirements Document
+HOTO
+Handover and Takeover
+IFM
+Integrated Facilities Management
+IIOC
+Island Integrated Operations Centre
+IOH
+Integrated Operations Hub; used operationally to refer to the IIOC facility and its staff
+LO
+Liaison Officer
+MOS
+Method of Statement
+NOP
+No Objection Permit
+NCS
+NCS Pte Ltd
+OR
+Operational Resilience
+PTZ
+Pan-Tilt-Zoom
+RA
+Risk Assessment
+RBAC
+Role-Based Access Control
+SCDF
+Singapore Civil Defence Force
+SCOG
+Sentosa Crisis Operations Group
+SCMG
+Sentosa Crisis Management Group
+SDC
+Sentosa Development Corporation
+SJ
+Surbana Jurong
+SPF
+Singapore Police Force
+SSO
+Single Sign-On
+UCS
+Unified Command System
+VA
+Video Analytics
+VMS
+Video Management System
+WOG
+Whole-of-Government
+
+
+Overview
+Purpose and Scope
+This document specifies the functional requirements for the Case Management System (CMS) component of the SDC Island Integrated Operations Centre platform, covering 
+Incident Management
+Fault Reporting
+Task Management
+No-Objection Permit
+Events Masterlist
+Broadcast and Notification
+CMS Dashboard
+System Configuration and Administration
+CMS Modules
+
+
+The CMS is a web browser-based platform. All modules are subject to role-based access control; the specific modules, tabs, and functions visible to a given user upon login are determined by their assigned role. The following modules are covered in this document.
+Module
+Description
+Incident Management
+Creation, assignment, tracking, and closure of incident records from all reporting sources across the island
+Fault Reporting
+Creation, automatic triage, routing, and closure of fault records, with rule-based assignment to the IFM contractor and CMMS ticket creation via API where required
+Creation, tracking and closure of fault records. Creation of CMMS tickets via API.
+Task Management
+Creation, assignment and tracking of operational tasks directed to Rangers or SDC staff within a Case
+Examples: welfare check, escort, item collection, access arrangements
+Broadcast and Notification
+Structured framework for disseminating incident information to defined distribution groups, with crisis-level classification governing escalation and recall behaviour
+CMS Dashboard
+Consolidated operational and calendar event view of active cases, incidents, faults, and tasks, with a filterable 2D map of island-wide activity
+System Configuration
+Administration of user accounts, role assignments, classification taxonomies, routing matrices, distribution groups, and audit settings
+Authentication and Access Control
+Authentication Method
+Users authenticate to the CMS via Whole-of-Government Single Sign-On (WOG SSO). Two-Factor Authentication (2FA) is enforced for all user accounts. Access granted via WOG SSO may assign users a default role with minimal permissions, such as fault submission and status tracking, without requiring a separately provisioned CMS account
+Non-SDC users, such as term-contractors, are not eligible for WOG SSO authentication. A separate authentication mechanism will be required for these users, where access is scoped to the NOP module only.
+CMS Dashboard
+The CMS Dashboard shall provide a consolidated operational view for Controllers, Duty Officers, and Duty Managers.
+It is distinct from the UCS Dashboard in scope and purpose: the UCS Dashboard presents live-state summary counts and high-level situational awareness, while the CMS Dashboard provides access to both current and historical records with line-item detail views.
+Landing Page and Navigation
+Upon successful authentication, users are presented with the CMS landing page. Navigation items visible to a given user are filtered by their assigned role.
+Navigation Item
+Description
+Dashboard
+Consolidated operational view of active cases, incidents, faults, tasks, events, no-objection permits, and 2D island map
+Case Management
+Case log list view and case detail view, with access to linked incidents, faults, tasks and e-diary entries
+Incident Management
+Incident log list view, incident creation and management, and incident detail view
+Fault Reporting
+Fault log list view, fault creation and management, and fault detail view
+Task Management
+Task log list view, task creation and assignment, and task default view
+Events Masterlist
+Events list and calendar view, event creation and management, and event-case linking
+No-Objection Permit
+NOP application log, permit submission, review and approval workflow, and permit lifecycle management
+Broadcast and Notification
+Broadcast log, crisis broadcast composition and dispatch, and distribution group management
+Operational Statistics
+Real-time operational analytics and data export of cases, incidents, faults, tasks, events and no-objection permits volume trends. Includes breakdown by status, type, location, processing time metrics, and more.
+
+System Configuration
+Administrator-only module for account management and system settings
+
+Summary Metrics
+The Dashboard shall display the following operational counters, each filterable by a date and time range selected by the user.
+Metric
+Description
+Active Cases
+Count of case records currently in Active status
+Incidents Reported
+Total count of incident records within the selected period
+Unclosed Incidents
+Count of incident records not in Closed status
+Faults Reported
+Total count of fault records within the selected period
+Unclosed Faults
+Count of fault records not in Closed status
+Active Tasks
+Count of task records currently in an active status
+Overdue Tasks
+Count of task records that have passed their due date and are not in Closed status
+Events Today
+Count of events from the Events Masterlist that are ongoing or scheduled on the current day
+Active NOPs
+Count of NOP permits with Approved and Active Status on the current day
+
+Events Masterlist
+The Events Masterlist is a module for managing planned events on Sentosa Island. It provides Controllers with visibility of upcoming and active events alongside operational case records, supporting situational awareness and operational deconfliction.
+Event Creation and Management
+Authorised users shall be able to create, edit, and manage event records in the Events Masterlist.
+Each event record shall include:
+Field
+Notes
+Event Name
+Free text
+Event Date and Time
+Start and end date/time
+Event Location
+Input location and boundary selectable on 2D Island Map
+Event Type
+TBC
+Description
+Free text
+Created By
+System-generated
+Created At
+System-generated
+Where an event occupies a defined spatial area, the authorised user shall be able to draw a boundary overlay for display on the 2D island map
+Event Calendar View
+The Events Masterlist shall provide a calendar view of all events, displaying upcoming and active events by date
+Events shall also be accessible as a list view with filtering by date range and event type
+2D Island Map
+The CMS Dashboard shall include an embedded 2D map of Sentosa Island leveraging on OneMap and its available API. The map will provide a consolidated spatial view of active operational activity across the island and is accessible to all users with Dashboard access.
+Map Layer
+Description
+Incidents
+Drop-pins for active incident records, derived from the text-entered location data on each incident log. Coordinates are resolved from the entered address, road name, building, or postal code via the OneMap geocoding API
+For incidents at locations without a standard address (e.g. beach areas, open outdoor spaces), coordinates are taken from the manually placed pin drop on the incident record.
+Faults
+Drop-pins for active fault records, resolved by geocoding
+Active Works
+Boundary overlays for approved and active NOP works areas. Works boundaries drawn by NOP applicants during their application are automatically displayed on this map upon permit approval, providing Controllers with a live spatial overview of all ongoing permitted works on the island
+Events
+Boundary overlays for events from the Events Masterlist that are scheduled to be upcoming or on-going on the current day.
+
+
+For locations with defined physical boundaries, such as named buildings and venues, the system shall associate a text-entered location with the corresponding pinned coordinate.
+For road-based locations, which cannot be geofenced, coordinate resolution relies on the geocoding result returned by OneMap for the entered road name or common name.
+Island events at fixed venue sites, such as pavilions, event grounds, and beaches, shall be represented on the map as drop-pin icons.
+Geographical Coverage
+The map shall support plotting of records across Sentosa Island, and all named off-island SDC operational locations, including:
+Mount Faber Leisure Group premises on Mt Faber and Harbourfront Tower
+SDC-operated berths at Harbourfront Bus Interchange
+Vivocity, nearby MRT stations and bus stops, and other transport nodes in the immediate vicinity
+Designated crisis locations
+Road routes to and from Sentosa Gateway, including all road names on these routes
+Map Display Behaviour
+Behaviour
+Description
+Pin Clustering 
+When multiple pins of the same layer are in proximity at the current zoom level, they are aggregated into a numbered cluster marker showing the record count
+Zoom to Expand
+Clicking a cluster marker zooms the map to the cluster area, expanding it to reveal individual pins
+Pin Interaction
+Clicking an individual pin surfaces a summary panel showing the record type, ID, and current status, with a link to the full record in the CMS
+
+Integration Dependency and Data Accuracy
+Map functionality is dependent on the availability of the OneMap API, a government geospatial service maintained by SLA. SJ will be responsible for maintaining the API integration code in line with any changes to OneMap API versioning, endpoints, or authentication specifications. The accuracy and completeness of OneMap's underlying geospatial data is outside the development team's remit.
+The spatial accuracy of plotted records is dependent on OneMap geocoding data, which may not reflect recent construction or changes to the built environment. For locations not yet reflected in OneMap, pin placement relies on the coordinate data in the CMS location taxonomy, which is maintained by the System Administrator via the System Configuration module.
+Integration with Unified Command System
+The CMS and the Unified Command System operate as complementary but functionally distinct platforms.
+While the CMS is the system of record for all operational case data, the UCS is the primary command interface, surfacing a real-time operational overview to Controllers and the Duty Officer.
+Live Metric Feed to UCS Dashboard
+The CMS shall supply real-time summary counts to the UCS Dashboard, including the number of active cases, open incidents, open faults, active tasks.
+Summary counts shall update in real time as records are created, updated or closed in the CMS. 
+Detailed record lists and case-level views are not replicated on the UCS and reside exclusively within the CMS.
+Embedded CMS Functions within UCS
+CMS functions that are frequently used or operationally time-critical shall be surfaced as embedded panels or inline actions within the UCS, without requiring the user to navigate away from the UCS interface.
+Actions performed through embedded UCS panels shall create, update, or retrieve records directly in the CMS. The UCS does not store or duplicate CMS data.
+The embedded functions shall operate under the same role-based access controls as the full CMS.
+Controllers shall be able to perform create, read and update operations for the following record types directly from within the UCS:
+Record Type
+Embedded Operations
+Incidents
+Create, view and update incident records. Assign responders and update incident status
+Acknowledge VA triggers to create Incident records.
+Tasks
+Create, view, update and reassign task records
+CMMS Faults
+Create and view fault records, view CMMS ticket reference
+e-Diary
+Create, view, and amend e-Diary entries
+No-Objection Permit
+Actionable items involving IOH within NOP workflow
+
+Embedded operations shall be fully completable from within UCS, such as form input, validation and save shall be performable without the Controller navigating away to the CMS.
+The embedded integration shall function as a working form and data interface, not a link or redirect to the CMS. Implementation method (inline panel, pop-up form, embedded component) is subject to technical design.
+
+
+
+
+
+
+Navigation from UCS to CMS 
+The UCS and CMS are complementary interfaces. CMS functions that are frequently used or operationally time-critical are surfaces as embedded panels or inline actions within the UCS. All remaining CMS functions are accessible from the UCS via direct navigation.
+Where a function is not available as an embedded UCS action, selecting a live metric, summary item, or record reference in the UCS shall direct the user to the corresponding CMS module page.
+Line-item detail, full record editing, case management, and reporting functions are handled within the CMS and are not replicated in the UCS.
+The presentation of CMS data within the UCS, including widget layout, record list columns, display depth and filtering options will be defined in the UCS functional requirements document. A UCS record widget may surface a live list of active records with key fields, such as record ID, status, type and created at, alongside inline quick actions, for embedded operations.
+Incident Creation from UCS
+A Controller shall be able to initiate a new Incident record directly from the UCS without navigating to the CMS.
+Incident creation from the UCS shall be available as an inline action, for example in response to a Video Analytics alert, a system-generated prompt, or a patrol report received in the UCS.
+The Incident record shall be created and stored in the CMS. The UCS surfaces the creation interface only; it does not own the record.
+Where a Video Analytics alert or system prompt is used as the trigger, the relevant alert reference shall be pre-populated into the Incident record where applicable.
+Upon successful creation, the Controller shall be able to continue monitoring the UCS or navigate directly to the full Incident record in the CMS.
+
+User Roles and Permissions
+System Level Role Definitions
+The CMS defines the following system-level roles. A user's assigned role determines their permitted actions across all modules and records within the system.
+Role
+Description
+System Access
+System Administrator
+Super Admin accounts holding maximum administrative rights, responsible for user provisioning, role configuration, taxonomy management, and system-level settings
+Full, including System Configuration
+Duty Manager
+Senior operational authority on shift. Responsible for incident closure endorsement, escalation decisions, and endorsement of NOP applications
+Full
+Duty Officer
+Senior officer on shift, supervising Controllers. Covers Duty Manager responsibilities during periods of absence under role elevation
+Full
+Controller
+Primary IOH operator. Creates and manages incident and fault records, assigns Responders, routes tasks, and manages cases through to closure submission
+Full access to case modules, but cannot independently close incidents
+Responder 
+Field personnel assigned by a Controller to respond to an incident or task. Logs field activities and updates response status milestones within assigned records only
+Assigning a Responder is optional. A Controller may complete and submit a record without one.
+Limited to assigned incident and task record segments
+Stakeholder
+SDC internal staff with read access to incident records relevant to their department or operational zone
+View-only for CMS Incident records under their purview
+Broadcast Recipient
+SDC staff or external stakeholders receiving incident broadcast notifications. No case creation or editing capability
+Broadcast receipt only
+Zone Manager / Contract Manager (Non-IFM)
+
+SDC staff responsible for systems and assets outside of IFM purview
+
+Read-only access to incident records relevant to their assigned systems or assets
+Operational Resilience Analyst
+Read access to incident records for post-incident classification, tagging, and trend analysis. Does not create or edit operational records
+Read-only access to incident records
+Incident tagging and classification
+Bulk data export in CSV format
+Non-SDC Term-Contractor
+Island operators and term contractors with a regular operational presence on Sentosa Island, including bus operators (Strides, Tower Transit), facilities management contractors (IFM), and other SDC-engaged entities.
+
+NOP module only
+No CMS access
+NOP application submission, document upload (MOS, RA, Workers List), and application status tracking
+
+
+
+
+
+
+
+
+Duty Officer Role Elevation
+The Duty Officer may be elevated to cover Duty Manager responsibilities during the Duty Manager's absence. In the elevated state, the Duty Officer holds identical permissions to the Duty Manager.
+Elevation will apply as a long-term role configuration on a named user. In the case where an elevated Duty Manager is unable to close an incident they created in a prior shift, the incident is closed by the next shift’s Duty Manager.
+
+
+Role and Status Action Matrix
+Incident Management
+Incident records progress through the following statuses on the table header from left to right:
+Role
+Live
+Live (Acknowledged)
+Live (On-Site) / Live (Returned to Responder)
+Live (Completed)
+Pending Review
+Returned
+Closed
+Owner*
+View
+Edit
+Assign Responder
+Submit for Review
+View
+Edit
+Assign Responder
+Submit for Review
+View
+Edit
+Assign Responder
+Submit for Review
+View
+Edit
+Assign Responder
+Submit for Review
+View
+View
+Edit
+Assign Responder
+Submit for Review
+View
+Controller
+Create
+View
+Edit
+Assign Responder
+Submit for Review
+Create
+View
+Edit
+Assign Responder
+Submit for Review
+Create
+View
+Edit
+Assign Responder
+Submit for Review
+View
+Edit
+Return to Responder
+Submit for Review
+View
+View
+Edit
+Assign Responder
+Submit for Review
+View
+Responder*
+View
+Acknowledge
+View
+Notify Arrival On-Site
+View
+Edit
+Notify Completion
+View
+View
+View
+Cannot View after 12 hours of incident closure*
+See Section 5.6.2 Responder Activity Logging (f)
+Duty Officer
+View
+Edit
+Assign Responder
+Submit for Review
+View
+Edit
+Return to Owner
+Assign Responder
+View
+Edit
+Assign Responder
+Submit for Review
+View
+Edit
+Return to Responder
+Assign Responder
+Submit for Review
+View
+Edit
+Return to Owner
+Close
+View
+Edit
+Assign Responder
+Submit for Review
+View
+Duty Manager
+View
+Edit
+Assign Responder
+Submit for Review
+View
+Edit
+Return to Owner
+Assign Responder
+View
+Edit
+Assign Responder
+Submit for Review
+View
+Edit
+Return to Responder
+Assign Responder
+Submit for Review
+View
+Edit
+Return to Owner
+Close
+View
+Edit
+Assign Responder
+Submit for Review
+View
+
+Task Management
+Task records progress through the following statuses: Created, Re-Assigned, Acknowledged, In Progress, Pending, Further Action, and Closed.
+Role
+Created
+Re-Assigned
+Acknowledged
+In Progress
+Pending Further Action
+Closed
+Owner*
+Create
+View
+Edit
+Assign Responder
+View
+Edit
+Assign Responder
+View
+View
+View
+View
+Controller
+Create
+View
+Edit
+Assign Responder
+View
+Edit
+Assign Responder
+View
+View
+View
+View
+Responder*
+View
+Acknowledge
+Re-assign
+View
+Acknowledge
+Re-assign
+View
+Notify Arrival On-Site
+View
+Edit
+Re-assign
+Set to Pending
+Close
+View
+Edit
+Re-assign
+Acknowledge
+View
+Duty Officer
+View
+Edit
+Assign Responder
+View
+Edit
+Assign Responder
+View
+View
+View
+View
+Duty Manager
+View
+Edit
+Assign Responder
+View
+Edit
+Assign Responder
+View
+View
+View
+View
+
+
+
+e-Diary Management
+Role
+Create
+View
+Edit
+Delete
+System Administrator
+Yes
+All entries
+All entries
+Yes
+Duty Manager
+Yes
+All entries
+All entries
+No
+Duty Officer
+Yes
+All entries
+All entries
+No
+Controller
+Yes
+All entries
+All entries
+No
+Record Data Retention
+When a user account is deactivated or removed, their associated records should remain accessible to users with appropriate role permissions, with the original creator's identity preserved on each record.
+Stakeholder Incident Record Access
+Upon creation of an Incident and confirmation of Incident Type, CMS accounts of SDC stakeholders associated with the relevant incident type will be granted view-only access to the Incident Record for incident visibility and live updates of the incident log.
+
+Case Data Model
+The Case is the top-level record in the CMS. All operational activity is anchored to a Case.
+Entity Structure and Relationships
+For the purpose of the CMS, an operational event is any occurrence requiring official action by a Controller or above, including security incidents, fault reports, directed tasks, and e-Diary log entries. 
+A Case is created for each operational event, and the sub-record that triggers the Case carries the operational detail. The CMS data model is organised around the Case as a lean operational record container. The Case holds an identifier, a status, and references to its associated sub-records.
+A Case may be created independently of any child record.
+A Case may contain zero or one Incident record.
+A Case may contain zero or more Task records.
+A Case may reference zero or more CMMS Ticket IDs. These identifiers are returned by the IFM CMMS upon ticket creation and stored as reference attributes of the Case. The ticket lifecycle is owned entirely by the IFM CMMS.
+An Incident, Task, or CMMS Ticket reference cannot exist in the CMS without an associated Case.
+Where a Case does not exist at the time of Incident or Task creation, the system shall auto-create a Case before creating the child record.
+
+ e-Diary records are linked to a Case. A Case is auto-created on creation of an e-Diary entry if no existing Case context is present. An e-Diary entry does not trigger a ground response, work order, or broadcast, it is a log record only.
+
+Case Entity Relationship
+The following diagram illustrates the relationship between the Case and its linked record types.
+
+Figure 41 - Case Entity Relationship Model
+Entity
+Cardinality
+Description
+Case
+Parent
+The operational record container. One Case is created per operational event
+Incident
+Zero or one per Case
+The formal incident record managed by the Controller. A Case may contain at most one Incident
+Linked (Slave) Incident
+Zero or many per Incident
+Duplicate incident reports linked to a Master Incident.
+Task
+Zero or many per Case
+Operational ground response tasks assigned to Rangers or SDC staff. Multiple Tasks may exist under one Case simultaneously.
+CMMS Fault Ticket 
+Zero or many per Case
+Reference identifiers for tickets raised in the IFM contractor's CMMS via API.
+Stored as attributes on the Case.
+CMMS ticket lifecycle is managed externally.
+e-Diary
+Zero or many per Case
+Occurrence log entries linked to a Case. e-Diary entries do not trigger a ground response, work order or broadcast.
+Case Creation
+System shall generate a unique identifier upon creation.
+
+The Case ID is referenced by all child records (Incident, Tasks, CMMS Tickets, e-Diary) for traceability.
+Case Field Design
+Field
+Type
+Mandatory
+Notes
+Case ID
+System
+Yes
+Auto-generated, format: SEN/CI/YYYYMMDD/NNN
+Case Title
+Text
+No
+Auto-populated for VA and system-triggered Cases, otherwise input by Controllers
+Status
+System
+Yes
+System-managed
+Created By
+System
+Yes
+Auto populated, referencing CMS user record
+Created At
+System
+Yes
+Auto populated timestamp
+Closed By
+System
+No
+Auto populated on Case closure, referencing CMS user record of Duty Officer/Duty Manager
+Closed At
+System
+No
+Auto populated timestamp on Case closure
+
+Case Status Definitions
+Status
+Description
+Pending Triage
+Initial status on Case creation. The Controller has not yet determined whether action is required
+Active
+Action has been determined as required. One or more sub-processes (Incident, Task, CMMS Ticket) are in progress
+No Action Required
+No operational action is required or taken. Applies to: (a) VA or system-triggered Cases assessed by the Controller as non-actionable; (b) Cases auto-created by new e-Diary entry.
+If an e-Diary entry subsequently escalates, the Case transitions to Active on creation of a linked Incident, Task, or CMMS Fault record.
+Closed
+All linked Incident, Task, and CMMS Ticket records are resolved. The Case is read-only
+
+The Controller may close a Case after a CMMS Ticket has been raised, without waiting for the IFM contractor to resolve the ticket.
+High-Level Case Process Flow
+
+Figure 42 - Case Process Workflow
+
+Incident Management Module
+The Case is the primary operational record container in the CMS. Every operational activity on the island, whether an incident, a ground response task, or an infrastructure fault requiring contractor action, is anchored to a Case record.
+Incident Classification
+Incident Types
+Each incident record shall be assigned a Type and a Sub-type from SDC's defined classification taxonomy.
+Both Type and Sub-type fields are mandatory.
+Sub-type values are unique within each Type. An Others option shall be available as a Sub-type of last resort where no defined Sub-type accurately describes the incident.
+Note: Finalised Incident Type and Sub-type taxonomy to be confirmed
+Incident Categories
+Beyond Type and Sub-type, the following operational categories apply to incident records and govern how they are handled within the system. These categories are for-info and not noted in the system.
+Category
+Description
+Standard Incident
+An active incident requiring Controller management and, where applicable, a Ranger field response
+Proactive Incident
+Created by the Controller in response to a notification or advisory where no immediate ground response is required. Common examples include missing person lookouts and lost item notices
+Backdated Incident
+Created to record an incident that has already occurred and concluded, typically following notification from a state agency after the fact. The record is created, populated with the known details, and closed immediately
+Ongoing Incident
+An incident that remains open over an extended period while the situation develops and is actively monitored. Common examples include prolonged state emergencies or extended search operations
+Operational Record
+An administrative record created for tracking purposes, covering planned exercises, drills, or coordinated information dissemination. These records do not require a ground response or broadcast
+Crisis Incident Level Classification
+Each Incident shall be assigned a Crisis Level at the point of creation or escalation by a Controller
+The Crisis Level determines the broadcast type, distribution group, and escalation behaviour triggered upon or during the incident. 
+The Crisis Level is assigned by the Controller at the point of incident creation and may be escalated by the Duty Manager or Duty Officer as the incident develops.
+By default, the Crisis Level is set at Level 4 at incident creation. The Controller is expected to review and update the classification as the situation develops.
+The system shall surface a reminder to the Controllers on-duty 45 minutes from the incident creation, prompting review and confirmation of the Crisis Level. The reminder does not escalate nor amend the level automatically.
+Note: Full classification and routing behaviour is defined in further sections on Broadcasts.
+Incident Field Design
+The incident record is structured into the following sections. Fields marked as mandatory must be completed before the record can be submitted for review.
+General Information
+Field
+Type
+Mandatory
+Notes
+Incident ID
+Auto generated
+Yes
+System generated unique identifier, read-only
+Format: SEN/IR/YYYYMMDD/NNNN
+
+Case ID
+Auto generated
+Yes
+System-generated unique identifier. Read-only.
+If no existing Case context is present, a new case is auto created, and the Case ID is generated and assigned.
+If the Incident is created within an existing Case, the existing Case ID is pre-populated 
+Incident Title
+Text
+Yes
+Auto generated when incident is triggered by a third-party system, e.g. "VA: Abandoned Object @ Cove". Manually entered by Controller for all other incidents
+Date and Time of Incident
+Date/Time
+Yes
+Defaults to current date and time. Backdating is permitted with no restriction
+Incident Type
+Dropdown
+Yes
+Selected from SDC's defined taxonomy. Refer to Appendix C
+Incident Sub-type
+Dropdown
+Yes
+Values are unique within the selected Incident Type. Refer to Appendix C
+Priority
+Dropdown
+Yes
+High, Normal; Default to Normal
+Crisis Level
+Dropdown
+Yes
+To be assigned by 1 hour after incident creation. Notification to confirm 45mins after incident elapsed
+Reporter's Name
+Text
+No
+Refers to the source of the incident report, not the Controller completing the form
+Requested By
+Text / Dropdown
+No
+The party who initiated the report or requested action
+Created By
+Auto
+-
+Populated from the authenticated user account. Read-only
+Status
+System-managed
+-
+Changes in status are triggered by actions in the incident process. Refer to Section 5.4.1 for Incident status definitions
+Assigned To
+User
+No
+Ranger or Responder assigned by the Controller
+Location
+Field
+Type
+Mandatory
+Notes
+Road
+Text
+No
+Road name or nearest road reference
+Building
+Text
+No
+Building name where applicable
+Level and Space
+Text
+No
+Floor level and specific space within the building
+Beside / Near To / At
+Text
+No
+Directional qualifier, e.g. "Lane 2", "near the entrance"
+Common Name
+Text
+No
+Free text accepting building names, lamp post numbers, or bus stop numbers
+Postal Code
+Text
+No
+Defaults to 000000 for locations without a postal code
+Location Tags
+Tags
+No
+Predefined zone and facility tags for filtering and reporting
+Minimap
+Map display
+-
+Displayed after location entry via postal code or address search for address confirmation 
+Supports manual pin drop for locations without a standard address. Postal Code defaults to 000000 when a pin is placed.
+
+
+Incident Log
+The Incident Log section captures a chronological, row-by-row account of the incident as it unfolds. Each row is timestamped and auto sorted by date and time.
+Field
+Type
+Mandatory
+Notes
+Event Number
+Auto generated
+-
+Sequentially assigned per row
+Date
+Date
+Yes (per row)
+Date of the event entry
+Time
+Time
+Yes (per row)
+Time of the event entry
+Event Description
+Free text
+Yes (per row)
+Controller's account of the event at that point in time
+
+
+Sample screenshot of Incident Log 
+Emergency Services
+Police
+Field
+Type
+Mandatory
+Notes
+Police at Scene
+Checkbox
+No
+Indicates police presence at the incident
+Officer Name and Rank
+Text
+No
+Name and rank of the attending officer
+Police Incident Number
+Text
+No
+Reference number from the police
+Classification
+Text
+No
+Police classification of the incident
+Responding Unit
+Text
+No
+Unit or station responding
+
+Ambulance and SCDF
+Field
+Type
+Mandatory
+Notes
+Type
+Dropdown
+No
+Ambulance or SCDF
+Officer Name
+Text
+No
+
+Call Sign
+Text
+No
+
+Responding Unit
+Text
+No
+
+Arrival Time
+Time
+No
+
+Hospital Conveyed To
+Text
+No
+Name of hospital if patient was conveyed
+Media Involvement
+Field
+Type
+Mandatory
+Notes
+Media at Scene
+Checkbox
+No
+Indicates media presence at the incident
+Media Name
+Text
+No
+Name of the media organisation or outlet present
+SDC Comms Notification
+Prompt
+—
+A prompt or reminder mechanism shall be surfaced when media presence is indicated, to ensure the Controller notifies the SDC Communications team.
+
+Property and Vehicles
+Property Damage
+Field
+Type
+Mandatory
+Notes
+SDC Property Damaged
+Checkbox
+No
+Indicates whether SDC-owned property was damaged in the incident
+Description
+Text
+No
+Description of damage where applicable
+Vehicles Involved
+Field
+Type
+Mandatory
+Notes
+SDC Vehicle Involved
+Checkbox
+No
+Indicates whether an SDC-owned vehicle was involved
+Vehicle Model
+Text
+No
+
+Vehicle Number
+Text
+No
+
+Driver Name
+Text
+No
+
+Driver Contact Number
+Text
+No
+
+Driving Licence Number
+Text
+No
+
+Driver Address
+Text
+No
+
+Remarks
+Text
+No
+
+Personal Injuries
+Field
+Type
+Mandatory
+Notes
+Name
+Text
+No
+
+Address
+Text
+No
+
+Age
+Number
+No
+
+Gender
+Dropdown
+No
+
+Contact Number
+Text
+No
+
+Clinic or Hospital Attended
+Text
+No
+
+MSIG Form Issued, 
+Checkbox + Text
+No
+Indicates whether an MSIG form was issued. If yes, Serial Number field is surfaced
+Under-16 Indicator
+Checkbox
+No
+If the injured person is aged 16 or below, a parental or guardian details sub-form is surfaced
+Parent or Guardian Name
+Text
+No
+Surfaced conditionally when under-16 indicator is selected
+Parent or Guardian Contact
+Text
+No
+Surfaced conditionally when under-16 indicator is selected
+Persons Involved
+Field
+Type
+Mandatory
+Notes
+Guest or non-Guest
+Dropdown
+No
+Indicates whether the person is a guest of the island or otherwise
+Type
+Dropdown
+No
+Guest, Staff, Island Partner or Contractor, Resident, Others
+Name
+Text
+No
+
+Address
+Text
+No
+
+Age
+Number
+No
+
+Gender
+Dropdown
+No
+
+Contact Number
+Text
+No
+
+Role or Involvement
+Text
+No
+Free text describing the person's role, e.g. victim, witness, bystander
+Injury Details
+Text
+No
+Surfaced if the person sustained an injury
+CCTV and Body Worn Camera
+This section records references to CCTV footage and Body Worn Camera footage relevant to the incident. Multiple entries are supported for incidents spanning several locations or involving multiple officers. 
+Footage retrieval is performed via the VMS and is not accessible directly from within the CMS.
+Field
+Type
+Mandatory
+Notes
+Camera Number
+Text
+No
+Multiple entries supported
+VMS Timestamp
+Time
+No
+
+VMS Footage Bookmark
+Text
+No
+Reference bookmark within the VMS footage
+BWC Number
+Text
+No
+Body Worn Camera identifier
+BWC Timestamp
+Time
+No
+
+
+Attachments
+Field
+Type
+Mandatory
+Notes
+Attachments
+File upload
+No
+Accepted formats: photo, video, and document files. Police reports shall not be attached in this section
+Summary and Closure
+Field
+Type
+Mandatory
+Notes
+Summary
+Rich text
+No
+Free-text summary field, relocated below the Personal Injuries section. Renamed from Remarks in the previous system
+Completion Remarks
+Text
+Conditional
+
+
+Free text remarks field for the Duty Manager when reviewing an incident submitted for closure. Used to record approval notes or, where the record is being returned, to specify the revision required by the Controller. 
+Mandatory when the DM selects Return, optional when approving.
+Closed By
+Auto
+-
+Populated from the authenticated user account upon closure. Read-only
+Closed At
+Auto timestamp
+-
+System timestamp recorded at the point of closure. Read-only
+Incident Lifecycle
+An Incident record shall be created either manually by a Controller or automatically triggered from a third-party source or the UCS.
+Where a Case does not already exist, Case creation is triggered automatically before the Incident record is initialised.
+The Controller may assign one or more Responders to the Incident. Assignment is optional; an Incident may be managed without a Responder assigned.
+The Incident progresses through defined statuses reflecting its operational state.
+Upon closure, the system shall automatically record the identity of the closing user and the closure timestamp.
+Closed Incident records are read-only. A System Administrator must revert the status to an active state before any edits can be made.
+Incident Status Definitions
+Status
+Description
+Permitted Actions
+Live
+Incident created and active. No Responder acknowledged.
+Controller
+Edit
+Assign Responder
+Mark false alarm
+Submit for closure
+Live (Assigned)
+Responder has been assigned by Controller. Awaiting Responder acknowledgement
+Controller
+Edit
+Assign/Reassign Responder
+Live (Acknowledged)
+Assigned Responder has acknowledged.
+Controller:
+Edit
+Reassign
+Responder:
+Update to On-Site
+Log activity
+Live (On-Site)
+Responder confirmed on location.
+Controller:
+Edit
+Responder:
+Update to Completed
+Log activity
+Live (Incomplete)
+Controller has returned the record to Responder for further action.
+Controller:
+Edit
+Resubmit
+Responder:
+Update
+Log activity
+ Live (Completed)
+Responder has marked as completed. Pending Duty Manager review.
+Duty Manager:
+Approve closure or return
+Controller:
+View only
+Pending Review
+Submitted for Duty Manager approval before closure.
+Duty Manager:
+Approve closure or return.
+Controller:
+View only
+Returned
+Duty Manager returned the record for further information or corrections.
+Controller: 
+Edit
+Resubmit
+Responder:
+Update
+Closed
+Approved for closure. Record is read-only.
+System Administrator:
+Revert status
+All roles:
+Read only
+Note: Full role-by-role action permissions across all statuses are defined in the Role and Permission Matrix, Section 3.4.2
+
+
+High-Level Incident Process Flow
+The following diagram illustrates the end-to-end incident lifecycle from creation through to closure.
+
+Figure 51 - Incident Creation and Assignment Workflow
+
+Figure 52 - Incident Review Process
+Incident Ageing Alerts
+Where an Incident has remained in an active status for 12 consecutive days from the date of creation, the system shall generate an advance notification to the Controller assigned to the Incident and the Duty Manager, identifying the Incident by ID and prompting a review of the Incident status.
+Where an Incident has remained in an active status for 14 consecutive days from the date of creation, the system shall generate a further notification to the assigned Controller and the Duty Manager, identifying the Incident by ID and requiring action toward closure.
+Incident Reporting Sources
+All Incident records, regardless of source, area created manually by a Controller within the CMS or from within the UCS.
+The originating source shall be recorded as a field on the Incident record for audit and reporting purposes.
+The VA system does not create incident records autonomously, Controllers review and confirm each alert before a record is created.
+Source
+Channel
+Logging Method
+Guest or Member of Public
+1800 duty phone. Controller receives the call directly
+Manual. Controller creates the incident record during or after the call
+Guest or Member of Public
+Email to SDC's contact address
+Manual. Controller creates the incident record upon reviewing the email
+Staff or First Responder
+Duty phone, direct call, or WhatsApp
+Manual. Controller creates the incident record from details communicated by the staff member
+Video Analytics System
+VA alert surfaced on the UCS. Controller reviews the alert and determines whether it is genuine
+Manual. Controller creates the incident record from within the UCS if the alert is confirmed genuine.
+Where a Controller acknowledges the alert but is unable to complete the record, the incomplete item remains visible in the UCS open case list for pickup by another Controller
+Fire Alarm System
+Fire alarm alert triggered at the IIOC
+Manual. Controller creates the incident record upon receiving the alert
+Carpark Intercom
+Two-way intercom between a driver at the carpark gantry and the IIOC
+Manual. Controller creates an incident record only where the interaction requires follow-up action, such as a barrier fault. Routine interactions that require no follow-up are not logged
+State Agency (SCDF, SPF, MPA)
+State agency contacts the IIOC duty phone to notify of an incident
+Manual. Controller creates the incident record from the details communicated. Where the state agency notifies SDC of an incident that has already concluded, the Controller creates a backdated incident record and closes it immediately. No system integration exists between the CMS and any state agency
+Responder Assignment and Response Tracking
+Assignment
+A Controller may assign one or more Rangers or  SDC staff to an Incident as Responders.
+Assignment may occur at creation or at any point while the Incident is in a Live status.
+The system shall notify the assigned Responder upon assignment via the configured notification channel.
+Multiple Responders may be assigned to a single Incident.
+A Responder may be reassigned by a Controller while the Incident is active.
+Response Milestone Tracking
+The CMS records and timestamps each milestone in the incident response lifecycle, supporting real-time operational monitoring, post-incident review and response time benchmarking.
+The system shall record the following response milestones against each assigned incident:
+Milestone
+Status Transition
+Recorded By
+Status Update
+Dispatch
+Incident assigned by Controller to Responder
+Controller
+
+Acknowledgement
+Responder confirms receipt of assignment
+Responder or Controller. 
+Status changes to Live (Acknowledged)
+Arrival on Site
+Responder confirms arrival at the incident location
+Responder or Controller. 
+Status changes to Live (On-Site)
+Activity Updates
+Responder logs actions taken at scene
+Responder or Controller. Free text entries within the Responder activity section
+
+Completion
+Responder notifies completion of ground activities and logging of actions taken
+Responder or Controller. 
+Status changes to Live (Completed)
+Incident Logging
+The Incident Log section is a dedicated segment within the incident record. section. It is accessible to the assigned Responder and Controllers, and is used to log the actions taken during the ground response.
+The Incident Record refers to the whole Incident within the Case, while the Incident Log refers to the chronological, row-by-row account of the incident as it unfolds.
+Responders and Controllers shall be able to log activity updates against an Incident
+Selection of activity list should support typing for free-text, but also support auto-complete from a predefined activity list to guide Responders to quick-fill
+Incident log entries are timestamped and attributed to the logging user or by System.
+Incident logs are editable even after submission, until the Controller submits the Incident to the Duty Manager for closure review.
+Incident log entries are visible to Controllers and Duty Managers in the Incident record view.
+Upon closure, the assigned Responder(s) retain read-only access to the incident record for 12 hours from the closure timestamp. After 12 hours, the incident record will no longer be visible to the Responder.
+Duplicate Incident Detection and Handling
+Multiple reports of the same incident may be received concurrently from different sources, e.g. several guests calling the 1800 hotline about the same event within a short period.
+The system shall flag the Controller when a potential duplicate incident is detected during manual creation, based on matching criteria including date, time, incident type, and sub-type.
+The Controller retains the option to proceed with creating a new record, override the duplicate flag, or link the new record to an existing incident
+Where a record is confirmed as a duplicate, it shall be marked as a linked duplicate and not treated as an independent active Incident
+Linked duplicates shall not generate independent response workflows or separate broadcast triggers
+Closing the Master Incident shall automatically close all linked duplicate records. 
+Incident Record Save and Concurrent Editing
+Save Mechanism
+The system shall auto-save all form input at regular intervals while an incident record is being edited, to minimise data loss in the event of session timeout or interruption.
+A manual save action shall also be available to the user at any point during editing.
+A record in an unsaved state shall display a visible indicator to the user.
+Unsaved changes shall not be discarded without user confirmation.
+The auto-save interval shall be configurable by the System Administrator.
+Concurrent Editing
+Where two Controllers access and edit the same incident record simultaneously, the system shall manage the conflict to prevent one Controller's saved input from silently overwriting the others without notification. 
+Scenario
+Required Behaviour
+Second user opens a record already being edited
+The system shall notify the second user that the record is currently being edited by another user
+Both users save changes to the same record
+The system shall not silently discard either user's input. A conflict resolution mechanism shall be applied to surface the discrepancy and prompt resolution
+Linked Fault Creation
+Where an incident reveals an underlying infrastructure defect, a Fault Report may be created directly from the incident record.
+A Controller may raise a fault record from within an active Incident where physical defect is identified as part of or resulting from the incident.
+Fault creation from an Incident record shall initiate the CMMS ticket creation workflow
+The fault record shall be linked to the originating incident and shall be visible from both the incident and fault detail views.
+The incident and fault are managed independently once created. Either may be closed before the other.
+Incident may be closed after the immediate situation is resolved while the fault record remains open as the infrastructure repair and investigation continue.
+False Alarm Handling
+Where an incoming report or VA alert is reviewed by the Controller and determined to require no action, the Controller may log the record and mark it as a false alarm.
+A false alarm record, including the identity of the closing user, shall be retained in the system as a closed record for audit and reporting purposes.
+Incident Closure and Reopening
+Incident closure requires Duty Manager or designated in-charge approval, except for false alarm closures
+A Controller shall submit an Incident for closure by transitioning it to Pending Review status
+The Duty Manager shall review the record and either approve closure or return it with comments.
+Upon approval, the Incident status changes to Closed and the Case closure process is triggered if all linked records are resolve.
+To reopen a closed incident, a System Administrator must revert the status from Closed to the appropriate active status.
+Upon closure, the system shall automatically trigger a notification to the Controller to perform a closure broadcast.
+Broadcasting Triggers
+Broadcast specifications including delivery channels, templates, recipient group management, crisis level classification, and the routing matrix are defined in Section 10: Broadcast and Notification Framework.
+Closure Broadcast
+The system shall automatically trigger a closure broadcast notification to the Controller when the Duty Manager or designated In-charge approves incident closure.
+The system shall dispatch the broadcast to the configured recipient group without requiring a separate manual send action from the Controller.
+One closure broadcast shall be issued per incident.
+End-of-Day Interim Broadcast
+For incidents that remain active at the end of the operational day, the system shall flag open incidents for inclusion in the end-of-day batch review queue.
+The Duty Manager reviews and approves dispatch for each flagged incident
+Fault Reporting Module
+The Fault Reporting module is the single point of entry within the CMS for logging fault records and initiating ticket creation in the IFM CMMS.
+Triage, routing and severity classification of faults are handled by the IFM on the CMMS. The CMS does not replicate or manage any part of the fault or work order lifecycle
+The CMS role includes:
+Data Capture at point of fault submission
+Ticket creation in the CMMS
+Storage of the returned CMMS Fault ID in the Case record
+Subsequent retrieval of fault information from the CMMS using that stored identifier
+Fault Entry Points
+Fault records may be created within the CMS through the following entry points:
+Entry Point
+Description
+From an active Incident record
+A Controller raises a fault from within an active Incident where a physical defect is identified as part of or resulting from the Incident.
+Standalone Case
+A Controller creates a fault as a standalone Case where a fault is reported directly, independent of any Incident.
+SDC Staff Application
+SDC staff submit a fault report through the Staff Application, which routes the submission into the CMMS.
+.
+CMMS Ticket Creation
+Requirements
+Upon fault submission, the system shall check whether an existing Case is associated with the request.
+Where no Case exists, the system shall auto-create a Case before proceeding with ticket creation
+The CMMS returns a Ticket ID upon successful creation, which the system stores as an attribute on the Case record.
+The CMMS subsequently manages and updates the ticket status independently of the CMS.
+Fault Field Design
+The fields captured by the CMS at the point of fault creation, and transmitted to the CMMS API, shall be defined in alignment with the CMMS API specifications.
+Field
+Type
+Mandatory
+Notes
+Field ID
+System 
+Yes
+Auto-generated, format SEN/FR/YYYYMMDD/NNN
+Case ID
+System
+Yes
+Auto populated, refencing parent Case 
+Fault Type
+Dropdown
+Yes
+Populated from configurable taxonomy
+Fault Sub-type
+Dropdown
+Yes
+Sub-options based on selected Fault Type, from configurable taxonomy
+Location
+Lookup / Text / Pin Drop
+Yes
+Follows incident location hierarchy: 
+Road | Building | Level + Space
+Description
+Text
+Yes
+Free text description of fault observed
+Attachments
+File Upload
+No
+Supporting photos/documents
+Created By
+System
+Yes
+Auto populated, referencing CMS/SDC staff app user record
+Created At
+System
+Yes
+Auto populated timestamp
+Submitted At
+System
+No
+Auto populated timestamp on submission to CMMS
+Fault Ticket ID
+System 
+No
+Reference Ticket ID returned by CMMS API on successful submission
+Closed By
+System
+No
+Auto populated on Case closure, referencing CMS user record of Duty Officer/Duty Manager
+Closed At
+System
+No
+Auto populated timestamp on Case closure
+
+High-Level CMMS Ticket Process Flow
+The process flow for CMMS ticket creation is illustrated in the diagram below.
+
+Figure 61 - CMMS Ticket Process
+Fault Status and Information Retrieval
+Fault Case Status
+Status
+Description
+Actor
+Created
+New fault record created,
+Controller
+Pending Submission
+Controller has filled up the fault record and is preparing to submit to CMMS
+Controller
+Closed
+Automatically closed by CMS on receipt of the CMMS Fault ID. The Fault Ticket ID is stored on the Case for reference. The CMMS work order continues to be managed independently by IFM CMMS.
+CMS
+
+Where fault status or details are required within the CMS, the system shall post a request to the CMMS API referencing the stored Fault ID to retrieve the relevant information.
+Retrieved fault data shall be surfaced on the associated Case record for operator reference.
+Non-IFM Fault Handling
+Faults that fall outside current IFM CMMS scope, the interim arrangement is for these to continue to be recorded in the current system and not logged within the CMS.
+Note: This arrangement will be revised once the IFM CMMS is expanded to cover non-IFM fault categories, at which point the CMS will route all fault submissions through the CMMS API.
+Case Linkage and Closure
+The CMMS Fault ID shall be stored as a reference attribute on the CMS Case
+The CMS shall close the Fault record automatically upon receipt of the CMMS Fault ID, confirming successful submission to the CMMS
+The Fault record lifecycle is not dependent on the subsequent status of the CMMS ticket
+A Case may be closed after the CMMS ticket has been raised, without waiting for the CMMS ticket to be resolved.
+Multiple CMMS Fault IDs may be stored in a single Case where more than one fault is raised.
+
+Task Management Module
+Tasks are non-FM operational activities assigned to SDC staff for ground response or follow-up actions that do not constitute a formal FM work order.
+Tasks are created by Controllers and are always linked to a Case.
+A Task may exist within a Case independently of an Incident, or alongside an Incident where parallel ground activity is required.
+Tasks are distinct from the Responder Activity log within an Incident record, which captures actions taken by an assigned Ranger during the incident response.
+Tasks are distinct from CMMS tickets, which are FM work orders managed externally.
+Task Creation
+A Controller may create a Task at any point during the lifecycle of a Case. The system shall allow multiple Tasks to be created under the same Case. 
+Requirements
+Tasks are created by Controllers and higher roles (Duty Manager, Duty Officer, System Administrator) and are always linked to Case
+A Task is linked to a Case and is not required to be associated with an Incident. 
+Tasks may be created for any operational ground activity, including standalone requests such as item collection, escort, or access arrangements, as well as activities arising from or running in parallel with an active Incident.
+Tasks can be set as a recurring event and may be assigned to one Assignee or a group.
+Task Field Design
+The following fields shall be captured at the point of Task creation:
+Field
+Input Type
+Mandatory
+Notes
+Task ID
+System
+Yes
+System-generated upon Task creation. Not manually editable.
+Linked Case ID
+System
+Yes
+Auto populated from the Case the Task is created within.
+Task Title
+Text
+Yes
+Free text
+Task Description
+Text
+No
+Free text. Additional detail on the required action.
+Assignee
+Lookup
+Yes
+Selected from the CMS user directory. Any CMS-registered staff member may be assigned. See Section 3.
+Priority
+Dropdown
+No
+Normal, High; default to Normal
+Due Date and Time
+Date/Time
+No
+Optional target completion date and time
+Checklist
+Text
+No
+One or more items defined by Controller at creation or editing. All items must be ticked before the Assignee can mark the Task as complete.
+When no checklist is defined, the Assignee may mark complete freely.
+Recurrence Schedule
+Date/Time
+No
+Set repeat creation of commonly scheduled tasks, and assigned to same Assignees or group of Assignees
+Task Comments
+Text
+No
+Comments section by Responder or Controller for the Task
+Task Close Reason
+Text
+Conditional
+For input by Controller. Mandatory if closing task before task is complete; non-mandatory if Task has been completed
+Attachments
+File upload
+No
+Supporting documents or images relevant to the Task
+Created By
+System
+Yes
+Auto-populated from the creating user's account.
+Created Date and Time
+System
+Yes
+Auto-populated at point of creation.
+Task Assignment and Notifications
+The system shall dispatch a notification to the assignee upon Task creation.
+Where a Task is subsequently reassigned, the new assignee shall receive a notification, and the Task status shall update to Re-Assigned.
+Tasks may be assigned to any SDC staff with a CMS account, including but not limited to Rangers and Zone Managers.
+The assignee shall update the Task status to reflect completion and may close a Task directly upon completion.
+No Controller verification step is required for Task closure.
+Task Process
+Requirements
+Status transitions per role are defined in the Roles and Permission Matrix, Section 3.4.2
+The Controller retains visibility of all Task statuses within the linked Case.
+Where a Case is closed while one or more linked Tasks remain open, the system shall prompt the Controller to resolve of close outstanding Tasks before Case closure proceeds.
+Where open Tasks exist at the time of Case closure, the Controller shall close each outstanding Task before proceeding.
+A Task Close Reason is mandatory for any Task closed without Assignee completion.
+Task Statuses
+Each Task shall progress through the following statuses:
+Status
+Description
+Permitted Actions
+Created
+Task has been created and not yet assigned to a  Controller
+Controller:
+Assign Assignee or group
+Edit task details
+Close tasks
+Assigned
+Controller has assigned a Responder or group to the Task
+Assignee:
+Acknowledge
+Controller:
+Assign / reassign
+Edit task details
+Close task
+Acknowledged
+Assignee has acknowledged receipt of the Task
+Assignee:
+Start task
+Controller:
+Assign / reassign
+Close task
+
+In Progress
+Responder has arrived on-site and commenced the Task
+Assignee:
+Log task actions
+Mark task as complete/cannot complete
+Controller:
+Assign / reassign
+Close task
+Pending Further Action
+Task is temporarily on hold pending further input or external dependency
+Controller:
+Assign / reassign
+Close task
+
+
+
+Closed
+Task has been completed and closed
+Controller:
+Reopen task
+High-Level Task Process Flow
+
+Figure 71 - Task Process
+
+e-Diary Module
+The e-Diary module is a module for recording events and interactions that fall under IOH responsibility but do not meet the threshold for a formal incident, fault, or task. The module digitises existing hardcopy occurrence logbooks currently maintained by the IOH Controllers, providing a searchable and filterable electronic record in place of the physical diary.
+e-Diary records do not trigger a ground response, work order, or broadcast, and are not linked to the Case structure.
+Common use cases include verbal interactions with members of the public, VIP and dignitary visit notifications, exercises, drills, and information dissemination activities.
+Requirements
+The e-Diary is a sub-record under the Case structure. Where no Case exists at the time of creation, the CMS shall auto-create a Case.
+Where an e-Diary entry escalates to require a formal response, a new Incident shall be created within the same Case. The e-Diary entry is retained as a journal record.
+Entries are mutable, a Controller may amend an entry after submission. All amendments are tracked and timestamped.
+File and image attachments are supported
+ e-Diary Field Design
+Each e-Diary entry shall capture the following fields:
+Field
+Input Type
+Mandatory
+Notes
+e-Diary ID
+System
+Yes
+System-generated
+Case ID
+System
+Yes
+Auto-populated; auto-creates a Case if none exists
+Created By
+System
+Yes
+Account holder creating the entry. System-populated from authenticated session
+Date / Time
+Date/Time
+Yes
+Defaulted to current date and time. Backdating permitted
+Topic
+Text
+No
+Structured or free text
+Entry Text
+Text
+No
+Free text narrative
+Attachments
+File upload
+No
+File / image references
+E-Diary Creation
+
+The e-Diary module is primarily intended for use by Controllers. Duty Officers, Duty Managers, and System Administrators may also create e-Diary entries. All other CMS roles have no access to the e-Diary.
+Creation requires no approval or assignment workflow.
+ e-Diary records can be edited even after submission, but not deleted except by the System Administrator.
+Retrieval and Filtering
+The system shall support retrieval of e-Diary records with filtering by date and by user account.
+Additional filtering criteria may be introduced subject to the confirmed field list from SDC.
+UCS Integration
+The e-Diary shall be accessible as a module within the UCS, allowing Controllers and Duty Officers to create and retrieve occurrence entries without navigating to the CMS.
+The UCS surface requirements for the e-Diary are defined within the UCS Functional Requirements Document.
+
+Broadcast and Notification Framework
+The Broadcast and Notification Framework govern the composition, delivery, and record-keeping of all outbound communications generated by the CMS. Broadcasts are structured communications issued to defined recipient groups in response to incident lifecycle events.
+Notifications are system-generated alerts directed to individual users in response to record assignments, status changes, or workflow actions.
+Broadcast Types
+Broadcast Type
+Trigger
+Initiator
+Closure Broadcast
+Duty Manager approves incident closure; system notifies Controller to perfom Closure Broadcase
+Controller, upon accepting system notification. Broadcast composition menu is presented for Controller to confirm fields and recipients before dispatch
+End-of-Day Interim Broadcast
+End of operational day, system notification prompts Duty Manager to review open incidents and confirm whether a broadcast is required
+Duty Manager
+Not all open incident require a broadcast, the Duty Manager decide per incident
+
+
+
+Each broadcast shall be assigned a system-generated Broadcast ID following the convention: [Case ID]-BC[3-digit running sequence starting from 001].
+Example: The second broadcast issued against Case 2002/01/0004 shall be 2002/01/0004-BC002.
+All broadcasts are delivered via email to configured distribution groups
+Delivery Channels
+Channel
+Used For
+Notes
+Email
+Closure broadcasts; end-of-day interim broadcasts
+Directed to configured distribution groups
+
+
+
+Recipient Group
+Distribution groups shall be managed as named collections of user email addresses, configurable by the System Administrator.
+The system shall support creation, editing, and deactivation of distribution groups. 
+
+On broadcast initiation, the system shall pre-populate the recipient field with the default distribution group mapped to the incident type and crisis level.
+The Duty Manager or Controller may add or remove individual recipients prior to dispatch without modifying the group configuration permanently.
+Broadcast Templates
+The system shall support configurable broadcast templates mapped to incident type and crisis level.
+Templates shall define the default set of incident fields included in the broadcast.
+Default templates shall be configured to exclude sensitive content, defined as details that are operationally sensitive, under active investigation, or unsafe for wider distribution.
+Inclusion of fields beyond the default requires explicit confirmation by the Duty Manager at the point of dispatch.
+Templates shall be configurable by the System Administrator
+Note: Broadcast template content per incident type and crisis level to be confirmed.
+System Notifications
+The system shall generate automated notifications to individual users for the following events:
+Event
+Recipient
+Task assigned or reassigned
+Assignee
+Incident assigned for Responder Activity
+Responder
+Responder incident log submission: review prompt
+Controller
+Incident log returned for revision by Duty Manager
+Controller of incident
+NOP status change
+Applicant and relevant approvers
+CMMS Fault ID received
+Controller of linked Case
+Incident active for 12 days: advance ageing alert
+Duty Manager
+Incident active for 14 days: ageing alert action required
+Duty Manager
+Incident closed: closure broadcast prompt
+Controller of closed incident
+
+
+Broadcast Matrix
+[TBC – Full broadcast matrix]
+End-of-Day Interim Broadcast
+At the end of each operational day, the system shall surface a queue of open incidents flagged for interim broadcast to the Duty Manager.
+Not all open incidents require an interim broadcast. The Duty Manager shall review each incident in the queue and decide whether a broadcast is required.
+For each incident in the queue, the Duty Manager shall select the applicable template, confirm the content to be included, and approve dispatch. 
+Note: Broadcast timing rules and criteria governing which active incidents are surfaced in the interim broadcast queue are to be determined.
+SDC Communications Team Notification
+When media is confirmed or suspected to be present at an incident scene, the system shall prompt the Controller to notify the SDC Communications team by broadcast.
+This broadcast would include details of the incident and the media organisation that is present.
+The incident record shall include a field to log confirmation that this notification has been made.
+Broadcast Record and Export
+All dispatched broadcasts shall be logged against the originating Case record and identified by Broadcast ID.
+The system shall retain a full record of each broadcast including the recipient list, template used, content dispatched, date and time of dispatch, and the authorising user.
+Broadcast content shall be included as a section within the incident report export. The broadcast export format may differ from the full incident report format and shall present a concise summary suitable for record-keeping purposes.
+
+Crisis Management and Emergency Recall
+Crisis Recall is distinct from the broadcasts described in the previous section. While Broadcasts disseminate incident information to external recipients via email. Crisis Recall is the activation of named stakeholder groups to the command centre, triggered by an incident classified at Level 4+ or above, and delivered via SMS.
+Crisis Level Classification and Routing
+
+Each incident shall be assigned a crisis level from 1 to 5 that determines the broadcast type, delivery channel, and recipient group as follows:
+Crisis Level
+Description
+Broadcast Behaviour
+Level 1–3
+High-severity incidents
+Fixed broadcast via email, select recall via SMS with acknowledgement to defined distribution groups
+Level 4+
+Incidents requiring SCOG activation
+Fixed broadcast via email, select recall via SMS with acknowledgement to defined distribution groups
+Level 4
+Routing incidents
+Targeted email broadcast to relevant distribution groups
+Level 5
+Occurrences and false alarms
+Targeted email broadcast to relevant distribution groups
+Level 1 is the most severe; Level 5 is the least severe (occurrence or false alarm).
+Crisis level may be influenced by dynamic factors including media or press presence, reputational impact, and number of persons involved.
+
+Crisis Recall
+Crisis Recall shall be triggered when an incident is classified at Level 4+ or above.
+Crisis Recall is semi-automated. An authorised user (Duty Manager) must reivew and confirm the recall before dispatch
+At Level 4+, the specific relevant stakeholder group shall be recalled. At Level 3 and below, a broader set of SDC stakeholders shall be recalled.
+Delivery Channels
+Channel
+Used For
+Notes
+SMS
+Crisis recall at Level 4+ and above
+Includes recipient acknowledgement feature; routed via SMS gateway integrated with on-premises UCS
+
+SMS Recall Workflow
+For incidents at Level 4+ and above, the system shall generate and queue a crisis recall SMS based on the incident classification and configured recipient group.
+An authorised user (Duty Manager) shall review and confirm the queued message before dispatch.
+The system shall surface SMS acknowledgement status to the authorised user (Duty Manager) upon receipt by recipients.
+
+Reporting and Data Export
+The Reporting and Data Export module provides structured exports of CMS records for operational record-keeping, management review, and downstream analytics. 
+Export outputs are distinct from broadcast content. Fields included in an export may differ from those included in a broadcast for the same incident.
+Operational Statistics Module
+The Operational Statistics module is a dedicated analytics surface accessible from the main CMS navigation. It provides in-built visualisations and data export across all core operational record types.
+The module shall provide in-built analytics across Cases, Incidents, Faults, Tasks, e-Diary entries, Events and No-Objection Permits, including the following:
+Chart / Metric
+Description Example
+Volume Trends
+Daily count of records over selected period
+Status Breakdown
+Distribution of records by current status
+Type Breakdown
+Distribution of incidents by type and sub-type
+Location Breakdown
+Distribution of incident by location
+Processing time metrics
+Daily average pending time and processing time
+The module shall support user-selectable date range filtering, with preset shortcuts for the last 7 days, 30 days, last 12 months, and a custom range.
+Data export shall be available directly from any chart or table view, in PDF format for period summaries and CSV format for bulk record export
+Access to the Operational Statistics modules and export of reports shall be governed by the user's assigned role
+Operational Resilience Analysts access shall extend to live and closed records across all record types to support post-incident classification, tagging and trend analysis.
+
+Incident Report Export
+The system shall support export of a formal incident report for each closed incident. 
+The report shall present a structured summary of the incident record fields and shall be exportable in PDF format.
+The fields included in the incident report export shall be defined separately from the incident form field structure, as the export may present a subset or differently formatted representation of the full record.
+Case Summary Export
+The system shall support export of a case summary record presenting the key attributes of a Case, including and not limited to:
+Linked incident reference and status
+Task count and status summary
+CMMS Fault ID references
+Case status history and closure timestamp
+e-Diary
+Data Export for Analytics
+The system shall support bulk data export of incident and case records and their sub-records, including incidents, faults, tasks, and e-Diary entries, in CSV format to enable downstream analytics by authorised parties. 
+The bulk exported shall support filtering by, and not limited to:
+Date Range
+Incident Status
+Incident Type and Category
+Crisis Level
+Access to report and data export functions shall be governed by the user's assigned role.
+System Configuration and Administration
+The System Configuration and Administration module provides System Admins with the tools to manage users, roles, reference data, and broadcast configuration across the CMS. 
+User and Role Management
+The System Administrator shall be able to create, edit, deactivate, and reactivate user accounts.
+Role assignment shall follow the role structure defined in Section 3
+The default access model shall be role-based group assignment, with individual access exceptions handled on a per-request basis by the System Administrator.
+Where users are authenticated via WOG SSO, account provisioning may be partially automated based on Active Directory attributes such as department or organisational unit.
+Accounts requiring permissions beyond the default role assigned by domain authentication shall require manual role assignment by the System Administrator.
+System Reference Data Configuration
+The System Administrator shall be able to configure the following reference data sets without developer intervention:
+Configuration Item
+Notes
+Incident Type and Sub-type taxonomy
+Mandatory fields at incident creation
+Fault Type and Sub-type taxonomy
+Governs CMMS ticket creation and severity rules
+Location hierarchy
+Road, Building, Level, Space structure
+Task priority levels
+Configurable labels and definitions
+e-Diary topic categories
+-
+Auto-save interval
+Frequency of automatic record saving during active editing
+Record lock timeout
+Duration before an inactive editing session lock is released
+
+Broadcast Configuration
+Configuration Item
+Notes
+Distribution groups
+Create, edit, deactivate named recipient groups
+Broadcast routing matrix
+Map incident type and crisis level to distribution groups and delivery channels
+Broadcast templates
+Define and edit default field sets per incident type and crisis level
+SMS gateway settings
+Connection parameters for the on-premises SMS gateway
+End-of-day broadcast timing
+Define the time at which open Incidents are surfaced in the Duty Manager's end-of-day interim broadcast queue
+Audit Log
+All user actions, configuration changes, and system events shall be captured in the system audit log automatically.
+The audit log shall be accessible to the System Admin only
+The audit log shall support filtering by user, action type, date, and record reference. 
+Audit log records shall be immutable and retained in accordance with the data retention policy.
+
+Non-Functional Requirements
+Availability
+Performance
+Concurrent Users
+Security
+Session Management
+Audit and Compliance
+Data Retentional and Archival
+
+Open Items
+
+
+
+UCS
+Note: The full list of CMS widgets/items to be made available as embedded widgets on the UCS dashboard is still under discussion with SDC.
+Incident
+Note: Finalised Incident Type and Sub-type taxonomy to be confirmed
+Broadcast
+Note: Broadcast template content per incident type and crisis level to be confirmed.
+Note: Broadcast timing rules and criteria governing which active incidents are surfaced in the interim broadcast queue are to be determined.
+Broadcast Matrix
+
+Appendix

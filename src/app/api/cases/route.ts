@@ -29,6 +29,8 @@ export async function POST(request: Request) {
       status: body.status || 'Active',
       createdAt: new Date().toISOString(),
       closedAt: null,
+      closedBy: null,
+      createdBy: body.username || 'admin',
       cmmsTickets: [],
       incident: null
     };
@@ -38,12 +40,14 @@ export async function POST(request: Request) {
       const incidentData = body.incident;
       
       const newIncident: Incident = {
+        id: caseId,
         caseId: caseId,
         title: title,
         dateTime: incidentData.dateTime || new Date().toISOString(),
         type: incidentData.type || 'Others',
         subType: incidentData.subType || 'Others',
         priority: incidentData.priority || 'Medium',
+        crisisLevel: 4,
         reporterName: incidentData.reporterName || 'Unknown',
         requestedBy: incidentData.requestedBy || 'IIOC Controller',
         createdBy: body.username || 'admin',
@@ -95,7 +99,8 @@ export async function POST(request: Request) {
         personsInvolved: incidentData.personsInvolved || [],
         cctvBwc: incidentData.cctvBwc || [],
         summary: incidentData.summary || '',
-        completionRemarks: ''
+        completionRemarks: '',
+        slaveIncidents: []
       };
       
       newCase.incident = newIncident;

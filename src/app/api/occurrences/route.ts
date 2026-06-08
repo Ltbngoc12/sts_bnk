@@ -23,6 +23,7 @@ export async function POST(request: Request) {
     
     const newOccurrence: Occurrence = {
       id: occurrenceId,
+      caseId: body.caseId || '',
       user: body.username || 'Controller',
       dateTime: body.dateTime || new Date().toISOString(),
       topic: body.topic || 'General Notice',
