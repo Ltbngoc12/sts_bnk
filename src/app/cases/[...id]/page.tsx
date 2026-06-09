@@ -588,7 +588,7 @@ export default function CaseDetailsPage() {
                                 onChange={e => incFieldUpdate({ mediaInvolvement: { mediaName: e.target.value } })}
                                 disabled={incClosed} />
                             </div>
-                            <div style={{ background: 'rgba(234,88,12,0.08)', border: '1px solid rgba(234,88,12,0.25)', borderRadius: 6, padding: '10px 14px', fontSize: 12, color: 'var(--color-high)' }}>
+                            <div style={{ background: 'var(--color-high-bg)', border: '1px solid var(--color-high-border)', borderRadius: 6, padding: '10px 14px', fontSize: 12, color: 'var(--color-high)' }}>
                               <strong>⚠ CRITICAL:</strong> Media presence flagged. Notify SDC Communications Team immediately.
                               <label className="checkbox-row" style={{ marginTop: 8 }}>
                                 <input type="checkbox" id="comms-notified" checked={inc.mediaInvolvement.commsNotified}

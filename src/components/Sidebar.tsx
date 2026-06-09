@@ -288,7 +288,7 @@ export const Sidebar: React.FC = () => {
           position: absolute; left: 100%; top: 50%;
           transform: translateY(-50%) translateX(8px);
           margin-left: 8px;
-          background: #111827; color: #fff;
+          background: var(--bg-sidebar); color: #fff;
           font-size: 12px; font-weight: 500;
           padding: 5px 10px; border-radius: 5px;
           white-space: nowrap;

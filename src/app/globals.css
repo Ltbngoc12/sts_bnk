@@ -1,13 +1,15 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
 :root {
-  /* ─── Command-Center Color System ─────────────────────────────── */
-  --bg-base:    #F0F2F5;
-  --bg-card:    #FFFFFF;
+  /* ─── Design System Color Tokens ──────────────────────────────── */
+  /* Spec: Primary #FF8200 | Secondary #008C95 | Tertiary #4A148C | Neutral #F4F1EA */
+
+  --bg-base:    #F4F1EA; /* Neutral warm background */
+  --bg-card:    #FDFCF8; /* Warm white card surface */
   --bg-sidebar: #0F1117;
-  --bg-header:  #FFFFFF;
-  --bg-inset:   #F7F8FA;
-  --bg-hover:   #F0F2F5;
+  --bg-header:  #FDFCF8;
+  --bg-inset:   #EEEADE; /* Slightly darker neutral for inset panels */
+  --bg-hover:   #E8E3D8; /* Hover tint on neutral base */
 
   /* Status / Severity Colors (high-contrast, status-driven) */
   --color-critical:       #DC2626; /* Level 1-2: Live / Emergency */
@@ -18,44 +20,47 @@
   --color-high-bg:        rgba(234, 88, 12, 0.08);
   --color-high-border:    rgba(234, 88, 12, 0.20);
 
-  --color-active:         #0D9488; /* On-Site / In Progress / Teal */
-  --color-active-bg:      rgba(13, 148, 136, 0.08);
-  --color-active-border:  rgba(13, 148, 136, 0.20);
+  /* Secondary brand color: Teal #008C95 — On-Site / In Progress */
+  --color-active:         #008C95;
+  --color-active-bg:      rgba(0, 140, 149, 0.08);
+  --color-active-border:  rgba(0, 140, 149, 0.20);
 
-  --color-review:         #7C3AED; /* Pending Review / Purple */
-  --color-review-bg:      rgba(124, 58, 237, 0.08);
-  --color-review-border:  rgba(124, 58, 237, 0.20);
+  /* Tertiary brand color: Purple #4A148C — Pending Review */
+  --color-review:         #4A148C;
+  --color-review-bg:      rgba(74, 20, 140, 0.08);
+  --color-review-border:  rgba(74, 20, 140, 0.20);
 
   --color-closed:         #6B7280; /* Closed / Read-only / Grey */
   --color-closed-bg:      rgba(107, 114, 128, 0.08);
   --color-closed-border:  rgba(107, 114, 128, 0.20);
 
-  --color-info:           #2563EB; /* Info/CMMS/System actions */
+  --color-info:           #2563EB; /* Info/CMMS/System IDs */
   --color-info-bg:        rgba(37, 99, 235, 0.08);
   --color-info-border:    rgba(37, 99, 235, 0.20);
 
-  /* Brand accent (Sentosa orange, used sparingly for key CTAs) */
-  --color-primary:        #EA580C;
-  --color-primary-hover:  #C2410C;
-  --color-primary-bg:     rgba(234, 88, 12, 0.08);
+  /* Primary brand color: Orange #FF8200 — Key CTAs and active states */
+  --color-primary:        #FF8200;
+  --color-primary-hover:  #D97006;
+  --color-primary-bg:     rgba(255, 130, 0, 0.08);
+  --color-primary-border: rgba(255, 130, 0, 0.25);
 
   /* Typography */
-  --text-main:    #111827;
-  --text-sub:     #374151;
-  --text-muted:   #6B7280;
-  --text-faint:   #9CA3AF;
+  --text-main:    #2C1A0E; /* Warm dark brown for body text on warm bg */
+  --text-sub:     #4A3728;
+  --text-muted:   #7A6555;
+  --text-faint:   #A89080;
   --text-inverse: #FFFFFF;
 
-  /* Borders */
-  --border-color:       #E5E7EB;
-  --border-color-hover: #D1D5DB;
-  --border-focus:       #2563EB;
+  /* Borders — warm toned to match neutral background */
+  --border-color:       #D9D0C4;
+  --border-color-hover: #C5BAB0;
+  --border-focus:       #FF8200; /* Focus ring uses primary brand color */
 
   /* Sidebar (dark) */
   --sidebar-text:       rgba(255,255,255,0.70);
   --sidebar-text-hover: rgba(255,255,255,0.95);
-  --sidebar-active-bg:  rgba(255,255,255,0.10);
-  --sidebar-active-border: rgba(255,255,255,0.15);
+  --sidebar-active-bg:  rgba(255, 130, 0, 0.15); /* Tinted with primary brand */
+  --sidebar-active-border: rgba(255, 130, 0, 0.30);
   --sidebar-divider:    rgba(255,255,255,0.08);
 
   /* Layout */
@@ -65,8 +70,9 @@
   --radius-lg:  12px;
 
   /* Typography Stacks */
-  --font-body:  'Inter', 'IBM Plex Sans', system-ui, sans-serif;
-  --font-mono:  'IBM Plex Mono', 'Menlo', monospace;
+  --font-headline: 'Playfair Display', Georgia, serif;
+  --font-body:     'Inter', 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono:     'IBM Plex Mono', 'Menlo', monospace;
 }
 
 body.sidebar-collapsed {
@@ -76,6 +82,10 @@ body.sidebar-collapsed {
 /* ─── Resets ───────────────────────────────────────────────────── */
 *, *::before, *::after {
   margin: 0; padding: 0; box-sizing: border-box;
+}
+
+html {
+  background: var(--bg-base); /* Prevent dark browser-default bleeding */
 }
 
 body {
@@ -93,6 +103,7 @@ body {
 .app-container {
   display: flex;
   min-height: 100vh;
+  background: var(--bg-base); /* Ensure warm bg fills the full viewport */
 }
 
 .main-content {
@@ -137,7 +148,7 @@ body {
 }
 
 /* ─── Typography ─────────────────────────────────────────────────── */
-h1 { font-size: 18px; font-weight: 700; color: var(--text-main); letter-spacing: -0.01em; }
+h1 { font-family: var(--font-headline); font-size: 18px; font-weight: 700; color: var(--text-main); letter-spacing: -0.01em; }
 h2 { font-size: 14px; font-weight: 600; color: var(--text-main); }
 h3 { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
 
@@ -151,6 +162,7 @@ h3 { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform
 }
 
 .header-title-sec h1 {
+  font-family: var(--font-headline);
   font-size: 16px;
   font-weight: 700;
   color: var(--text-main);
@@ -367,8 +379,8 @@ h3 { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform
 }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none !important; }
 
-.btn-primary   { background: var(--text-main);      border-color: var(--text-main); }
-.btn-primary:hover:not(:disabled)   { background: #1F2937; transform: translateY(-1px); }
+.btn-primary   { background: var(--color-primary);  border-color: var(--color-primary); }
+.btn-primary:hover:not(:disabled)   { background: var(--color-primary-hover); transform: translateY(-1px); }
 
 .btn-brand     { background: var(--color-primary);  border-color: var(--color-primary); }
 .btn-brand:hover:not(:disabled)     { background: var(--color-primary-hover); transform: translateY(-1px); }
@@ -600,7 +612,7 @@ textarea.form-control { resize: vertical; min-height: 72px; line-height: 1.5; }
   white-space: nowrap;
 }
 .tab-btn:hover  { color: var(--text-main); }
-.tab-btn.active { color: var(--color-info); border-bottom-color: var(--color-info); }
+.tab-btn.active { color: var(--color-primary); border-bottom-color: var(--color-primary); }
 
 /* ─── Modal Overlay ──────────────────────────────────────────────── */
 .modal-overlay {
@@ -858,7 +870,7 @@ textarea.form-control { resize: vertical; min-height: 72px; line-height: 1.5; }
 .stat-row:last-child { margin-bottom: 0; }
 .stat-row .lbl { color: var(--text-muted); }
 .stat-row .val { font-weight: 700; color: var(--text-main); }
-.text-primary { color: var(--color-info); }
+.text-primary { color: var(--color-primary); }
 
 .warning-note {
   padding: 10px 12px;
@@ -944,9 +956,9 @@ textarea.form-control { resize: vertical; min-height: 72px; line-height: 1.5; }
 .cmms-pill {
   display: inline-flex; align-items: center;
   padding: 2px 8px;
-  background: rgba(217, 119, 6, 0.08);
-  border: 1px solid rgba(217, 119, 6, 0.22);
-  color: #92400E;
+  background: var(--color-primary-bg);
+  border: 1px solid var(--color-primary-border);
+  color: var(--color-primary-hover);
   font-family: var(--font-mono);
   font-weight: 600; font-size: 11px;
   border-radius: var(--radius-sm);

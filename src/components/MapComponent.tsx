@@ -39,10 +39,11 @@ const MapComponent: React.FC<MapComponentProps> = ({ cases }) => {
         maxBoundsViscosity: 0.8
       });
 
-      // Add OpenStreetMap dark theme layer (or standard tiles with opacity)
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors',
-        className: 'map-tiles-dark'
+      // CartoDB Voyager tiles — crisp, neutral style that contrasts well with warm UI
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',
+        subdomains: 'abcd',
+        maxZoom: 19
       }).addTo(mapInstance.current);
 
       // Custom SVG markers function
@@ -112,7 +113,7 @@ const MapComponent: React.FC<MapComponentProps> = ({ cases }) => {
             <a href="/cases/${c.id}" style="
               display: block; 
               text-align: center; 
-              background: var(--color-primary-dark); 
+              background: var(--color-primary); 
               color: #ffffff; 
               padding: 8px 12px; 
               border-radius: 6px; 
@@ -206,9 +207,9 @@ const MapComponent: React.FC<MapComponentProps> = ({ cases }) => {
           border-radius: 50%;
         }
 
-        .dot-danger { background: var(--color-primary); box-shadow: 0 0 6px var(--color-primary); } /* High Priority is now Orange */
-        .dot-info { background: var(--color-secondary); box-shadow: 0 0 6px var(--color-secondary); } /* Standard is now Teal */
-        .dot-warning { background: var(--color-primary-dark); box-shadow: 0 0 6px var(--color-primary-dark); } /* Fault is now Chestnut Brown */
+        .dot-danger  { background: var(--color-primary);       box-shadow: 0 0 6px var(--color-primary); }       /* High Priority — Orange */
+        .dot-info    { background: var(--color-active);        box-shadow: 0 0 6px var(--color-active); }        /* Standard Incident — Teal */
+        .dot-warning { background: var(--color-primary-hover); box-shadow: 0 0 6px var(--color-primary-hover); } /* Infrastructure Fault — Amber */
       `}</style>
     </div>
   );
