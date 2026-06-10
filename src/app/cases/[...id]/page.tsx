@@ -7,7 +7,7 @@ import { Case, Task, PersonalInjury, PersonInvolved } from '@/lib/db';
 import { useRole } from '@/context/RoleContext';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type ComponentTab = 'incident' | 'tasks' | 'faults';
+type ComponentTab = 'incident' | 'tasks' | 'faults' | 'ediary';
 type IncidentTab  = 'log' | 'services' | 'media' | 'property' | 'persons' | 'duplicates';
 
 // ─── Helper: incident status → badge class ────────────────────────────────────
@@ -55,6 +55,11 @@ export default function CaseDetailsPage() {
   // Log input
   const [newLogText,       setNewLogText]       = useState('');
   const [rangerActivityText, setRangerActivity] = useState('');
+
+  // e-Diary state
+  const [ediaryLogs, setEdiaryLogs] = useState<any[]>([]);
+  const [ediaryTopic, setEdiaryTopic] = useState('');
+  const [ediaryContent, setEdiaryContent] = useState('');
 
   // Modals
   const [showAssignModal,    setShowAssignModal]    = useState(false);
@@ -104,9 +109,10 @@ export default function CaseDetailsPage() {
   // ─── Data fetching ──────────────────────────────────────────────────────────
   const refresh = useCallback(async () => {
     try {
-      const [caseRes, taskRes] = await Promise.all([
+      const [caseRes, taskRes, ediaryRes] = await Promise.all([
         fetch(`/api/cases/${caseId}`),
         fetch('/api/tasks'),
+        fetch('/api/occurrences'),
       ]);
       if (caseRes.ok) {
         const c: Case = await caseRes.json();
@@ -118,6 +124,10 @@ export default function CaseDetailsPage() {
       if (taskRes.ok) {
         const all: Task[] = await taskRes.json();
         setTasks(all.filter(t => t.caseId === caseId));
+      }
+      if (ediaryRes.ok) {
+        const all: any[] = await ediaryRes.json();
+        setEdiaryLogs(all.filter(o => o.caseId === caseId));
       }
     } catch (e) {
       console.error(e);
@@ -194,11 +204,28 @@ export default function CaseDetailsPage() {
   const handleOnSite        = () => incAction('on-site');
   const handleSubmitReview  = () => incAction('submit-review');
   const handleReturn        = () => incAction('return');
-  const handleReopen        = async () => {
-    await incAction('acknowledge'); // resets to Live via legacy PUT
-    // For reopen we use the legacy PUT directly
-    await incFieldUpdate({ status: 'Live' });
-    await caseUpdate({ status: 'Active' });
+  const handleCreateEDiary = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ediaryTopic.trim() || !ediaryContent.trim()) return;
+    try {
+      const res = await fetch('/api/occurrences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          caseId,
+          topic: ediaryTopic,
+          content: ediaryContent,
+          username
+        })
+      });
+      if (res.ok) {
+        setEdiaryTopic('');
+        setEdiaryContent('');
+        await refresh();
+      }
+    } catch (e) {
+      console.error('Error creating e-Diary entry:', e);
+    }
   };
 
   const handleComplete = async () => {
@@ -368,8 +395,21 @@ export default function CaseDetailsPage() {
           {isCtrl && caseData.status === 'Pending Triage' && (
             <button className="btn btn-success btn-sm" onClick={() => caseUpdate({ status: 'Active' })}>Activate Case</button>
           )}
-          {role === 'System Administrator' && isClosed && (
-            <button className="btn btn-secondary btn-sm" onClick={() => caseUpdate({ status: 'Active' })}>Reopen Case</button>
+          {(isCtrl || isMgr) && (caseData.status === 'Active' || caseData.status === 'Pending Triage') && (
+            <button className="btn btn-success btn-sm" onClick={async () => {
+              // Perform client-side validation
+              const activeTasks = tasks.filter(t => t.status !== 'Closed');
+              if (activeTasks.length > 0) {
+                alert(`Cannot close Case. Please close all linked Tasks first (${activeTasks.length} active task(s) remaining).`);
+                return;
+              }
+              if (caseData.incident && caseData.incident.status !== 'Closed') {
+                alert(`Cannot close Case. The linked Incident (${caseData.incident.id}) must be Closed first.`);
+                return;
+              }
+              // Proceed with closure
+              await caseUpdate({ status: 'Closed', username });
+            }}>Close Case</button>
           )}
 
           {/* Incident workflow buttons */}
@@ -408,21 +448,17 @@ export default function CaseDetailsPage() {
               )}
             </>
           )}
-
-          {/* System Admin reopen */}
-          {role === 'System Administrator' && incClosed && isClosed && (
-            <button className="btn btn-secondary btn-sm" onClick={handleReopen}>Reopen Incident</button>
-          )}
         </div>
       </div>
 
       {/* ── Component selector tabs ─────────────────────────────────────────── */}
       <div style={{ display: 'flex', gap: 10 }}>
-        {(['incident', 'tasks', 'faults'] as ComponentTab[]).map(tab => {
+        {(['incident', 'tasks', 'faults', 'ediary'] as ComponentTab[]).map(tab => {
           const labels: Record<ComponentTab, string> = {
             incident: `Incident Report${!inc ? ' (None)' : ''}`,
             tasks:    `Ranger Tasks (${tasks.length})`,
             faults:   `IFM Faults (${caseData.cmmsTickets?.length ?? 0})`,
+            ediary:   `e-Diary Logs (${ediaryLogs.length})`,
           };
           return (
             <button
@@ -824,6 +860,62 @@ export default function CaseDetailsPage() {
                     </div>
                   ))}
                   <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>Fault status updates are fetched via API callback. You may close this case without waiting for CMMS resolution.</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── E-DIARY TAB ────────────────────────────────────────────────── */}
+          {compTab === 'ediary' && (
+            <div className="glass" style={{ padding: '18px 20px' }}>
+              <div className="card-header" style={{ paddingLeft: 0, paddingRight: 0, paddingTop: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h2>e-Diary Occurrence Logs ({ediaryLogs.length})</h2>
+              </div>
+              
+              {!isClosed ? (
+                <form onSubmit={handleCreateEDiary} style={{ marginBottom: 24, paddingBottom: 20, borderBottom: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label>Topic / Subject *</label>
+                    <input 
+                      type="text" 
+                      className="form-control" 
+                      placeholder="e.g. Verbal query from guest, VIP notice, etc."
+                      value={ediaryTopic} 
+                      onChange={e => setEdiaryTopic(e.target.value)} 
+                      required 
+                    />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label>Entry Narrative *</label>
+                    <textarea
+                      className="form-control"
+                      placeholder="Enter details of the occurrence..."
+                      value={ediaryContent}
+                      onChange={e => setEdiaryContent(e.target.value)}
+                      rows={3}
+                      required
+                    />
+                  </div>
+                  <button type="submit" className="btn btn-primary btn-sm" style={{ width: 'fit-content' }}>Log Entry</button>
+                </form>
+              ) : (
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 20 }}>This Case is Closed. No new e-Diary entries can be added.</p>
+              )}
+
+              {ediaryLogs.length === 0 ? (
+                <div className="empty-state">No occurrence logs recorded for this case.</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {ediaryLogs.map(log => (
+                    <div key={log.id} style={{ padding: '12px 16px', border: '1px solid var(--border-color)', borderRadius: '6px', background: 'var(--bg-inset)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--color-active)' }}>{log.topic}</span>
+                        <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>{new Date(log.dateTime).toLocaleString('en-SG')}</span>
+                      </div>
+                      <p style={{ fontSize: '12.5px', color: 'var(--text-sub)', whiteSpace: 'pre-wrap', lineHeight: '1.5', margin: '0 0 8px 0' }}>{log.content}</p>
+                      <div style={{ fontSize: '11px', color: 'var(--text-faint)' }}>Logged by: <strong>{log.user}</strong></div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

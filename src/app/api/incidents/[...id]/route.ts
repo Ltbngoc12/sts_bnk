@@ -210,11 +210,12 @@ export async function POST(
           }
         }
         incident.status = 'Closed';
-        incident.closedAt = new Date().toISOString();
-        if (body.closureRemarks) incident.closureRemarks = body.closureRemarks;
-        // Also close the parent case
-        currentCase.status = 'Closed';
-        currentCase.closedAt = new Date().toISOString();
+        // Close the parent case only if no other active tasks exist
+        const activeTasks = db.tasks.filter(t => t.caseId === caseId && t.status !== 'Closed');
+        if (activeTasks.length === 0) {
+          currentCase.status = 'Closed';
+          currentCase.closedAt = new Date().toISOString();
+        }
         // Close any slave incidents
         if (incident.slaveIncidents) {
           incident.slaveIncidents = incident.slaveIncidents.map((s: any) => ({ ...s, status: 'Closed' }));

@@ -70,6 +70,7 @@ model Case {
   eDiaryLogs  EDiaryEntry[]
   broadcasts  BroadcastLog[]
 
+  @@index([createdAt])
   @@map("cases")
 }
 

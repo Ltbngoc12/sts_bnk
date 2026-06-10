@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getDb, saveDb, Case } from '@/lib/db';
 
 export async function GET(
@@ -37,22 +37,84 @@ export async function PUT(
     }
     
     const existingCase = db.cases[caseIndex];
+
+    // Closed cases are read-only
+    if (existingCase.status === 'Closed') {
+      return NextResponse.json({ error: 'Closed cases are read-only and cannot be updated.' }, { status: 400 });
+    }
     
-    // Update Case status
+    // Update Case Title
+    if (body.title !== undefined) {
+      const title = String(body.title).replace(/<[^>]*>/g, '').trim();
+      if (title.length > 255) {
+        return NextResponse.json({ error: 'Case Title exceeds 255 characters limit.' }, { status: 400 });
+      }
+      existingCase.title = title || 'New Unnamed Case';
+    }
+
+    // Update Case status with validation
     if (body.status) {
-      existingCase.status = body.status;
-      if (body.status === 'Closed') {
-        existingCase.closedAt = new Date().toISOString();
-        if (existingCase.incident) {
-          existingCase.incident.status = 'Closed';
+      const currentStatus = existingCase.status;
+      const targetStatus = body.status;
+
+      const validStatuses = ['Pending Triage', 'Active', 'No Action Required', 'Closed'];
+      if (!validStatuses.includes(targetStatus)) {
+        return NextResponse.json({ error: `Invalid status: ${targetStatus}` }, { status: 400 });
+      }
+
+      // Check transition rules
+      if (currentStatus === 'Pending Triage') {
+        if (targetStatus !== 'Active' && targetStatus !== 'No Action Required') {
+          return NextResponse.json({ error: `Invalid transition from ${currentStatus} to ${targetStatus}` }, { status: 400 });
+        }
+      } else if (currentStatus === 'Active') {
+        if (targetStatus !== 'Closed') {
+          return NextResponse.json({ error: `Invalid transition from ${currentStatus} to ${targetStatus}` }, { status: 400 });
+        }
+      } else if (currentStatus === 'No Action Required') {
+        if (targetStatus !== 'Active') {
+          return NextResponse.json({ error: `Invalid transition from ${currentStatus} to ${targetStatus}` }, { status: 400 });
         }
       }
+
+      // Enforce closure validation rules
+      if (targetStatus === 'Closed') {
+        // 1. Check if there is an active incident
+        const activeIncident = db.cases
+          .map(c => c.id === caseId ? c.incident : null)
+          .filter(Boolean)
+          .find(inc => inc && inc.status !== 'Closed');
+        
+        if (activeIncident) {
+          return NextResponse.json({ 
+            error: `Cannot close Case. The linked Incident (${activeIncident.id}) must be Closed first.` 
+          }, { status: 400 });
+        }
+
+        // 2. Check if there are active tasks
+        const activeTasks = db.tasks.filter(t => t.caseId === caseId && t.status !== 'Closed');
+        if (activeTasks.length > 0) {
+          return NextResponse.json({ 
+            error: `Cannot close Case. Please close all linked Tasks first (${activeTasks.length} active task(s) remaining).` 
+          }, { status: 400 });
+        }
+
+        // Apply closure metadata
+        existingCase.closedAt = new Date().toISOString();
+        existingCase.closedBy = body.username || 'admin';
+      }
+
+      existingCase.status = targetStatus;
     }
 
     // Link CMMS Ticket ID
     if (body.cmmsTicketId) {
       if (!existingCase.cmmsTickets.includes(body.cmmsTicketId)) {
         existingCase.cmmsTickets.push(body.cmmsTicketId);
+        // Automatically transition Case to Active if it was in Pending Triage
+        if (existingCase.status === 'Pending Triage') {
+          existingCase.status = 'Active';
+        }
       }
     }
     

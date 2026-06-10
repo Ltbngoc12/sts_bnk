@@ -61,6 +61,33 @@
       "createdAt": "2026-06-08T13:51:21.389Z",
       "createdBy": "system",
       "closedAt": null
+    },
+    {
+      "id": "SEN/CI/20260611/001",
+      "title": "New Unnamed Case",
+      "status": "Pending Triage",
+      "createdAt": "2026-06-10T17:23:42.264Z",
+      "createdBy": "admin",
+      "closedAt": null,
+      "closedBy": null
+    },
+    {
+      "id": "SEN/CI/20260611/002",
+      "title": "New Unnamed Case",
+      "status": "Pending Triage",
+      "createdAt": "2026-06-10T17:24:53.444Z",
+      "createdBy": "DM Gan",
+      "closedAt": null,
+      "closedBy": null
+    },
+    {
+      "id": "SEN/CI/20260611/003",
+      "title": "New Unnamed Case",
+      "status": "Pending Triage",
+      "createdAt": "2026-06-10T17:25:03.375Z",
+      "createdBy": "DM Gan",
+      "closedAt": null,
+      "closedBy": null
     }
   ],
   "incidents": [
