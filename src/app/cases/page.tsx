@@ -126,28 +126,8 @@ export default function CaseLogPage() {
     setPage(1);
   };
 
-  const handleCreateCase = async () => {
-    try {
-      const res = await fetch('/api/cases', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: '', // optional/blank for manual cases
-          status: 'Pending Triage',
-          username: username || 'admin'
-        })
-      });
-      if (res.ok) {
-        const newCase = await res.json();
-        window.location.href = `/cases/${newCase.id}`;
-      } else {
-        const err = await res.json();
-        alert(`Failed to create case: ${err.error}`);
-      }
-    } catch (error) {
-      console.error('Error creating case:', error);
-      alert('An error occurred while creating the case.');
-    }
+  const handleCreateCase = () => {
+    window.location.href = '/cases/new';
   };
 
   const startIdx = (page - 1) * limit + 1;

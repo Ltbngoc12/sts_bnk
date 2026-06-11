@@ -17,16 +17,12 @@ export default function TasksPage() {
   const [taskDesc, setTaskDesc] = useState('');
   const [taskCaseId, setTaskCaseId] = useState('');
   const [taskAssignee, setTaskAssignee] = useState('Ranger John');
-  const [taskPriority, setTaskPriority] = useState('Medium');
+  const [taskPriority, setTaskPriority] = useState('Normal');
   const [taskDueDate, setTaskDueDate] = useState('');
 
   // Selected task detail popup states
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [newAssignee, setNewAssignee] = useState('');
-
-  useEffect(() => {
-    fetchTasksAndCases();
-  }, []);
 
   const fetchTasksAndCases = async () => {
     try {
@@ -48,6 +44,10 @@ export default function TasksPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchTasksAndCases();
+  }, []);
 
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -144,8 +144,7 @@ export default function TasksPage() {
               <div key={t.id} className="task-card glass" onClick={() => { setSelectedTask(t); setNewAssignee(t.assignee); }}>
                 <div className="task-priority-tag">
                   <span className={`priority-indicator ${
-                    t.priority === 'High' ? 'p-high' :
-                    t.priority === 'Medium' ? 'p-med' : 'p-low'
+                    t.priority === 'High' ? 'p-high' : 'p-normal'
                   }`} />
                   <span>{t.priority} Priority</span>
                 </div>
@@ -362,8 +361,7 @@ export default function TasksPage() {
                       className="form-control select-dark"
                     >
                       <option value="High">High</option>
-                      <option value="Medium">Medium</option>
-                      <option value="Low">Low</option>
+                      <option value="Normal">Normal</option>
                     </select>
                   </div>
                 </div>

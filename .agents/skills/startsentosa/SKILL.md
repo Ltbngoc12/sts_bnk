@@ -17,5 +17,8 @@ This skill automates pulling the latest version of the Sentosa project from Git 
    - Check if `package.json` or `package-lock.json` has changed.
    - If changed, run `npm install` to update the dependencies.
 
-3. **Provide Status:**
-   - Report the status of the git pull (already up-to-date, or what files were updated) and dependency installation to the user.
+3. **Start Local Development Server:**
+   - Run `npm run dev` to launch the local server.
+
+4. **Provide Status:**
+   - Report the status of the git pull, dependency installation, and local development server status to the user.

@@ -88,6 +88,24 @@
       "createdBy": "DM Gan",
       "closedAt": null,
       "closedBy": null
+    },
+    {
+      "id": "SEN/CI/20260611/004",
+      "title": "Hie",
+      "status": "Active",
+      "createdAt": "2026-06-10T17:25:53.847Z",
+      "createdBy": "Controller Steve",
+      "closedAt": null,
+      "closedBy": null
+    },
+    {
+      "id": "SEN/CI/20260611/005",
+      "title": "New Unnamed Case",
+      "status": "Active",
+      "createdAt": "2026-06-11T15:36:35.017Z",
+      "createdBy": "Controller Steve",
+      "closedAt": null,
+      "closedBy": null
     }
   ],
   "incidents": [
@@ -514,6 +532,69 @@
       "summary": "12",
       "completionRemarks": "",
       "id": "SEN/IR/20260608/0004"
+    },
+    {
+      "id": "SEN/IR/20260611/0001",
+      "caseId": "SEN/CI/20260611/005",
+      "title": "New Unnamed Case",
+      "dateTime": "2026-06-11T15:53:55.111Z",
+      "type": "Safety / Medical",
+      "subType": "Heat Stroke",
+      "priority": "High",
+      "crisisLevel": 4,
+      "reporterName": "1",
+      "requestedBy": "Guest Call-in",
+      "createdBy": "Controller Steve",
+      "status": "Live",
+      "assignedTo": "",
+      "location": {
+        "road": "",
+        "building": "",
+        "levelSpace": "",
+        "nearAt": "",
+        "commonName": "1",
+        "postalCode": "000000",
+        "tags": [],
+        "lat": 1.25,
+        "lng": 103.83
+      },
+      "log": [
+        {
+          "eventNumber": 1,
+          "date": "2026-06-11",
+          "time": "22:53:55",
+          "description": "Incident logged under ID SEN/IR/20260611/0001 (Case ID SEN/CI/20260611/005). Classification: Safety / Medical - Heat Stroke."
+        }
+      ],
+      "emergencyServices": {
+        "policeAtScene": false,
+        "officerNameRank": "",
+        "policeIncidentNo": "",
+        "classification": "",
+        "respondingUnit": "",
+        "ambulanceScdfType": "",
+        "ambulanceOfficerName": "",
+        "ambulanceCallSign": "",
+        "ambulanceRespondingUnit": "",
+        "ambulanceArrivalTime": "",
+        "hospitalConveyedTo": ""
+      },
+      "mediaInvolvement": {
+        "mediaAtScene": false,
+        "mediaName": "",
+        "commsNotified": false
+      },
+      "propertyDamage": {
+        "sdcPropertyDamaged": false,
+        "description": ""
+      },
+      "vehiclesInvolved": [],
+      "personalInjuries": [],
+      "personsInvolved": [],
+      "cctvBwc": [],
+      "summary": "1",
+      "completionRemarks": "",
+      "slaveIncidents": []
     }
   ],
   "faults": [
@@ -581,6 +662,32 @@
       "status": "Pending",
       "createdBy": "controller_steve",
       "createdDate": "2026-06-05T08:00:00+07:00",
+      "attachments": []
+    },
+    {
+      "id": "TASK-002",
+      "caseId": "SEN/CI/20260611/004",
+      "title": "2",
+      "description": "1",
+      "assignee": "Ranger Sarah",
+      "priority": "High",
+      "dueDate": "",
+      "status": "In Progress",
+      "createdBy": "Controller Steve",
+      "createdDate": "2026-06-10T17:26:04.245Z",
+      "attachments": []
+    },
+    {
+      "id": "TASK-003",
+      "caseId": "SEN/CI/20260611/005",
+      "title": "1",
+      "description": "1",
+      "assignee": "Ranger Sarah",
+      "priority": "Medium",
+      "dueDate": "2026-06-18T10:54",
+      "status": "Created",
+      "createdBy": "Controller Steve",
+      "createdDate": "2026-06-11T15:54:08.889Z",
       "attachments": []
     }
   ],

@@ -812,6 +812,7 @@ textarea.form-control { resize: vertical; min-height: 72px; line-height: 1.5; }
 }
 .priority-indicator { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 .p-high { background: var(--color-critical); box-shadow: 0 0 5px var(--color-critical); }
+.p-normal { background: var(--color-info); }
 .p-med  { background: var(--color-high);     box-shadow: 0 0 5px var(--color-high); }
 .p-low  { background: var(--color-closed); }
 

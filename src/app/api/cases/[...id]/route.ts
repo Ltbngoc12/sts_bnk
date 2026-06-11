@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb, saveDb, Case } from '@/lib/db';
+import { getDb, saveDb, Case, Incident, generateIncidentId } from '@/lib/db';
 
 export async function GET(
   request: Request,
@@ -105,6 +105,65 @@ export async function PUT(
       }
 
       existingCase.status = targetStatus;
+    }
+
+    // Attach Incident Report if requested
+    if (body.incident) {
+      const incidentData = body.incident;
+      const incidentId = generateIncidentId(db);
+      const newIncident: Incident = {
+        id: incidentId,
+        caseId: caseId,
+        title: existingCase.title,
+        dateTime: incidentData.dateTime || new Date().toISOString(),
+        type: incidentData.type || 'Others',
+        subType: incidentData.subType || 'Others',
+        priority: incidentData.priority || 'Normal',
+        crisisLevel: 4,
+        reporterName: incidentData.reporterName || 'Unknown',
+        requestedBy: incidentData.requestedBy || 'IIOC Controller',
+        createdBy: body.username || 'admin',
+        category: incidentData.category || 'Standard Incident',
+        status: incidentData.status || 'Live',
+        assignedTo: incidentData.assignedTo || '',
+        location: {
+          road: incidentData.location?.road || '',
+          building: incidentData.location?.building || '',
+          levelSpace: incidentData.location?.levelSpace || '',
+          nearAt: incidentData.location?.nearAt || '',
+          commonName: incidentData.location?.commonName || '',
+          postalCode: incidentData.location?.postalCode || '000000',
+          tags: incidentData.location?.tags || [],
+          lat: incidentData.location?.lat || 1.2500,
+          lng: incidentData.location?.lng || 103.8300
+        },
+        log: [
+          {
+            eventNumber: 1,
+            date: new Date().toISOString().split('T')[0],
+            time: new Date().toLocaleTimeString('en-US', { hour12: false }),
+            description: `Incident logged under ID ${incidentId} (Case ID ${caseId}). Classification: ${incidentData.type} - ${incidentData.subType}.`
+          }
+        ],
+        emergencyServices: {
+          policeAtScene: false, officerNameRank: '', policeIncidentNo: '', classification: '', respondingUnit: '',
+          ambulanceScdfType: '', ambulanceOfficerName: '', ambulanceCallSign: '', ambulanceRespondingUnit: '', ambulanceArrivalTime: '', hospitalConveyedTo: ''
+        },
+        mediaInvolvement: { mediaAtScene: false, mediaName: '', commsNotified: false },
+        propertyDamage: { sdcPropertyDamaged: false, description: '' },
+        vehiclesInvolved: [],
+        personalInjuries: [],
+        personsInvolved: [],
+        cctvBwc: [],
+        summary: incidentData.summary || '',
+        completionRemarks: '',
+        slaveIncidents: []
+      };
+      existingCase.incident = newIncident;
+      // Escalates status to Active on child creation
+      if (existingCase.status === 'Pending Triage') {
+        existingCase.status = 'Active';
+      }
     }
 
     // Link CMMS Ticket ID

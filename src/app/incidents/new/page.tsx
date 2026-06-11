@@ -3,275 +3,1909 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useRole } from '@/context/RoleContext';
+import Link from 'next/link';
 
-const taxonomy: Record<string, string[]> = {
-  'Security': ['Unattended Property', 'Suspicious Person', 'Intruder', 'Trespass', 'Theft', 'Vandalism', 'Others'],
-  'Safety / Medical': ['Fainting/Giddiness', 'Slip & Fall', 'Heat Stroke', 'Drowning Alert', 'Cardiac Arrest', 'Others'],
-  'Fire Alarm': ['Smoke Detector', 'Manual Call Point', 'Actual Fire', 'False Trigger', 'Others'],
-  'Infrastructure': ['Power Outage', 'Water Pipe Leak', 'Lift Fault', 'Barrier Malfunction', 'Lighting Fault', 'Others']
+const subTypesMap: Record<string, string[]> = {
+  'Security': ['Abandoned Property', 'Intrusion', 'Theft', 'Vandalism', 'Trespass', 'Crowd Control', 'Suspect Package', 'Others'],
+  'Safety / Medical': ['Fainting/Giddiness', 'Cardiac Arrest', 'Heat Stroke', 'Slip & Fall', 'Injury', 'Animal Encounter', 'Others'],
+  'Fire Alarm': ['False Alarm', 'Real Fire', 'Smoke Detector', 'Others'],
+  'Facilities': ['Power Outage', 'Water Leak', 'Lift Fault', 'Aircon Fault', 'Others'],
 };
 
 export default function NewIncidentPage() {
   const router = useRouter();
   const { username } = useRole();
 
+  // Simulation Setting state
+  const [simulatedOffset, setSimulatedOffset] = useState<'now' | '45m' | '12d' | '15d'>('now');
+
+  // Accordion Expand States (1 to 12)
+  const [expandedSections, setExpandedSections] = useState<Record<number, boolean>>({
+    1: true, // open first by default
+  });
+
+  // Success Modal State
+  const [successModal, setSuccessModal] = useState(false);
+  const [generatedCaseId, setGeneratedCaseId] = useState('');
+  const [generatedIncidentId, setGeneratedIncidentId] = useState('');
+
+  // 1. General Information State
   const [title, setTitle] = useState('');
+  const [category, setCategory] = useState('Standard Incident');
   const [incType, setIncType] = useState('Security');
-  const [incSubType, setIncSubType] = useState('Unattended Property');
-  const [priority, setPriority] = useState('Medium');
-  const [reporter, setReporter] = useState('');
-  const [requestedBy, setRequestedBy] = useState('IIOC Controller');
-  const [summary, setSummary] = useState('');
+  const [incSubType, setIncSubType] = useState('Abandoned Property');
+  const [priority, setPriority] = useState('Normal');
+  const [crisisLevel, setCrisisLevel] = useState('4');
+  const [reporterName, setReporterName] = useState('');
+  const [requestedBy, setRequestedBy] = useState('Public Phone');
+  const [incidentDateTime, setIncidentDateTime] = useState('');
+  const [createdBy, setCreatedBy] = useState(username || 'Controller Steve');
+
+  useEffect(() => {
+    if (username) {
+      setCreatedBy(username);
+    }
+  }, [username]);
+
+  // 2. Location State
   const [road, setRoad] = useState('');
   const [building, setBuilding] = useState('');
   const [levelSpace, setLevelSpace] = useState('');
   const [nearAt, setNearAt] = useState('');
   const [commonName, setCommonName] = useState('');
-  const [postalCode, setPostalCode] = useState('');
+  const [postalCode, setPostalCode] = useState('000000');
   const [tagsStr, setTagsStr] = useState('Beachfront');
-  const [submitting, setSubmitting] = useState(false);
+  const [manualPin, setManualPin] = useState(false);
+  const [pinCoords, setPinCoords] = useState({ lat: 1.2500, lng: 103.8300 });
 
+  // 3. Incident Log State
+  const [logs, setLogs] = useState<{ id: number; date: string; time: string; description: string }[]>([
+    { id: 1, date: new Date().toISOString().split('T')[0], time: '12:00', description: 'Incident logged. Dispatch pending.' }
+  ]);
+
+  // 4. Emergency Services State
+  const [policeAtScene, setPoliceAtScene] = useState(false);
+  const [policeOfficer, setPoliceOfficer] = useState('');
+  const [policeIncidentNo, setPoliceIncidentNo] = useState('');
+  const [policeClassification, setPoliceClassification] = useState('');
+  const [policeUnit, setPoliceUnit] = useState('');
+  
+  const [scdfType, setScdfType] = useState('None'); // None | Ambulance | SCDF
+  const [scdfOfficer, setScdfOfficer] = useState('');
+  const [scdfCallSign, setScdfCallSign] = useState('');
+  const [scdfUnit, setScdfUnit] = useState('');
+  const [scdfArrivalTime, setScdfArrivalTime] = useState('');
+  const [scdfHospital, setScdfHospital] = useState('');
+
+  // 5. Media Involvement State
+  const [mediaAtScene, setMediaAtScene] = useState(false);
+  const [mediaName, setMediaName] = useState('');
+  const [mediaCommsNotified, setMediaCommsNotified] = useState(false);
+
+  // 6. Property & Vehicles State
+  const [propertyDamaged, setPropertyDamaged] = useState(false);
+  const [propertyDamageDesc, setPropertyDamageDesc] = useState('');
+  const [vehicles, setVehicles] = useState<{ id: number; sdcVehicle: boolean; model: string; plate: string; driverName: string; driverContact: string; licence: string; address: string; remarks: string }[]>([]);
+
+  // 7. Personal Injuries State
+  const [injuries, setInjuries] = useState<{ id: number; name: string; address: string; age: string; gender: string; contact: string; hospital: string; msigIssued: boolean; msigSerial: string; under16: boolean; parentName: string; parentContact: string }[]>([]);
+
+  // 8. Persons Involved State
+  const [persons, setPersons] = useState<{ id: number; guestOrNon: string; type: string; name: string; address: string; age: string; gender: string; contact: string; role: string; injuryDetails: string }[]>([]);
+
+  // 9. CCTV & Body Worn Camera State
+  const [cctvFootages, setCctvFootages] = useState<{ id: number; cameraNo: string; timestamp: string; bookmark: string; bwcNo: string; bwcTimestamp: string }[]>([]);
+
+  // 10. Attachments State (mock list of files)
+  const [mockFiles, setMockFiles] = useState<{ name: string; size: string }[]>([]);
+
+  // 11. Responder Assignment State
+  const [assignedResponder, setAssignedResponder] = useState('');
+
+  // 12. Summary & Closure State
+  const [summary, setSummary] = useState('');
+  const [completionRemarks, setCompletionRemarks] = useState('');
+
+  // Time simulation effects
   useEffect(() => {
-    const list = taxonomy[incType];
-    if (list && list.length > 0) setIncSubType(list[0]);
+    const now = new Date();
+    if (simulatedOffset === 'now') {
+      setIncidentDateTime(now.toISOString().slice(0, 16));
+    } else if (simulatedOffset === '45m') {
+      const offset = new Date(now.getTime() - 45 * 60 * 1000);
+      setIncidentDateTime(offset.toISOString().slice(0, 16));
+    } else if (simulatedOffset === '12d') {
+      const offset = new Date(now.getTime() - 12 * 24 * 60 * 60 * 1000);
+      setIncidentDateTime(offset.toISOString().slice(0, 16));
+    } else if (simulatedOffset === '15d') {
+      const offset = new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000);
+      setIncidentDateTime(offset.toISOString().slice(0, 16));
+    }
+  }, [simulatedOffset]);
+
+  // Handle Type -> Sub-Type resets
+  useEffect(() => {
+    const list = subTypesMap[incType];
+    if (list && list.length > 0) {
+      setIncSubType(list[0]);
+    }
   }, [incType]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Handle Age changes inside injury list to auto-toggle Under-16 status
+  const handleInjuryAgeChange = (id: number, ageVal: string) => {
+    setInjuries(prev => prev.map(item => {
+      if (item.id === id) {
+        const isUnder16 = parseInt(ageVal, 10) < 16;
+        return {
+          ...item,
+          age: ageVal,
+          under16: isUnder16
+        };
+      }
+      return item;
+    }));
+  };
+
+  // Warning Banners triggers
+  const now = new Date();
+  const incidentDateObj = new Date(incidentDateTime || now.toISOString());
+  const elapsedMs = now.getTime() - incidentDateObj.getTime();
+  const elapsedMinutes = elapsedMs / (60 * 1000);
+  const elapsedDays = elapsedMs / (24 * 60 * 60 * 1000);
+
+  const showCrisisLevelBanner = elapsedMinutes >= 45 && elapsedDays < 12;
+  const showReviewWarningBanner = elapsedDays >= 12 && elapsedDays < 14;
+  const showEscalationWarningBanner = elapsedDays >= 14;
+  const showMediaBanner = mediaAtScene;
+
+  // Accordion Toggle handlers
+  const toggleSection = (index: number) => {
+    setExpandedSections(prev => ({ ...prev, [index]: !prev[index] }));
+  };
+
+  const expandAll = () => {
+    const allExpanded: Record<number, boolean> = {};
+    for (let i = 1; i <= 12; i++) allExpanded[i] = true;
+    setExpandedSections(allExpanded);
+  };
+
+  const collapseAll = () => {
+    setExpandedSections({});
+  };
+
+  // Mock Form Submit Handler
+  const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) return;
-    setSubmitting(true);
-
-    let lat = 1.2500, lng = 103.8300;
-    if (commonName.toLowerCase().includes('siloso')) { lat = 1.2562; lng = 103.8124; }
-    else if (commonName.toLowerCase().includes('palawan')) { lat = 1.2520; lng = 103.8210; }
-    else if (commonName.toLowerCase().includes('cove')) { lat = 1.2464; lng = 103.8440; }
-    else if (commonName.toLowerCase().includes('rws') || commonName.toLowerCase().includes('resorts')) { lat = 1.2585; lng = 103.8210; }
-
-    const payload = {
-      title,
-      username,
-      status: 'Active',
-      incident: {
-        dateTime: new Date().toISOString(),
-        type: incType,
-        subType: incSubType,
-        priority,
-        reporterName: reporter || 'Anonymous Guest',
-        requestedBy,
-        status: 'Live',
-        summary,
-        location: {
-          road, building, levelSpace, nearAt, commonName,
-          postalCode: postalCode || '000000',
-          tags: tagsStr.split(',').map(t => t.trim()).filter(Boolean),
-          lat, lng
-        }
-      }
-    };
-
-    try {
-      const res = await fetch('/api/cases', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (res.ok) {
-        router.push('/incidents');
-      } else {
-        alert('Failed to log incident.');
-        setSubmitting(false);
-      }
-    } catch (err) {
-      console.error('Error creating incident:', err);
-      setSubmitting(false);
+    if (!title.trim()) {
+      alert('General Information: Incident Title is required.');
+      toggleSection(1);
+      return;
     }
+
+    const yyyymmdd = now.toISOString().split('T')[0].replace(/-/g, '');
+    const caseId = `SEN/CI/${yyyymmdd}/${String(Math.floor(Math.random() * 899) + 100).padStart(3, '0')}`;
+    const incidentId = `SEN/IR/${yyyymmdd}/${String(Math.floor(Math.random() * 8999) + 1000).padStart(4, '0')}`;
+
+    setGeneratedCaseId(caseId);
+    setGeneratedIncidentId(incidentId);
+    setSuccessModal(true);
   };
 
   return (
-    <div className="page-content">
-      <div className="cases-header-bar glass">
+    <div className="page-content" style={{ maxWidth: '1000px', margin: '0 auto', padding: '0 20px 60px 20px' }}>
+      
+      <style jsx global>{`
+        /* Simulator Panel */
+        .simulator-panel {
+          background: #FFFDF5;
+          border: 1px dashed #E6C280;
+          border-radius: 10px;
+          padding: 14px 18px;
+          margin-bottom: 20px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+        .simulator-title {
+          font-size: 12.5px;
+          font-weight: 700;
+          color: #B27C24;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
+        .simulator-options {
+          display: flex;
+          gap: 8px;
+        }
+        .sim-btn {
+          padding: 5px 12px;
+          font-size: 12px;
+          font-weight: 600;
+          border-radius: 6px;
+          border: 1px solid #E6D0A8;
+          background: #FFF;
+          color: #7D5C28;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+        .sim-btn.active {
+          background: #F2C94C;
+          border-color: #F2C94C;
+          color: #2B1F1D;
+        }
+
+        /* Warning Banners styling */
+        .banner-container {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          margin-bottom: 20px;
+        }
+        .warning-banner {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 12px 16px;
+          border-radius: 8px;
+          font-size: 13px;
+          font-weight: 500;
+        }
+        .warning-banner.info {
+          background: var(--color-info-bg);
+          border: 1px solid var(--color-info-border);
+          color: var(--color-info);
+        }
+        .warning-banner.warning {
+          background: var(--color-high-bg);
+          border: 1px solid var(--color-high-border);
+          color: var(--color-high);
+        }
+        .warning-banner.danger {
+          background: var(--color-critical-bg);
+          border: 1px solid var(--color-critical-border);
+          color: var(--color-critical);
+        }
+        .banner-icon { font-size: 18px; }
+
+        /* Accordion Wizard styling */
+        .accordion-item {
+          background: var(--bg-card);
+          border: 1px solid var(--border-color);
+          border-radius: 8px;
+          margin-bottom: 12px;
+          overflow: hidden;
+          box-shadow: 0 2px 8px rgba(43, 31, 29, 0.01);
+          transition: border-color 0.15s ease;
+        }
+        .accordion-item.expanded {
+          border-color: var(--border-color-hover);
+        }
+        .accordion-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 14px 18px;
+          background: var(--bg-card);
+          cursor: pointer;
+          user-select: none;
+          transition: background 0.12s ease;
+        }
+        .accordion-header:hover {
+          background: var(--bg-inset);
+        }
+        .accordion-header-left {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+        .accordion-num {
+          background: var(--bg-inset);
+          border: 1px solid var(--border-color);
+          width: 24px;
+          height: 24px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 11.5px;
+          font-weight: 700;
+          color: var(--text-muted);
+        }
+        .accordion-item.expanded .accordion-num {
+          background: var(--color-primary-bg);
+          border-color: var(--color-primary-border);
+          color: var(--color-primary);
+        }
+        .accordion-title {
+          font-size: 14px;
+          font-weight: 600;
+          color: var(--text-main);
+        }
+        .accordion-header-right {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .accordion-content {
+          padding: 20px 24px;
+          border-top: 1px solid var(--border-color);
+          background: var(--bg-card);
+        }
+
+        /* Dynamic Grid Sub-forms */
+        .sub-form-card {
+          background: var(--bg-inset);
+          border: 1px solid var(--border-color);
+          border-radius: 8px;
+          padding: 16px;
+          margin-bottom: 12px;
+          position: relative;
+        }
+        .sub-form-card:last-child {
+          margin-bottom: 0;
+        }
+        .remove-card-btn {
+          position: absolute;
+          top: 14px;
+          right: 14px;
+        }
+
+        /* Mock Map */
+        .mock-map-canvas {
+          height: 200px;
+          background: #EAF2E6;
+          border: 1px solid var(--border-color);
+          border-radius: 8px;
+          position: relative;
+          overflow: hidden;
+          margin-top: 8px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .map-grid-bg {
+          position: absolute; inset: 0;
+          background-size: 20px 20px;
+          background-image: linear-gradient(to right, rgba(0,0,0,0.02) 1px, transparent 1px),
+                            linear-gradient(to bottom, rgba(0,0,0,0.02) 1px, transparent 1px);
+        }
+        .map-beach-line {
+          position: absolute;
+          bottom: 0; left: 0; right: 0; height: 70px;
+          background: #FFEAA7;
+          border-top: 2px dashed #E5BA73;
+        }
+        .map-sea-line {
+          position: absolute;
+          bottom: 0; left: 0; right: 0; height: 35px;
+          background: #74B9FF;
+        }
+        .map-pin {
+          position: absolute;
+          font-size: 24px;
+          margin-top: -24px;
+          margin-left: -12px;
+          z-index: 10;
+          animation: bounce 1s infinite alternate;
+        }
+        @keyframes bounce {
+          from { transform: translateY(0); }
+          to { transform: translateY(-6px); }
+        }
+
+        /* Mock File Drop Area */
+        .mock-dropzone {
+          border: 2px dashed var(--border-color);
+          border-radius: 8px;
+          padding: 30px;
+          text-align: center;
+          cursor: pointer;
+          background: var(--bg-inset);
+          transition: all 0.15s ease;
+        }
+        .mock-dropzone:hover {
+          border-color: var(--color-primary);
+          background: var(--bg-card);
+        }
+      `}</style>
+
+      {/* Header Panel */}
+      <div className="cases-header-bar glass" style={{ marginBottom: '20px' }}>
         <div className="title-section">
-          <h1>LOG NEW INCIDENT</h1>
-          <p>Complete the form below to log a new incident into the registry</p>
+          <h1>Log New Incident Report</h1>
+          <p>Complete the strict 12 accordion sections below to log the incident.</p>
+        </div>
+        <div>
+          <button onClick={expandAll} className="btn btn-secondary btn-sm" style={{ marginRight: '8px' }}>Expand All</button>
+          <button onClick={collapseAll} className="btn btn-secondary btn-sm">Collapse All</button>
         </div>
       </div>
 
-      <div className="glass" style={{ padding: '2rem', marginTop: '1rem' }}>
-        <form onSubmit={handleSubmit} className="modal-form">
-
-          <h3 className="section-title">General Information</h3>
-          <div className="form-grid">
-            <div className="form-group colspan-2">
-              <label>Incident Title *</label>
-              <input
-                type="text"
-                placeholder="e.g. Unattended backpack near beach tram station"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                required
-                className="form-control"
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Incident Type *</label>
-              <select value={incType} onChange={(e) => setIncType(e.target.value)} className="form-control select-dark">
-                {Object.keys(taxonomy).map(t => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label>Incident Sub-Type *</label>
-              <select value={incSubType} onChange={(e) => setIncSubType(e.target.value)} className="form-control select-dark">
-                {taxonomy[incType]?.map(st => (
-                  <option key={st} value={st}>{st}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label>Priority</label>
-              <select value={priority} onChange={(e) => setPriority(e.target.value)} className="form-control select-dark">
-                <option value="High">High</option>
-                <option value="Medium">Medium</option>
-                <option value="Low">Low</option>
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label>Requested By</label>
-              <select value={requestedBy} onChange={(e) => setRequestedBy(e.target.value)} className="form-control select-dark">
-                <option value="IIOC Controller">IIOC Controller</option>
-                <option value="Guest Call-in">Guest Call-in (Hotline)</option>
-                <option value="Ranger Field Patrol">Ranger Field Patrol</option>
-                <option value="State Agency (SCDF/SPF)">State Agency (SCDF/SPF)</option>
-              </select>
-            </div>
-
-            <div className="form-group colspan-2">
-              <label>Reporter Details</label>
-              <input
-                type="text"
-                placeholder="Reporter Name / Contact Details"
-                value={reporter}
-                onChange={(e) => setReporter(e.target.value)}
-                className="form-control"
-              />
-            </div>
-          </div>
-
-          <h3 className="section-title">Incident Location</h3>
-          <div className="form-grid">
-            <div className="form-group">
-              <label>Common Name *</label>
-              <input
-                type="text"
-                placeholder="e.g. Siloso Lifeguard Post 2"
-                value={commonName}
-                onChange={(e) => setCommonName(e.target.value)}
-                required
-                className="form-control"
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Road Reference</label>
-              <input
-                type="text"
-                placeholder="e.g. Siloso Beach Walk"
-                value={road}
-                onChange={(e) => setRoad(e.target.value)}
-                className="form-control"
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Building Name</label>
-              <input
-                type="text"
-                placeholder="e.g. Emerald Pavilion"
-                value={building}
-                onChange={(e) => setBuilding(e.target.value)}
-                className="form-control"
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Level & Space</label>
-              <input
-                type="text"
-                placeholder="e.g. Near public shower block"
-                value={levelSpace}
-                onChange={(e) => setLevelSpace(e.target.value)}
-                className="form-control"
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Postal Code</label>
-              <input
-                type="text"
-                placeholder="e.g. 098997"
-                value={postalCode}
-                onChange={(e) => setPostalCode(e.target.value)}
-                maxLength={6}
-                className="form-control"
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Beside / Near To Qualifier</label>
-              <input
-                type="text"
-                placeholder="e.g. Beside the main bench"
-                value={nearAt}
-                onChange={(e) => setNearAt(e.target.value)}
-                className="form-control"
-              />
-            </div>
-
-            <div className="form-group colspan-2">
-              <label>Location Tags (Comma separated)</label>
-              <input
-                type="text"
-                placeholder="Beachfront, Siloso Zone"
-                value={tagsStr}
-                onChange={(e) => setTagsStr(e.target.value)}
-                className="form-control"
-              />
-            </div>
-          </div>
-
-          <h3 className="section-title">Incident Details</h3>
-          <div className="form-group">
-            <label>Initial Description</label>
-            <textarea
-              rows={3}
-              placeholder="Provide details on the incident..."
-              value={summary}
-              onChange={(e) => setSummary(e.target.value)}
-              className="form-control"
-            />
-          </div>
-
-          <div className="modal-actions" style={{ marginTop: '2rem' }}>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => router.push('/incidents')}
-            >
-              Cancel
-            </button>
-            <button type="submit" className="btn btn-primary" disabled={submitting}>
-              {submitting ? 'Logging...' : 'LOG INCIDENT'}
-            </button>
-          </div>
-
-        </form>
+      {/* Time Simulation Settings Panel */}
+      <div className="simulator-panel">
+        <span className="simulator-title">⏱️ Incident Age Simulator:</span>
+        <div className="simulator-options">
+          <button 
+            type="button" 
+            className={`sim-btn ${simulatedOffset === 'now' ? 'active' : ''}`}
+            onClick={() => setSimulatedOffset('now')}
+          >
+            Just Created
+          </button>
+          <button 
+            type="button" 
+            className={`sim-btn ${simulatedOffset === '45m' ? 'active' : ''}`}
+            onClick={() => setSimulatedOffset('45m')}
+          >
+            45 mins ago
+          </button>
+          <button 
+            type="button" 
+            className={`sim-btn ${simulatedOffset === '12d' ? 'active' : ''}`}
+            onClick={() => setSimulatedOffset('12d')}
+          >
+            12 days ago
+          </button>
+          <button 
+            type="button" 
+            className={`sim-btn ${simulatedOffset === '15d' ? 'active' : ''}`}
+            onClick={() => setSimulatedOffset('15d')}
+          >
+            15 days ago
+          </button>
+        </div>
       </div>
+
+      {/* Warning Banners area */}
+      <div className="banner-container">
+        {showMediaBanner && (
+          <div className="warning-banner warning">
+            <span className="banner-icon">📢</span>
+            <div><strong>SDC Comms Notification:</strong> Press/Media present at scene. SDC Communications team must be notified immediately.</div>
+          </div>
+        )}
+
+        {showCrisisLevelBanner && (
+          <div className="warning-banner info">
+            <span className="banner-icon">⏳</span>
+            <div><strong>Crisis Level Review:</strong> This incident has been open for 45 minutes. Please review and confirm the Crisis Level.</div>
+          </div>
+        )}
+
+        {showReviewWarningBanner && (
+          <div className="warning-banner warning">
+            <span className="banner-icon">⚠️</span>
+            <div><strong>Incident Ageing Alert:</strong> This incident has remained active for 12 consecutive days. Please review and update status.</div>
+          </div>
+        )}
+
+        {showEscalationWarningBanner && (
+          <div className="warning-banner danger">
+            <span className="banner-icon">🚨</span>
+            <div><strong>Incident Ageing Escalation:</strong> This incident has remained active for 14 consecutive days. Immediate action toward closure is required.</div>
+          </div>
+        )}
+      </div>
+
+      {/* Accordion Form */}
+      <form onSubmit={handleFormSubmit}>
+        
+        {/* 1. GENERAL INFORMATION */}
+        <div className={`accordion-item ${expandedSections[1] ? 'expanded' : ''}`}>
+          <div className="accordion-header" onClick={() => toggleSection(1)}>
+            <div className="accordion-header-left">
+              <span className="accordion-num">1</span>
+              <span className="accordion-title">General Information</span>
+            </div>
+            <div className="accordion-header-right">
+              {title && <span className="badge badge-completed">Valid</span>}
+              <span>{expandedSections[1] ? '▲' : '▼'}</span>
+            </div>
+          </div>
+          {expandedSections[1] && (
+            <div className="accordion-content">
+              <div className="form-grid">
+                <div className="form-group colspan-2">
+                  <label>Incident Title *</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. Unattended black bag left near Lifeguard Post 2"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    required
+                    className="form-control"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Incident ID (Auto)</label>
+                  <input type="text" value="SEN/IR/YYYYMMDD/NNNN" disabled className="form-control" style={{ fontStyle: 'italic', background: 'var(--bg-inset)' }} />
+                </div>
+
+                <div className="form-group">
+                  <label>Case ID (Auto)</label>
+                  <input type="text" value="SEN/CI/YYYYMMDD/NNN" disabled className="form-control" style={{ fontStyle: 'italic', background: 'var(--bg-inset)' }} />
+                </div>
+
+                <div className="form-group">
+                  <label>Incident Category *</label>
+                  <select value={category} onChange={(e) => setCategory(e.target.value)} className="form-control select-dark">
+                    <option value="Standard Incident">Standard Incident</option>
+                    <option value="Proactive Incident">Proactive Incident</option>
+                    <option value="Backdated Incident">Backdated Incident</option>
+                    <option value="Ongoing Incident">Ongoing Incident</option>
+                    <option value="Operational Record">Operational Record</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Incident Type *</label>
+                  <select value={incType} onChange={(e) => setIncType(e.target.value)} className="form-control select-dark">
+                    <option value="Security">Security</option>
+                    <option value="Safety / Medical">Safety / Medical</option>
+                    <option value="Fire Alarm">Fire Alarm</option>
+                    <option value="Facilities">Facilities</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Incident Sub-Type *</label>
+                  <select value={incSubType} onChange={(e) => setIncSubType(e.target.value)} className="form-control select-dark">
+                    {subTypesMap[incType]?.map(st => (
+                      <option key={st} value={st}>{st}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Priority *</label>
+                  <select value={priority} onChange={(e) => setPriority(e.target.value)} className="form-control select-dark">
+                    <option value="Normal">Normal</option>
+                    <option value="High">High</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Crisis Level *</label>
+                  <select value={crisisLevel} onChange={(e) => setCrisisLevel(e.target.value)} className="form-control select-dark">
+                    <option value="1">Level 1 (Crisis)</option>
+                    <option value="2">Level 2</option>
+                    <option value="3">Level 3</option>
+                    <option value="4">Level 4 (Default)</option>
+                    <option value="5">Level 5 (Low)</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Requested By (Source)</label>
+                  <select value={requestedBy} onChange={(e) => setRequestedBy(e.target.value)} className="form-control select-dark">
+                    <option value="Public Phone">Public Phone</option>
+                    <option value="Email">Email</option>
+                    <option value="UCS">UCS</option>
+                    <option value="Government Agency">Government Agency</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Reporter's Name</label>
+                  <input 
+                    type="text" 
+                    placeholder="Enter reporter details if any"
+                    value={reporterName} 
+                    onChange={e => setReporterName(e.target.value)} 
+                    className="form-control" 
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Created By</label>
+                  <input type="text" value={createdBy} disabled className="form-control" style={{ background: 'var(--bg-inset)' }} />
+                </div>
+
+                <div className="form-group">
+                  <label>Date and Time of Incident *</label>
+                  <input 
+                    type="datetime-local" 
+                    value={incidentDateTime} 
+                    onChange={(e) => setIncidentDateTime(e.target.value)}
+                    required
+                    className="form-control"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 2. LOCATION */}
+        <div className={`accordion-item ${expandedSections[2] ? 'expanded' : ''}`}>
+          <div className="accordion-header" onClick={() => toggleSection(2)}>
+            <div className="accordion-header-left">
+              <span className="accordion-num">2</span>
+              <span className="accordion-title">Location</span>
+            </div>
+            <div className="accordion-header-right">
+              {commonName && <span className="badge badge-onsite">Mapped</span>}
+              <span>{expandedSections[2] ? '▲' : '▼'}</span>
+            </div>
+          </div>
+          {expandedSections[2] && (
+            <div className="accordion-content">
+              <div className="form-grid">
+                <div className="form-group">
+                  <label>Common Name Reference *</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. Siloso Lifeguard Post 2"
+                    value={commonName}
+                    onChange={(e) => setCommonName(e.target.value)}
+                    required
+                    className="form-control"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Road Name</label>
+                  <input type="text" placeholder="Siloso Beach Walk" value={road} onChange={(e) => setRoad(e.target.value)} className="form-control" />
+                </div>
+
+                <div className="form-group">
+                  <label>Building Name</label>
+                  <input type="text" placeholder="e.g. Emerald Pavilion" value={building} onChange={(e) => setBuilding(e.target.value)} className="form-control" />
+                </div>
+
+                <div className="form-group">
+                  <label>Level & Space</label>
+                  <input type="text" placeholder="e.g. Level 1 Outdoor area" value={levelSpace} onChange={(e) => setLevelSpace(e.target.value)} className="form-control" />
+                </div>
+
+                <div className="form-group">
+                  <label>Beside / Near To / At Qualifier</label>
+                  <input type="text" placeholder="e.g. Near public shower block" value={nearAt} onChange={(e) => setNearAt(e.target.value)} className="form-control" />
+                </div>
+
+                <div className="form-group">
+                  <label>Postal Code</label>
+                  <input type="text" value={postalCode} onChange={(e) => setPostalCode(e.target.value)} className="form-control" />
+                </div>
+
+                <div className="form-group colspan-2">
+                  <label>Location Tags (Comma separated)</label>
+                  <input type="text" value={tagsStr} onChange={(e) => setTagsStr(e.target.value)} className="form-control" />
+                </div>
+
+                {/* Minimap Widget Mock */}
+                <div className="form-group colspan-2">
+                  <label>Interactive Minimap (OneMap API Layout)</label>
+                  <div className="mock-map-canvas">
+                    <div className="map-grid-bg" />
+                    <div className="map-beach-line" />
+                    <div className="map-sea-line" />
+                    <div className="map-pin" style={{ left: manualPin ? '60%' : '38%', top: manualPin ? '30%' : '45%' }}>📍</div>
+                    
+                    <div style={{ position: 'absolute', top: '10px', left: '10px', background: 'rgba(255,255,255,0.95)', padding: '5px 10px', borderRadius: '4px', fontSize: '11px', border: '1px solid var(--border-color)', pointerEvents: 'none' }}>
+                      <strong>Pin Position:</strong> {pinCoords.lat.toFixed(4)}, {pinCoords.lng.toFixed(4)} {manualPin ? '(Manual Drop)' : '(Resolved Address)'}
+                    </div>
+                  </div>
+                  <div style={{ marginTop: '8px', display: 'flex', gap: '10px' }}>
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        setManualPin(!manualPin);
+                        if (!manualPin) {
+                          setPinCoords({ lat: 1.2562, lng: 103.8124 });
+                        } else {
+                          setPinCoords({ lat: 1.2500, lng: 103.8300 });
+                        }
+                      }} 
+                      className="btn btn-secondary btn-xs"
+                    >
+                      {manualPin ? 'Clear Pin Drop' : 'Place Pin Manually'}
+                    </button>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }}>
+                      Manual pin placement overrides postal code coordinates.
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 3. INCIDENT LOG */}
+        <div className={`accordion-item ${expandedSections[3] ? 'expanded' : ''}`}>
+          <div className="accordion-header" onClick={() => toggleSection(3)}>
+            <div className="accordion-header-left">
+              <span className="accordion-num">3</span>
+              <span className="accordion-title">Incident Log ({logs.length} entries)</span>
+            </div>
+            <div className="accordion-header-right">
+              <span>{expandedSections[3] ? '▲' : '▼'}</span>
+            </div>
+          </div>
+          {expandedSections[3] && (
+            <div className="accordion-content">
+              <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginBottom: '12px' }}>
+                Chronological sequence of events logging. Each row represents a timestamped operational activity entry.
+              </p>
+              
+              <div className="table-container mb-4">
+                <table className="custom-table" style={{ background: 'var(--bg-inset)' }}>
+                  <thead>
+                    <tr>
+                      <th style={{ width: '8%' }}>No.</th>
+                      <th style={{ width: '15%' }}>Date</th>
+                      <th style={{ width: '15%' }}>Time</th>
+                      <th>Log Description</th>
+                      <th style={{ width: '10%' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {logs.map((log, idx) => (
+                      <tr key={log.id}>
+                        <td>{idx + 1}</td>
+                        <td>
+                          <input 
+                            type="date" 
+                            value={log.date} 
+                            onChange={(e) => {
+                              const newVal = e.target.value;
+                              setLogs(prev => prev.map(l => l.id === log.id ? { ...l, date: newVal } : l));
+                            }} 
+                            className="form-control"
+                            style={{ padding: '4px 6px', fontSize: '12px' }}
+                          />
+                        </td>
+                        <td>
+                          <input 
+                            type="time" 
+                            value={log.time} 
+                            onChange={(e) => {
+                              const newVal = e.target.value;
+                              setLogs(prev => prev.map(l => l.id === log.id ? { ...l, time: newVal } : l));
+                            }} 
+                            className="form-control"
+                            style={{ padding: '4px 6px', fontSize: '12px' }}
+                          />
+                        </td>
+                        <td>
+                          <input 
+                            type="text" 
+                            value={log.description} 
+                            onChange={(e) => {
+                              const newVal = e.target.value;
+                              setLogs(prev => prev.map(l => l.id === log.id ? { ...l, description: newVal } : l));
+                            }} 
+                            placeholder="Enter timeline detail..."
+                            className="form-control"
+                            style={{ padding: '4px 8px', fontSize: '12.5px' }}
+                          />
+                        </td>
+                        <td>
+                          <button 
+                            type="button" 
+                            onClick={() => setLogs(prev => prev.filter(l => l.id !== log.id))}
+                            className="btn btn-danger btn-xs"
+                            disabled={logs.length === 1}
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <button 
+                type="button" 
+                onClick={() => {
+                  const maxId = logs.length > 0 ? Math.max(...logs.map(l => l.id)) : 0;
+                  const nowStr = new Date();
+                  setLogs(prev => [...prev, {
+                    id: maxId + 1,
+                    date: nowStr.toISOString().split('T')[0],
+                    time: nowStr.toTimeString().slice(0, 5),
+                    description: ''
+                  }]);
+                }} 
+                className="btn btn-secondary btn-sm"
+              >
+                + Add Log Entry
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* 4. EMERGENCY SERVICES */}
+        <div className={`accordion-item ${expandedSections[4] ? 'expanded' : ''}`}>
+          <div className="accordion-header" onClick={() => toggleSection(4)}>
+            <div className="accordion-header-left">
+              <span className="accordion-num">4</span>
+              <span className="accordion-title">Emergency Services</span>
+            </div>
+            <div className="accordion-header-right">
+              {(policeAtScene || scdfType !== 'None') && <span className="badge badge-ack">Active</span>}
+              <span>{expandedSections[4] ? '▲' : '▼'}</span>
+            </div>
+          </div>
+          {expandedSections[4] && (
+            <div className="accordion-content">
+              {/* Police */}
+              <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '16px', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                  <input 
+                    type="checkbox" 
+                    id="policeAtScene" 
+                    checked={policeAtScene} 
+                    onChange={e => setPoliceAtScene(e.target.checked)} 
+                    style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                  />
+                  <label htmlFor="policeAtScene" style={{ fontWeight: '600', fontSize: '13px', color: 'var(--text-main)', cursor: 'pointer' }}>
+                    🚨 Police Attending Scene
+                  </label>
+                </div>
+
+                {policeAtScene && (
+                  <div className="form-grid">
+                    <div className="form-group">
+                      <label>Attending Officer & Rank</label>
+                      <input type="text" placeholder="e.g. Sgt. Tan" value={policeOfficer} onChange={e => setPoliceOfficer(e.target.value)} className="form-control" />
+                    </div>
+                    <div className="form-group">
+                      <label>Police Incident Number</label>
+                      <input type="text" placeholder="e.g. SPF-10928A" value={policeIncidentNo} onChange={e => setPoliceIncidentNo(e.target.value)} className="form-control" />
+                    </div>
+                    <div className="form-group">
+                      <label>Police Classification</label>
+                      <input type="text" placeholder="e.g. Theft / Mischief" value={policeClassification} onChange={e => setPoliceClassification(e.target.value)} className="form-control" />
+                    </div>
+                    <div className="form-group">
+                      <label>Responding Unit / Station</label>
+                      <input type="text" placeholder="e.g. Marina Bay NPP" value={policeUnit} onChange={e => setPoliceUnit(e.target.value)} className="form-control" />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* SCDF / Ambulance */}
+              <div>
+                <div className="form-group" style={{ maxWidth: '300px' }}>
+                  <label>Ambulance / SCDF Attending</label>
+                  <select value={scdfType} onChange={(e) => setScdfType(e.target.value)} className="form-control select-dark">
+                    <option value="None">None</option>
+                    <option value="Ambulance">Ambulance</option>
+                    <option value="SCDF">SCDF Fire Service</option>
+                  </select>
+                </div>
+
+                {scdfType !== 'None' && (
+                  <div className="form-grid" style={{ marginTop: '12px' }}>
+                    <div className="form-group">
+                      <label>Attending Officer Name</label>
+                      <input type="text" placeholder="e.g. Officer Roslan" value={scdfOfficer} onChange={e => setScdfOfficer(e.target.value)} className="form-control" />
+                    </div>
+                    <div className="form-group">
+                      <label>Vehicle / Call Sign</label>
+                      <input type="text" placeholder="e.g. Alpha 12" value={scdfCallSign} onChange={e => setScdfCallSign(e.target.value)} className="form-control" />
+                    </div>
+                    <div className="form-group">
+                      <label>Responding Station</label>
+                      <input type="text" placeholder="e.g. Bukit Merah Fire Stn" value={scdfUnit} onChange={e => setScdfUnit(e.target.value)} className="form-control" />
+                    </div>
+                    <div className="form-group">
+                      <label>Arrival Time at Scene</label>
+                      <input type="time" value={scdfArrivalTime} onChange={e => setScdfArrivalTime(e.target.value)} className="form-control" />
+                    </div>
+                    <div className="form-group colspan-2">
+                      <label>Hospital Patient Conveyed To</label>
+                      <input type="text" placeholder="e.g. Singapore General Hospital (A&E)" value={scdfHospital} onChange={e => setScdfHospital(e.target.value)} className="form-control" />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 5. MEDIA INVOLVEMENT */}
+        <div className={`accordion-item ${expandedSections[5] ? 'expanded' : ''}`}>
+          <div className="accordion-header" onClick={() => toggleSection(5)}>
+            <div className="accordion-header-left">
+              <span className="accordion-num">5</span>
+              <span className="accordion-title">Media Involvement</span>
+            </div>
+            <div className="accordion-header-right">
+              {mediaAtScene && <span className="badge badge-live">Media Present</span>}
+              <span>{expandedSections[5] ? '▲' : '▼'}</span>
+            </div>
+          </div>
+          {expandedSections[5] && (
+            <div className="accordion-content">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+                <input 
+                  type="checkbox" 
+                  id="mediaAtScene" 
+                  checked={mediaAtScene} 
+                  onChange={e => setMediaAtScene(e.target.checked)} 
+                  style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                />
+                <label htmlFor="mediaAtScene" style={{ fontWeight: '600', fontSize: '13px', color: 'var(--text-main)', cursor: 'pointer' }}>
+                  🎥 Press / Media Present at Scene
+                </label>
+              </div>
+
+              {mediaAtScene && (
+                <div className="form-grid">
+                  <div className="form-group colspan-2">
+                    <label>Media / Outlet Name</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. Channel NewsAsia / Straits Times"
+                      value={mediaName} 
+                      onChange={e => setMediaName(e.target.value)} 
+                      className="form-control" 
+                    />
+                  </div>
+                  <div className="form-group colspan-2">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+                      <input 
+                        type="checkbox" 
+                        id="mediaCommsNotified" 
+                        checked={mediaCommsNotified} 
+                        onChange={e => setMediaCommsNotified(e.target.checked)} 
+                        style={{ width: '14px', height: '14px', cursor: 'pointer' }}
+                      />
+                      <label htmlFor="mediaCommsNotified" style={{ fontSize: '12.5px', color: 'var(--text-sub)', cursor: 'pointer' }}>
+                        Confirmed SDC Corporate Communications Team notified.
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* 6. PROPERTY & VEHICLES */}
+        <div className={`accordion-item ${expandedSections[6] ? 'expanded' : ''}`}>
+          <div className="accordion-header" onClick={() => toggleSection(6)}>
+            <div className="accordion-header-left">
+              <span className="accordion-num">6</span>
+              <span className="accordion-title">Property & Vehicles ({vehicles.length} vehicles)</span>
+            </div>
+            <div className="accordion-header-right">
+              {(propertyDamaged || vehicles.length > 0) && <span className="badge badge-onsite">Logged</span>}
+              <span>{expandedSections[6] ? '▲' : '▼'}</span>
+            </div>
+          </div>
+          {expandedSections[6] && (
+            <div className="accordion-content">
+              {/* SDC Property damage */}
+              <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '16px', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                  <input 
+                    type="checkbox" 
+                    id="propertyDamaged" 
+                    checked={propertyDamaged} 
+                    onChange={e => setPropertyDamaged(e.target.checked)} 
+                    style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                  />
+                  <label htmlFor="propertyDamaged" style={{ fontWeight: '600', fontSize: '13px', color: 'var(--text-main)', cursor: 'pointer' }}>
+                    🏢 SDC Property Damaged
+                  </label>
+                </div>
+                {propertyDamaged && (
+                  <div className="form-group">
+                    <label>Description of Damage</label>
+                    <textarea 
+                      placeholder="e.g. Scratched paintwork on gantry barriers, broken post rails."
+                      value={propertyDamageDesc} 
+                      onChange={e => setPropertyDamageDesc(e.target.value)} 
+                      className="form-control"
+                      rows={2}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Vehicles */}
+              <div>
+                <label style={{ display: 'block', fontWeight: '700', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '10px' }}>
+                  Vehicles Involved
+                </label>
+                
+                {vehicles.length === 0 ? (
+                  <div style={{ background: 'var(--bg-inset)', padding: '14px', borderRadius: '8px', fontSize: '12.5px', color: 'var(--text-muted)', textAlign: 'center', marginBottom: '12px' }}>
+                    No vehicle records added. Click the button below to add.
+                  </div>
+                ) : (
+                  vehicles.map((v, index) => (
+                    <div key={v.id} className="sub-form-card">
+                      <div className="remove-card-btn">
+                        <button 
+                          type="button" 
+                          onClick={() => setVehicles(prev => prev.filter(item => item.id !== v.id))}
+                          className="btn btn-danger btn-xs"
+                        >
+                          Remove Vehicle #{index + 1}
+                        </button>
+                      </div>
+
+                      <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--color-primary)', display: 'block', marginBottom: '12px' }}>
+                        Vehicle Details #{index + 1}
+                      </span>
+
+                      <div className="form-grid">
+                        <div className="form-group colspan-2">
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <input 
+                              type="checkbox" 
+                              id={`sdcVehicle-${v.id}`} 
+                              checked={v.sdcVehicle} 
+                              onChange={(e) => {
+                                const checked = e.target.checked;
+                                setVehicles(prev => prev.map(item => item.id === v.id ? { ...item, sdcVehicle: checked } : item));
+                              }}
+                            />
+                            <label htmlFor={`sdcVehicle-${v.id}`} style={{ fontWeight: '500', fontSize: '12.5px' }}>
+                              SDC Owned Vehicle
+                            </label>
+                          </div>
+                        </div>
+
+                        <div className="form-group">
+                          <label>Vehicle Model</label>
+                          <input 
+                            type="text" 
+                            placeholder="e.g. Toyota Hiace"
+                            value={v.model} 
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setVehicles(prev => prev.map(item => item.id === v.id ? { ...item, model: val } : item));
+                            }} 
+                            className="form-control" 
+                          />
+                        </div>
+
+                        <div className="form-group">
+                          <label>Vehicle License Plate</label>
+                          <input 
+                            type="text" 
+                            placeholder="e.g. GBA1234Z"
+                            value={v.plate} 
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setVehicles(prev => prev.map(item => item.id === v.id ? { ...item, plate: val } : item));
+                            }} 
+                            className="form-control" 
+                          />
+                        </div>
+
+                        <div className="form-group">
+                          <label>Driver Name</label>
+                          <input 
+                            type="text" 
+                            value={v.driverName} 
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setVehicles(prev => prev.map(item => item.id === v.id ? { ...item, driverName: val } : item));
+                            }} 
+                            className="form-control" 
+                          />
+                        </div>
+
+                        <div className="form-group">
+                          <label>Driver Contact</label>
+                          <input 
+                            type="text" 
+                            value={v.driverContact} 
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setVehicles(prev => prev.map(item => item.id === v.id ? { ...item, driverContact: val } : item));
+                            }} 
+                            className="form-control" 
+                          />
+                        </div>
+
+                        <div className="form-group">
+                          <label>Driving License No.</label>
+                          <input 
+                            type="text" 
+                            value={v.licence} 
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setVehicles(prev => prev.map(item => item.id === v.id ? { ...item, licence: val } : item));
+                            }} 
+                            className="form-control" 
+                          />
+                        </div>
+
+                        <div className="form-group">
+                          <label>Driver Address</label>
+                          <input 
+                            type="text" 
+                            value={v.address} 
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setVehicles(prev => prev.map(item => item.id === v.id ? { ...item, address: val } : item));
+                            }} 
+                            className="form-control" 
+                          />
+                        </div>
+
+                        <div className="form-group colspan-2">
+                          <label>Remarks / Insurer Details</label>
+                          <input 
+                            type="text" 
+                            value={v.remarks} 
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setVehicles(prev => prev.map(item => item.id === v.id ? { ...item, remarks: val } : item));
+                            }} 
+                            className="form-control" 
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    const maxId = vehicles.length > 0 ? Math.max(...vehicles.map(item => item.id)) : 0;
+                    setVehicles(prev => [...prev, {
+                      id: maxId + 1, sdcVehicle: false, model: '', plate: '', driverName: '', driverContact: '', licence: '', address: '', remarks: ''
+                    }]);
+                  }} 
+                  className="btn btn-secondary btn-sm"
+                >
+                  + Add Vehicle Record
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 7. PERSONAL INJURIES */}
+        <div className={`accordion-item ${expandedSections[7] ? 'expanded' : ''}`}>
+          <div className="accordion-header" onClick={() => toggleSection(7)}>
+            <div className="accordion-header-left">
+              <span className="accordion-num">7</span>
+              <span className="accordion-title">Personal Injuries ({injuries.length} persons)</span>
+            </div>
+            <div className="accordion-header-right">
+              {injuries.length > 0 && <span className="badge badge-live">Injuries Logged</span>}
+              <span>{expandedSections[7] ? '▲' : '▼'}</span>
+            </div>
+          </div>
+          {expandedSections[7] && (
+            <div className="accordion-content">
+              {injuries.length === 0 ? (
+                <div style={{ background: 'var(--bg-inset)', padding: '14px', borderRadius: '8px', fontSize: '12.5px', color: 'var(--text-muted)', textAlign: 'center', marginBottom: '12px' }}>
+                  No injury records added. Click below to add if an individual sustained bodily injury.
+                </div>
+              ) : (
+                injuries.map((inj, index) => (
+                  <div key={inj.id} className="sub-form-card">
+                    <div className="remove-card-btn">
+                      <button 
+                        type="button" 
+                        onClick={() => setInjuries(prev => prev.filter(item => item.id !== inj.id))}
+                        className="btn btn-danger btn-xs"
+                      >
+                        Remove Record #{index + 1}
+                      </button>
+                    </div>
+
+                    <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--color-primary)', display: 'block', marginBottom: '12px' }}>
+                      Injured Individual Details #{index + 1}
+                    </span>
+
+                    <div className="form-grid">
+                      <div className="form-group">
+                        <label>Full Name</label>
+                        <input 
+                          type="text" 
+                          placeholder="Jane Doe"
+                          value={inj.name} 
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setInjuries(prev => prev.map(item => item.id === inj.id ? { ...item, name: val } : item));
+                          }} 
+                          className="form-control" 
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label>Age</label>
+                        <input 
+                          type="number" 
+                          placeholder="e.g. 15"
+                          value={inj.age} 
+                          onChange={(e) => handleInjuryAgeChange(inj.id, e.target.value)} 
+                          className="form-control" 
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label>Gender</label>
+                        <select 
+                          value={inj.gender} 
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setInjuries(prev => prev.map(item => item.id === inj.id ? { ...item, gender: val } : item));
+                          }} 
+                          className="form-control select-dark"
+                        >
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </div>
+
+                      <div className="form-group">
+                        <label>Contact Number</label>
+                        <input 
+                          type="text" 
+                          value={inj.contact} 
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setInjuries(prev => prev.map(item => item.id === inj.id ? { ...item, contact: val } : item));
+                          }} 
+                          className="form-control" 
+                        />
+                      </div>
+
+                      <div className="form-group colspan-2">
+                        <label>Home Address</label>
+                        <input 
+                          type="text" 
+                          value={inj.address} 
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setInjuries(prev => prev.map(item => item.id === inj.id ? { ...item, address: val } : item));
+                          }} 
+                          className="form-control" 
+                        />
+                      </div>
+
+                      <div className="form-group colspan-2">
+                        <label>Clinic or Hospital Attended</label>
+                        <input 
+                          type="text" 
+                          placeholder="e.g. Singapore General Hospital"
+                          value={inj.hospital} 
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setInjuries(prev => prev.map(item => item.id === inj.id ? { ...item, hospital: val } : item));
+                          }} 
+                          className="form-control" 
+                        />
+                      </div>
+
+                      {/* MSIG Insurance block */}
+                      <div className="form-group">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '24px' }}>
+                          <input 
+                            type="checkbox" 
+                            id={`msigIssued-${inj.id}`} 
+                            checked={inj.msigIssued} 
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setInjuries(prev => prev.map(item => item.id === inj.id ? { ...item, msigIssued: checked } : item));
+                            }}
+                          />
+                          <label htmlFor={`msigIssued-${inj.id}`} style={{ fontWeight: '500', fontSize: '12.5px' }}>
+                            MSIG Form Issued
+                          </label>
+                        </div>
+                      </div>
+
+                      <div className="form-group">
+                        {inj.msigIssued && (
+                          <>
+                            <label>MSIG Serial Number *</label>
+                            <input 
+                              type="text" 
+                              placeholder="e.g. MSIG-90218"
+                              value={inj.msigSerial} 
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setInjuries(prev => prev.map(item => item.id === inj.id ? { ...item, msigSerial: val } : item));
+                              }} 
+                              className="form-control" 
+                              required={inj.msigIssued}
+                            />
+                          </>
+                        )}
+                      </div>
+
+                      {/* Under-16 conditional fields */}
+                      <div className="form-group colspan-2" style={{ borderTop: '1px dashed var(--border-color)', paddingTop: '12px', marginTop: '6px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                          <input 
+                            type="checkbox" 
+                            id={`under16-${inj.id}`}
+                            checked={inj.under16} 
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setInjuries(prev => prev.map(item => item.id === inj.id ? { ...item, under16: checked } : item));
+                            }}
+                          />
+                          <label htmlFor={`under16-${inj.id}`} style={{ fontWeight: '600', fontSize: '12.5px', color: 'var(--text-main)' }}>
+                            Under-16 Consent Required
+                          </label>
+                        </div>
+
+                        {inj.under16 && (
+                          <div className="form-grid" style={{ background: '#FFFDF5', padding: '12px', borderRadius: '6px', border: '1px solid #E6D8B3' }}>
+                            <div className="form-group">
+                              <label>Parent / Guardian Name</label>
+                              <input 
+                                type="text" 
+                                value={inj.parentName} 
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setInjuries(prev => prev.map(item => item.id === inj.id ? { ...item, parentName: val } : item));
+                                }} 
+                                className="form-control" 
+                              />
+                            </div>
+                            <div className="form-group">
+                              <label>Parent / Guardian Contact</label>
+                              <input 
+                                type="text" 
+                                value={inj.parentContact} 
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setInjuries(prev => prev.map(item => item.id === inj.id ? { ...item, parentContact: val } : item));
+                                }} 
+                                className="form-control" 
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+
+              <button 
+                type="button" 
+                onClick={() => {
+                  const maxId = injuries.length > 0 ? Math.max(...injuries.map(item => item.id)) : 0;
+                  setInjuries(prev => [...prev, {
+                    id: maxId + 1, name: '', address: '', age: '', gender: 'Male', contact: '', hospital: '', msigIssued: false, msigSerial: '', under16: false, parentName: '', parentContact: ''
+                  }]);
+                }} 
+                className="btn btn-secondary btn-sm"
+              >
+                + Add Injury Record
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* 8. PERSONS INVOLVED */}
+        <div className={`accordion-item ${expandedSections[8] ? 'expanded' : ''}`}>
+          <div className="accordion-header" onClick={() => toggleSection(8)}>
+            <div className="accordion-header-left">
+              <span className="accordion-num">8</span>
+              <span className="accordion-title">Persons Involved ({persons.length} persons)</span>
+            </div>
+            <div className="accordion-header-right">
+              {persons.length > 0 && <span className="badge badge-review">Logged</span>}
+              <span>{expandedSections[8] ? '▲' : '▼'}</span>
+            </div>
+          </div>
+          {expandedSections[8] && (
+            <div className="accordion-content">
+              {persons.length === 0 ? (
+                <div style={{ background: 'var(--bg-inset)', padding: '14px', borderRadius: '8px', fontSize: '12.5px', color: 'var(--text-muted)', textAlign: 'center', marginBottom: '12px' }}>
+                  No additional persons involved (witnesses, staff, partners) logged. Click below to add.
+                </div>
+              ) : (
+                persons.map((p, index) => (
+                  <div key={p.id} className="sub-form-card">
+                    <div className="remove-card-btn">
+                      <button 
+                        type="button" 
+                        onClick={() => setPersons(prev => prev.filter(item => item.id !== p.id))}
+                        className="btn btn-danger btn-xs"
+                      >
+                        Remove Person #{index + 1}
+                      </button>
+                    </div>
+
+                    <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--color-primary)', display: 'block', marginBottom: '12px' }}>
+                      Individual Record #{index + 1}
+                    </span>
+
+                    <div className="form-grid">
+                      <div className="form-group">
+                        <label>Guest / non-Guest Status</label>
+                        <select 
+                          value={p.guestOrNon} 
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setPersons(prev => prev.map(item => item.id === p.id ? { ...item, guestOrNon: val } : item));
+                          }} 
+                          className="form-control select-dark"
+                        >
+                          <option value="Guest">Guest</option>
+                          <option value="Non-Guest">Non-Guest</option>
+                        </select>
+                      </div>
+
+                      <div className="form-group">
+                        <label>Personnel Category</label>
+                        <select 
+                          value={p.type} 
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setPersons(prev => prev.map(item => item.id === p.id ? { ...item, type: val } : item));
+                          }} 
+                          className="form-control select-dark"
+                        >
+                          <option value="Guest">Guest</option>
+                          <option value="Staff">Staff</option>
+                          <option value="Island Partner">Island Partner</option>
+                          <option value="Contractor">Contractor</option>
+                          <option value="Resident">Resident</option>
+                          <option value="Others">Others</option>
+                        </select>
+                      </div>
+
+                      <div className="form-group">
+                        <label>Name</label>
+                        <input 
+                          type="text" 
+                          value={p.name} 
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setPersons(prev => prev.map(item => item.id === p.id ? { ...item, name: val } : item));
+                          }} 
+                          className="form-control" 
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label>Contact Number</label>
+                        <input 
+                          type="text" 
+                          value={p.contact} 
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setPersons(prev => prev.map(item => item.id === p.id ? { ...item, contact: val } : item));
+                          }} 
+                          className="form-control" 
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label>Age</label>
+                        <input 
+                          type="number" 
+                          value={p.age} 
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setPersons(prev => prev.map(item => item.id === p.id ? { ...item, age: val } : item));
+                          }} 
+                          className="form-control" 
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label>Gender</label>
+                        <select 
+                          value={p.gender} 
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setPersons(prev => prev.map(item => item.id === p.id ? { ...item, gender: val } : item));
+                          }} 
+                          className="form-control select-dark"
+                        >
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </div>
+
+                      <div className="form-group colspan-2">
+                        <label>Address</label>
+                        <input 
+                          type="text" 
+                          value={p.address} 
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setPersons(prev => prev.map(item => item.id === p.id ? { ...item, address: val } : item));
+                          }} 
+                          className="form-control" 
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label>Role / Involvement</label>
+                        <input 
+                          type="text" 
+                          placeholder="e.g. Witness / Informant"
+                          value={p.role} 
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setPersons(prev => prev.map(item => item.id === p.id ? { ...item, role: val } : item));
+                          }} 
+                          className="form-control" 
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label>Injury Details (If injured)</label>
+                        <input 
+                          type="text" 
+                          placeholder="Minor scrape / None"
+                          value={p.injuryDetails} 
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setPersons(prev => prev.map(item => item.id === p.id ? { ...item, injuryDetails: val } : item));
+                          }} 
+                          className="form-control" 
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+
+              <button 
+                type="button" 
+                onClick={() => {
+                  const maxId = persons.length > 0 ? Math.max(...persons.map(item => item.id)) : 0;
+                  setPersons(prev => [...prev, {
+                    id: maxId + 1, guestOrNon: 'Guest', type: 'Guest', name: '', address: '', age: '', gender: 'Male', contact: '', role: '', injuryDetails: ''
+                  }]);
+                }} 
+                className="btn btn-secondary btn-sm"
+              >
+                + Add Person Record
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* 9. CCTV & BODY WORN CAMERA */}
+        <div className={`accordion-item ${expandedSections[9] ? 'expanded' : ''}`}>
+          <div className="accordion-header" onClick={() => toggleSection(9)}>
+            <div className="accordion-header-left">
+              <span className="accordion-num">9</span>
+              <span className="accordion-title">CCTV & Body Worn Camera ({cctvFootages.length} references)</span>
+            </div>
+            <div className="accordion-header-right">
+              {cctvFootages.length > 0 && <span className="badge badge-onsite">Logged</span>}
+              <span>{expandedSections[9] ? '▲' : '▼'}</span>
+            </div>
+          </div>
+          {expandedSections[9] && (
+            <div className="accordion-content">
+              {cctvFootages.length === 0 ? (
+                <div style={{ background: 'var(--bg-inset)', padding: '14px', borderRadius: '8px', fontSize: '12.5px', color: 'var(--text-muted)', textAlign: 'center', marginBottom: '12px' }}>
+                  No CCTV / BWC references logged. Click below to add a footage reference descriptor.
+                </div>
+              ) : (
+                cctvFootages.map((cctv, index) => (
+                  <div key={cctv.id} className="sub-form-card">
+                    <div className="remove-card-btn">
+                      <button 
+                        type="button" 
+                        onClick={() => setCctvFootages(prev => prev.filter(item => item.id !== cctv.id))}
+                        className="btn btn-danger btn-xs"
+                      >
+                        Remove Reference #{index + 1}
+                      </button>
+                    </div>
+
+                    <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--color-primary)', display: 'block', marginBottom: '12px' }}>
+                      Footage Descriptor #{index + 1}
+                    </span>
+
+                    <div className="form-grid">
+                      <div className="form-group">
+                        <label>Camera Number / Reference ID</label>
+                        <input 
+                          type="text" 
+                          placeholder="e.g. CAM-SIL-08"
+                          value={cctv.cameraNo} 
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setCctvFootages(prev => prev.map(item => item.id === cctv.id ? { ...item, cameraNo: val } : item));
+                          }} 
+                          className="form-control" 
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label>VMS Footage Timestamp</label>
+                        <input 
+                          type="time" 
+                          value={cctv.timestamp} 
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setCctvFootages(prev => prev.map(item => item.id === cctv.id ? { ...item, timestamp: val } : item));
+                          }} 
+                          className="form-control" 
+                        />
+                      </div>
+
+                      <div className="form-group colspan-2">
+                        <label>VMS Footage Bookmark Reference</label>
+                        <input 
+                          type="text" 
+                          placeholder="e.g. VA-ABANDON-08"
+                          value={cctv.bookmark} 
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setCctvFootages(prev => prev.map(item => item.id === cctv.id ? { ...item, bookmark: val } : item));
+                          }} 
+                          className="form-control" 
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label>BWC Device Number</label>
+                        <input 
+                          type="text" 
+                          placeholder="e.g. BWC-R12"
+                          value={cctv.bwcNo} 
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setCctvFootages(prev => prev.map(item => item.id === cctv.id ? { ...item, bwcNo: val } : item));
+                          }} 
+                          className="form-control" 
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label>BWC Incident Footage Timestamp</label>
+                        <input 
+                          type="time" 
+                          value={cctv.bwcTimestamp} 
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setCctvFootages(prev => prev.map(item => item.id === cctv.id ? { ...item, bwcTimestamp: val } : item));
+                          }} 
+                          className="form-control" 
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+
+              <button 
+                type="button" 
+                onClick={() => {
+                  const maxId = cctvFootages.length > 0 ? Math.max(...cctvFootages.map(item => item.id)) : 0;
+                  setCctvFootages(prev => [...prev, {
+                    id: maxId + 1, cameraNo: '', timestamp: '', bookmark: '', bwcNo: '', bwcTimestamp: ''
+                  }]);
+                }} 
+                className="btn btn-secondary btn-sm"
+              >
+                + Add Footage Reference
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* 10. ATTACHMENTS */}
+        <div className={`accordion-item ${expandedSections[10] ? 'expanded' : ''}`}>
+          <div className="accordion-header" onClick={() => toggleSection(10)}>
+            <div className="accordion-header-left">
+              <span className="accordion-num">10</span>
+              <span className="accordion-title">Attachments</span>
+            </div>
+            <div className="accordion-header-right">
+              {mockFiles.length > 0 && <span className="badge badge-completed">{mockFiles.length} files</span>}
+              <span>{expandedSections[10] ? '▲' : '▼'}</span>
+            </div>
+          </div>
+          {expandedSections[10] && (
+            <div className="accordion-content">
+              <div 
+                className="mock-dropzone"
+                onClick={() => {
+                  const demoFiles = [
+                    { name: 'photo_scene_1.jpg', size: '1.2 MB' },
+                    { name: 'bwc_recording_clip.mp4', size: '15.4 MB' },
+                    { name: 'incident_witness_statement.pdf', size: '240 KB' }
+                  ];
+                  const nextFile = demoFiles[mockFiles.length % demoFiles.length];
+                  setMockFiles(prev => [...prev, nextFile]);
+                }}
+              >
+                <span>📁</span>
+                <div style={{ marginTop: '8px', fontSize: '13.5px', fontWeight: '600' }}>Click here to simulate drag-and-drop file upload</div>
+                <div style={{ fontSize: '12px', color: 'var(--text-faint)', marginTop: '4px' }}>
+                  Accepted formats: Photos, Videos, and Document files.
+                </div>
+              </div>
+
+              {mockFiles.length > 0 && (
+                <div style={{ marginTop: '16px' }}>
+                  <label style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>
+                    Uploaded Files
+                  </label>
+                  <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                    {mockFiles.map((f, idx) => (
+                      <li key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 12px', background: 'var(--bg-inset)', border: '1px solid var(--border-color)', borderRadius: '6px', marginBottom: '6px', fontSize: '12.5px' }}>
+                        <span>📄 {f.name} ({f.size})</span>
+                        <button type="button" onClick={(e) => { e.stopPropagation(); setMockFiles(prev => prev.filter((_, i) => i !== idx)); }} style={{ border: 'none', background: 'transparent', color: 'var(--color-critical)', cursor: 'pointer', fontWeight: 'bold' }}>✕</button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div style={{ background: 'var(--color-critical-bg)', border: '1px solid var(--color-critical-border)', color: 'var(--color-critical)', padding: '10px 14px', borderRadius: '6px', marginTop: '14px', fontSize: '12px', fontWeight: '500' }}>
+                ⚠️ <strong>Security Disclaimer:</strong> Police reports shall NOT be attached in this section.
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 11. RESPONDER ASSIGNMENT */}
+        <div className={`accordion-item ${expandedSections[11] ? 'expanded' : ''}`}>
+          <div className="accordion-header" onClick={() => toggleSection(11)}>
+            <div className="accordion-header-left">
+              <span className="accordion-num">11</span>
+              <span className="accordion-title">Responder Assignment</span>
+            </div>
+            <div className="accordion-header-right">
+              {assignedResponder && <span className="badge badge-ack">Assigned</span>}
+              <span>{expandedSections[11] ? '▲' : '▼'}</span>
+            </div>
+          </div>
+          {expandedSections[11] && (
+            <div className="accordion-content">
+              <div className="form-group" style={{ maxWidth: '400px' }}>
+                <label>Select Responder (Responder / Ranger Staff)</label>
+                <select value={assignedResponder} onChange={e => setAssignedResponder(e.target.value)} className="form-control select-dark">
+                  <option value="">-- Choose Responder (Optional) --</option>
+                  <option value="Ranger John">Ranger John</option>
+                  <option value="Ranger Dave">Ranger Dave</option>
+                  <option value="Ranger Sarah">Ranger Sarah</option>
+                  <option value="Ranger Mike">Ranger Mike</option>
+                </select>
+              </div>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '8px' }}>
+                * Note: Assigning a Responder is optional. Controllers can log and process the incident without assigning a responder to the ground.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* 12. SUMMARY & CLOSURE */}
+        <div className={`accordion-item ${expandedSections[12] ? 'expanded' : ''}`}>
+          <div className="accordion-header" onClick={() => toggleSection(12)}>
+            <div className="accordion-header-left">
+              <span className="accordion-num">12</span>
+              <span className="accordion-title">Summary & Closure</span>
+            </div>
+            <div className="accordion-header-right">
+              {summary && <span className="badge badge-completed">Ready</span>}
+              <span>{expandedSections[12] ? '▲' : '▼'}</span>
+            </div>
+          </div>
+          {expandedSections[12] && (
+            <div className="accordion-content">
+              <div className="form-group">
+                <label>Incident Summary (Rich-Text Editor Mock) *</label>
+                <textarea 
+                  placeholder="Provide a detailed operational summary of the incident..."
+                  value={summary}
+                  onChange={(e) => setSummary(e.target.value)}
+                  className="form-control"
+                  rows={4}
+                  required
+                />
+              </div>
+
+              {category === 'Backdated Incident' && (
+                <div className="form-group" style={{ marginTop: '16px' }}>
+                  <label>Completion Remarks (Duty Manager approval notes)</label>
+                  <input 
+                    type="text" 
+                    placeholder="Provide closure comments..."
+                    value={completionRemarks} 
+                    onChange={e => setCompletionRemarks(e.target.value)} 
+                    className="form-control" 
+                  />
+                </div>
+              )}
+
+              <div className="form-grid" style={{ marginTop: '16px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
+                <div className="form-group">
+                  <label>Closed By</label>
+                  <input type="text" value={category === 'Backdated Incident' ? 'System Autoclosure' : 'TBD'} disabled className="form-control" style={{ background: 'var(--bg-inset)', fontStyle: 'italic' }} />
+                </div>
+                <div className="form-group">
+                  <label>Closed At</label>
+                  <input type="text" value={category === 'Backdated Incident' ? 'Auto-closed on save' : 'TBD'} disabled className="form-control" style={{ background: 'var(--bg-inset)', fontStyle: 'italic' }} />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Form Actions */}
+        <div className="modal-actions" style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+          <Link href="/incidents" className="btn btn-secondary">
+            Cancel
+          </Link>
+          <button type="submit" className="btn btn-primary">
+            LOG INCIDENT
+          </button>
+        </div>
+
+      </form>
+
+      {/* Success Confirmation Modal */}
+      {successModal && (
+        <div className="modal-overlay">
+          <div className="modal-content glass" style={{ maxWidth: '480px', width: '100%', padding: '28px', borderTop: '4px solid var(--color-primary)' }}>
+            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+              <span style={{ fontSize: '42px' }}>✅</span>
+              <h2 style={{ fontFamily: 'var(--font-title)', fontSize: '20px', fontWeight: '700', color: 'var(--text-main)', marginTop: '12px' }}>
+                Incident Successfully Logged!
+              </h2>
+              <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '6px' }}>
+                The new incident record and parent case have been successfully generated in the CMS database.
+              </p>
+            </div>
+
+            <div style={{ background: 'var(--bg-inset)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)', marginBottom: '24px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                <span style={{ color: 'var(--text-muted)', fontWeight: '500' }}>Generated Case ID:</span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontWeight: '700', color: 'var(--color-info)' }}>{generatedCaseId}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                <span style={{ color: 'var(--text-muted)', fontWeight: '500' }}>Generated Incident ID:</span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontWeight: '700', color: 'var(--color-info)' }}>{generatedIncidentId}</span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <button 
+                type="button"
+                onClick={() => {
+                  // Hard redirect to the newly generated mock incident detail page
+                  // We simulate opening details using the ID we just generated.
+                  router.push(`/incidents/${generatedIncidentId}`);
+                }}
+                className="btn btn-primary"
+                style={{ width: '100%', padding: '10px' }}
+              >
+                🔍 Open Incident Details
+              </button>
+              <button 
+                type="button"
+                onClick={() => {
+                  router.push('/incidents');
+                }}
+                className="btn btn-secondary"
+                style={{ width: '100%', padding: '10px' }}
+              >
+                🗂️ Go to Dashboard
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

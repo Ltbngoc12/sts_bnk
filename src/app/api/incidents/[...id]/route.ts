@@ -15,17 +15,7 @@ function makeLogEntry(db_incident: any, description: string) {
 /**
  * Route: /api/incidents/[...id]
  *
- * Segments supported:
- *   GET  /api/incidents/[caseId]               → fetch incident
- *   PUT  /api/incidents/[caseId]               → legacy partial update (deprecated)
- *   POST /api/incidents/[caseId]/assign        → assign responder
- *   POST /api/incidents/[caseId]/acknowledge   → responder acknowledges dispatch
- *   POST /api/incidents/[caseId]/on-site       → responder arrives on site
- *   POST /api/incidents/[caseId]/complete      → responder completes ground activities
- *   POST /api/incidents/[caseId]/close         → DM/DM-elevated approves closure
- *   POST /api/incidents/[caseId]/return        → DM returns incident to controller
- *   POST /api/incidents/[caseId]/log           → append manual log entry
- *   POST /api/incidents/[caseId]/update-fields → update ancillary fields (injuries, damage, media, etc.)
+ * Supports slash-containing case/incident IDs, resolving by Case ID or Incident ID.
  */
 
 // ─── GET ──────────────────────────────────────────────────────────────────────
@@ -35,9 +25,9 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const caseId = id[0];
+    const queryId = id.join('/');
     const db = getDb();
-    const caseObj = db.cases.find(c => c.id === caseId);
+    const caseObj = db.cases.find(c => c.id === queryId || (c.incident && c.incident.id === queryId));
     if (!caseObj?.incident) {
       return NextResponse.json({ error: 'Incident not found' }, { status: 404 });
     }
@@ -47,18 +37,18 @@ export async function GET(
   }
 }
 
-// ─── PUT (legacy / general update) ───────────────────────────────────────────
+// ─── PUT (Legacy/ancillary updates) ───────────────────────────────────────────
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string[] }> }
 ) {
   try {
     const { id } = await params;
-    const caseId = id.join('/');
+    const queryId = id.join('/');
     const body = await request.json();
     const db = getDb();
 
-    const caseIndex = db.cases.findIndex(c => c.id === caseId);
+    const caseIndex = db.cases.findIndex(c => c.id === queryId || (c.incident && c.incident.id === queryId));
     if (caseIndex === -1 || !db.cases[caseIndex].incident) {
       return NextResponse.json({ error: 'Incident not found' }, { status: 404 });
     }
@@ -74,30 +64,21 @@ export async function PUT(
       const prev = incident.assignedTo;
       incident.assignedTo = body.assignedTo;
       if (body.assignedTo && body.assignedTo !== prev) {
-        incident.log.push({ eventNumber: incident.log.length + 1, date: logDate, time: logTime,
-          description: `Responder assigned: ${body.assignedTo} (by ${body.username ?? 'Controller'}).` });
+        incident.status = 'Live (Assigned)';
+        incident.log.push({
+          eventNumber: incident.log.length + 1,
+          date: logDate,
+          time: logTime,
+          description: `Responder assigned: ${body.assignedTo} (by ${body.username ?? 'Controller'}). Status set to Live (Assigned).`
+        });
       }
     }
 
-    // Status transition
+    // Direct Status update (if needed, though POST endpoints are preferred)
     if (body.status) {
       const old = incident.status;
       incident.status = body.status;
       let msg = `Status changed from "${old}" → "${body.status}"${body.username ? ` by ${body.username}` : ''}.`;
-
-      if (body.status === 'Live (Acknowledged)') msg = `Responder ${incident.assignedTo ?? '—'} acknowledged dispatch.`;
-      else if (body.status === 'Live (On-Site)')    msg = `Responder ${incident.assignedTo ?? '—'} confirmed arrival on-site.`;
-      else if (body.status === 'Live (Completed)') {
-        msg = `Responder ${incident.assignedTo ?? '—'} marked ground activities completed.`;
-        if (body.completionRemarks) { incident.completionRemarks = body.completionRemarks; msg += ` Remarks: ${body.completionRemarks}`; }
-      } else if (body.status === 'Closed') {
-        currentCase.status = 'Closed';
-        currentCase.closedAt = new Date().toISOString();
-        msg = `Incident closed by ${body.username ?? 'Duty Manager'}. Record is now read-only.`;
-      } else if (body.status === 'Returned') {
-        msg = `Incident returned to Controller by ${body.username ?? 'Duty Manager'}.`;
-      }
-
       incident.log.push({ eventNumber: incident.log.length + 1, date: logDate, time: logTime, description: msg });
     }
 
@@ -109,18 +90,24 @@ export async function PUT(
     // Ancillary field updates
     if (body.emergencyServices) incident.emergencyServices = { ...incident.emergencyServices, ...body.emergencyServices };
     if (body.mediaInvolvement) {
+      const prevMedia = incident.mediaInvolvement.mediaAtScene;
+      const prevComms = incident.mediaInvolvement.commsNotified;
       incident.mediaInvolvement = { ...incident.mediaInvolvement, ...body.mediaInvolvement };
-      if (body.mediaInvolvement.commsNotified) {
+      
+      if (incident.mediaInvolvement.mediaAtScene && !prevMedia) {
+        incident.log.push({ eventNumber: incident.log.length + 1, date: logDate, time: logTime, description: 'Media presence detected at scene.' });
+      }
+      if (incident.mediaInvolvement.commsNotified && !prevComms) {
         incident.log.push({ eventNumber: incident.log.length + 1, date: logDate, time: logTime, description: 'SDC Communications Team notified regarding media presence.' });
       }
     }
-    if (body.propertyDamage)   incident.propertyDamage   = { ...incident.propertyDamage, ...body.propertyDamage };
-    if (body.vehiclesInvolved) incident.vehiclesInvolved  = body.vehiclesInvolved;
-    if (body.personalInjuries) incident.personalInjuries  = body.personalInjuries;
-    if (body.personsInvolved)  incident.personsInvolved   = body.personsInvolved;
-    if (body.cctvBwc)          incident.cctvBwc           = body.cctvBwc;
-    if (body.summary)          incident.summary           = body.summary;
-    if (body.slaveIncidents)   incident.slaveIncidents    = body.slaveIncidents;
+    if (body.propertyDamage) incident.propertyDamage = { ...incident.propertyDamage, ...body.propertyDamage };
+    if (body.vehiclesInvolved) incident.vehiclesInvolved = body.vehiclesInvolved;
+    if (body.personalInjuries) incident.personalInjuries = body.personalInjuries;
+    if (body.personsInvolved) incident.personsInvolved = body.personsInvolved;
+    if (body.cctvBwc) incident.cctvBwc = body.cctvBwc;
+    if (body.summary) incident.summary = body.summary;
+    if (body.category) incident.category = body.category;
 
     currentCase.incident = incident;
     db.cases[caseIndex] = currentCase;
@@ -132,21 +119,34 @@ export async function PUT(
   }
 }
 
-// ─── POST (action-oriented) ───────────────────────────────────────────────────
+// ─── POST (action-oriented lifecycle transitions) ───────────────────────────
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string[] }> }
 ) {
   try {
     const { id } = await params;
-    // id = ['CASE-001'] or ['CASE-001', 'assign']
-    const caseId = id[0];
-    const action = id[1] ?? null; // e.g. 'assign', 'acknowledge', etc.
+    
+    // Resolve queryId and action correctly
+    const lastSegment = id[id.length - 1];
+    let action: string | null = null;
+    let queryId = id.join('/');
+
+    const knownActions = [
+      'assign', 'acknowledge', 'on-site', 'complete', 'close', 'return',
+      'submit-review', 'submit-endorsement', 'log', 'update-fields',
+      'reopen', 'mark-incomplete'
+    ];
+
+    if (knownActions.includes(lastSegment)) {
+      action = lastSegment;
+      queryId = id.slice(0, -1).join('/');
+    }
 
     const body = await request.json().catch(() => ({}));
     const db = getDb();
 
-    const caseIndex = db.cases.findIndex(c => c.id === caseId);
+    const caseIndex = db.cases.findIndex(c => c.id === queryId || (c.incident && c.incident.id === queryId));
     if (caseIndex === -1 || !db.cases[caseIndex].incident) {
       return NextResponse.json({ error: 'Incident not found' }, { status: 404 });
     }
@@ -154,6 +154,7 @@ export async function POST(
     const currentCase = db.cases[caseIndex];
     const incident = currentCase.incident!;
     const actor = body.username ?? 'System';
+    const caseId = currentCase.id;
 
     switch (action) {
       // ── Assign responder ───────────────────────────────────────
@@ -161,18 +162,19 @@ export async function POST(
         if (!body.assignedTo) return NextResponse.json({ error: 'assignedTo is required' }, { status: 400 });
         const prev = incident.assignedTo;
         incident.assignedTo = body.assignedTo;
-        incident.log.push(makeLogEntry(incident, `Responder assigned: ${body.assignedTo}${prev ? ` (replaced ${prev})` : ''} — by ${actor}.`));
+        incident.status = 'Live (Assigned)';
+        incident.log.push(makeLogEntry(incident, `Responder assigned: ${body.assignedTo}${prev ? ` (replaced ${prev})` : ''} — by ${actor}. Status changed to Live (Assigned).`));
         break;
       }
 
       // ── Responder acknowledges ─────────────────────────────────
       case 'acknowledge': {
-        if (incident.status !== 'Live') {
+        if (!['Live', 'Live (Assigned)'].includes(incident.status)) {
           return NextResponse.json({ error: `Cannot acknowledge: current status is "${incident.status}"` }, { status: 409 });
         }
         incident.status = 'Live (Acknowledged)';
         incident.acknowledgedAt = new Date().toISOString();
-        incident.log.push(makeLogEntry(incident, `Responder ${incident.assignedTo ?? actor} acknowledged dispatch.`));
+        incident.log.push(makeLogEntry(incident, `Responder ${incident.assignedTo ?? actor} acknowledged dispatch. Status changed to Live (Acknowledged).`));
         break;
       }
 
@@ -183,40 +185,51 @@ export async function POST(
         }
         incident.status = 'Live (On-Site)';
         incident.onSiteAt = new Date().toISOString();
-        incident.log.push(makeLogEntry(incident, `Responder ${incident.assignedTo ?? actor} confirmed arrival on-site.`));
+        incident.log.push(makeLogEntry(incident, `Responder ${incident.assignedTo ?? actor} confirmed arrival on-site. Status changed to Live (On-Site).`));
         break;
       }
 
       // ── Responder completes ground activities ──────────────────
       case 'complete': {
-        if (!['Live (On-Site)', 'Live (Acknowledged)', 'Live'].includes(incident.status)) {
+        if (!['Live (On-Site)', 'Live (Acknowledged)', 'Live', 'Live (Assigned)', 'Live (Incomplete)'].includes(incident.status)) {
           return NextResponse.json({ error: `Cannot complete: current status is "${incident.status}"` }, { status: 409 });
         }
         incident.status = 'Live (Completed)';
         incident.completedAt = new Date().toISOString();
         if (body.completionRemarks) incident.completionRemarks = body.completionRemarks;
         incident.log.push(makeLogEntry(incident,
-          `Responder ${incident.assignedTo ?? actor} marked ground activities completed.${body.completionRemarks ? ` Remarks: ${body.completionRemarks}` : ''}`
+          `Responder ${incident.assignedTo ?? actor} marked ground activities completed.${body.completionRemarks ? ` Remarks: ${body.completionRemarks}` : ''} Status changed to Live (Completed).`
         ));
         break;
       }
 
-      // ── Duty Manager closes incident ───────────────────────────
+      // ── Submit for review / endorsement ────────────────────────
+      case 'submit-review':
+      case 'submit-endorsement': {
+        if (!['Live (Completed)', 'Live (Incomplete)', 'Returned', 'Live'].includes(incident.status)) {
+          return NextResponse.json({ error: `Can only submit for endorsement from completed, incomplete, or returned status. Current: "${incident.status}"` }, { status: 409 });
+        }
+        incident.status = 'Pending Endorsement';
+        incident.log.push(makeLogEntry(incident, `Incident submitted for Duty Manager endorsement by ${actor}.`));
+        break;
+      }
+
+      // ── Duty Manager approves closure ──────────────────────────
       case 'close': {
-        if (incident.status !== 'Pending Review') {
-          // DM can also force-close from completed states
-          if (!['Live (Completed)', 'Live (On-Site)', 'Live (Acknowledged)'].includes(incident.status)) {
-            return NextResponse.json({ error: `Cannot close: incident is "${incident.status}"` }, { status: 409 });
-          }
+        if (!['Pending Endorsement', 'Live (Completed)', 'Live (On-Site)', 'Live (Acknowledged)', 'Live (Incomplete)'].includes(incident.status)) {
+          return NextResponse.json({ error: `Cannot close: incident status is "${incident.status}"` }, { status: 409 });
         }
         incident.status = 'Closed';
+        
         // Close the parent case only if no other active tasks exist
         const activeTasks = db.tasks.filter(t => t.caseId === caseId && t.status !== 'Closed');
         if (activeTasks.length === 0) {
           currentCase.status = 'Closed';
           currentCase.closedAt = new Date().toISOString();
+          currentCase.closedBy = actor;
         }
-        // Close any slave incidents
+        
+        // Close any linked duplicate records
         if (incident.slaveIncidents) {
           incident.slaveIncidents = incident.slaveIncidents.map((s: any) => ({ ...s, status: 'Closed' }));
         }
@@ -228,20 +241,42 @@ export async function POST(
 
       // ── Duty Manager returns to controller ─────────────────────
       case 'return': {
-        incident.status = 'Live';
+        if (incident.status !== 'Pending Endorsement') {
+          return NextResponse.json({ error: `Cannot return: incident status is "${incident.status}" (must be Pending Endorsement)` }, { status: 409 });
+        }
+        incident.status = 'Returned';
         incident.log.push(makeLogEntry(incident,
           `Incident returned to Controller by ${actor}${body.returnRemarks ? `. Reason: ${body.returnRemarks}` : '.'}`
         ));
         break;
       }
 
-      // ── Submit for review (pending DM approval) ────────────────
-      case 'submit-review': {
-        if (incident.status !== 'Live (Completed)') {
-          return NextResponse.json({ error: `Can only submit for review from "Live (Completed)" status` }, { status: 409 });
+      // ── System Administrator Reopens closed incident ───────────
+      case 'reopen': {
+        if (incident.status !== 'Closed') {
+          return NextResponse.json({ error: 'Incident is not closed and cannot be reopened.' }, { status: 400 });
         }
-        incident.status = 'Pending Review';
-        incident.log.push(makeLogEntry(incident, `Incident submitted for Duty Manager review by ${actor}.`));
+        
+        incident.status = 'Live';
+        
+        // Reopen parent Case as active
+        if (currentCase.status === 'Closed') {
+          currentCase.status = 'Active';
+          currentCase.closedAt = null;
+          currentCase.closedBy = null;
+        }
+        
+        incident.log.push(makeLogEntry(incident, `Incident reopened by System Administrator (${actor}). Status reset to Live.`));
+        break;
+      }
+
+      // ── Mark Incomplete ────────────────────────────────────────
+      case 'mark-incomplete': {
+        if (!['Live (On-Site)', 'Live (Acknowledged)', 'Live (Assigned)', 'Live'].includes(incident.status)) {
+          return NextResponse.json({ error: `Cannot mark incomplete: current status is "${incident.status}"` }, { status: 409 });
+        }
+        incident.status = 'Live (Incomplete)';
+        incident.log.push(makeLogEntry(incident, `Incident marked as Incomplete by ${actor}.${body.remarks ? ` Remarks: ${body.remarks}` : ''}`));
         break;
       }
 
@@ -261,12 +296,14 @@ export async function POST(
             incident.log.push(makeLogEntry(incident, 'SDC Communications Team notified regarding media presence.'));
           }
         }
-        if (body.propertyDamage)   incident.propertyDamage   = { ...incident.propertyDamage, ...body.propertyDamage };
-        if (body.vehiclesInvolved) incident.vehiclesInvolved  = body.vehiclesInvolved;
-        if (body.personalInjuries) incident.personalInjuries  = body.personalInjuries;
-        if (body.personsInvolved)  incident.personsInvolved   = body.personsInvolved;
-        if (body.cctvBwc)          incident.cctvBwc           = body.cctvBwc;
-        if (body.summary)          incident.summary           = body.summary;
+        if (body.propertyDamage) incident.propertyDamage = { ...incident.propertyDamage, ...body.propertyDamage };
+        if (body.vehiclesInvolved) incident.vehiclesInvolved = body.vehiclesInvolved;
+        if (body.personalInjuries) incident.personalInjuries = body.personalInjuries;
+        if (body.personsInvolved) incident.personsInvolved = body.personsInvolved;
+        if (body.cctvBwc) incident.cctvBwc = body.cctvBwc;
+        if (body.summary) incident.summary = body.summary;
+        if (body.category) incident.category = body.category;
+        
         incident.log.push(makeLogEntry(incident, `Ancillary fields updated by ${actor}.`));
         break;
       }

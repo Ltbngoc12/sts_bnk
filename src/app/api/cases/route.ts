@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb, saveDb, generateCaseId, Case, Incident } from '@/lib/db';
+import { getDb, saveDb, generateCaseId, generateIncidentId, Case, Incident } from '@/lib/db';
 
 export async function GET(request: NextRequest) {
   try {
@@ -161,8 +161,9 @@ export async function POST(request: Request) {
           throw new Error('Incident Type and Sub-type are mandatory.');
         }
         
+        const incidentId = generateIncidentId(db);
         const newIncident: Incident = {
-          id: caseId,
+          id: incidentId,
           caseId: caseId,
           title: title,
           dateTime: incidentData.dateTime || new Date().toISOString(),
@@ -173,6 +174,7 @@ export async function POST(request: Request) {
           reporterName: incidentData.reporterName || 'Unknown',
           requestedBy: incidentData.requestedBy || 'IIOC Controller',
           createdBy: body.username || 'admin',
+          category: incidentData.category || 'Standard Incident',
           status: incidentData.status || 'Live',
           assignedTo: incidentData.assignedTo || '',
           location: {
@@ -191,7 +193,7 @@ export async function POST(request: Request) {
               eventNumber: 1,
               date: new Date().toISOString().split('T')[0],
               time: new Date().toLocaleTimeString('en-US', { hour12: false }),
-              description: `Incident logged under Case ID ${caseId}. Classification: ${incidentData.type} - ${incidentData.subType}.`
+              description: `Incident logged under ID ${incidentId} (Case ID ${caseId}). Classification: ${incidentData.type} - ${incidentData.subType}.`
             }
           ],
           emergencyServices: {

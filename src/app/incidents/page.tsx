@@ -2,19 +2,35 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Case } from '@/lib/db';
+import { Case, Incident } from '@/lib/db';
 import { useRole } from '@/context/RoleContext';
+
+const subTypesMap: Record<string, string[]> = {
+  'Security': ['Abandoned Property', 'Intrusion', 'Theft', 'Vandalism', 'Trespass', 'Crowd Control', 'Suspect Package', 'Others'],
+  'Safety / Medical': ['Fainting/Giddiness', 'Cardiac Arrest', 'Heat Stroke', 'Slip & Fall', 'Injury', 'Animal Encounter', 'Others'],
+  'Fire Alarm': ['False Alarm', 'Real Fire', 'Smoke Detector', 'Others'],
+  'Facilities': ['Power Outage', 'Water Leak', 'Lift Fault', 'Aircon Fault', 'Others'],
+};
 
 export default function IncidentsPage() {
   const { role } = useRole();
   const [cases, setCases] = useState<Case[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterPriority, setFilterPriority] = useState<string>('All');
-  const [searchTerm, setSearchTerm] = useState<string>('');
 
-  useEffect(() => {
-    fetchCases();
-  }, []);
+  // View Mode State
+  const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
+
+  // Filter States
+  const [activeTab, setActiveTab] = useState<string>('All');
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [filterStatus, setFilterStatus] = useState<string>('All');
+  const [filterType, setFilterType] = useState<string>('All');
+  const [filterSubType, setFilterSubType] = useState<string>('All');
+  const [filterCrisisLevel, setFilterCrisisLevel] = useState<string>('All');
+  const [filterSource, setFilterSource] = useState<string>('All');
+  const [filterController, setFilterController] = useState<string>('All');
+  const [filterDateStart, setFilterDateStart] = useState<string>('');
+  const [filterDateEnd, setFilterDateEnd] = useState<string>('');
 
   const fetchCases = async () => {
     try {
@@ -29,68 +45,551 @@ export default function IncidentsPage() {
     }
   };
 
+  useEffect(() => {
+    fetchCases();
+  }, []);
+
+  // Reset Filters
+  const resetFilters = () => {
+    setSearchTerm('');
+    setFilterStatus('All');
+    setFilterType('All');
+    setFilterSubType('All');
+    setFilterCrisisLevel('All');
+    setFilterSource('All');
+    setFilterController('All');
+    setFilterDateStart('');
+    setFilterDateEnd('');
+  };
+
   // Filter only cases containing incidents
   const incidentCases = cases.filter(c => c.incident !== null);
 
+  // Dynamic list of controllers (creators) from data
+  const uniqueControllers = Array.from(
+    new Set(
+      incidentCases
+        .map(c => c.incident?.createdBy)
+        .filter((val): val is string => !!val)
+    )
+  ).sort();
+
+  // Helper to match Incident Source dropdown options to database requestedBy values
+  const matchesSource = (incidentSourceFilter: string, requestedBy: string) => {
+    if (incidentSourceFilter === 'All') return true;
+    const req = (requestedBy || '').toLowerCase();
+    const filter = incidentSourceFilter.toLowerCase();
+    
+    if (filter === 'public phone') {
+      return req.includes('phone') || req.includes('call-in') || req.includes('guest') || req.includes('public');
+    }
+    if (filter === 'email') {
+      return req.includes('email');
+    }
+    if (filter === 'ucs') {
+      return req.includes('ucs') || req.includes('controller') || req.includes('system') || req.includes('analytics') || req.includes('va');
+    }
+    if (filter === 'government agency') {
+      return req.includes('agency') || req.includes('state') || req.includes('scdf') || req.includes('spf') || req.includes('mpa') || req.includes('government');
+    }
+    return req.includes(filter);
+  };
+
+  // Helper to match tab category or status pre-filters
+  const matchesTab = (tab: string, inc: Incident) => {
+    if (tab === 'All') return true;
+    const status = inc.status;
+    const category = inc.category;
+    
+    if (tab === 'Active') {
+      return ['Live', 'Live (Assigned)', 'Live (Acknowledged)', 'Live (On-Site)', 'Live (Incomplete)', 'Live (Completed)'].includes(status);
+    }
+    if (tab === 'Pending Endorsement') {
+      return status === 'Pending Endorsement';
+    }
+    if (tab === 'Returned') {
+      return status === 'Returned';
+    }
+    if (tab === 'Closed') {
+      return status === 'Closed';
+    }
+    if (tab === 'Ongoing') {
+      return category === 'Ongoing Incident';
+    }
+    if (tab === 'Proactive') {
+      return category === 'Proactive Incident';
+    }
+    if (tab === 'Backdated') {
+      return category === 'Backdated Incident';
+    }
+    if (tab === 'Operational Records') {
+      return category === 'Operational Record';
+    }
+    return true;
+  };
+
+  // Helper to filter by Date Range
+  const matchesDateRange = (incDateStr: string) => {
+    if (!filterDateStart && !filterDateEnd) return true;
+    const incDate = new Date(incDateStr);
+    if (isNaN(incDate.getTime())) return true;
+    
+    if (filterDateStart) {
+      const start = new Date(filterDateStart + 'T00:00:00');
+      if (incDate < start) return false;
+    }
+    if (filterDateEnd) {
+      const end = new Date(filterDateEnd + 'T23:59:59');
+      if (incDate > end) return false;
+    }
+    return true;
+  };
+
+  // Calculate Summary Metrics (filtered by date range only per FSD specifications)
+  const dateFilteredIncidents = incidentCases.map(c => c.incident).filter((i): i is Incident => !!i).filter(inc => {
+    return matchesDateRange(inc.dateTime);
+  });
+
+  const totalIncidentsCount = dateFilteredIncidents.length;
+  const activeIncidentsCount = dateFilteredIncidents.filter(inc => 
+    ['Live', 'Live (Assigned)', 'Live (Acknowledged)', 'Live (On-Site)', 'Live (Incomplete)', 'Live (Completed)'].includes(inc.status)
+  ).length;
+  const pendingEndorsementCount = dateFilteredIncidents.filter(inc => inc.status === 'Pending Endorsement').length;
+  const ongoingIncidentsCount = dateFilteredIncidents.filter(inc => inc.category === 'Ongoing Incident' && ['Live', 'Live (Assigned)', 'Live (Acknowledged)', 'Live (On-Site)', 'Live (Incomplete)', 'Live (Completed)'].includes(inc.status)).length;
+
+  // Apply all filter rules to line items
   const filteredIncidents = incidentCases.filter(c => {
-    const matchesSearch = c.id.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          c.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          (c.incident?.assignedTo && c.incident.assignedTo.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesPriority = filterPriority === 'All' || (c.incident && c.incident.priority === filterPriority);
-    return matchesSearch && matchesPriority;
+    const inc = c.incident!;
+    
+    if (!matchesTab(activeTab, inc)) return false;
+    
+    const matchesSearch = 
+      c.id.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      inc.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (inc.summary && inc.summary.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (inc.assignedTo && inc.assignedTo.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    if (!matchesSearch) return false;
+    if (filterStatus !== 'All' && inc.status !== filterStatus) return false;
+    if (filterType !== 'All' && inc.type !== filterType) return false;
+    if (filterSubType !== 'All' && inc.subType !== filterSubType) return false;
+    if (filterCrisisLevel !== 'All' && String(inc.crisisLevel) !== filterCrisisLevel) return false;
+    if (!matchesSource(filterSource, inc.requestedBy)) return false;
+    if (filterController !== 'All' && inc.createdBy !== filterController) return false;
+    if (!matchesDateRange(inc.dateTime)) return false;
+
+    return true;
   });
 
   const isController = role === 'Controller' || role === 'Duty Manager' || role === 'Duty Officer' || role === 'System Administrator';
 
+  // Helper for Status Badge styling classes
+  const getStatusBadgeClass = (status: string) => {
+    switch (status) {
+      case 'Live':
+      case 'Live (Incomplete)':
+      case 'Returned':
+        return 'badge-live';
+      case 'Live (Assigned)':
+      case 'Live (Acknowledged)':
+        return 'badge-ack';
+      case 'Live (On-Site)':
+        return 'badge-onsite';
+      case 'Live (Completed)':
+        return 'badge-completed';
+      case 'Pending Endorsement':
+        return 'badge-review';
+      case 'Closed':
+        return 'badge-closed';
+      default:
+        return 'badge-closed';
+    }
+  };
+
   return (
     <>
+      <style jsx global>{`
+        /* Metric borders using design system palette colors */
+        .metric-card.total-incidents::before { background: var(--color-info); }
+        .metric-card.active-incidents::before { background: var(--color-critical); }
+        .metric-card.pending-endorsement::before { background: var(--color-review); }
+        .metric-card.closed-today::before { background: var(--color-closed); }
+        .metric-card.ongoing-incidents::before { background: var(--color-active); }
+
+        /* View Toggle Styling */
+        .view-toggle-container {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          background: var(--bg-inset);
+          padding: 4px;
+          border-radius: 8px;
+          border: 1px solid var(--border-color);
+        }
+        .toggle-btn {
+          padding: 6px 12px;
+          font-size: 12.5px;
+          font-weight: 600;
+          border-radius: 6px;
+          border: none;
+          background: transparent;
+          color: var(--text-muted);
+          cursor: pointer;
+          transition: all 0.15s ease;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .toggle-btn:hover {
+          color: var(--text-main);
+        }
+        .toggle-btn.active {
+          background: var(--bg-card);
+          color: var(--text-main);
+          box-shadow: 0 1px 3px rgba(43, 31, 29, 0.08);
+        }
+
+        /* Filter Panel Styles */
+        .filters-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+          gap: 12px;
+          margin-top: 14px;
+        }
+
+        /* Card View Styles */
+        .cards-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+          gap: 16px;
+          margin-top: 16px;
+        }
+        .incident-card {
+          background: var(--bg-card);
+          border: 1px solid var(--border-color);
+          border-radius: 12px;
+          padding: 18px;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          height: 100%;
+          cursor: pointer;
+          transition: all 0.15s ease;
+          box-shadow: 0 4px 12px rgba(43, 31, 29, 0.02);
+        }
+        .incident-card:hover {
+          border-color: var(--border-color-hover);
+          transform: translateY(-2px);
+          box-shadow: 0 8px 20px rgba(43, 31, 29, 0.05);
+        }
+        .card-header-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 8px;
+          margin-bottom: 8px;
+        }
+        .card-title-text {
+          font-size: 14.5px;
+          font-weight: 600;
+          color: var(--text-main);
+          margin-bottom: 6px;
+          line-height: 1.4;
+        }
+        .card-id-text {
+          font-family: var(--font-mono);
+          font-size: 10.5px;
+          color: var(--text-muted);
+        }
+        .card-location-row {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 12px;
+          color: var(--text-sub);
+          margin-bottom: 12px;
+        }
+        .card-metadata-section {
+          border-top: 1px solid var(--border-color);
+          padding-top: 10px;
+          margin-top: auto;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          font-size: 12.5px;
+        }
+        .card-meta-item {
+          display: flex;
+          justify-content: space-between;
+        }
+        .card-meta-label {
+          color: var(--text-muted);
+          font-weight: 500;
+        }
+        .card-meta-value {
+          color: var(--text-main);
+          font-weight: 600;
+        }
+        .card-footer-actions {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          border-top: 1px solid var(--border-color);
+          padding-top: 12px;
+          margin-top: 12px;
+        }
+        .card-date {
+          font-size: 11.5px;
+          color: var(--text-muted);
+        }
+        .btn-card-action {
+          padding: 4px 10px;
+          font-size: 11.5px;
+          font-weight: 600;
+        }
+      `}</style>
+
+      {/* Header bar */}
       <div className="cases-header-bar glass">
         <div className="title-section">
-          <h1>INCIDENT REGISTRY LOG</h1>
-          <p>Security, Safety, Fire, and Ground Incidents requiring Ranger response</p>
+          <h1 style={{ textTransform: 'uppercase' }}>Incident Management Dashboard</h1>
+          <p>Security, Safety, Fire, and Ground Incidents requiring ground response</p>
         </div>
         
-        {isController && (
-          <Link href="/incidents/new" className="btn btn-primary">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '18px', height: '18px' }}>
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-            </svg>
-            LOG NEW INCIDENT
-          </Link>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {/* View Toggle */}
+          <div className="view-toggle-container">
+            <button 
+              className={`toggle-btn ${viewMode === 'table' ? 'active' : ''}`} 
+              onClick={() => setViewMode('table')}
+            >
+              <span>📋</span> Table
+            </button>
+            <button 
+              className={`toggle-btn ${viewMode === 'card' ? 'active' : ''}`} 
+              onClick={() => setViewMode('card')}
+            >
+              <span>🎴</span> Card
+            </button>
+          </div>
+
+          {isController && (
+            <Link href="/incidents/new" className="btn btn-primary">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '18px', height: '18px' }}>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+              </svg>
+              LOG NEW INCIDENT
+            </Link>
+          )}
+        </div>
       </div>
 
-      {/* Filter panel */}
-      <div className="filter-panel glass">
-        <div className="search-group">
-          <input 
-            type="text" 
-            placeholder="Search by Case ID, Title, or Ranger..." 
-            value={searchTerm} 
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="form-control"
-          />
+      {/* Metrics Bar */}
+      <div className="metrics-grid mb-6">
+        <div className="metric-card glass total-incidents">
+          <div className="metric-info">
+            <h3>Total Incidents</h3>
+            <div className="metric-value text-info">{totalIncidentsCount}</div>
+          </div>
+          <div className="metric-icon" style={{ fontSize: '20px' }}>📊</div>
         </div>
-        <div className="select-filters">
-          <div className="filter-select-group">
-            <label>Priority:</label>
-            <select value={filterPriority} onChange={(e) => setFilterPriority(e.target.value)} className="form-control select-dark">
-              <option value="All">All Priorities</option>
-              <option value="High">High</option>
-              <option value="Medium">Medium</option>
-              <option value="Low">Low</option>
+        
+        <div className="metric-card glass active-incidents">
+          <div className="metric-info">
+            <h3>Active Incidents</h3>
+            <div className="metric-value text-danger">{activeIncidentsCount}</div>
+          </div>
+          <div className="metric-icon" style={{ fontSize: '20px' }}>🚨</div>
+        </div>
+        
+        <div className="metric-card glass pending-endorsement">
+          <div className="metric-info">
+            <h3>Pending Endorsement</h3>
+            <div className="metric-value text-warning">{pendingEndorsementCount}</div>
+          </div>
+          <div className="metric-icon" style={{ fontSize: '20px' }}>📝</div>
+        </div>
+
+        <div className="metric-card glass closed-today">
+          <div className="metric-info">
+            <h3>Closed Today</h3>
+            <div className="metric-value text-muted" style={{ fontSize: '18px', fontWeight: 'bold' }}>TBD</div>
+            <span className="badge badge-closed" style={{ marginTop: '4px', fontSize: '9px', padding: '1px 5px' }}>Not in FRD</span>
+          </div>
+          <div className="metric-icon" style={{ fontSize: '20px' }}>🔒</div>
+        </div>
+
+        <div className="metric-card glass ongoing-incidents">
+          <div className="metric-info">
+            <h3>Ongoing Incidents</h3>
+            <div className="metric-value text-success">{ongoingIncidentsCount}</div>
+          </div>
+          <div className="metric-icon" style={{ fontSize: '20px' }}>⏳</div>
+        </div>
+      </div>
+
+      {/* Tab Filter Bar */}
+      <div className="tabs-bar glass" style={{ marginBottom: '14px', borderRadius: '12px 12px 0 0' }}>
+        {[
+          { id: 'All', label: 'All' },
+          { id: 'Active', label: 'Active' },
+          { id: 'Pending Endorsement', label: 'Pending Endorsement' },
+          { id: 'Returned', label: 'Returned' },
+          { id: 'Closed', label: 'Closed' },
+          { id: 'Ongoing', label: 'Ongoing' },
+          { id: 'Proactive', label: 'Proactive' },
+          { id: 'Backdated', label: 'Backdated' },
+          { id: 'Operational Records', label: 'Operational Records' }
+        ].map(t => (
+          <button 
+            key={t.id} 
+            className={`tab-btn ${activeTab === t.id ? 'active' : ''}`}
+            onClick={() => setActiveTab(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Advanced Filter Panel */}
+      <div className="filter-panel glass" style={{ marginTop: '-14px', borderRadius: '0 0 12px 12px', borderTop: 'none', padding: '20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            Advanced Filters
+          </span>
+          <button onClick={resetFilters} className="btn btn-secondary btn-xs" style={{ border: 'none', background: 'transparent', textDecoration: 'underline' }}>
+            Clear Filters
+          </button>
+        </div>
+
+        {/* Filters Layout Grid */}
+        <div className="filters-grid">
+          {/* Search bar */}
+          <div className="form-group" style={{ gridColumn: 'span 2' }}>
+            <label>Search Registry:</label>
+            <input 
+              type="text" 
+              placeholder="Search by Case ID, Title, or Responder..." 
+              value={searchTerm} 
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="form-control"
+            />
+          </div>
+
+          {/* Status dropdown */}
+          <div className="form-group">
+            <label>Status:</label>
+            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="form-control select-dark">
+              <option value="All">All Statuses</option>
+              <option value="Live">Live</option>
+              <option value="Live (Assigned)">Live (Assigned)</option>
+              <option value="Live (Acknowledged)">Live (Acknowledged)</option>
+              <option value="Live (On-Site)">Live (On-Site)</option>
+              <option value="Live (Incomplete)">Live (Incomplete)</option>
+              <option value="Live (Completed)">Live (Completed)</option>
+              <option value="Pending Endorsement">Pending Endorsement</option>
+              <option value="Returned">Returned</option>
+              <option value="Closed">Closed</option>
             </select>
+          </div>
+
+          {/* Type dropdown */}
+          <div className="form-group">
+            <label>Incident Type:</label>
+            <select value={filterType} onChange={(e) => { setFilterType(e.target.value); setFilterSubType('All'); }} className="form-control select-dark">
+              <option value="All">All Types</option>
+              <option value="Security">Security</option>
+              <option value="Safety / Medical">Safety / Medical</option>
+              <option value="Fire Alarm">Fire Alarm</option>
+              <option value="Facilities">Facilities</option>
+            </select>
+          </div>
+
+          {/* Sub-type dropdown */}
+          <div className="form-group">
+            <label>Incident Sub-Type:</label>
+            <select 
+              value={filterSubType} 
+              onChange={(e) => setFilterSubType(e.target.value)} 
+              className="form-control select-dark"
+              disabled={filterType === 'All'}
+            >
+              <option value="All">All Sub-types</option>
+              {filterType !== 'All' && subTypesMap[filterType]?.map(st => (
+                <option key={st} value={st}>{st}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Crisis Level dropdown */}
+          <div className="form-group">
+            <label>Crisis Level:</label>
+            <select value={filterCrisisLevel} onChange={(e) => setFilterCrisisLevel(e.target.value)} className="form-control select-dark">
+              <option value="All">All Levels</option>
+              <option value="1">Level 1 (Crisis)</option>
+              <option value="2">Level 2</option>
+              <option value="3">Level 3</option>
+              <option value="4">Level 4 (Default)</option>
+              <option value="5">Level 5 (Low)</option>
+            </select>
+          </div>
+
+          {/* Source dropdown */}
+          <div className="form-group">
+            <label>Incident Source:</label>
+            <select value={filterSource} onChange={(e) => setFilterSource(e.target.value)} className="form-control select-dark">
+              <option value="All">All Sources</option>
+              <option value="Public Phone">Public Phone</option>
+              <option value="Email">Email</option>
+              <option value="UCS">UCS</option>
+              <option value="Government Agency">Government Agency</option>
+            </select>
+          </div>
+
+          {/* Controller dropdown */}
+          <div className="form-group">
+            <label>Controller (Created By):</label>
+            <select value={filterController} onChange={(e) => setFilterController(e.target.value)} className="form-control select-dark">
+              <option value="All">All Controllers</option>
+              {uniqueControllers.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Date Picker Start */}
+          <div className="form-group">
+            <label>Date From:</label>
+            <input 
+              type="date" 
+              value={filterDateStart} 
+              onChange={(e) => setFilterDateStart(e.target.value)} 
+              className="form-control" 
+            />
+          </div>
+
+          {/* Date Picker End */}
+          <div className="form-group">
+            <label>Date To:</label>
+            <input 
+              type="date" 
+              value={filterDateEnd} 
+              onChange={(e) => setFilterDateEnd(e.target.value)} 
+              className="form-control" 
+            />
           </div>
         </div>
       </div>
 
-      {/* Log list */}
-      <div className="cases-list-container glass">
+      {/* Main content area */}
+      <div className="cases-list-container glass" style={{ marginTop: '20px', padding: '20px' }}>
         {loading ? (
           <div className="cases-loading">Loading incident registry...</div>
         ) : filteredIncidents.length === 0 ? (
-          <div className="empty-cases">No incidents logged matching filters.</div>
-        ) : (
+          <div className="empty-cases">No incidents logged matching selected filters.</div>
+        ) : viewMode === 'table' ? (
+          /* TABLE VIEW */
           <div className="table-container">
             <table className="custom-table">
               <thead>
@@ -98,49 +597,112 @@ export default function IncidentsPage() {
                   <th>Case ID</th>
                   <th>Incident Title</th>
                   <th>Classification</th>
+                  <th>Category</th>
                   <th>Priority</th>
                   <th>Location (Common Name)</th>
-                  <th>Assigned Ranger</th>
+                  <th>Assigned Responder</th>
                   <th>Incident Status</th>
                   <th>Date Logged</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredIncidents.map((c) => (
-                  <tr key={c.id} onClick={() => window.location.href = `/cases/${c.id}`}>
-                    <td className="case-id-cell">{c.id}</td>
-                    <td className="case-title-cell">{c.title}</td>
-                    <td>{c.incident?.type} - {c.incident?.subType}</td>
-                    <td>
-                      <span className={`badge ${
-                        c.incident?.priority === 'High' ? 'badge-live' :
-                        c.incident?.priority === 'Medium' ? 'badge-ack' : 'badge-closed'
-                      }`}>
-                        {c.incident?.priority}
-                      </span>
-                    </td>
-                    <td>{c.incident?.location.commonName || c.incident?.location.road}</td>
-                    <td>{c.incident?.assignedTo || 'Unassigned'}</td>
-                    <td>
-                      <span className={`badge ${
-                        c.incident?.status === 'Live' ? 'badge-live' :
-                        c.incident?.status === 'Live (Acknowledged)' ? 'badge-ack' :
-                        c.incident?.status === 'Live (On-Site)' ? 'badge-onsite' :
-                        c.incident?.status === 'Live (Completed)' ? 'badge-completed' :
-                        c.incident?.status === 'Pending Review' ? 'badge-review' : 'badge-closed'
-                      }`}>
-                        {c.incident?.status || c.status}
-                      </span>
-                    </td>
-                    <td className="date-cell">{new Date(c.createdAt).toLocaleDateString('en-US')} {new Date(c.createdAt).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })}</td>
-                  </tr>
-                ))}
+                {filteredIncidents.map((c) => {
+                  const inc = c.incident!;
+                  return (
+                    <tr key={c.id} onClick={() => {
+                      window.location.href = `/incidents/${inc.id}`;
+                    }}>
+                      <td className="case-id-cell">{c.id}</td>
+                      <td className="case-title-cell">{c.title}</td>
+                      <td>{inc.type} - {inc.subType}</td>
+                      <td>{inc.category}</td>
+                      <td>
+                        <span className={`badge ${
+                          inc.priority === 'High' ? 'badge-live' : 'badge-closed'
+                        }`}>
+                          {inc.priority}
+                        </span>
+                      </td>
+                      <td>{inc.location.commonName || inc.location.road}</td>
+                      <td>{inc.assignedTo || <span style={{ color: 'var(--text-faint)' }}>Unassigned</span>}</td>
+                      <td>
+                        <span className={`badge ${getStatusBadgeClass(inc.status)}`}>
+                          {inc.status}
+                        </span>
+                      </td>
+                      <td className="date-cell">
+                        {new Date(inc.dateTime).toLocaleDateString('en-US')} {new Date(inc.dateTime).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
+        ) : (
+          /* CARD VIEW */
+          <div className="cards-grid">
+            {filteredIncidents.map((c) => {
+              const inc = c.incident!;
+              return (
+                <div 
+                  key={c.id} 
+                  className="incident-card"
+                  onClick={() => {
+                    window.location.href = `/incidents/${inc.id}`;
+                  }}
+                >
+                  <div>
+                    <div className="card-header-row">
+                      <span className="card-id-text">{inc.id}</span>
+                      <span className={`badge ${
+                        inc.priority === 'High' ? 'badge-live' : 'badge-closed'
+                      }`}>
+                        {inc.priority}
+                      </span>
+                    </div>
+
+                    <div className="card-title-text">{c.title}</div>
+                    
+                    <div className="card-location-row">
+                      <span>📍</span>
+                      <span>{inc.location.commonName || inc.location.road || 'Unknown Location'}</span>
+                    </div>
+
+                    <div style={{ margin: '8px 0' }}>
+                      <span className="badge badge-closed" style={{ fontSize: '10px', padding: '2px 6px' }}>
+                        {inc.category}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="card-metadata-section">
+                    <div className="card-meta-item">
+                      <span className="card-meta-label">Classification:</span>
+                      <span className="card-meta-value">{inc.type} / {inc.subType}</span>
+                    </div>
+                    <div className="card-meta-item">
+                      <span className="card-meta-label">Responder:</span>
+                      <span className="card-meta-value" style={{ color: inc.assignedTo ? 'var(--text-main)' : 'var(--text-faint)' }}>
+                        {inc.assignedTo || 'Unassigned'}
+                      </span>
+                    </div>
+                    
+                    <div className="card-footer-actions">
+                      <span className={`badge ${getStatusBadgeClass(inc.status)}`}>
+                        {inc.status}
+                      </span>
+                      <span className="card-date">
+                        {new Date(inc.dateTime).toLocaleDateString('en-US')}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
-
     </>
   );
 }

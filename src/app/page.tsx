@@ -168,26 +168,32 @@ export default function DashboardPage() {
                     .filter(c => c.status !== 'Closed')
                     .slice(0, 5)
                     .map(c => (
-                      <Link href={`/cases/${c.id}`} key={c.id} className="active-case-item">
-                        <div className="active-case-info">
+                      <div key={c.id} className="active-case-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', transition: 'background 0.12s ease', borderBottom: '1px solid var(--border-color)', padding: '12px 18px' }}>
+                        <Link href={`/cases/${c.id}`} style={{ textDecoration: 'none', color: 'inherit', flex: 1, display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
                           <span className="case-id">{c.id}</span>
-                          <span className="case-title">{c.title}</span>
-                          <span className="case-meta">
-                            {c.incident?.type} &bull; {c.incident?.location.commonName || c.incident?.location.road}
+                          <span className="case-title" style={{ fontWeight: 600, color: 'var(--text-main)' }}>{c.title}</span>
+                          <span className="case-meta" style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                            {c.incident ? `${c.incident.category} · ${c.incident.type}` : 'No attached incident'} &bull; {c.incident?.location.commonName || c.incident?.location.road || 'TBD'}
                           </span>
-                        </div>
-                        <div className="active-case-status">
-                          <span className={`badge ${
-                            c.incident?.status === 'Live' ? 'badge-live' :
-                            c.incident?.status === 'Live (Acknowledged)' ? 'badge-ack' :
-                            c.incident?.status === 'Live (On-Site)' ? 'badge-onsite' :
-                            c.incident?.status === 'Live (Completed)' ? 'badge-completed' :
-                            c.incident?.status === 'Pending Review' ? 'badge-review' : 'badge-closed'
-                          }`}>
-                            {c.incident?.status || c.status}
-                          </span>
-                        </div>
-                      </Link>
+                        </Link>
+                        {c.incident && (
+                          <Link href={`/incidents/${c.incident.id}`} className="active-case-status" style={{ textDecoration: 'none' }}>
+                            <span className={`badge ${
+                              c.incident.status === 'Live' ? 'badge-live' :
+                              c.incident.status === 'Live (Assigned)' ? 'badge-ack' :
+                              c.incident.status === 'Live (Acknowledged)' ? 'badge-ack' :
+                              c.incident.status === 'Live (On-Site)' ? 'badge-onsite' :
+                              c.incident.status === 'Live (Incomplete)' ? 'badge-live' :
+                              c.incident.status === 'Live (Completed)' ? 'badge-completed' :
+                              c.incident.status === 'Pending Endorsement' ? 'badge-review' :
+                              c.incident.status === 'Returned' ? 'badge-live' :
+                              'badge-closed'
+                            }`}>
+                              {c.incident.status}
+                            </span>
+                          </Link>
+                        )}
+                      </div>
                     ))
                 )}
               </div>

@@ -114,7 +114,8 @@ export interface Incident {
   reporterName: string;
   requestedBy: string;
   createdBy: string;
-  status: string; // Live, Live Acknowledged, Live On-Site, Live Completed, Pending Review, Returned, Closed
+  category: string; // "Standard Incident" | "Proactive Incident" | "Backdated Incident" | "Ongoing Incident" | "Operational Record"
+  status: string; // "Live" | "Live (Assigned)" | "Live (Acknowledged)" | "Live (On-Site)" | "Live (Incomplete)" | "Live (Completed)" | "Pending Endorsement" | "Returned" | "Closed"
   assignedTo: string; // "Ranger John", etc. (or comma-separated list of Responders)
   location: Location;
   log: LogEntry[];
@@ -138,6 +139,7 @@ export interface Incident {
   closedAt?: string;
   closureRemarks?: string;
 }
+
 
 export interface Fault {
   id: string; // SEN/FR/YYYYMMDD/NNN
@@ -357,6 +359,7 @@ export function getDb(): DbSchema {
             reporterName: incident.reporterName || 'Unknown',
             requestedBy: incident.requestedBy || 'IIOC Controller',
             createdBy: incident.createdBy || 'system',
+            category: incident.category || 'Standard Incident',
             status: incident.status || 'Live',
             assignedTo: incident.assignedTo || '',
             location: incident.location || {
@@ -447,6 +450,30 @@ export function getDb(): DbSchema {
         broadcasts: parsed.broadcasts || [],
         auditLogs: parsed.auditLogs || []
       };
+    }
+
+    // Ensure all incidents follow strict FRD status and category taxonomy
+    if (normalizedDb.incidents) {
+      normalizedDb.incidents = normalizedDb.incidents.map(inc => {
+        let mappedStatus = inc.status || 'Live';
+        if (mappedStatus === 'Live Acknowledged') mappedStatus = 'Live (Acknowledged)';
+        else if (mappedStatus === 'Live On-Site') mappedStatus = 'Live (On-Site)';
+        else if (mappedStatus === 'Live Completed') mappedStatus = 'Live (Completed)';
+        else if (mappedStatus === 'Pending Review') mappedStatus = 'Pending Endorsement';
+
+        // Set Live (Assigned) if there is an assignee but status is still Live
+        if (mappedStatus === 'Live' && inc.assignedTo) {
+          mappedStatus = 'Live (Assigned)';
+        }
+
+        const mappedCategory = inc.category || 'Standard Incident';
+
+        return {
+          ...inc,
+          status: mappedStatus,
+          category: mappedCategory
+        };
+      });
     }
 
     // HYDRATION LOGIC: Join normalized tables into the legacy nested models returned to the app
@@ -587,6 +614,35 @@ export function generateCaseId(db: DbSchema): string {
   }
   
   const seqStr = String(nextSeq).padStart(3, '0');
+  return `${prefix}${seqStr}`;
+}
+
+// Generate Incident ID following the SEN/IR/YYYYMMDD/NNNN format (FSD)
+export function generateIncidentId(db: DbSchema): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const prefix = `SEN/IR/${year}${month}${day}/`;
+  
+  const todayIncidents = db.cases
+    .map(c => c.incident)
+    .filter((inc): inc is Incident => !!inc && inc.id.startsWith(prefix));
+
+  let nextSeq = 1;
+  if (todayIncidents.length > 0) {
+    const sequences = todayIncidents.map(inc => {
+      const parts = inc.id.split('/');
+      const seqStr = parts[parts.length - 1];
+      return parseInt(seqStr, 10);
+    }).filter(num => !isNaN(num));
+    
+    if (sequences.length > 0) {
+      nextSeq = Math.max(...sequences) + 1;
+    }
+  }
+  
+  const seqStr = String(nextSeq).padStart(4, '0');
   return `${prefix}${seqStr}`;
 }
 
