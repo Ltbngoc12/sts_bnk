@@ -31,7 +31,25 @@ export async function GET(
     if (!caseObj?.incident) {
       return NextResponse.json({ error: 'Incident not found' }, { status: 404 });
     }
-    return NextResponse.json(caseObj.incident);
+    
+    const incidentData = caseObj.incident;
+    const caseId = caseObj.id;
+    
+    // Fetch related records
+    const relatedTasks = db.tasks.filter(t => t.caseId === caseId);
+    const relatedFaults = db.faults?.filter(f => f.caseId === caseId) || [];
+    const relatedBroadcasts = db.broadcasts?.filter(b => b.caseId === caseId || b.incidentId === incidentData.id) || [];
+    const relatedOccurrences = db.occurrences.filter(o => o.caseId === caseId);
+    
+    const responsePayload = {
+      ...incidentData,
+      relatedTasks,
+      relatedFaults,
+      relatedBroadcasts,
+      relatedOccurrences
+    };
+    
+    return NextResponse.json(responsePayload);
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
@@ -283,7 +301,13 @@ export async function POST(
       // ── Append manual log entry ────────────────────────────────
       case 'log': {
         if (!body.description) return NextResponse.json({ error: 'description is required' }, { status: 400 });
-        incident.log.push(makeLogEntry(incident, `[MANUAL] ${body.description} — by ${actor}.`));
+        const isRangerLog = body.description.startsWith('[Ranger Log]');
+        const text = isRangerLog ? body.description : `[MANUAL] ${body.description} — by ${actor}.`;
+        const entry = {
+          ...makeLogEntry(incident, text),
+          attachments: body.attachments || []
+        };
+        incident.log.push(entry);
         break;
       }
 

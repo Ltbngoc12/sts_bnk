@@ -45,6 +45,7 @@ const NAV_GROUPS = [
     label: 'Analytics',
     items: [
       { name: 'Statistics',      path: '/statistics',   d: 'M18 20V10M12 20V4M6 20v-6' },
+      { name: 'Lifecycle Showcase', path: '/incidents/lifecycle', d: 'M12 12L5 9M12 12l7-3M12 12v10', d2: 'M12 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM5 9a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM19 9a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z' },
     ]
   }
 ];

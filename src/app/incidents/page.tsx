@@ -17,7 +17,7 @@ export default function IncidentsPage() {
   const [cases, setCases] = useState<Case[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // View Mode State
+  const [showScenarios, setShowScenarios] = useState(true);
   const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
 
   // Filter States
@@ -348,6 +348,64 @@ export default function IncidentsPage() {
           font-size: 11.5px;
           font-weight: 600;
         }
+
+        /* Scenario Demo Library Playground Styling */
+        .scenario-library-container {
+          background: var(--bg-card);
+          border: 1px solid var(--border-color);
+          border-radius: var(--radius-lg);
+          transition: all 0.2s ease;
+        }
+        .scenarios-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+          gap: 12px;
+          margin-top: 8px;
+        }
+        .scenario-card {
+          background: var(--bg-base);
+          border: 1px solid var(--border-color);
+          border-radius: var(--radius-md);
+          padding: 14px;
+          cursor: pointer;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          transition: all 0.2s ease;
+          position: relative;
+          overflow: hidden;
+          box-shadow: 0 1px 3px rgba(43,31,29,0.03);
+        }
+        .scenario-card:hover {
+          border-color: var(--border-focus);
+          background: var(--bg-card);
+          box-shadow: 0 4px 12px rgba(255, 130, 0, 0.08);
+          transform: translateY(-2px);
+        }
+        .scenario-card-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 8px;
+        }
+        .scenario-card-body {
+          flex-grow: 1;
+        }
+        .scenario-card-footer {
+          margin-top: 10px;
+          font-size: 9.5px;
+          font-weight: 700;
+          color: var(--color-primary);
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          transition: transform 0.2s ease;
+        }
+        .scenario-card:hover .scenario-card-footer {
+          transform: translateX(4px);
+        }
       `}</style>
 
       {/* Header bar */}
@@ -373,6 +431,16 @@ export default function IncidentsPage() {
               <span>🎴</span> Card
             </button>
           </div>
+
+          <Link href="/incidents/lifecycle" className="btn btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 12L5 9M12 12l7-3M12 12v10" />
+              <circle cx="12" cy="12" r="2.5" fill="currentColor" />
+              <circle cx="5" cy="9" r="2" />
+              <circle cx="19" cy="9" r="2" />
+            </svg>
+            VIEW LIFECYCLE
+          </Link>
 
           {isController && (
             <Link href="/incidents/new" className="btn btn-primary">
@@ -427,6 +495,110 @@ export default function IncidentsPage() {
           </div>
           <div className="metric-icon" style={{ fontSize: '20px' }}>⏳</div>
         </div>
+      </div>
+
+      {/* Scenario Demo Library Playground */}
+      <div className="scenario-library-container glass mb-6" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => setShowScenarios(!showScenarios)}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '16px' }}>💡</span>
+            <h2 style={{ fontSize: '12.5px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', margin: 0 }}>
+              SOP Scenario Playground Library
+            </h2>
+          </div>
+          <button style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontWeight: 'bold', cursor: 'pointer', fontSize: '11px' }}>
+            {showScenarios ? 'COLLAPSE ▲' : 'EXPAND PLAYGROUND ▼'}
+          </button>
+        </div>
+
+        {showScenarios && (
+          <>
+            <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', margin: '0 0 4px 0', lineHeight: '1.4' }}>
+              Launch preloaded, high-fidelity demo incident records to inspect their specific lifecycle stages, timelines, and related action logs.
+            </p>
+            <div className="scenarios-grid">
+              {[
+                {
+                  id: 'SEN/IR/20260612/9001',
+                  category: 'Standard Incident',
+                  title: 'Water Leak',
+                  status: 'Closed',
+                  badgeClass: 'badge-closed',
+                  desc: 'Wet hazard at Beach Station. Displays full dispatch, ranger resolution, and DM endorsement loop.',
+                  icon: '🚰'
+                },
+                {
+                  id: 'SEN/IR/20260612/9002',
+                  category: 'Proactive Incident',
+                  title: 'Suspicious Bag',
+                  status: 'Closed',
+                  badgeClass: 'badge-closed',
+                  desc: 'Ranger Dave spotted and resolved a guest backpack on patrol. Self-reported and closed.',
+                  icon: '🎒'
+                },
+                {
+                  id: 'SEN/IR/20260612/9003',
+                  category: 'Backdated Incident',
+                  title: 'Snake Encounter',
+                  status: 'Closed',
+                  badgeClass: 'badge-closed',
+                  desc: 'Python caught yesterday. Filed post-event with explicit delay justification on timeline.',
+                  icon: '🐍'
+                },
+                {
+                  id: 'SEN/IR/20260612/9004',
+                  category: 'Ongoing Incident',
+                  title: 'Power Outage',
+                  status: 'Live (On-Site)',
+                  badgeClass: 'badge-onsite',
+                  desc: 'Active power blackout at Siloso Kiosks. Open timeline with broadcasts & utility provider updates.',
+                  icon: '⚡'
+                },
+                {
+                  id: 'SEN/IR/20260612/9005',
+                  category: 'Operational Record',
+                  title: 'Fire Drill Evac',
+                  status: 'Closed',
+                  badgeClass: 'badge-closed',
+                  desc: 'Scheduled evac drill at SDC HQ for annual compliance audit. Handled administratively.',
+                  icon: '🏢'
+                },
+                {
+                  id: 'SEN/IR/20260612/9006',
+                  category: 'Standard Incident',
+                  title: 'Missing Child (Returned)',
+                  status: 'Returned',
+                  badgeClass: 'badge-live',
+                  desc: 'DM returned report due to missing BWC clips. Illustrates DM Return → Ranger Rework flow.',
+                  icon: '👦'
+                }
+              ].map((s) => (
+                <div key={s.id} className="scenario-card" onClick={() => window.location.href = `/incidents/${s.id}`}>
+                  <div className="scenario-card-header">
+                    <span style={{ fontSize: '18px' }}>{s.icon}</span>
+                    <span className={`badge ${s.badgeClass}`} style={{ fontSize: '9.5px', padding: '1px 5px', borderRadius: '3px' }}>
+                      {s.status}
+                    </span>
+                  </div>
+                  <div className="scenario-card-body">
+                    <div style={{ fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-faint)', letterSpacing: '0.04em' }}>
+                      {s.category}
+                    </div>
+                    <div style={{ fontSize: '13.5px', fontWeight: '700', color: 'var(--text-main)', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {s.title}
+                    </div>
+                    <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px', lineHeight: '1.35', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                      {s.desc}
+                    </p>
+                  </div>
+                  <div className="scenario-card-footer">
+                    <span>LAUNCH DEMO →</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Tab Filter Bar */}
