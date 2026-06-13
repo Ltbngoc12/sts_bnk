@@ -27,39 +27,33 @@ const NAV_GROUPS = [
       { name: 'Task Board',      path: '/tasks',        d: 'M9 11l3 3L22 4', d2: 'M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11' },
       { name: 'e-Diary',         path: '/occurrences',  d: 'M4 19.5A2.5 2.5 0 0 1 6.5 17H20', d2: 'M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z' },
     ]
-  },
-  {
-    label: 'Planning',
-    items: [
-      { name: 'Events',          path: '/events',       d: 'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z' },
-      { name: 'Permits (NOP)',   path: '/nops',         d: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z', d2: 'M14 2v6h6M16 13H8M16 17H8M10 9H8' },
-    ]
-  },
-  {
-    label: 'Communications',
-    items: [
-      { name: 'Broadcasts',      path: '/broadcasts',   d: 'M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.64 3.45a2 2 0 0 1 1.97-2.18H6.5c.47 0 .87.33.94.79.1.6.28 1.18.53 1.73a2 2 0 0 1-.45 2.11L6.15 7.57' },
-    ]
-  },
-  {
-    label: 'Analytics',
-    items: [
-      { name: 'Statistics',      path: '/statistics',   d: 'M18 20V10M12 20V4M6 20v-6' },
-      { name: 'Lifecycle Showcase', path: '/incidents/lifecycle', d: 'M12 12L5 9M12 12l7-3M12 12v10', d2: 'M12 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM5 9a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM19 9a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z' },
-    ]
   }
+];
+
+const ADMIN_ITEMS = [
+  { name: 'User Management', path: '/admin/users' },
+  { name: 'Role Management', path: '/admin/roles' },
+  { name: 'Taxonomy', path: '/admin/taxonomy' },
+  { name: 'Location Hierarchy', path: '/admin/location-hierarchy' },
+  { name: 'Routing Matrix', path: '/admin/routing-matrix' },
+  { name: 'Broadcast Configuration', path: '/admin/broadcast-config' },
+  { name: 'Distribution Groups', path: '/admin/distribution-groups' },
+  { name: 'Audit Log', path: '/admin/audit-log' },
+  { name: 'System Settings', path: '/admin/system-settings' },
 ];
 
 export const Sidebar: React.FC = () => {
   const pathname = usePathname();
   const { role, username, setRole } = useRole();
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('sidebar_collapsed') === 'true';
+    }
+    return false;
+  });
   const [isDOElevated, setIsDOElevated] = useState(false);
 
-  useEffect(() => {
-    const stored = localStorage.getItem('sidebar_collapsed');
-    if (stored === 'true') setIsCollapsed(true);
-  }, []);
+  const [isAdminExpanded, setIsAdminExpanded] = useState(true);
 
   useEffect(() => {
     if (isCollapsed) {
@@ -123,6 +117,108 @@ export const Sidebar: React.FC = () => {
             ))}
           </div>
         ))}
+
+        {/* Administration Section */}
+        {role === 'System Administrator' && (
+          <div className="nav-group" style={{ marginTop: 12 }}>
+            {!isCollapsed && <div className="nav-group-label">Administration</div>}
+            <div className="collapsible-parent">
+              <button
+                className="nav-item collapsible-trigger"
+                onClick={() => setIsAdminExpanded(p => !p)}
+                style={{
+                  width: '100%',
+                  background: 'none',
+                  textAlign: 'left',
+                  border: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '9px',
+                  cursor: 'pointer',
+                  padding: '8px 8px',
+                  borderRadius: '6px',
+                  color: 'var(--sidebar-text)',
+                  fontSize: '12.5px',
+                  fontWeight: 500,
+                  transition: 'all 0.12s ease'
+                }}
+              >
+                <Icon
+                  d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"
+                  d2="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
+                />
+                <span className="nav-label" style={{ flex: 1 }}>System Configuration</span>
+                {!isCollapsed && (
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="12"
+                    height="12"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    style={{
+                      transform: isAdminExpanded ? 'rotate(90deg)' : 'none',
+                      transition: 'transform 0.15s',
+                      opacity: 0.6
+                    }}
+                  >
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                )}
+              </button>
+
+              {isAdminExpanded && (
+                <div
+                  className="collapsible-children"
+                  style={{
+                    paddingLeft: isCollapsed ? '0' : '16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '2px',
+                    marginTop: '4px'
+                  }}
+                >
+                  {ADMIN_ITEMS.map(item => (
+                    <Link
+                      key={item.path}
+                      href={item.path}
+                      className={`nav-item submenu-item ${isActive(item.path) ? 'active' : ''}`}
+                      style={{
+                        fontSize: '11.5px',
+                        padding: '6px 8px',
+                        borderRadius: '4px'
+                      }}
+                    >
+                      {isCollapsed ? (
+                        <span
+                          className="avatar-mini"
+                          style={{
+                            width: '16px',
+                            height: '16px',
+                            fontSize: '9px',
+                            borderRadius: '50%',
+                            background: 'rgba(255,255,255,0.08)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            border: '1px solid rgba(255,255,255,0.15)',
+                            color: 'rgba(255,255,255,0.8)'
+                          }}
+                        >
+                          {item.name.charAt(0)}
+                        </span>
+                      ) : (
+                        <span style={{ display: 'inline-block', marginRight: '6px', color: 'rgba(255,255,255,0.2)' }}>•</span>
+                      )}
+                      <span className="nav-label">{item.name}</span>
+                      {isCollapsed && <span className="nav-tooltip">{item.name}</span>}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </nav>
 
       {/* Footer */}
@@ -170,14 +266,6 @@ export const Sidebar: React.FC = () => {
               {roles.map(r => <option key={r} value={r}>{r}</option>)}
             </select>
           </div>
-        )}
-
-        {/* System Config link (admin only) */}
-        {(role === 'System Administrator') && (
-          <Link href="/admin" className={`nav-item ${isActive('/admin') ? 'active' : ''}`} style={{ marginTop: 4 }}>
-            <Icon d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" d2="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-            <span className="nav-label">System Config</span>
-          </Link>
         )}
       </div>
 

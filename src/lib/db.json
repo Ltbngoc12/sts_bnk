@@ -1499,5 +1499,114 @@
       "sentAt": "2026-06-12T10:30:00+07:00"
     }
   ],
-  "auditLogs": []
+  "auditLogs": [
+    {
+      "id": "AUD-seed-1",
+      "timestamp": "2026-06-13T10:15:00.000Z",
+      "user": "Admin Root",
+      "module": "User Management",
+      "action": "Create User",
+      "details": "Provisioned WOG SSO account for DO Shin Feng (shin.feng@sdc.gov.sg)",
+      "beforeSnapshot": "",
+      "afterSnapshot": "{\"name\":\"DO Shin Feng\",\"email\":\"shin.feng@sdc.gov.sg\",\"role\":\"Duty Officer\",\"status\":\"Active\",\"authSource\":\"WOG SSO\"}",
+      "correlationId": "CORR-seed-1",
+      "ipAddress": "192.168.1.10"
+    },
+    {
+      "id": "AUD-seed-2",
+      "timestamp": "2026-06-13T11:20:00.000Z",
+      "user": "Admin Root",
+      "module": "Taxonomy",
+      "action": "Create Taxonomy",
+      "details": "Added new Incident Type taxonomy item: Transport (subtypes: Cable Car Stoppage, Tram Incident, Road Obstruction)",
+      "beforeSnapshot": "",
+      "afterSnapshot": "{\"name\":\"Transport\",\"subTypes\":[\"Cable Car Stoppage\",\"Tram Incident\",\"Road Obstruction\"],\"category\":\"Incident\"}",
+      "correlationId": "CORR-seed-2",
+      "ipAddress": "192.168.1.10"
+    },
+    {
+      "id": "AUD-seed-3",
+      "timestamp": "2026-06-13T12:05:00.000Z",
+      "user": "Admin Root",
+      "module": "Routing Matrix",
+      "action": "Disable Routing Rule",
+      "details": "Disabled Fault Routing rule targeting Civil Works Express Crew for Structural defects",
+      "beforeSnapshot": "{\"condition\":\"Fault Type = \\\"Structural\\\" AND Severity = \\\"High\\\"\",\"destinationTeam\":\"Civil Works Express Crew\",\"status\":\"Active\"}",
+      "afterSnapshot": "{\"condition\":\"Fault Type = \\\"Structural\\\" AND Severity = \\\"High\\\"\",\"destinationTeam\":\"Civil Works Express Crew\",\"status\":\"Disabled\"}",
+      "correlationId": "CORR-seed-3",
+      "ipAddress": "192.168.1.10"
+    },
+    {
+      "id": "AUD-seed-4",
+      "timestamp": "2026-06-13T14:40:00.000Z",
+      "user": "Admin Root",
+      "module": "System Settings",
+      "action": "Update System Settings",
+      "details": "Modified operational timeout constants: Auto Save Interval set to 30s, Record Lock Timeout set to 15m",
+      "beforeSnapshot": "{\"autoSaveInterval\":\"60s\",\"recordLockTimeout\":\"10m\"}",
+      "afterSnapshot": "{\"autoSaveInterval\":\"30s\",\"recordLockTimeout\":\"15m\"}",
+      "correlationId": "CORR-seed-4",
+      "ipAddress": "192.168.1.10"
+    },
+    {
+      "id": "AUD-seed-5",
+      "timestamp": "2026-06-13T15:10:00.000Z",
+      "user": "Admin Root",
+      "module": "Broadcast Configuration",
+      "action": "Update Template",
+      "details": "Modified subject header string for Standard Incident Notification template",
+      "beforeSnapshot": "{\"name\":\"Standard Incident Notification\",\"subject\":\"[ALERT] Incident Reported\",\"body\":\"...\"}",
+      "afterSnapshot": "{\"name\":\"Standard Incident Notification\",\"subject\":\"[ALERT] SDC Operational Alert: {incident_title}\",\"body\":\"...\"}",
+      "correlationId": "CORR-seed-5",
+      "ipAddress": "192.168.1.10"
+    },
+    {
+      "id": "AUD-1781369691860-517",
+      "timestamp": "2026-06-13T16:54:51.860Z",
+      "user": "Admin Root",
+      "action": "Deactivate User",
+      "module": "User Management",
+      "details": "Deactivated account: gan.sh@sdc.gov.sg",
+      "beforeSnapshot": "{\"id\":\"2\",\"name\":\"DM Gan\",\"email\":\"gan.sh@sdc.gov.sg\",\"department\":\"IIOC Management\",\"orgUnit\":\"IOH Duty Managers\",\"authSource\":\"WOG SSO\",\"role\":\"Duty Manager\",\"status\":\"Active\",\"lastLogin\":\"2026-06-13T23:05:00Z\"}",
+      "afterSnapshot": "{\"id\":\"2\",\"name\":\"DM Gan\",\"email\":\"gan.sh@sdc.gov.sg\",\"department\":\"IIOC Management\",\"orgUnit\":\"IOH Duty Managers\",\"authSource\":\"WOG SSO\",\"role\":\"Duty Manager\",\"status\":\"Deactivated\",\"lastLogin\":\"2026-06-13T23:05:00Z\"}",
+      "correlationId": "USR-1781369691810",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "AUD-1781369692992-2",
+      "timestamp": "2026-06-13T16:54:52.992Z",
+      "user": "Admin Root",
+      "action": "Reactivate User",
+      "module": "User Management",
+      "details": "Reactivated account: gan.sh@sdc.gov.sg",
+      "beforeSnapshot": "{\"id\":\"2\",\"name\":\"DM Gan\",\"email\":\"gan.sh@sdc.gov.sg\",\"department\":\"IIOC Management\",\"orgUnit\":\"IOH Duty Managers\",\"authSource\":\"WOG SSO\",\"role\":\"Duty Manager\",\"status\":\"Deactivated\",\"lastLogin\":\"2026-06-13T23:05:00Z\"}",
+      "afterSnapshot": "{\"id\":\"2\",\"name\":\"DM Gan\",\"email\":\"gan.sh@sdc.gov.sg\",\"department\":\"IIOC Management\",\"orgUnit\":\"IOH Duty Managers\",\"authSource\":\"WOG SSO\",\"role\":\"Duty Manager\",\"status\":\"Active\",\"lastLogin\":\"2026-06-13T23:05:00Z\"}",
+      "correlationId": "USR-1781369692985",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "AUD-1781369696632-980",
+      "timestamp": "2026-06-13T16:54:56.632Z",
+      "user": "Admin Root",
+      "action": "Edit User",
+      "module": "User Management",
+      "details": "Modified user account: gan.sh@sdc.gov.sg",
+      "beforeSnapshot": "{\"id\":\"2\",\"name\":\"DM Gan\",\"email\":\"gan.sh@sdc.gov.sg\",\"department\":\"IIOC Management\",\"orgUnit\":\"IOH Duty Managers\",\"authSource\":\"WOG SSO\",\"role\":\"Duty Manager\",\"status\":\"Active\",\"lastLogin\":\"2026-06-13T23:05:00Z\"}",
+      "afterSnapshot": "{\"id\":\"2\",\"name\":\"DM Ganxa\",\"email\":\"gan.sh@sdc.gov.sg\",\"department\":\"IIOC Management\",\"orgUnit\":\"IOH Duty Managers\",\"authSource\":\"WOG SSO\",\"role\":\"Duty Manager\",\"status\":\"Active\",\"lastLogin\":\"2026-06-13T23:05:00Z\"}",
+      "correlationId": "USR-1781369696622",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "AUD-1781369812698-674",
+      "timestamp": "2026-06-13T16:56:52.698Z",
+      "user": "Admin Root",
+      "action": "Update Taxonomy",
+      "module": "Taxonomy",
+      "details": "Updated Incident taxonomy: Security",
+      "beforeSnapshot": "{\"id\":\"inc-1\",\"category\":\"Incident\",\"name\":\"Security\",\"subTypes\":[\"Trespassing\",\"Theft\",\"Vandalism\",\"Public Nuisance\"],\"status\":\"Active\"}",
+      "afterSnapshot": "{\"id\":\"inc-1\",\"category\":\"Incident\",\"name\":\"Security\",\"subTypes\":[\"Trespassing\",\"Theft\",\"Vandalism\",\"Public Nuisance\"],\"status\":\"Active\",\"description\":\"\"}",
+      "correlationId": "REF-1781369812689",
+      "ipAddress": "127.0.0.1"
+    }
+  ]
 }

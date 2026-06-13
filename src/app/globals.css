@@ -41,6 +41,7 @@
   /* Primary brand color: Orange #FF8200 — Key CTAs and active states */
   --color-primary:        #FF8200;
   --color-primary-hover:  #D97006;
+  --color-primary-dark:   #6D3500;
   --color-primary-bg:     rgba(255, 130, 0, 0.08);
   --color-primary-border: rgba(255, 130, 0, 0.25);
 

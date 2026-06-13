@@ -17,8 +17,7 @@ export default function IncidentsPage() {
   const [cases, setCases] = useState<Case[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [showScenarios, setShowScenarios] = useState(true);
-  const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   // Filter States
   const [activeTab, setActiveTab] = useState<string>('All');
@@ -416,22 +415,6 @@ export default function IncidentsPage() {
         </div>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          {/* View Toggle */}
-          <div className="view-toggle-container">
-            <button 
-              className={`toggle-btn ${viewMode === 'table' ? 'active' : ''}`} 
-              onClick={() => setViewMode('table')}
-            >
-              <span>📋</span> Table
-            </button>
-            <button 
-              className={`toggle-btn ${viewMode === 'card' ? 'active' : ''}`} 
-              onClick={() => setViewMode('card')}
-            >
-              <span>🎴</span> Card
-            </button>
-          </div>
-
           <Link href="/incidents/lifecycle" className="btn btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 12L5 9M12 12l7-3M12 12v10" />
@@ -497,162 +480,41 @@ export default function IncidentsPage() {
         </div>
       </div>
 
-      {/* Scenario Demo Library Playground */}
-      <div className="scenario-library-container glass mb-6" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => setShowScenarios(!showScenarios)}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '16px' }}>💡</span>
-            <h2 style={{ fontSize: '12.5px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', margin: 0 }}>
-              SOP Scenario Playground Library
-            </h2>
-          </div>
-          <button style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontWeight: 'bold', cursor: 'pointer', fontSize: '11px' }}>
-            {showScenarios ? 'COLLAPSE ▲' : 'EXPAND PLAYGROUND ▼'}
-          </button>
-        </div>
-
-        {showScenarios && (
-          <>
-            <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', margin: '0 0 4px 0', lineHeight: '1.4' }}>
-              Launch preloaded, high-fidelity demo incident records to inspect their specific lifecycle stages, timelines, and related action logs.
-            </p>
-            <div className="scenarios-grid">
-              {[
-                {
-                  id: 'SEN/IR/20260612/9001',
-                  category: 'Standard Incident',
-                  title: 'Water Leak',
-                  status: 'Closed',
-                  badgeClass: 'badge-closed',
-                  desc: 'Wet hazard at Beach Station. Displays full dispatch, ranger resolution, and DM endorsement loop.',
-                  icon: '🚰'
-                },
-                {
-                  id: 'SEN/IR/20260612/9002',
-                  category: 'Proactive Incident',
-                  title: 'Suspicious Bag',
-                  status: 'Closed',
-                  badgeClass: 'badge-closed',
-                  desc: 'Ranger Dave spotted and resolved a guest backpack on patrol. Self-reported and closed.',
-                  icon: '🎒'
-                },
-                {
-                  id: 'SEN/IR/20260612/9003',
-                  category: 'Backdated Incident',
-                  title: 'Snake Encounter',
-                  status: 'Closed',
-                  badgeClass: 'badge-closed',
-                  desc: 'Python caught yesterday. Filed post-event with explicit delay justification on timeline.',
-                  icon: '🐍'
-                },
-                {
-                  id: 'SEN/IR/20260612/9004',
-                  category: 'Ongoing Incident',
-                  title: 'Power Outage',
-                  status: 'Live (On-Site)',
-                  badgeClass: 'badge-onsite',
-                  desc: 'Active power blackout at Siloso Kiosks. Open timeline with broadcasts & utility provider updates.',
-                  icon: '⚡'
-                },
-                {
-                  id: 'SEN/IR/20260612/9005',
-                  category: 'Operational Record',
-                  title: 'Fire Drill Evac',
-                  status: 'Closed',
-                  badgeClass: 'badge-closed',
-                  desc: 'Scheduled evac drill at SDC HQ for annual compliance audit. Handled administratively.',
-                  icon: '🏢'
-                },
-                {
-                  id: 'SEN/IR/20260612/9006',
-                  category: 'Standard Incident',
-                  title: 'Missing Child (Returned)',
-                  status: 'Returned',
-                  badgeClass: 'badge-live',
-                  desc: 'DM returned report due to missing BWC clips. Illustrates DM Return → Ranger Rework flow.',
-                  icon: '👦'
-                }
-              ].map((s) => (
-                <div key={s.id} className="scenario-card" onClick={() => window.location.href = `/incidents/${s.id}`}>
-                  <div className="scenario-card-header">
-                    <span style={{ fontSize: '18px' }}>{s.icon}</span>
-                    <span className={`badge ${s.badgeClass}`} style={{ fontSize: '9.5px', padding: '1px 5px', borderRadius: '3px' }}>
-                      {s.status}
-                    </span>
-                  </div>
-                  <div className="scenario-card-body">
-                    <div style={{ fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-faint)', letterSpacing: '0.04em' }}>
-                      {s.category}
-                    </div>
-                    <div style={{ fontSize: '13.5px', fontWeight: '700', color: 'var(--text-main)', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {s.title}
-                    </div>
-                    <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px', lineHeight: '1.35', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                      {s.desc}
-                    </p>
-                  </div>
-                  <div className="scenario-card-footer">
-                    <span>LAUNCH DEMO →</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* Tab Filter Bar */}
-      <div className="tabs-bar glass" style={{ marginBottom: '14px', borderRadius: '12px 12px 0 0' }}>
-        {[
-          { id: 'All', label: 'All' },
-          { id: 'Active', label: 'Active' },
-          { id: 'Pending Endorsement', label: 'Pending Endorsement' },
-          { id: 'Returned', label: 'Returned' },
-          { id: 'Closed', label: 'Closed' },
-          { id: 'Ongoing', label: 'Ongoing' },
-          { id: 'Proactive', label: 'Proactive' },
-          { id: 'Backdated', label: 'Backdated' },
-          { id: 'Operational Records', label: 'Operational Records' }
-        ].map(t => (
-          <button 
-            key={t.id} 
-            className={`tab-btn ${activeTab === t.id ? 'active' : ''}`}
-            onClick={() => setActiveTab(t.id)}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
       {/* Advanced Filter Panel */}
-      <div className="filter-panel glass" style={{ marginTop: '-14px', borderRadius: '0 0 12px 12px', borderTop: 'none', padding: '20px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-          <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-            Advanced Filters
-          </span>
-          <button onClick={resetFilters} className="btn btn-secondary btn-xs" style={{ border: 'none', background: 'transparent', textDecoration: 'underline' }}>
-            Clear Filters
-          </button>
-        </div>
-
-        {/* Filters Layout Grid */}
-        <div className="filters-grid">
+      <div className="glass" style={{ padding: '20px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        
+        {/* Main Filters Row (Search, Type, Status, Actions) */}
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          
           {/* Search bar */}
-          <div className="form-group" style={{ gridColumn: 'span 2' }}>
-            <label>Search Registry:</label>
+          <div style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.04em' }}>Search Registry:</label>
             <input 
               type="text" 
               placeholder="Search by Case ID, Title, or Responder..." 
               value={searchTerm} 
               onChange={(e) => setSearchTerm(e.target.value)}
               className="form-control"
+              style={{ width: '100%' }}
             />
           </div>
 
+          {/* Type dropdown */}
+          <div style={{ flex: '0 1 180px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.04em' }}>Incident Type:</label>
+            <select value={filterType} onChange={(e) => { setFilterType(e.target.value); setFilterSubType('All'); }} className="form-control select-dark" style={{ width: '100%' }}>
+              <option value="All">All Types</option>
+              <option value="Security">Security</option>
+              <option value="Safety / Medical">Safety / Medical</option>
+              <option value="Fire Alarm">Fire Alarm</option>
+              <option value="Facilities">Facilities</option>
+            </select>
+          </div>
+
           {/* Status dropdown */}
-          <div className="form-group">
-            <label>Status:</label>
-            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="form-control select-dark">
+          <div style={{ flex: '0 1 180px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.04em' }}>Status:</label>
+            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="form-control select-dark" style={{ width: '100%' }}>
               <option value="All">All Statuses</option>
               <option value="Live">Live</option>
               <option value="Live (Assigned)">Live (Assigned)</option>
@@ -666,92 +528,113 @@ export default function IncidentsPage() {
             </select>
           </div>
 
-          {/* Type dropdown */}
-          <div className="form-group">
-            <label>Incident Type:</label>
-            <select value={filterType} onChange={(e) => { setFilterType(e.target.value); setFilterSubType('All'); }} className="form-control select-dark">
-              <option value="All">All Types</option>
-              <option value="Security">Security</option>
-              <option value="Safety / Medical">Safety / Medical</option>
-              <option value="Fire Alarm">Fire Alarm</option>
-              <option value="Facilities">Facilities</option>
-            </select>
-          </div>
-
-          {/* Sub-type dropdown */}
-          <div className="form-group">
-            <label>Incident Sub-Type:</label>
-            <select 
-              value={filterSubType} 
-              onChange={(e) => setFilterSubType(e.target.value)} 
-              className="form-control select-dark"
-              disabled={filterType === 'All'}
+          {/* Action buttons */}
+          <div style={{ display: 'flex', gap: '10px', height: '36px', alignItems: 'center' }}>
+            <button 
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)} 
+              className="btn btn-secondary"
+              style={{ padding: '0 14px', fontSize: '12px', height: '100%', display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}
             >
-              <option value="All">All Sub-types</option>
-              {filterType !== 'All' && subTypesMap[filterType]?.map(st => (
-                <option key={st} value={st}>{st}</option>
-              ))}
-            </select>
+              ⚙️ {showAdvancedFilters ? 'Hide Options' : 'More Options'}
+            </button>
+            
+            <button 
+              onClick={resetFilters} 
+              className="btn btn-secondary"
+              style={{ padding: '0 10px', fontSize: '12px', height: '100%', border: 'none', background: 'transparent', textDecoration: 'underline', whiteSpace: 'nowrap' }}
+            >
+              Clear
+            </button>
           </div>
 
-          {/* Crisis Level dropdown */}
-          <div className="form-group">
-            <label>Crisis Level:</label>
-            <select value={filterCrisisLevel} onChange={(e) => setFilterCrisisLevel(e.target.value)} className="form-control select-dark">
-              <option value="All">All Levels</option>
-              <option value="1">Level 1 (Crisis)</option>
-              <option value="2">Level 2</option>
-              <option value="3">Level 3</option>
-              <option value="4">Level 4 (Default)</option>
-              <option value="5">Level 5 (Low)</option>
-            </select>
-          </div>
-
-          {/* Source dropdown */}
-          <div className="form-group">
-            <label>Incident Source:</label>
-            <select value={filterSource} onChange={(e) => setFilterSource(e.target.value)} className="form-control select-dark">
-              <option value="All">All Sources</option>
-              <option value="Public Phone">Public Phone</option>
-              <option value="Email">Email</option>
-              <option value="UCS">UCS</option>
-              <option value="Government Agency">Government Agency</option>
-            </select>
-          </div>
-
-          {/* Controller dropdown */}
-          <div className="form-group">
-            <label>Controller (Created By):</label>
-            <select value={filterController} onChange={(e) => setFilterController(e.target.value)} className="form-control select-dark">
-              <option value="All">All Controllers</option>
-              {uniqueControllers.map(c => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Date Picker Start */}
-          <div className="form-group">
-            <label>Date From:</label>
-            <input 
-              type="date" 
-              value={filterDateStart} 
-              onChange={(e) => setFilterDateStart(e.target.value)} 
-              className="form-control" 
-            />
-          </div>
-
-          {/* Date Picker End */}
-          <div className="form-group">
-            <label>Date To:</label>
-            <input 
-              type="date" 
-              value={filterDateEnd} 
-              onChange={(e) => setFilterDateEnd(e.target.value)} 
-              className="form-control" 
-            />
-          </div>
         </div>
+
+        {/* Collapsible Advanced Filters Row */}
+        {showAdvancedFilters && (
+          <div 
+            style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', 
+              gap: '12px', 
+              paddingTop: '16px', 
+              borderTop: '1px solid var(--border-color)' 
+            }}
+          >
+            {/* Sub-type dropdown */}
+            <div className="form-group" style={{ margin: 0 }}>
+              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Incident Sub-Type:</label>
+              <select 
+                value={filterSubType} 
+                onChange={(e) => setFilterSubType(e.target.value)} 
+                className="form-control select-dark"
+                disabled={filterType === 'All'}
+              >
+                <option value="All">All Sub-types</option>
+                {filterType !== 'All' && subTypesMap[filterType]?.map(st => (
+                  <option key={st} value={st}>{st}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Crisis Level dropdown */}
+            <div className="form-group" style={{ margin: 0 }}>
+              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Crisis Level:</label>
+              <select value={filterCrisisLevel} onChange={(e) => setFilterCrisisLevel(e.target.value)} className="form-control select-dark">
+                <option value="All">All Levels</option>
+                <option value="1">Level 1 (Crisis)</option>
+                <option value="2">Level 2</option>
+                <option value="3">Level 3</option>
+                <option value="4">Level 4 (Default)</option>
+                <option value="5">Level 5 (Low)</option>
+              </select>
+            </div>
+
+            {/* Source dropdown */}
+            <div className="form-group" style={{ margin: 0 }}>
+              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Incident Source:</label>
+              <select value={filterSource} onChange={(e) => setFilterSource(e.target.value)} className="form-control select-dark">
+                <option value="All">All Sources</option>
+                <option value="Public Phone">Public Phone</option>
+                <option value="Email">Email</option>
+                <option value="UCS">UCS</option>
+                <option value="Government Agency">Government Agency</option>
+              </select>
+            </div>
+
+            {/* Controller dropdown */}
+            <div className="form-group" style={{ margin: 0 }}>
+              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Controller:</label>
+              <select value={filterController} onChange={(e) => setFilterController(e.target.value)} className="form-control select-dark">
+                <option value="All">All Controllers</option>
+                {uniqueControllers.map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Date Picker Start */}
+            <div className="form-group" style={{ margin: 0 }}>
+              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Date From:</label>
+              <input 
+                type="date" 
+                value={filterDateStart} 
+                onChange={(e) => setFilterDateStart(e.target.value)} 
+                className="form-control" 
+              />
+            </div>
+
+            {/* Date Picker End */}
+            <div className="form-group" style={{ margin: 0 }}>
+              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Date To:</label>
+              <input 
+                type="date" 
+                value={filterDateEnd} 
+                onChange={(e) => setFilterDateEnd(e.target.value)} 
+                className="form-control" 
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Main content area */}
@@ -760,7 +643,7 @@ export default function IncidentsPage() {
           <div className="cases-loading">Loading incident registry...</div>
         ) : filteredIncidents.length === 0 ? (
           <div className="empty-cases">No incidents logged matching selected filters.</div>
-        ) : viewMode === 'table' ? (
+        ) : (
           /* TABLE VIEW */
           <div className="table-container">
             <table className="custom-table">
@@ -810,68 +693,6 @@ export default function IncidentsPage() {
                 })}
               </tbody>
             </table>
-          </div>
-        ) : (
-          /* CARD VIEW */
-          <div className="cards-grid">
-            {filteredIncidents.map((c) => {
-              const inc = c.incident!;
-              return (
-                <div 
-                  key={c.id} 
-                  className="incident-card"
-                  onClick={() => {
-                    window.location.href = `/incidents/${inc.id}`;
-                  }}
-                >
-                  <div>
-                    <div className="card-header-row">
-                      <span className="card-id-text">{inc.id}</span>
-                      <span className={`badge ${
-                        inc.priority === 'High' ? 'badge-live' : 'badge-closed'
-                      }`}>
-                        {inc.priority}
-                      </span>
-                    </div>
-
-                    <div className="card-title-text">{c.title}</div>
-                    
-                    <div className="card-location-row">
-                      <span>📍</span>
-                      <span>{inc.location.commonName || inc.location.road || 'Unknown Location'}</span>
-                    </div>
-
-                    <div style={{ margin: '8px 0' }}>
-                      <span className="badge badge-closed" style={{ fontSize: '10px', padding: '2px 6px' }}>
-                        {inc.category}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="card-metadata-section">
-                    <div className="card-meta-item">
-                      <span className="card-meta-label">Classification:</span>
-                      <span className="card-meta-value">{inc.type} / {inc.subType}</span>
-                    </div>
-                    <div className="card-meta-item">
-                      <span className="card-meta-label">Responder:</span>
-                      <span className="card-meta-value" style={{ color: inc.assignedTo ? 'var(--text-main)' : 'var(--text-faint)' }}>
-                        {inc.assignedTo || 'Unassigned'}
-                      </span>
-                    </div>
-                    
-                    <div className="card-footer-actions">
-                      <span className={`badge ${getStatusBadgeClass(inc.status)}`}>
-                        {inc.status}
-                      </span>
-                      <span className="card-date">
-                        {new Date(inc.dateTime).toLocaleDateString('en-US')}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
           </div>
         )}
       </div>

@@ -391,8 +391,8 @@ export default function IncidentDetailsPage() {
         events.push({
           type: 'broadcast',
           timestamp: b.sentAt,
-          title: `Broadcast Dispatched (${b.type})`,
-          description: `Template: ${b.templateUsed} | Recipients: ${b.recipients.join(', ')} | Status: ${b.status} ${b.lastErrorMessage ? `(Err: ${b.lastErrorMessage})` : ''}`,
+          title: `Broadcast Dispatched (${b.type || 'Notice'})`,
+          description: `Template: ${b.templateUsed || (b as any).templateName || 'Standard'} | Recipients: ${(Array.isArray(b.recipients) ? b.recipients : [(b as any).recipientGroup || '']).filter(Boolean).join(', ')} | Status: ${b.status} ${b.lastErrorMessage ? `(Err: ${b.lastErrorMessage})` : ''}`,
           actor: b.sentBy
         });
       });
@@ -1550,9 +1550,9 @@ export default function IncidentDetailsPage() {
                           <span className="case-id" style={{ color: 'var(--color-info)' }}>{b.id}</span>
                           <span className={`badge ${b.status === 'SENT' ? 'badge-onsite' : 'badge-live'}`} style={{ scale: '0.8', transformOrigin: 'right center' }}>{b.status}</span>
                         </div>
-                        <div style={{ fontWeight: 500, margin: '2px 0', fontStyle: 'italic' }}>{b.templateUsed}</div>
+                        <div style={{ fontWeight: 500, margin: '2px 0', fontStyle: 'italic' }}>{b.templateUsed || (b as any).templateName || 'Standard Broadcast'}</div>
                         <div style={{ fontSize: '10px', color: 'var(--text-faint)', wordBreak: 'break-word' }}>
-                          To: {b.recipients.join(', ')}
+                          To: {(Array.isArray(b.recipients) ? b.recipients : [(b as any).recipientGroup || '']).filter(Boolean).join(', ')}
                         </div>
                       </div>
                     ))
