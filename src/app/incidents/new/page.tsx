@@ -227,8 +227,8 @@ export default function NewIncidentPage() {
     }, 60);
   };
 
-  // Mock Form Submit Handler
-  const handleFormSubmit = (e: React.FormEvent) => {
+  // Form Submit Handler (Saves to Database)
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) {
       alert('General Information: Incident Title is required.');
@@ -247,13 +247,126 @@ export default function NewIncidentPage() {
       return;
     }
 
-    const yyyymmdd = now.toISOString().split('T')[0].replace(/-/g, '');
-    const caseId = `SEN/CI/${yyyymmdd}/${String(Math.floor(Math.random() * 899) + 100).padStart(3, '0')}`;
-    const incidentId = `SEN/IR/${yyyymmdd}/${String(Math.floor(Math.random() * 8999) + 1000).padStart(4, '0')}`;
+    const payload: any = {
+      title: title || `Incident: ${incType} - ${incSubType}`,
+      status: category === 'Backdated Incident' ? 'Closed' : 'Active',
+      username: createdBy || username || 'admin',
+      incident: {
+        dateTime: new Date(incidentDateTime).toISOString(),
+        type: incType,
+        subType: incSubType,
+        priority: priority,
+        crisisLevel: parseInt(crisisLevel, 10) || 4,
+        reporterName: reporterName || 'Anonymous Guest',
+        requestedBy: requestedBy,
+        category: category,
+        status: category === 'Backdated Incident' ? 'Closed' : 'Live',
+        assignedTo: assignedResponder,
+        location: {
+          road: road,
+          building: building,
+          levelSpace: levelSpace,
+          nearAt: nearAt,
+          commonName: commonName,
+          postalCode: postalCode || '000000',
+          tags: tagsStr.split(',').map(t => t.trim()).filter(Boolean),
+          lat: pinCoords.lat,
+          lng: pinCoords.lng
+        },
+        log: logs.map(l => ({
+          eventNumber: l.id,
+          date: l.date,
+          time: l.time,
+          description: l.description
+        })),
+        emergencyServices: {
+          policeAtScene: policeAtScene,
+          officerNameRank: policeOfficer,
+          policeIncidentNo: policeIncidentNo,
+          classification: policeClassification,
+          respondingUnit: policeUnit,
+          ambulanceScdfType: scdfType,
+          ambulanceOfficerName: scdfOfficer,
+          ambulanceCallSign: scdfCallSign,
+          ambulanceRespondingUnit: scdfUnit,
+          ambulanceArrivalTime: scdfArrivalTime,
+          hospitalConveyedTo: scdfHospital
+        },
+        mediaInvolvement: {
+          mediaAtScene: mediaAtScene,
+          mediaName: mediaName,
+          commsNotified: mediaCommsNotified
+        },
+        propertyDamage: {
+          sdcPropertyDamaged: propertyDamaged,
+          description: propertyDamageDesc
+        },
+        vehiclesInvolved: vehicles.map(v => ({
+          sdcVehicleInvolved: v.sdcVehicle,
+          vehicleModel: v.model,
+          vehicleNumber: v.plate,
+          driverName: v.driverName,
+          driverContact: v.driverContact,
+          drivingLicenceNo: v.licence,
+          driverAddress: v.address,
+          remarks: v.remarks
+        })),
+        personalInjuries: injuries.map(inj => ({
+          name: inj.name,
+          address: inj.address,
+          age: parseInt(inj.age, 10) || 0,
+          gender: inj.gender,
+          contactNumber: inj.contact,
+          clinicHospitalAttended: inj.hospital,
+          msigFormIssued: inj.msigIssued,
+          msigSerialNo: inj.msigSerial,
+          under16: inj.under16,
+          parentGuardianName: inj.parentName,
+          parentGuardianContact: inj.parentContact
+        })),
+        personsInvolved: persons.map(p => ({
+          guestOrNonGuest: p.guestOrNon,
+          type: p.type,
+          name: p.name,
+          address: p.address,
+          age: parseInt(p.age, 10) || 0,
+          gender: p.gender,
+          contactNumber: p.contact,
+          roleInvolvement: p.role,
+          injuryDetails: p.injuryDetails
+        })),
+        cctvBwc: cctvFootages.map(f => ({
+          cameraNumber: f.cameraNo,
+          vmsTimestamp: f.timestamp,
+          vmsBookmark: f.bookmark,
+          bwcNumber: f.bwcNo,
+          bwcTimestamp: f.bwcTimestamp
+        })),
+        summary: summary,
+        completionRemarks: completionRemarks || ''
+      }
+    };
 
-    setGeneratedCaseId(caseId);
-    setGeneratedIncidentId(incidentId);
-    setSuccessModal(true);
+    try {
+      const res = await fetch('/api/cases', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setGeneratedCaseId(data.id);
+        setGeneratedIncidentId(data.incident.id);
+        setSuccessModal(true);
+      } else {
+        const err = await res.json();
+        alert(`Failed to log incident: ${err.error || 'Server error'}`);
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert(`Failed to log incident: ${err.message}`);
+    }
   };
 
   return (
