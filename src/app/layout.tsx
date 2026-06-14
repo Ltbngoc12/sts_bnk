@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { RoleProvider } from "@/context/RoleContext";
 import { Sidebar } from "@/components/Sidebar";
+import { NotificationProvider } from "@/context/NotificationContext";
+import { NotificationWidget } from "@/components/NotificationWidget";
 
 export const metadata: Metadata = {
   title: "Sentosa ISS Case Management System",
@@ -23,12 +25,15 @@ export default function RootLayout({
       </head>
       <body>
         <RoleProvider>
-          <div className="app-container">
-            <Sidebar />
-            <main className="main-content">
-              {children}
-            </main>
-          </div>
+          <NotificationProvider>
+            <div className="app-container">
+              <Sidebar />
+              <main className="main-content">
+                {children}
+              </main>
+              <NotificationWidget />
+            </div>
+          </NotificationProvider>
         </RoleProvider>
       </body>
     </html>
