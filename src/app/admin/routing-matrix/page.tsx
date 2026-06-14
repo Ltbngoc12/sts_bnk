@@ -15,9 +15,9 @@ interface RoutingRule {
 
 const DEFAULT_RULES: RoutingRule[] = [
   // Incident Routing
-  { id: 'rule-inc-1', category: 'Incident', condition: 'Incident Category = "Security" AND Zone = "Siloso Beach Walk"', destinationTeam: 'Ranger Team Alpha (Siloso)', priority: 'High', status: 'Active' },
-  { id: 'rule-inc-2', category: 'Incident', condition: 'Incident Category = "Safety" AND Incident Sub-Type = "Medical Emergency"', destinationTeam: 'Medical Response Unit (Palawan)', priority: 'Critical', status: 'Active' },
-  { id: 'rule-inc-3', category: 'Incident', condition: 'Incident Category = "Environmental"', destinationTeam: 'Horticulture & Wildlife Team', priority: 'Normal', status: 'Active' },
+  { id: 'rule-inc-1', category: 'Incident', condition: 'Incident Type = "Security" AND Zone = "Siloso Beach Walk"', destinationTeam: 'Ranger Team Alpha (Siloso)', priority: 'High', status: 'Active' },
+  { id: 'rule-inc-2', category: 'Incident', condition: 'Incident Type = "Safety" AND Incident Sub-Type = "Medical Emergency"', destinationTeam: 'Medical Response Unit (Palawan)', priority: 'Critical', status: 'Active' },
+  { id: 'rule-inc-3', category: 'Incident', condition: 'Incident Type = "Environmental"', destinationTeam: 'Horticulture & Wildlife Team', priority: 'Normal', status: 'Active' },
 
   // Fault Routing
   { id: 'rule-flt-1', category: 'Fault', condition: 'Fault Type = "Mechanical" AND Location = "Cable Car Station"', destinationTeam: 'Lift & Cable Maint. Team', priority: 'High', status: 'Active' },
@@ -26,7 +26,7 @@ const DEFAULT_RULES: RoutingRule[] = [
 
   // Escalation Routing
   { id: 'rule-esc-1', category: 'Escalation', condition: 'Incident Status = "Live (Unassigned)" FOR > 15 mins', destinationTeam: 'IOH Duty Officer', priority: 'High', status: 'Active' },
-  { id: 'rule-esc-2', category: 'Escalation', condition: 'Crisis Level <= 2 OR Incident Category = "Crisis"', destinationTeam: 'IOH Duty Manager (Shift Commander)', priority: 'Critical', status: 'Active' },
+  { id: 'rule-esc-2', category: 'Escalation', condition: 'Crisis Level <= 2 OR Incident Type = "Crisis"', destinationTeam: 'IOH Duty Manager (Shift Commander)', priority: 'Critical', status: 'Active' },
   { id: 'rule-esc-3', category: 'Escalation', condition: 'Task Priority = "High" AND SLA On-Site Breach > 30 mins', destinationTeam: 'Head of SDC Security Ops', priority: 'High', status: 'Active' }
 ];
 
@@ -268,7 +268,7 @@ export default function RoutingMatrixPage() {
                 <textarea
                   rows={2}
                   required
-                  placeholder='e.g. Incident Category = "Security" AND Location = "Siloso"'
+                  placeholder='e.g. Incident Type = "Security" AND Location = "Siloso"'
                   value={formCondition}
                   onChange={e => setFormCondition(e.target.value)}
                   style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '12.5px', fontFamily: 'var(--font-mono)', resize: 'vertical' }}

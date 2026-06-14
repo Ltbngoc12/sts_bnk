@@ -4,13 +4,9 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useRole } from '@/context/RoleContext';
 import Link from 'next/link';
+import LocationSelector from '@/components/LocationSelector';
 
-const subTypesMap: Record<string, string[]> = {
-  'Security': ['Abandoned Property', 'Intrusion', 'Theft', 'Vandalism', 'Trespass', 'Crowd Control', 'Suspect Package', 'Others'],
-  'Safety / Medical': ['Fainting/Giddiness', 'Cardiac Arrest', 'Heat Stroke', 'Slip & Fall', 'Injury', 'Animal Encounter', 'Others'],
-  'Fire Alarm': ['False Alarm', 'Real Fire', 'Smoke Detector', 'Others'],
-  'Facilities': ['Power Outage', 'Water Leak', 'Lift Fault', 'Aircon Fault', 'Others'],
-};
+import { getIncidentTaxonomy } from '@/lib/taxonomy';
 
 export default function NewIncidentPage() {
   const router = useRouter();
@@ -32,14 +28,20 @@ export default function NewIncidentPage() {
   // 1. General Information State
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('Standard Incident');
-  const [incType, setIncType] = useState('Security');
-  const [incSubType, setIncSubType] = useState('Abandoned Property');
+  const [incType, setIncType] = useState('');
+  const [incSubType, setIncSubType] = useState('');
   const [priority, setPriority] = useState('Normal');
   const [crisisLevel, setCrisisLevel] = useState('4');
   const [reporterName, setReporterName] = useState('');
   const [requestedBy, setRequestedBy] = useState('Public Phone');
   const [incidentDateTime, setIncidentDateTime] = useState('');
   const [createdBy, setCreatedBy] = useState(username || 'Controller Steve');
+
+  const [taxonomy, setTaxonomy] = useState<Record<string, string[]>>({});
+
+  useEffect(() => {
+    setTaxonomy(getIncidentTaxonomy());
+  }, []);
 
   useEffect(() => {
     if (username) {
@@ -106,6 +108,23 @@ export default function NewIncidentPage() {
   const [summary, setSummary] = useState('');
   const [completionRemarks, setCompletionRemarks] = useState('');
 
+  const handleLocationChange = (details: {
+    road: string;
+    building: string;
+    levelSpace: string;
+    commonName: string;
+    lat: number;
+    lng: number;
+    tags: string[];
+  }) => {
+    setRoad(details.road);
+    setBuilding(details.building);
+    setLevelSpace(details.levelSpace);
+    setCommonName(details.commonName);
+    setPinCoords({ lat: details.lat, lng: details.lng });
+    setTagsStr(details.tags.join(', '));
+  };
+
   // Time simulation effects
   useEffect(() => {
     const now = new Date();
@@ -125,10 +144,7 @@ export default function NewIncidentPage() {
 
   // Handle Type -> Sub-Type resets
   useEffect(() => {
-    const list = subTypesMap[incType];
-    if (list && list.length > 0) {
-      setIncSubType(list[0]);
-    }
+    setIncSubType('');
   }, [incType]);
 
   // Handle Age changes inside injury list to auto-toggle Under-16 status
@@ -173,11 +189,60 @@ export default function NewIncidentPage() {
     setExpandedSections({});
   };
 
+  const [activeSection, setActiveSection] = useState<number>(1);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollPosition = window.scrollY + 120;
+      let currentActive = 1;
+      for (let i = 1; i <= 12; i++) {
+        const el = document.getElementById(`incident-section-${i}`);
+        if (el) {
+          const top = el.getBoundingClientRect().top + window.scrollY;
+          if (scrollPosition >= top) {
+            currentActive = i;
+          }
+        }
+      }
+      setActiveSection(currentActive);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToSection = (id: number) => {
+    setExpandedSections(prev => ({ ...prev, [id]: true }));
+    setTimeout(() => {
+      const element = document.getElementById(`incident-section-${id}`);
+      if (element) {
+        const elementPosition = element.getBoundingClientRect().top + window.scrollY;
+        const offsetPosition = elementPosition - 112;
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: 'smooth'
+        });
+      }
+    }, 60);
+  };
+
   // Mock Form Submit Handler
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) {
       alert('General Information: Incident Title is required.');
+      toggleSection(1);
+      return;
+    }
+
+    if (!incType) {
+      alert('General Information: Incident Type is required.');
+      toggleSection(1);
+      return;
+    }
+    if (!incSubType) {
+      alert('General Information: Incident Sub-Type is required.');
       toggleSection(1);
       return;
     }
@@ -192,7 +257,7 @@ export default function NewIncidentPage() {
   };
 
   return (
-    <div className="page-content" style={{ maxWidth: '1000px', margin: '0 auto', padding: '0 20px 60px 20px' }}>
+    <div className="page-content" style={{ maxWidth: '100%', padding: '0 0 60px 0' }}>
       
       <style jsx global>{`
         /* Simulator Panel */
@@ -409,23 +474,102 @@ export default function NewIncidentPage() {
           border-color: var(--color-primary);
           background: var(--bg-card);
         }
+
+        /* Sticky Navigator styling */
+        .sticky-navigator-card {
+          background: var(--bg-card);
+          border: 1px solid var(--border-color);
+          border-radius: var(--radius-lg);
+          padding: 18px;
+          box-shadow: 0 4px 16px rgba(44, 26, 14, 0.05);
+        }
+        .navigator-title {
+          font-size: 13px;
+          font-weight: 700;
+          color: var(--text-main);
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          margin-bottom: 12px;
+          border-bottom: 1px solid var(--border-color);
+          padding-bottom: 8px;
+        }
+        .navigator-list {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          list-style: none;
+          padding: 0;
+          margin: 0;
+        }
+        .navigator-item {
+          cursor: pointer;
+          padding: 8px 12px;
+          font-size: 12.5px;
+          font-weight: 500;
+          border-radius: var(--radius-sm);
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          transition: all 0.15s ease;
+          color: var(--text-sub);
+          border-left: 3px solid transparent;
+        }
+        .navigator-item:hover {
+          background: var(--bg-hover);
+          color: var(--text-main);
+        }
+        .navigator-item.active {
+          border-left-color: var(--color-primary);
+          background: var(--color-primary-bg);
+          color: var(--color-primary);
+          font-weight: 600;
+        }
+
+        @media (max-width: 1024px) {
+          .form-columns-container {
+            flex-direction: column;
+          }
+          .sticky-navigator {
+            display: none !important;
+          }
+        }
       `}</style>
 
       {/* Header Panel */}
-      <div className="cases-header-bar glass" style={{ marginBottom: '20px' }}>
+      <div 
+        className="cases-header-bar glass" 
+        style={{ 
+          position: 'sticky', 
+          top: '12px', 
+          zIndex: 1000, 
+          marginBottom: '20px',
+          background: 'rgba(253, 252, 248, 0.96)',
+          backdropFilter: 'blur(8px)',
+          boxShadow: '0 4px 20px rgba(44, 26, 14, 0.12)',
+        }}
+      >
         <div className="title-section">
           <h1>Log New Incident Report</h1>
           <p>Complete the strict 12 accordion sections below to log the incident.</p>
         </div>
-        <div>
-          <button onClick={expandAll} className="btn btn-secondary btn-sm" style={{ marginRight: '8px' }}>Expand All</button>
-          <button onClick={collapseAll} className="btn btn-secondary btn-sm">Collapse All</button>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <Link href="/incidents" className="btn btn-secondary btn-sm" style={{ display: 'inline-flex', alignItems: 'center', height: '32px' }}>
+            Cancel
+          </Link>
+          <button type="submit" form="new-incident-form" className="btn btn-primary" style={{ background: 'var(--color-primary)', borderColor: 'var(--color-primary)', color: '#FFF', padding: '8px 18px', fontSize: '13px', height: '38px' }}>
+            Log Incident
+          </button>
         </div>
       </div>
 
       {/* Time Simulation Settings Panel */}
       <div className="simulator-panel">
-        <span className="simulator-title">⏱️ Incident Age Simulator:</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          <span className="simulator-title">⏱️ Incident Age Simulator:</span>
+          <span style={{ fontSize: '11px', color: '#B27C24', opacity: 0.8, fontStyle: 'italic' }}>
+            (Demo simulation for Ageing Alert only — will be removed in production)
+          </span>
+        </div>
         <div className="simulator-options">
           <button 
             type="button" 
@@ -490,10 +634,13 @@ export default function NewIncidentPage() {
       </div>
 
       {/* Accordion Form */}
-      <form onSubmit={handleFormSubmit}>
+      <form id="new-incident-form" onSubmit={handleFormSubmit}>
+        <div className="form-columns-container" style={{ display: 'flex', gap: '24px', alignItems: 'flex-start' }}>
+          {/* Left Column: Form Sections */}
+          <div style={{ flex: 1, minWidth: 0 }}>
         
         {/* 1. GENERAL INFORMATION */}
-        <div className={`accordion-item ${expandedSections[1] ? 'expanded' : ''}`}>
+        <div id="incident-section-1" className={`accordion-item ${expandedSections[1] ? 'expanded' : ''}`}>
           <div className="accordion-header" onClick={() => toggleSection(1)}>
             <div className="accordion-header-left">
               <span className="accordion-num">1</span>
@@ -529,31 +676,23 @@ export default function NewIncidentPage() {
                   <input type="text" value="SEN/CI/YYYYMMDD/NNN" disabled className="form-control" style={{ fontStyle: 'italic', background: 'var(--bg-inset)' }} />
                 </div>
 
-                <div className="form-group">
-                  <label>Incident Category *</label>
-                  <select value={category} onChange={(e) => setCategory(e.target.value)} className="form-control select-dark">
-                    <option value="Standard Incident">Standard Incident</option>
-                    <option value="Proactive Incident">Proactive Incident</option>
-                    <option value="Backdated Incident">Backdated Incident</option>
-                    <option value="Ongoing Incident">Ongoing Incident</option>
-                    <option value="Operational Record">Operational Record</option>
-                  </select>
-                </div>
+
 
                 <div className="form-group">
                   <label>Incident Type *</label>
-                  <select value={incType} onChange={(e) => setIncType(e.target.value)} className="form-control select-dark">
-                    <option value="Security">Security</option>
-                    <option value="Safety / Medical">Safety / Medical</option>
-                    <option value="Fire Alarm">Fire Alarm</option>
-                    <option value="Facilities">Facilities</option>
+                  <select value={incType} onChange={(e) => setIncType(e.target.value)} className="form-control select-dark" required>
+                    <option value="">-- Select Type --</option>
+                    {Object.keys(taxonomy).sort().map(type => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
                   </select>
                 </div>
 
                 <div className="form-group">
                   <label>Incident Sub-Type *</label>
-                  <select value={incSubType} onChange={(e) => setIncSubType(e.target.value)} className="form-control select-dark">
-                    {subTypesMap[incType]?.map(st => (
+                  <select value={incSubType} onChange={(e) => setIncSubType(e.target.value)} disabled={!incType} className="form-control select-dark" required>
+                    <option value="">-- Select Sub-Type --</option>
+                    {incType && taxonomy[incType]?.sort().map(st => (
                       <option key={st} value={st}>{st}</option>
                     ))}
                   </select>
@@ -620,7 +759,7 @@ export default function NewIncidentPage() {
         </div>
 
         {/* 2. LOCATION */}
-        <div className={`accordion-item ${expandedSections[2] ? 'expanded' : ''}`}>
+        <div id="incident-section-2" className={`accordion-item ${expandedSections[2] ? 'expanded' : ''}`}>
           <div className="accordion-header" onClick={() => toggleSection(2)}>
             <div className="accordion-header-left">
               <span className="accordion-num">2</span>
@@ -634,31 +773,25 @@ export default function NewIncidentPage() {
           {expandedSections[2] && (
             <div className="accordion-content">
               <div className="form-grid">
+                <div style={{ gridColumn: 'span 2' }}>
+                  <LocationSelector
+                    onLocationSelect={handleLocationChange}
+                    initialRoad={road}
+                    initialBuilding={building}
+                    initialLevelSpace={levelSpace}
+                    initialCommonName={commonName}
+                  />
+                </div>
+
                 <div className="form-group">
-                  <label>Common Name Reference *</label>
+                  <label>Common Name Reference</label>
                   <input 
                     type="text" 
                     placeholder="e.g. Siloso Lifeguard Post 2"
                     value={commonName}
                     onChange={(e) => setCommonName(e.target.value)}
-                    required
                     className="form-control"
                   />
-                </div>
-
-                <div className="form-group">
-                  <label>Road Name</label>
-                  <input type="text" placeholder="Siloso Beach Walk" value={road} onChange={(e) => setRoad(e.target.value)} className="form-control" />
-                </div>
-
-                <div className="form-group">
-                  <label>Building Name</label>
-                  <input type="text" placeholder="e.g. Emerald Pavilion" value={building} onChange={(e) => setBuilding(e.target.value)} className="form-control" />
-                </div>
-
-                <div className="form-group">
-                  <label>Level & Space</label>
-                  <input type="text" placeholder="e.g. Level 1 Outdoor area" value={levelSpace} onChange={(e) => setLevelSpace(e.target.value)} className="form-control" />
                 </div>
 
                 <div className="form-group">
@@ -666,12 +799,17 @@ export default function NewIncidentPage() {
                   <input type="text" placeholder="e.g. Near public shower block" value={nearAt} onChange={(e) => setNearAt(e.target.value)} className="form-control" />
                 </div>
 
+                <div className="form-group colspan-2" style={{ display: 'none' }}>
+                  {/* Keep hidden levelSpace to ensure it doesn't break any validation or legacy refs */}
+                  <input type="text" value={levelSpace} readOnly />
+                </div>
+
                 <div className="form-group">
                   <label>Postal Code</label>
                   <input type="text" value={postalCode} onChange={(e) => setPostalCode(e.target.value)} className="form-control" />
                 </div>
 
-                <div className="form-group colspan-2">
+                <div className="form-group">
                   <label>Location Tags (Comma separated)</label>
                   <input type="text" value={tagsStr} onChange={(e) => setTagsStr(e.target.value)} className="form-control" />
                 </div>
@@ -715,7 +853,7 @@ export default function NewIncidentPage() {
         </div>
 
         {/* 3. INCIDENT LOG */}
-        <div className={`accordion-item ${expandedSections[3] ? 'expanded' : ''}`}>
+        <div id="incident-section-3" className={`accordion-item ${expandedSections[3] ? 'expanded' : ''}`}>
           <div className="accordion-header" onClick={() => toggleSection(3)}>
             <div className="accordion-header-left">
               <span className="accordion-num">3</span>
@@ -771,8 +909,7 @@ export default function NewIncidentPage() {
                           />
                         </td>
                         <td>
-                          <input 
-                            type="text" 
+                          <textarea 
                             value={log.description} 
                             onChange={(e) => {
                               const newVal = e.target.value;
@@ -780,7 +917,8 @@ export default function NewIncidentPage() {
                             }} 
                             placeholder="Enter timeline detail..."
                             className="form-control"
-                            style={{ padding: '4px 8px', fontSize: '12.5px' }}
+                            rows={2}
+                            style={{ padding: '6px 8px', fontSize: '12.5px', resize: 'vertical', minHeight: '40px', lineHeight: '1.4' }}
                           />
                         </td>
                         <td>
@@ -820,7 +958,7 @@ export default function NewIncidentPage() {
         </div>
 
         {/* 4. EMERGENCY SERVICES */}
-        <div className={`accordion-item ${expandedSections[4] ? 'expanded' : ''}`}>
+        <div id="incident-section-4" className={`accordion-item ${expandedSections[4] ? 'expanded' : ''}`}>
           <div className="accordion-header" onClick={() => toggleSection(4)}>
             <div className="accordion-header-left">
               <span className="accordion-num">4</span>
@@ -911,7 +1049,7 @@ export default function NewIncidentPage() {
         </div>
 
         {/* 5. MEDIA INVOLVEMENT */}
-        <div className={`accordion-item ${expandedSections[5] ? 'expanded' : ''}`}>
+        <div id="incident-section-5" className={`accordion-item ${expandedSections[5] ? 'expanded' : ''}`}>
           <div className="accordion-header" onClick={() => toggleSection(5)}>
             <div className="accordion-header-left">
               <span className="accordion-num">5</span>
@@ -970,7 +1108,7 @@ export default function NewIncidentPage() {
         </div>
 
         {/* 6. PROPERTY & VEHICLES */}
-        <div className={`accordion-item ${expandedSections[6] ? 'expanded' : ''}`}>
+        <div id="incident-section-6" className={`accordion-item ${expandedSections[6] ? 'expanded' : ''}`}>
           <div className="accordion-header" onClick={() => toggleSection(6)}>
             <div className="accordion-header-left">
               <span className="accordion-num">6</span>
@@ -1171,7 +1309,7 @@ export default function NewIncidentPage() {
         </div>
 
         {/* 7. PERSONAL INJURIES */}
-        <div className={`accordion-item ${expandedSections[7] ? 'expanded' : ''}`}>
+        <div id="incident-section-7" className={`accordion-item ${expandedSections[7] ? 'expanded' : ''}`}>
           <div className="accordion-header" onClick={() => toggleSection(7)}>
             <div className="accordion-header-left">
               <span className="accordion-num">7</span>
@@ -1392,7 +1530,7 @@ export default function NewIncidentPage() {
         </div>
 
         {/* 8. PERSONS INVOLVED */}
-        <div className={`accordion-item ${expandedSections[8] ? 'expanded' : ''}`}>
+        <div id="incident-section-8" className={`accordion-item ${expandedSections[8] ? 'expanded' : ''}`}>
           <div className="accordion-header" onClick={() => toggleSection(8)}>
             <div className="accordion-header-left">
               <span className="accordion-num">8</span>
@@ -1545,8 +1683,7 @@ export default function NewIncidentPage() {
 
                       <div className="form-group">
                         <label>Injury Details (If injured)</label>
-                        <input 
-                          type="text" 
+                        <textarea 
                           placeholder="Minor scrape / None"
                           value={p.injuryDetails} 
                           onChange={(e) => {
@@ -1554,6 +1691,8 @@ export default function NewIncidentPage() {
                             setPersons(prev => prev.map(item => item.id === p.id ? { ...item, injuryDetails: val } : item));
                           }} 
                           className="form-control" 
+                          rows={2}
+                          style={{ padding: '6px 8px', fontSize: '12.5px', resize: 'vertical', minHeight: '40px', lineHeight: '1.4' }}
                         />
                       </div>
                     </div>
@@ -1578,7 +1717,7 @@ export default function NewIncidentPage() {
         </div>
 
         {/* 9. CCTV & BODY WORN CAMERA */}
-        <div className={`accordion-item ${expandedSections[9] ? 'expanded' : ''}`}>
+        <div id="incident-section-9" className={`accordion-item ${expandedSections[9] ? 'expanded' : ''}`}>
           <div className="accordion-header" onClick={() => toggleSection(9)}>
             <div className="accordion-header-left">
               <span className="accordion-num">9</span>
@@ -1702,7 +1841,7 @@ export default function NewIncidentPage() {
         </div>
 
         {/* 10. ATTACHMENTS */}
-        <div className={`accordion-item ${expandedSections[10] ? 'expanded' : ''}`}>
+        <div id="incident-section-10" className={`accordion-item ${expandedSections[10] ? 'expanded' : ''}`}>
           <div className="accordion-header" onClick={() => toggleSection(10)}>
             <div className="accordion-header-left">
               <span className="accordion-num">10</span>
@@ -1758,7 +1897,7 @@ export default function NewIncidentPage() {
         </div>
 
         {/* 11. RESPONDER ASSIGNMENT */}
-        <div className={`accordion-item ${expandedSections[11] ? 'expanded' : ''}`}>
+        <div id="incident-section-11" className={`accordion-item ${expandedSections[11] ? 'expanded' : ''}`}>
           <div className="accordion-header" onClick={() => toggleSection(11)}>
             <div className="accordion-header-left">
               <span className="accordion-num">11</span>
@@ -1789,7 +1928,7 @@ export default function NewIncidentPage() {
         </div>
 
         {/* 12. SUMMARY & CLOSURE */}
-        <div className={`accordion-item ${expandedSections[12] ? 'expanded' : ''}`}>
+        <div id="incident-section-12" className={`accordion-item ${expandedSections[12] ? 'expanded' : ''}`}>
           <div className="accordion-header" onClick={() => toggleSection(12)}>
             <div className="accordion-header-left">
               <span className="accordion-num">12</span>
@@ -1814,43 +1953,56 @@ export default function NewIncidentPage() {
                 />
               </div>
 
-              {category === 'Backdated Incident' && (
-                <div className="form-group" style={{ marginTop: '16px' }}>
-                  <label>Completion Remarks (Duty Manager approval notes)</label>
-                  <input 
-                    type="text" 
-                    placeholder="Provide closure comments..."
-                    value={completionRemarks} 
-                    onChange={e => setCompletionRemarks(e.target.value)} 
-                    className="form-control" 
-                  />
-                </div>
-              )}
-
               <div className="form-grid" style={{ marginTop: '16px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
                 <div className="form-group">
                   <label>Closed By</label>
-                  <input type="text" value={category === 'Backdated Incident' ? 'System Autoclosure' : 'TBD'} disabled className="form-control" style={{ background: 'var(--bg-inset)', fontStyle: 'italic' }} />
+                  <input type="text" value="TBD" disabled className="form-control" style={{ background: 'var(--bg-inset)', fontStyle: 'italic' }} />
                 </div>
                 <div className="form-group">
                   <label>Closed At</label>
-                  <input type="text" value={category === 'Backdated Incident' ? 'Auto-closed on save' : 'TBD'} disabled className="form-control" style={{ background: 'var(--bg-inset)', fontStyle: 'italic' }} />
+                  <input type="text" value="TBD" disabled className="form-control" style={{ background: 'var(--bg-inset)', fontStyle: 'italic' }} />
                 </div>
               </div>
             </div>
           )}
         </div>
-
-        {/* Form Actions */}
-        <div className="modal-actions" style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-          <Link href="/incidents" className="btn btn-secondary">
-            Cancel
-          </Link>
-          <button type="submit" className="btn btn-primary">
-            LOG INCIDENT
-          </button>
         </div>
 
+          {/* Right Column: Sticky Navigation Panel */}
+          <aside className="sticky-navigator" style={{ width: '250px', flexShrink: 0, position: 'sticky', top: '96px' }}>
+            <div className="sticky-navigator-card">
+              <div className="navigator-title">Incident Sections</div>
+              <ul className="navigator-list">
+                {[
+                  { id: 1, label: '1. General Information' },
+                  { id: 2, label: '2. Location' },
+                  { id: 3, label: '3. Incident Log' },
+                  { id: 4, label: '4. Emergency Services' },
+                  { id: 5, label: '5. Media Involvement' },
+                  { id: 6, label: '6. Property & Vehicles' },
+                  { id: 7, label: '7. Personal Injuries' },
+                  { id: 8, label: '8. Persons Involved' },
+                  { id: 9, label: '9. CCTV & Body Worn Camera' },
+                  { id: 10, label: '10. Attachments' },
+                  { id: 11, label: '11. Responder Assignment' },
+                  { id: 12, label: '12. Summary & Closure' }
+                ].map(sec => (
+                  <li 
+                    key={sec.id} 
+                    onClick={() => scrollToSection(sec.id)}
+                    className={`navigator-item ${activeSection === sec.id ? 'active' : ''}`}
+                    style={{ paddingLeft: activeSection === sec.id ? '9px' : '12px' }}
+                  >
+                    <span style={{ width: '12px', display: 'inline-block', flexShrink: 0, color: 'var(--color-primary)', fontSize: '10px' }}>
+                      {activeSection === sec.id ? '▶' : ''}
+                    </span>
+                    {sec.label}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </aside>
+        </div>
       </form>
 
       {/* Success Confirmation Modal */}

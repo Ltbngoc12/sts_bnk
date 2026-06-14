@@ -802,7 +802,6 @@ export default function IncidentDetailsPage() {
           <div className="glass overview-card">
             <div>
               <div className="overview-section-title">Core Particulars</div>
-              <div className="cd-info-row"><span className="cd-info-label">Category</span><span className="cd-info-value"><strong>{incident.category || 'Standard Incident'}</strong></span></div>
               <div className="cd-info-row"><span className="cd-info-label">Priority</span><span className="cd-info-value"><strong>{incident.priority}</strong></span></div>
               <div className="cd-info-row"><span className="cd-info-label">Reporter Name</span><span className="cd-info-value">{incident.reporterName || 'TBD'}</span></div>
               <div className="cd-info-row"><span className="cd-info-label">Requested By</span><span className="cd-info-value">{incident.requestedBy}</span></div>

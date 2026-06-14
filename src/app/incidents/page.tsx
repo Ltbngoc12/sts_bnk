@@ -4,13 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Case, Incident } from '@/lib/db';
 import { useRole } from '@/context/RoleContext';
-
-const subTypesMap: Record<string, string[]> = {
-  'Security': ['Abandoned Property', 'Intrusion', 'Theft', 'Vandalism', 'Trespass', 'Crowd Control', 'Suspect Package', 'Others'],
-  'Safety / Medical': ['Fainting/Giddiness', 'Cardiac Arrest', 'Heat Stroke', 'Slip & Fall', 'Injury', 'Animal Encounter', 'Others'],
-  'Fire Alarm': ['False Alarm', 'Real Fire', 'Smoke Detector', 'Others'],
-  'Facilities': ['Power Outage', 'Water Leak', 'Lift Fault', 'Aircon Fault', 'Others'],
-};
+import { getIncidentTaxonomy } from '@/lib/taxonomy';
 
 export default function IncidentsPage() {
   const { role } = useRole();
@@ -44,8 +38,11 @@ export default function IncidentsPage() {
     }
   };
 
+  const [taxonomy, setTaxonomy] = useState<Record<string, string[]>>({});
+
   useEffect(() => {
     fetchCases();
+    setTaxonomy(getIncidentTaxonomy());
   }, []);
 
   // Reset Filters
@@ -98,7 +95,6 @@ export default function IncidentsPage() {
   const matchesTab = (tab: string, inc: Incident) => {
     if (tab === 'All') return true;
     const status = inc.status;
-    const category = inc.category;
     
     if (tab === 'Active') {
       return ['Live', 'Live (Assigned)', 'Live (Acknowledged)', 'Live (On-Site)', 'Live (Incomplete)', 'Live (Completed)'].includes(status);
@@ -111,18 +107,6 @@ export default function IncidentsPage() {
     }
     if (tab === 'Closed') {
       return status === 'Closed';
-    }
-    if (tab === 'Ongoing') {
-      return category === 'Ongoing Incident';
-    }
-    if (tab === 'Proactive') {
-      return category === 'Proactive Incident';
-    }
-    if (tab === 'Backdated') {
-      return category === 'Backdated Incident';
-    }
-    if (tab === 'Operational Records') {
-      return category === 'Operational Record';
     }
     return true;
   };
@@ -154,7 +138,7 @@ export default function IncidentsPage() {
     ['Live', 'Live (Assigned)', 'Live (Acknowledged)', 'Live (On-Site)', 'Live (Incomplete)', 'Live (Completed)'].includes(inc.status)
   ).length;
   const pendingEndorsementCount = dateFilteredIncidents.filter(inc => inc.status === 'Pending Endorsement').length;
-  const ongoingIncidentsCount = dateFilteredIncidents.filter(inc => inc.category === 'Ongoing Incident' && ['Live', 'Live (Assigned)', 'Live (Acknowledged)', 'Live (On-Site)', 'Live (Incomplete)', 'Live (Completed)'].includes(inc.status)).length;
+
 
   // Apply all filter rules to line items
   const filteredIncidents = incidentCases.filter(c => {
@@ -471,13 +455,6 @@ export default function IncidentsPage() {
           <div className="metric-icon" style={{ fontSize: '20px' }}>🔒</div>
         </div>
 
-        <div className="metric-card glass ongoing-incidents">
-          <div className="metric-info">
-            <h3>Ongoing Incidents</h3>
-            <div className="metric-value text-success">{ongoingIncidentsCount}</div>
-          </div>
-          <div className="metric-icon" style={{ fontSize: '20px' }}>⏳</div>
-        </div>
       </div>
 
       {/* Advanced Filter Panel */}
@@ -504,10 +481,9 @@ export default function IncidentsPage() {
             <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.04em' }}>Incident Type:</label>
             <select value={filterType} onChange={(e) => { setFilterType(e.target.value); setFilterSubType('All'); }} className="form-control select-dark" style={{ width: '100%' }}>
               <option value="All">All Types</option>
-              <option value="Security">Security</option>
-              <option value="Safety / Medical">Safety / Medical</option>
-              <option value="Fire Alarm">Fire Alarm</option>
-              <option value="Facilities">Facilities</option>
+              {Object.keys(taxonomy).sort().map(t => (
+                <option key={t} value={t}>{t}</option>
+              ))}
             </select>
           </div>
 
@@ -570,7 +546,7 @@ export default function IncidentsPage() {
                 disabled={filterType === 'All'}
               >
                 <option value="All">All Sub-types</option>
-                {filterType !== 'All' && subTypesMap[filterType]?.map(st => (
+                {filterType !== 'All' && taxonomy[filterType]?.sort().map(st => (
                   <option key={st} value={st}>{st}</option>
                 ))}
               </select>
@@ -652,7 +628,6 @@ export default function IncidentsPage() {
                   <th>Case ID</th>
                   <th>Incident Title</th>
                   <th>Classification</th>
-                  <th>Category</th>
                   <th>Priority</th>
                   <th>Location (Common Name)</th>
                   <th>Assigned Responder</th>
@@ -670,7 +645,6 @@ export default function IncidentsPage() {
                       <td className="case-id-cell">{c.id}</td>
                       <td className="case-title-cell">{c.title}</td>
                       <td>{inc.type} - {inc.subType}</td>
-                      <td>{inc.category}</td>
                       <td>
                         <span className={`badge ${
                           inc.priority === 'High' ? 'badge-live' : 'badge-closed'

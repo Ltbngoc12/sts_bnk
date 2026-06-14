@@ -4,12 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useRole } from '@/context/RoleContext';
 
-const taxonomy: Record<string, string[]> = {
-  'Security': ['Unattended Property', 'Suspicious Person', 'Intruder', 'Trespass', 'Theft', 'Vandalism', 'Others'],
-  'Safety / Medical': ['Fainting/Giddiness', 'Slip & Fall', 'Heat Stroke', 'Drowning Alert', 'Cardiac Arrest', 'Others'],
-  'Fire Alarm': ['Smoke Detector', 'Manual Call Point', 'Actual Fire', 'False Trigger', 'Others'],
-  'Infrastructure': ['Power Outage', 'Water Pipe Leak', 'Lift Fault', 'Barrier Malfunction', 'Lighting Fault', 'Others']
-};
+import { getIncidentTaxonomy } from '@/lib/taxonomy';
 
 export default function NewCasePage() {
   const router = useRouter();
@@ -22,8 +17,8 @@ export default function NewCasePage() {
   const [submitting, setSubmitting] = useState(false);
 
   // Dynamic Incident Form States
-  const [incType, setIncType] = useState('Security');
-  const [incSubType, setIncSubType] = useState('Unattended Property');
+  const [incType, setIncType] = useState('');
+  const [incSubType, setIncSubType] = useState('');
   const [incPriority, setIncPriority] = useState('Normal');
   const [incReporter, setIncReporter] = useState('');
   const [incRequestedBy, setIncRequestedBy] = useState('IIOC Controller');
@@ -54,9 +49,14 @@ export default function NewCasePage() {
   const [ediarySpecifyTopic, setEdiarySpecifyTopic] = useState('');
   const [ediaryContent, setEdiaryContent] = useState('');
 
+  const [taxonomy, setTaxonomy] = useState<Record<string, string[]>>({});
+
   useEffect(() => {
-    const list = taxonomy[incType];
-    if (list && list.length > 0) setIncSubType(list[0]);
+    setTaxonomy(getIncidentTaxonomy());
+  }, []);
+
+  useEffect(() => {
+    setIncSubType('');
   }, [incType]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -73,6 +73,16 @@ export default function NewCasePage() {
 
       // If we are attaching an Incident, we embed it in the initial POST request
       if (componentType === 'incident') {
+        if (!incType) {
+          alert('Incident Type is required.');
+          setSubmitting(false);
+          return;
+        }
+        if (!incSubType) {
+          alert('Incident Sub-Type is required.');
+          setSubmitting(false);
+          return;
+        }
         if (!incCommonName.trim()) {
           alert('Location Common Name is required for Incident Reports.');
           setSubmitting(false);
@@ -264,8 +274,9 @@ export default function NewCasePage() {
               <div className="form-grid">
                 <div className="form-group">
                   <label>Incident Type *</label>
-                  <select value={incType} onChange={(e) => setIncType(e.target.value)} className="form-control select-dark">
-                    {Object.keys(taxonomy).map(t => (
+                  <select value={incType} onChange={(e) => setIncType(e.target.value)} className="form-control select-dark" required>
+                    <option value="">-- Select Type --</option>
+                    {Object.keys(taxonomy).sort().map(t => (
                       <option key={t} value={t}>{t}</option>
                     ))}
                   </select>
@@ -273,8 +284,9 @@ export default function NewCasePage() {
 
                 <div className="form-group">
                   <label>Incident Sub-Type *</label>
-                  <select value={incSubType} onChange={(e) => setIncSubType(e.target.value)} className="form-control select-dark">
-                    {taxonomy[incType]?.map(st => (
+                  <select value={incSubType} onChange={(e) => setIncSubType(e.target.value)} disabled={!incType} className="form-control select-dark" required>
+                    <option value="">-- Select Sub-Type --</option>
+                    {incType && taxonomy[incType]?.sort().map(st => (
                       <option key={st} value={st}>{st}</option>
                     ))}
                   </select>

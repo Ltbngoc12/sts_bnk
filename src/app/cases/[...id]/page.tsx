@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Case, Task, PersonalInjury, PersonInvolved } from '@/lib/db';
 import { useRole } from '@/context/RoleContext';
+import { getIncidentTaxonomy } from '@/lib/taxonomy';
 
 // ─── Helper: case status → badge class ───────────────────────────────────────
 function caseBadgeClass(status: string) {
@@ -38,13 +39,6 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
-const taxonomy: Record<string, string[]> = {
-  'Security': ['Unattended Property', 'Suspicious Person', 'Intruder', 'Trespass', 'Theft', 'Vandalism', 'Others'],
-  'Safety / Medical': ['Fainting/Giddiness', 'Slip & Fall', 'Heat Stroke', 'Drowning Alert', 'Cardiac Arrest', 'Others'],
-  'Fire Alarm': ['Smoke Detector', 'Manual Call Point', 'Actual Fire', 'False Trigger', 'Others'],
-  'Infrastructure': ['Power Outage', 'Water Pipe Leak', 'Lift Fault', 'Barrier Malfunction', 'Lighting Fault', 'Others']
-};
-
 export default function CaseDetailsPage() {
   const params = useParams();
   const { role, username } = useRole();
@@ -64,8 +58,8 @@ export default function CaseDetailsPage() {
   // Attach Incident Report Modal States
   const [showAttachIncidentModal, setShowAttachIncidentModal] = useState(false);
   const [attachCategory, setAttachCategory] = useState('Standard Incident');
-  const [attachType, setAttachType] = useState('Security');
-  const [attachSubType, setAttachSubType] = useState('Unattended Property');
+  const [attachType, setAttachType] = useState('');
+  const [attachSubType, setAttachSubType] = useState('');
   const [attachPriority, setAttachPriority] = useState('Normal');
   const [attachLocation, setAttachLocation] = useState('');
   const [attachSummary, setAttachSummary] = useState('');
@@ -97,9 +91,14 @@ export default function CaseDetailsPage() {
   // CMMS
   const [cmmsLoading, setCmmsLoading] = useState(false);
 
+  const [taxonomy, setTaxonomy] = useState<Record<string, string[]>>({});
+
   useEffect(() => {
-    const list = taxonomy[attachType];
-    if (list && list.length > 0) setAttachSubType(list[0]);
+    setTaxonomy(getIncidentTaxonomy());
+  }, []);
+
+  useEffect(() => {
+    setAttachSubType('');
   }, [attachType]);
 
   // ─── Data fetching ──────────────────────────────────────────────────────────
@@ -238,7 +237,14 @@ export default function CaseDetailsPage() {
 
   const handleAttachIncident = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!attachLocation.trim()) return;
+    if (!attachType) {
+      alert('Incident Type is required.');
+      return;
+    }
+    if (!attachSubType) {
+      alert('Incident Sub-Type is required.');
+      return;
+    }
     setSaving(true);
     try {
       const res = await fetch(`/api/cases/${caseId}`, {
@@ -385,7 +391,6 @@ export default function CaseDetailsPage() {
                     <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)' }}>{inc.title}</div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px', fontSize: '12px', color: 'var(--text-muted)' }}>
                       <div><strong>Incident ID:</strong> <span className="mono-id" style={{ fontSize: '10px', padding: '1px 5px' }}>{inc.id}</span></div>
-                      <div><strong>Category:</strong> {inc.category || 'Standard Incident'}</div>
                       <div><strong>Priority:</strong> {inc.priority}</div>
                       <div><strong>Classification:</strong> {inc.type} &bull; {inc.subType}</div>
                       <div><strong>Location:</strong> {inc.location.commonName || inc.location.road || 'TBD'}</div>
@@ -546,7 +551,6 @@ export default function CaseDetailsPage() {
             <div className="glass" style={{ padding: '14px 16px' }}>
               <h3 className="section-title">Incident Summary</h3>
               <InfoRow label="Incident ID" value={<span className="mono-id" style={{ fontSize: '10px', padding: '1px 5px' }}>{inc.id}</span>} />
-              <InfoRow label="Category" value={inc.category || 'Standard Incident'} />
               <InfoRow label="Priority" value={<strong>{inc.priority}</strong>} />
               <InfoRow label="Type" value={`${inc.type} · ${inc.subType}`} />
               <InfoRow label="Assigned" value={inc.assignedTo || 'Unassigned'} />
@@ -591,21 +595,13 @@ export default function CaseDetailsPage() {
             <div className="modal-title">Attach Security/Safety Incident Report</div>
             <form onSubmit={handleAttachIncident}>
               <div className="form-grid">
-                <div className="form-group colspan-2">
-                  <label>Incident Category *</label>
-                  <select value={attachCategory} onChange={(e) => setAttachCategory(e.target.value)} className="form-control select-dark">
-                    <option value="Standard Incident">Standard Incident</option>
-                    <option value="Proactive Incident">Proactive Incident</option>
-                    <option value="Backdated Incident">Backdated Incident</option>
-                    <option value="Ongoing Incident">Ongoing Incident</option>
-                    <option value="Operational Record">Operational Record</option>
-                  </select>
-                </div>
+
 
                 <div className="form-group">
                   <label>Incident Type *</label>
-                  <select value={attachType} onChange={(e) => setAttachType(e.target.value)} className="form-control select-dark">
-                    {Object.keys(taxonomy).map(t => (
+                  <select value={attachType} onChange={(e) => setAttachType(e.target.value)} className="form-control select-dark" required>
+                    <option value="">-- Select Type --</option>
+                    {Object.keys(taxonomy).sort().map(t => (
                       <option key={t} value={t}>{t}</option>
                     ))}
                   </select>
@@ -613,8 +609,9 @@ export default function CaseDetailsPage() {
 
                 <div className="form-group">
                   <label>Incident Sub-Type *</label>
-                  <select value={attachSubType} onChange={(e) => setAttachSubType(e.target.value)} className="form-control select-dark">
-                    {taxonomy[attachType]?.map(st => (
+                  <select value={attachSubType} onChange={(e) => setAttachSubType(e.target.value)} disabled={!attachType} className="form-control select-dark" required>
+                    <option value="">-- Select Sub-Type --</option>
+                    {attachType && taxonomy[attachType]?.sort().map(st => (
                       <option key={st} value={st}>{st}</option>
                     ))}
                   </select>
@@ -650,13 +647,12 @@ export default function CaseDetailsPage() {
                 </div>
 
                 <div className="form-group colspan-2">
-                  <label>Location Common Name *</label>
+                  <label>Location Common Name</label>
                   <input
                     type="text"
                     placeholder="e.g. Siloso Lifeguard Post 2"
                     value={attachLocation}
                     onChange={(e) => setAttachLocation(e.target.value)}
-                    required
                     className="form-control"
                   />
                 </div>
