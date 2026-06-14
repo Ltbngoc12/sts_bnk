@@ -46,17 +46,17 @@ const statusDetails: Record<string, StatusDetail> = {
     color: '#EA580C',
     bgColor: 'rgba(234, 88, 12, 0.08)',
     borderColor: 'rgba(234, 88, 12, 0.25)',
-    description: 'A ground responder (Ranger) has been selected and dispatched to resolve the incident.',
+    description: 'One or more ground Responders (Rangers) have been selected and dispatched to resolve the incident.',
     whoCanTransition: ['Controller', 'Duty Officer', 'Duty Manager'],
     actionTriggers: [
-      'Controller/DM selects a responder from the active Ranger list and clicks "Dispatch" on the action panel.'
+      'Controller/DM selects one or more Responders from the active Ranger list and dispatches them.'
     ],
     operationalImpacts: [
-      'Sends a high-priority push notification to the assigned Ranger\'s mobile app.',
-      'Logs a Chronological Timeline entry: "Dispatched to Ranger [Name]".',
-      'Updates Incident assignment metadata in Case Log.'
+      'Sends a high-priority push notification to each assigned Responder\'s mobile app.',
+      'Logs a Chronological Timeline entry: "Responder [Name] assigned".',
+      'Updates Incident assignment metadata (plural) in Case Log.'
     ],
-    actionPanelState: 'Re-assignable: Controller can update or change the assigned responder if needed.',
+    actionPanelState: 'Manage Responders: Controller can add additional Responders or remove existing ones (enforcing that at least one remains assigned).',
     relatedElements: ['Ranger Mobile Dispatch Queue', 'Timeline: Dispatched']
   },
   'Live (Acknowledged)': {

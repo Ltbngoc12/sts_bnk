@@ -160,6 +160,15 @@
       "createdBy": "Controller Steve",
       "closedAt": null,
       "closedBy": null
+    },
+    {
+      "id": "SEN/CI/20260614/001",
+      "title": "Test 12",
+      "status": "Closed",
+      "createdAt": "2026-06-14T09:28:22.756Z",
+      "createdBy": "Controller Steve",
+      "closedAt": "2026-06-14T10:39:17.214Z",
+      "closedBy": "DM Gan"
     }
   ],
   "incidents": [
@@ -176,7 +185,6 @@
       "requestedBy": "IIOC Controller",
       "createdBy": "system_controller",
       "status": "Live (On-Site)",
-      "assignedTo": "Ranger John",
       "location": {
         "road": "Siloso Beach Walk",
         "building": "Emerald Pavilion",
@@ -269,7 +277,16 @@
           "status": "Open"
         }
       ],
-      "category": "Standard Incident"
+      "category": "Standard Incident",
+      "attachments": [],
+      "responders": [
+        {
+          "responderId": "Ranger John",
+          "assignedBy": "system_controller",
+          "assignedAt": "2026-06-05T08:15:00+07:00",
+          "status": "Active"
+        }
+      ]
     },
     {
       "id": "SEN/IR/20260605/0002",
@@ -284,7 +301,6 @@
       "requestedBy": "RWS Security Desk",
       "createdBy": "controller_steve",
       "status": "Closed",
-      "assignedTo": "Ranger Sarah",
       "location": {
         "road": "Sentosa Gateway",
         "building": "RWS Casino Entrance",
@@ -405,7 +421,16 @@
       "summary": "Female guest fainted at RWS Casino entrance lobby. Ranger Sarah responded. SCDF ambulance called and conveyed patient to SGH. Closed.",
       "completionRemarks": "Ranger Sarah completed medical assist. SCDF Ambulance took over.",
       "slaveIncidents": [],
-      "category": "Standard Incident"
+      "category": "Standard Incident",
+      "attachments": [],
+      "responders": [
+        {
+          "responderId": "Ranger Sarah",
+          "assignedBy": "controller_steve",
+          "assignedAt": "2026-06-05T07:10:00+07:00",
+          "status": "Active"
+        }
+      ]
     },
     {
       "id": "SEN/IR/20260605/0003",
@@ -420,7 +445,6 @@
       "requestedBy": "Guest Call-in",
       "createdBy": "Controller Steve",
       "status": "Live (Completed)",
-      "assignedTo": "",
       "location": {
         "road": "123",
         "building": "1233",
@@ -517,9 +541,11 @@
       "personsInvolved": [],
       "cctvBwc": [],
       "summary": "123132",
-      "completionRemarks": "csacs",
+      "completionRemarks": "",
       "slaveIncidents": [],
-      "category": "Standard Incident"
+      "category": "Standard Incident",
+      "attachments": [],
+      "responders": []
     },
     {
       "caseId": "SEN/CI/20260608/001",
@@ -532,7 +558,6 @@
       "requestedBy": "Ranger Field Patrol",
       "createdBy": "DM Gan",
       "status": "Live (Assigned)",
-      "assignedTo": "Ranger John",
       "location": {
         "road": "12",
         "building": "12",
@@ -635,7 +660,16 @@
       "summary": "12",
       "completionRemarks": "",
       "id": "SEN/IR/20260608/0004",
-      "category": "Standard Incident"
+      "category": "Standard Incident",
+      "attachments": [],
+      "responders": [
+        {
+          "responderId": "Ranger John",
+          "assignedBy": "DM Gan",
+          "assignedAt": "2026-06-08T13:51:21.374Z",
+          "status": "Active"
+        }
+      ]
     },
     {
       "id": "SEN/IR/20260611/0001",
@@ -650,7 +684,6 @@
       "requestedBy": "Guest Call-in",
       "createdBy": "Controller Steve",
       "status": "Closed",
-      "assignedTo": "",
       "location": {
         "road": "",
         "building": "",
@@ -750,7 +783,9 @@
       "category": "Standard Incident",
       "acknowledgedAt": "2026-06-12T03:58:46.186Z",
       "onSiteAt": "2026-06-12T03:58:51.891Z",
-      "completedAt": "2026-06-12T03:59:12.817Z"
+      "completedAt": "2026-06-12T03:59:12.817Z",
+      "attachments": [],
+      "responders": []
     },
     {
       "id": "SEN/IR/20260612/9001",
@@ -765,7 +800,6 @@
       "requestedBy": "Guest Call-in",
       "createdBy": "system",
       "status": "Closed",
-      "assignedTo": "Ranger John",
       "location": {
         "road": "Siloso Beach Walk",
         "building": "Beach Station",
@@ -850,7 +884,16 @@
       "personalInjuries": [],
       "personsInvolved": [],
       "cctvBwc": [],
-      "slaveIncidents": []
+      "slaveIncidents": [],
+      "attachments": [],
+      "responders": [
+        {
+          "responderId": "Ranger John",
+          "assignedBy": "system",
+          "assignedAt": "2026-06-12T08:00:00+07:00",
+          "status": "Active"
+        }
+      ]
     },
     {
       "id": "SEN/IR/20260612/9002",
@@ -865,7 +908,6 @@
       "requestedBy": "Ranger Field Patrol",
       "createdBy": "Ranger Dave",
       "status": "Closed",
-      "assignedTo": "Ranger Dave",
       "location": {
         "road": "Palawan Beach Walk",
         "building": "Palawan Food Court",
@@ -932,7 +974,16 @@
       "personalInjuries": [],
       "personsInvolved": [],
       "cctvBwc": [],
-      "slaveIncidents": []
+      "slaveIncidents": [],
+      "attachments": [],
+      "responders": [
+        {
+          "responderId": "Ranger Dave",
+          "assignedBy": "Ranger Dave",
+          "assignedAt": "2026-06-12T09:00:00+07:00",
+          "status": "Active"
+        }
+      ]
     },
     {
       "id": "SEN/IR/20260612/9003",
@@ -947,7 +998,6 @@
       "requestedBy": "Ranger Field Patrol",
       "createdBy": "Controller Steve",
       "status": "Closed",
-      "assignedTo": "External Pest Control",
       "location": {
         "road": "Imbiah Trail",
         "building": "Main footpath",
@@ -1014,7 +1064,16 @@
       "personalInjuries": [],
       "personsInvolved": [],
       "cctvBwc": [],
-      "slaveIncidents": []
+      "slaveIncidents": [],
+      "attachments": [],
+      "responders": [
+        {
+          "responderId": "External Pest Control",
+          "assignedBy": "Controller Steve",
+          "assignedAt": "2026-06-11T14:30:00+07:00",
+          "status": "Active"
+        }
+      ]
     },
     {
       "id": "SEN/IR/20260612/9004",
@@ -1029,7 +1088,6 @@
       "requestedBy": "UCS Power Feed",
       "createdBy": "system",
       "status": "Live (On-Site)",
-      "assignedTo": "Ranger Sarah",
       "location": {
         "road": "Siloso Beach Walk",
         "building": "Kiosk Sector 3",
@@ -1108,7 +1166,16 @@
       "personalInjuries": [],
       "personsInvolved": [],
       "cctvBwc": [],
-      "slaveIncidents": []
+      "slaveIncidents": [],
+      "attachments": [],
+      "responders": [
+        {
+          "responderId": "Ranger Sarah",
+          "assignedBy": "system",
+          "assignedAt": "2026-06-12T10:00:00+07:00",
+          "status": "Active"
+        }
+      ]
     },
     {
       "id": "SEN/IR/20260612/9005",
@@ -1123,7 +1190,6 @@
       "requestedBy": "IIOC Controller",
       "createdBy": "Safety Coordinator",
       "status": "Closed",
-      "assignedTo": "HQ Fire Wardens",
       "location": {
         "road": "Sentosa Gateway",
         "building": "SDC HQ Building",
@@ -1191,7 +1257,16 @@
       "personalInjuries": [],
       "personsInvolved": [],
       "cctvBwc": [],
-      "slaveIncidents": []
+      "slaveIncidents": [],
+      "attachments": [],
+      "responders": [
+        {
+          "responderId": "HQ Fire Wardens",
+          "assignedBy": "Safety Coordinator",
+          "assignedAt": "2026-06-12T14:00:00+07:00",
+          "status": "Active"
+        }
+      ]
     },
     {
       "id": "SEN/IR/20260612/9006",
@@ -1206,7 +1281,6 @@
       "requestedBy": "Walk-in Guest",
       "createdBy": "Controller Steve",
       "status": "Returned",
-      "assignedTo": "Ranger John",
       "location": {
         "road": "Siloso Beach Walk",
         "building": "Siloso Restrooms",
@@ -1291,7 +1365,253 @@
       "personalInjuries": [],
       "personsInvolved": [],
       "cctvBwc": [],
-      "slaveIncidents": []
+      "slaveIncidents": [],
+      "attachments": [],
+      "responders": [
+        {
+          "responderId": "Ranger John",
+          "assignedBy": "Controller Steve",
+          "assignedAt": "2026-06-12T11:00:00+07:00",
+          "status": "Active"
+        }
+      ]
+    },
+    {
+      "id": "SEN/IR/20260614/0001",
+      "caseId": "SEN/CI/20260614/001",
+      "title": "Test 12",
+      "dateTime": "2026-06-14T02:26:00.000Z",
+      "type": "Environmental",
+      "subType": "Fallen Tree",
+      "priority": "High",
+      "crisisLevel": 4,
+      "reporterName": "HH",
+      "requestedBy": "Email",
+      "createdBy": "Controller Steve",
+      "category": "Standard Incident",
+      "status": "Closed",
+      "location": {
+        "road": "Siloso Beach Walk",
+        "building": "Siloso Beach Station",
+        "levelSpace": "Level 1 - Control Room",
+        "nearAt": "",
+        "commonName": "Control Room",
+        "postalCode": "000000",
+        "tags": [
+          "Operational",
+          "Restricted"
+        ],
+        "lat": 1.2562,
+        "lng": 103.8124
+      },
+      "log": [
+        {
+          "eventNumber": 1,
+          "date": "2026-06-14",
+          "time": "16:28:22",
+          "description": "Incident logged under ID SEN/IR/20260614/0001 (Case ID SEN/CI/20260614/001). Classification: Environmental - Fallen Tree."
+        },
+        {
+          "eventNumber": 2,
+          "date": "2026-06-14",
+          "time": "16:52:10",
+          "description": "Responder Ranger John acknowledged dispatch. Status changed to Live (Acknowledged)."
+        },
+        {
+          "eventNumber": 3,
+          "date": "2026-06-14",
+          "time": "16:52:11",
+          "description": "Responder Ranger John confirmed arrival on-site. Status changed to Live (On-Site)."
+        },
+        {
+          "eventNumber": 4,
+          "date": "2026-06-14",
+          "time": "16:52:14",
+          "description": "Responder Ranger John marked ground activities completed. Remarks: sss Status changed to Live (Completed)."
+        },
+        {
+          "eventNumber": 5,
+          "date": "2026-06-14",
+          "time": "16:52:20",
+          "description": "Incident submitted for Duty Manager endorsement by Controller Steve."
+        },
+        {
+          "eventNumber": 6,
+          "date": "2026-06-14",
+          "time": "16:52:40",
+          "description": "Incident approved and closed by DM Gan (Duty Manager). Closure remarks: qqq Record is now read-only."
+        },
+        {
+          "eventNumber": 7,
+          "date": "2026-06-14",
+          "time": "17:21:13",
+          "description": "Incident reopened by System Administrator (Admin Root). Status reset to Live."
+        },
+        {
+          "eventNumber": 8,
+          "date": "2026-06-14",
+          "time": "17:21:15",
+          "description": "Responder added: Ranger Alex — assigned by Admin Root."
+        },
+        {
+          "eventNumber": 9,
+          "date": "2026-06-14",
+          "time": "17:21:43",
+          "description": "Responder removed: Ranger John — unassigned by Admin Root."
+        },
+        {
+          "eventNumber": 10,
+          "date": "2026-06-14",
+          "time": "17:22:30",
+          "description": "Responder added: Ranger John — assigned by Admin Root."
+        },
+        {
+          "eventNumber": 11,
+          "date": "2026-06-14",
+          "time": "17:22:32",
+          "description": "Responder removed: Ranger Alex — unassigned by Admin Root."
+        },
+        {
+          "eventNumber": 12,
+          "date": "2026-06-14",
+          "time": "17:25:27",
+          "description": "Responder added: Ranger Alex — assigned by Admin Root."
+        },
+        {
+          "eventNumber": 13,
+          "date": "2026-06-14",
+          "time": "17:38:30",
+          "description": "Responder Ranger John, Ranger Alex acknowledged dispatch. Status changed to Live (Acknowledged)."
+        },
+        {
+          "eventNumber": 14,
+          "date": "2026-06-14",
+          "time": "17:38:32",
+          "description": "Responder Ranger John, Ranger Alex confirmed arrival on-site. Status changed to Live (On-Site)."
+        },
+        {
+          "eventNumber": 15,
+          "date": "2026-06-14",
+          "time": "17:38:34",
+          "description": "Responder Ranger John, Ranger Alex marked ground activities completed. Status changed to Live (Completed)."
+        },
+        {
+          "eventNumber": 16,
+          "date": "2026-06-14",
+          "time": "17:38:43",
+          "description": "Incident submitted for Duty Manager endorsement by Controller Steve."
+        },
+        {
+          "eventNumber": 17,
+          "date": "2026-06-14",
+          "time": "17:38:47",
+          "description": "[MANUAL] scascas — by Controller Steve.",
+          "attachments": []
+        },
+        {
+          "eventNumber": 18,
+          "date": "2026-06-14",
+          "time": "17:39:01",
+          "description": "Incident returned to Controller by DM Gan. Reason: sssss"
+        },
+        {
+          "eventNumber": 19,
+          "date": "2026-06-14",
+          "time": "17:39:10",
+          "description": "Incident submitted for Duty Manager endorsement by Controller Steve."
+        },
+        {
+          "eventNumber": 20,
+          "date": "2026-06-14",
+          "time": "17:39:17",
+          "description": "Incident approved and closed by DM Gan (Duty Manager). Closure remarks: scascâ Record is now read-only."
+        }
+      ],
+      "emergencyServices": {
+        "policeAtScene": true,
+        "officerNameRank": "Tan",
+        "policeIncidentNo": "",
+        "classification": "",
+        "respondingUnit": "",
+        "ambulanceScdfType": "None",
+        "ambulanceOfficerName": "",
+        "ambulanceCallSign": "",
+        "ambulanceRespondingUnit": "",
+        "ambulanceArrivalTime": "",
+        "hospitalConveyedTo": ""
+      },
+      "mediaInvolvement": {
+        "mediaAtScene": true,
+        "mediaName": "Aw",
+        "commsNotified": false
+      },
+      "propertyDamage": {
+        "sdcPropertyDamaged": true,
+        "description": "qqqw"
+      },
+      "vehiclesInvolved": [],
+      "personalInjuries": [
+        {
+          "name": "Bie",
+          "address": "",
+          "age": 12,
+          "gender": "Male",
+          "contactNumber": "",
+          "clinicHospitalAttended": "",
+          "msigFormIssued": false,
+          "msigSerialNo": "",
+          "under16": true,
+          "parentGuardianName": "12",
+          "parentGuardianContact": "12"
+        }
+      ],
+      "personsInvolved": [
+        {
+          "guestOrNonGuest": "Guest",
+          "type": "Guest",
+          "name": "1",
+          "address": "2",
+          "age": 3,
+          "gender": "Male",
+          "contactNumber": "2",
+          "roleInvolvement": "",
+          "injuryDetails": ""
+        }
+      ],
+      "cctvBwc": [],
+      "summary": "sss",
+      "completionRemarks": "scascâ",
+      "slaveIncidents": [],
+      "attachments": [],
+      "acknowledgedAt": "2026-06-14T10:38:30.999Z",
+      "onSiteAt": "2026-06-14T10:38:32.360Z",
+      "completedAt": "2026-06-14T10:38:34.032Z",
+      "responders": [
+        {
+          "responderId": "Ranger John",
+          "assignedBy": "Controller Steve",
+          "assignedAt": "2026-06-14T02:26:00.000Z",
+          "status": "Removed"
+        },
+        {
+          "responderId": "Ranger Alex",
+          "assignedBy": "Admin Root",
+          "assignedAt": "2026-06-14T10:21:15.899Z",
+          "status": "Removed"
+        },
+        {
+          "responderId": "Ranger John",
+          "assignedBy": "Admin Root",
+          "assignedAt": "2026-06-14T10:22:30.482Z",
+          "status": "Active"
+        },
+        {
+          "responderId": "Ranger Alex",
+          "assignedBy": "Admin Root",
+          "assignedAt": "2026-06-14T10:25:27.321Z",
+          "status": "Active"
+        }
+      ]
     }
   ],
   "faults": [
@@ -1606,6 +1926,18 @@
       "beforeSnapshot": "{\"id\":\"inc-1\",\"category\":\"Incident\",\"name\":\"Security\",\"subTypes\":[\"Trespassing\",\"Theft\",\"Vandalism\",\"Public Nuisance\"],\"status\":\"Active\"}",
       "afterSnapshot": "{\"id\":\"inc-1\",\"category\":\"Incident\",\"name\":\"Security\",\"subTypes\":[\"Trespassing\",\"Theft\",\"Vandalism\",\"Public Nuisance\"],\"status\":\"Active\",\"description\":\"\"}",
       "correlationId": "REF-1781369812689",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "AUD-1781432420775-869",
+      "timestamp": "2026-06-14T10:20:20.775Z",
+      "user": "Admin Root",
+      "action": "Create User",
+      "module": "User Management",
+      "details": "Created user account: alex.tan@ranger.com.sg",
+      "beforeSnapshot": "null",
+      "afterSnapshot": "{\"id\":\"1781432420704\",\"name\":\"Ranger Alex\",\"email\":\"alex.tan@ranger.com.sg\",\"department\":\"ODC\",\"orgUnit\":\"1\",\"authSource\":\"Non-SSO\",\"role\":\"Responder\",\"status\":\"Active\",\"lastLogin\":\"Never\"}",
+      "correlationId": "USR-1781432420704",
       "ipAddress": "127.0.0.1"
     }
   ]

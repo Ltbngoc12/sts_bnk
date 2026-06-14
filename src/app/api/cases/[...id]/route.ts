@@ -125,7 +125,9 @@ export async function PUT(
         createdBy: body.username || 'admin',
         category: incidentData.category || 'Standard Incident',
         status: incidentData.status || 'Live',
-        assignedTo: incidentData.assignedTo || '',
+        assignedTo: Array.isArray(incidentData.assignedTo)
+          ? incidentData.assignedTo
+          : (incidentData.assignedTo ? [incidentData.assignedTo] : []),
         location: {
           road: incidentData.location?.road || '',
           building: incidentData.location?.building || '',

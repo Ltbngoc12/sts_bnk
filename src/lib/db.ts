@@ -93,6 +93,17 @@ export interface CCTVBWC {
   bwcTimestamp: string;
 }
 
+export interface Attachment {
+  id: string;
+  incidentId: string;
+  fileName: string;
+  fileUrl: string;
+  fileType: string;
+  fileSize: number;
+  uploadedBy: string;
+  uploadedAt: string;
+}
+
 export interface SlaveIncident {
   id: string; // SEN/IR/YYYYMMDD/NNNN
   title: string;
@@ -100,6 +111,13 @@ export interface SlaveIncident {
   reporterName: string;
   summary: string;
   status: string; // Open, Closed
+}
+
+export interface IncidentResponder {
+  responderId: string;   // Display name, e.g. "Ranger John"
+  assignedBy: string;    // Username of Controller who made the assignment
+  assignedAt: string;    // ISO datetime of assignment
+  status: 'Active' | 'Removed'; // 'Removed' when explicitly unassigned
 }
 
 export interface Incident {
@@ -116,7 +134,8 @@ export interface Incident {
   createdBy: string;
   category: string; // "Standard Incident" | "Proactive Incident" | "Backdated Incident" | "Ongoing Incident" | "Operational Record"
   status: string; // "Live" | "Live (Assigned)" | "Live (Acknowledged)" | "Live (On-Site)" | "Live (Incomplete)" | "Live (Completed)" | "Pending Endorsement" | "Returned" | "Closed"
-  assignedTo: string; // "Ranger John", etc. (or comma-separated list of Responders)
+  assignedTo: string[]; // Array of responder display names, e.g. ["Ranger John", "Ranger Dave"]
+  responders?: IncidentResponder[]; // Rich metadata per assignment (assignedBy, assignedAt, status)
   location: Location;
   log: LogEntry[];
   emergencyServices: EmergencyServices;
@@ -126,6 +145,7 @@ export interface Incident {
   personalInjuries: PersonalInjury[];
   personsInvolved: PersonInvolved[];
   cctvBwc: CCTVBWC[];
+  attachments?: Attachment[];
   summary: string;
   completionRemarks: string;
   slaveIncidents: SlaveIncident[];
@@ -378,7 +398,8 @@ export function getDb(): DbSchema {
             cctvBwc: incident.cctvBwc || [],
             summary: incident.summary || '',
             completionRemarks: incident.completionRemarks || '',
-            slaveIncidents: incident.slaveIncidents || []
+            slaveIncidents: incident.slaveIncidents || [],
+            attachments: incident.attachments || []
           });
         }
 
@@ -455,14 +476,37 @@ export function getDb(): DbSchema {
     // Ensure all incidents follow strict FRD status and category taxonomy
     if (normalizedDb.incidents) {
       normalizedDb.incidents = normalizedDb.incidents.map(inc => {
+        // Migrate legacy assignedTo string/array to responders metadata if empty/missing
+        const legacyResponders = inc.responders || [];
+        let finalResponders = legacyResponders;
+        if (legacyResponders.length === 0) {
+          let legacyAssigned: string[] = [];
+          if (typeof inc.assignedTo === 'string') {
+            legacyAssigned = inc.assignedTo ? [inc.assignedTo] : [];
+          } else if (Array.isArray(inc.assignedTo)) {
+            legacyAssigned = inc.assignedTo;
+          }
+          finalResponders = legacyAssigned.map(r => ({
+            responderId: r,
+            assignedBy: inc.createdBy || 'System',
+            assignedAt: inc.dateTime || new Date().toISOString(),
+            status: 'Active' as const
+          }));
+        }
+
+        // Derive assignedTo dynamically from active responders (single source of truth)
+        const derivedAssignedTo = finalResponders
+          .filter(r => r.status === 'Active')
+          .map(r => r.responderId);
+
         let mappedStatus = inc.status || 'Live';
         if (mappedStatus === 'Live Acknowledged') mappedStatus = 'Live (Acknowledged)';
         else if (mappedStatus === 'Live On-Site') mappedStatus = 'Live (On-Site)';
         else if (mappedStatus === 'Live Completed') mappedStatus = 'Live (Completed)';
         else if (mappedStatus === 'Pending Review') mappedStatus = 'Pending Endorsement';
 
-        // Set Live (Assigned) if there is an assignee but status is still Live
-        if (mappedStatus === 'Live' && inc.assignedTo) {
+        // Set Live (Assigned) if there are assignees but status is still Live
+        if (mappedStatus === 'Live' && derivedAssignedTo.length > 0) {
           mappedStatus = 'Live (Assigned)';
         }
 
@@ -471,7 +515,10 @@ export function getDb(): DbSchema {
         return {
           ...inc,
           status: mappedStatus,
-          category: mappedCategory
+          category: mappedCategory,
+          attachments: inc.attachments || [],
+          responders: finalResponders,
+          assignedTo: derivedAssignedTo
         };
       });
     }
@@ -549,8 +596,11 @@ export function saveDb(data: DbSchema): void {
         if (!incident.id) {
           incident.id = `SEN/IR/${incident.dateTime?.split('T')[0].replace(/-/g, '') || new Date().toISOString().split('T')[0].replace(/-/g, '')}/${String(normalizedDb.incidents.length + 1).padStart(4, '0')}`;
         }
+        // Strip assignedTo to avoid duplicate storage on disk, since it is dynamically derived on load
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { assignedTo, ...incidentMeta } = incident;
         normalizedDb.incidents.push({
-          ...incident,
+          ...(incidentMeta as any),
           caseId: caseMeta.id
         });
       }

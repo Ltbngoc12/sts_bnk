@@ -77,18 +77,54 @@ export async function PUT(
     const logDate = now.toISOString().split('T')[0];
     const logTime = now.toLocaleTimeString('en-US', { hour12: false });
 
-    // Assigned responder
+    // Assigned responder — now supports arrays
     if (body.assignedTo !== undefined) {
-      const prev = incident.assignedTo;
-      incident.assignedTo = body.assignedTo;
-      if (body.assignedTo && body.assignedTo !== prev) {
-        incident.status = 'Live (Assigned)';
-        incident.log.push({
-          eventNumber: incident.log.length + 1,
-          date: logDate,
-          time: logTime,
-          description: `Responder assigned: ${body.assignedTo} (by ${body.username ?? 'Controller'}). Status set to Live (Assigned).`
+      const incoming: string[] = Array.isArray(body.assignedTo)
+        ? body.assignedTo
+        : (body.assignedTo ? [body.assignedTo] : []);
+      const prev: string[] = Array.isArray(incident.assignedTo)
+        ? incident.assignedTo
+        : (incident.assignedTo ? [incident.assignedTo as unknown as string] : []);
+      
+      if (JSON.stringify(incoming) !== JSON.stringify(prev)) {
+        // Sync responders array (single source of truth)
+        const actor = body.username ?? 'Controller';
+        
+        // Mark removed responders
+        const updatedResponders = (incident.responders || []).map(r => {
+          if (!incoming.includes(r.responderId) && r.status === 'Active') {
+            return { ...r, status: 'Removed' as const };
+          }
+          return r;
         });
+
+        // Add new active responders
+        incoming.forEach(r => {
+          const exists = updatedResponders.find(x => x.responderId === r);
+          if (exists) {
+            exists.status = 'Active';
+          } else {
+            updatedResponders.push({
+              responderId: r,
+              assignedBy: actor,
+              assignedAt: new Date().toISOString(),
+              status: 'Active'
+            });
+          }
+        });
+
+        incident.responders = updatedResponders;
+        incident.assignedTo = incoming;
+
+        if (incoming.length > 0) {
+          incident.status = 'Live (Assigned)';
+          incident.log.push({
+            eventNumber: incident.log.length + 1,
+            date: logDate,
+            time: logTime,
+            description: `Responders assigned: ${incoming.join(', ')} (by ${actor}). Status set to Live (Assigned).`
+          });
+        }
       }
     }
 
@@ -103,6 +139,25 @@ export async function PUT(
     // Manual log entry
     if (body.newLogEntry) {
       incident.log.push({ eventNumber: incident.log.length + 1, date: logDate, time: logTime, description: body.newLogEntry });
+    }
+
+    // Core particular updates
+    if (body.title) {
+      incident.title = body.title;
+      currentCase.title = body.title;
+    }
+    if (body.dateTime) incident.dateTime = body.dateTime;
+    if (body.type) incident.type = body.type;
+    if (body.subType) incident.subType = body.subType;
+    if (body.priority) incident.priority = body.priority;
+    if (body.crisisLevel !== undefined) incident.crisisLevel = parseInt(body.crisisLevel, 10);
+    if (body.requestedBy) incident.requestedBy = body.requestedBy;
+    if (body.reporterName !== undefined) incident.reporterName = body.reporterName;
+    if (body.category) incident.category = body.category;
+
+    // Location updates
+    if (body.location) {
+      incident.location = { ...incident.location, ...body.location };
     }
 
     // Ancillary field updates
@@ -125,7 +180,7 @@ export async function PUT(
     if (body.personsInvolved) incident.personsInvolved = body.personsInvolved;
     if (body.cctvBwc) incident.cctvBwc = body.cctvBwc;
     if (body.summary) incident.summary = body.summary;
-    if (body.category) incident.category = body.category;
+    if (body.attachments) incident.attachments = body.attachments;
 
     currentCase.incident = incident;
     db.cases[caseIndex] = currentCase;
@@ -175,14 +230,101 @@ export async function POST(
     const caseId = currentCase.id;
 
     switch (action) {
-      // ── Assign responder ───────────────────────────────────────
+      // ── Assign / Add / Remove responder ───────────────────────────────────
       case 'assign': {
-        if (!body.assignedTo) return NextResponse.json({ error: 'assignedTo is required' }, { status: 400 });
-        const prev = incident.assignedTo;
-        incident.assignedTo = body.assignedTo;
-        incident.status = 'Live (Assigned)';
-        incident.log.push(makeLogEntry(incident, `Responder assigned: ${body.assignedTo}${prev ? ` (replaced ${prev})` : ''} — by ${actor}. Status changed to Live (Assigned).`));
-        break;
+        // Normalise current list
+        const activeResponders = (incident.responders || []).filter(r => r.status === 'Active');
+        const currentList = activeResponders.map(r => r.responderId);
+
+        // ── ADD a single responder ────────────────────────────────────────
+        if (body.addResponder) {
+          if (currentList.includes(body.addResponder)) {
+            return NextResponse.json({ error: `${body.addResponder} is already assigned to this Incident.` }, { status: 409 });
+          }
+          const updatedList = [...currentList, body.addResponder];
+          incident.assignedTo = updatedList;
+          // First assignment: transition to Live (Assigned)
+          if (currentList.length === 0) {
+            incident.status = 'Live (Assigned)';
+          }
+          // Record rich metadata
+          incident.responders = [
+            ...(incident.responders || []),
+            {
+              responderId: body.addResponder,
+              assignedBy: actor,
+              assignedAt: new Date().toISOString(),
+              status: 'Active'
+            }
+          ];
+          incident.log.push(makeLogEntry(incident,
+            `Responder added: ${body.addResponder} — assigned by ${actor}.`
+          ));
+          break;
+        }
+
+        // ── REMOVE a single responder ───────────────────────────────────
+        if (body.removeResponder) {
+          if (currentList.length <= 1) {
+            return NextResponse.json(
+              { error: 'At least one Responder must remain assigned to the Incident.' },
+              { status: 409 }
+            );
+          }
+          if (!currentList.includes(body.removeResponder)) {
+            return NextResponse.json({ error: `${body.removeResponder} is not assigned to this Incident.` }, { status: 404 });
+          }
+          incident.assignedTo = currentList.filter(r => r !== body.removeResponder);
+          // Update rich metadata — mark as Removed
+          incident.responders = (incident.responders || []).map(r =>
+            r.responderId === body.removeResponder ? { ...r, status: 'Removed' } : r
+          );
+          incident.log.push(makeLogEntry(incident,
+            `Responder removed: ${body.removeResponder} — unassigned by ${actor}.`
+          ));
+          break;
+        }
+
+        // ── REPLACE full list (e.g. from legacy or bulk re-assign) ──────────
+        if (body.assignedTo !== undefined) {
+          const incoming: string[] = Array.isArray(body.assignedTo)
+            ? body.assignedTo
+            : (body.assignedTo ? [body.assignedTo] : []);
+          
+          const updatedResponders = (incident.responders || []).map(r => {
+            if (!incoming.includes(r.responderId) && r.status === 'Active') {
+              return { ...r, status: 'Removed' as const };
+            }
+            return r;
+          });
+
+          incoming.forEach(r => {
+            const exists = updatedResponders.find(x => x.responderId === r);
+            if (exists) {
+              exists.status = 'Active';
+            } else {
+              updatedResponders.push({
+                responderId: r,
+                assignedBy: actor,
+                assignedAt: new Date().toISOString(),
+                status: 'Active'
+              });
+            }
+          });
+
+          incident.responders = updatedResponders;
+          incident.assignedTo = incoming;
+
+          if (incoming.length > 0) {
+            incident.status = 'Live (Assigned)';
+          }
+          incident.log.push(makeLogEntry(incident,
+            `Responder assignment updated to: ${incoming.join(', ')} — by ${actor}.`
+          ));
+          break;
+        }
+
+        return NextResponse.json({ error: 'assignedTo, addResponder, or removeResponder is required' }, { status: 400 });
       }
 
       // ── Responder acknowledges ─────────────────────────────────
@@ -192,7 +334,7 @@ export async function POST(
         }
         incident.status = 'Live (Acknowledged)';
         incident.acknowledgedAt = new Date().toISOString();
-        incident.log.push(makeLogEntry(incident, `Responder ${incident.assignedTo ?? actor} acknowledged dispatch. Status changed to Live (Acknowledged).`));
+        incident.log.push(makeLogEntry(incident, `Responder ${Array.isArray(incident.assignedTo) && incident.assignedTo.length > 0 ? incident.assignedTo.join(', ') : actor} acknowledged dispatch. Status changed to Live (Acknowledged).`));
         break;
       }
 
@@ -203,7 +345,7 @@ export async function POST(
         }
         incident.status = 'Live (On-Site)';
         incident.onSiteAt = new Date().toISOString();
-        incident.log.push(makeLogEntry(incident, `Responder ${incident.assignedTo ?? actor} confirmed arrival on-site. Status changed to Live (On-Site).`));
+        incident.log.push(makeLogEntry(incident, `Responder ${Array.isArray(incident.assignedTo) && incident.assignedTo.length > 0 ? incident.assignedTo.join(', ') : actor} confirmed arrival on-site. Status changed to Live (On-Site).`));
         break;
       }
 
@@ -214,9 +356,8 @@ export async function POST(
         }
         incident.status = 'Live (Completed)';
         incident.completedAt = new Date().toISOString();
-        if (body.completionRemarks) incident.completionRemarks = body.completionRemarks;
         incident.log.push(makeLogEntry(incident,
-          `Responder ${incident.assignedTo ?? actor} marked ground activities completed.${body.completionRemarks ? ` Remarks: ${body.completionRemarks}` : ''} Status changed to Live (Completed).`
+          `Responder ${Array.isArray(incident.assignedTo) && incident.assignedTo.length > 0 ? incident.assignedTo.join(', ') : actor} marked ground activities completed. Status changed to Live (Completed).`
         ));
         break;
       }
@@ -238,6 +379,7 @@ export async function POST(
           return NextResponse.json({ error: `Cannot close: incident status is "${incident.status}"` }, { status: 409 });
         }
         incident.status = 'Closed';
+        incident.completionRemarks = body.closureRemarks || '';
         
         // Close the parent case only if no other active tasks exist
         const activeTasks = db.tasks.filter(t => t.caseId === caseId && t.status !== 'Closed');
@@ -263,6 +405,7 @@ export async function POST(
           return NextResponse.json({ error: `Cannot return: incident status is "${incident.status}" (must be Pending Endorsement)` }, { status: 409 });
         }
         incident.status = 'Returned';
+        incident.completionRemarks = body.returnRemarks || '';
         incident.log.push(makeLogEntry(incident,
           `Incident returned to Controller by ${actor}${body.returnRemarks ? `. Reason: ${body.returnRemarks}` : '.'}`
         ));

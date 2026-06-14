@@ -151,7 +151,9 @@ export default function IncidentsPage() {
       inc.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (inc.summary && inc.summary.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (inc.assignedTo && inc.assignedTo.toLowerCase().includes(searchTerm.toLowerCase()));
+      (Array.isArray(inc.assignedTo)
+        ? inc.assignedTo.some(r => r.toLowerCase().includes(searchTerm.toLowerCase()))
+        : (inc.assignedTo && (inc.assignedTo as unknown as string).toLowerCase().includes(searchTerm.toLowerCase())));
     
     if (!matchesSearch) return false;
     if (filterStatus !== 'All' && inc.status !== filterStatus) return false;
@@ -653,7 +655,17 @@ export default function IncidentsPage() {
                         </span>
                       </td>
                       <td>{inc.location.commonName || inc.location.road}</td>
-                      <td>{inc.assignedTo || <span style={{ color: 'var(--text-faint)' }}>Unassigned</span>}</td>
+                      <td>
+                        {Array.isArray(inc.assignedTo) ? (
+                          inc.assignedTo.length > 0 ? (
+                            inc.assignedTo.join(', ')
+                          ) : (
+                            <span style={{ color: 'var(--text-faint)' }}>Unassigned</span>
+                          )
+                        ) : (
+                          inc.assignedTo || <span style={{ color: 'var(--text-faint)' }}>Unassigned</span>
+                        )}
+                      </td>
                       <td>
                         <span className={`badge ${getStatusBadgeClass(inc.status)}`}>
                           {inc.status}

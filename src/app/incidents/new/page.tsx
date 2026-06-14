@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useRole } from '@/context/RoleContext';
 import Link from 'next/link';
 import LocationSelector from '@/components/LocationSelector';
+import MultiResponderSelect from '@/components/MultiResponderSelect';
 
 import { getIncidentTaxonomy } from '@/lib/taxonomy';
 
@@ -102,11 +103,10 @@ export default function NewIncidentPage() {
   const [mockFiles, setMockFiles] = useState<{ name: string; size: string }[]>([]);
 
   // 11. Responder Assignment State
-  const [assignedResponder, setAssignedResponder] = useState('');
+  const [assignedResponders, setAssignedResponders] = useState<string[]>([]);
 
   // 12. Summary & Closure State
   const [summary, setSummary] = useState('');
-  const [completionRemarks, setCompletionRemarks] = useState('');
 
   const handleLocationChange = (details: {
     road: string;
@@ -261,7 +261,7 @@ export default function NewIncidentPage() {
         requestedBy: requestedBy,
         category: category,
         status: category === 'Backdated Incident' ? 'Closed' : 'Live',
-        assignedTo: assignedResponder,
+        assignedTo: assignedResponders,
         location: {
           road: road,
           building: building,
@@ -343,7 +343,7 @@ export default function NewIncidentPage() {
           bwcTimestamp: f.bwcTimestamp
         })),
         summary: summary,
-        completionRemarks: completionRemarks || ''
+        completionRemarks: ''
       }
     };
 
@@ -453,7 +453,7 @@ export default function NewIncidentPage() {
           border: 1px solid var(--border-color);
           border-radius: 8px;
           margin-bottom: 12px;
-          overflow: hidden;
+          overflow: visible;
           box-shadow: 0 2px 8px rgba(43, 31, 29, 0.01);
           transition: border-color 0.15s ease;
         }
@@ -469,6 +469,10 @@ export default function NewIncidentPage() {
           cursor: pointer;
           user-select: none;
           transition: background 0.12s ease;
+          border-radius: 8px;
+        }
+        .accordion-item.expanded .accordion-header {
+          border-radius: 8px 8px 0 0;
         }
         .accordion-header:hover {
           background: var(--bg-inset);
@@ -2017,21 +2021,18 @@ export default function NewIncidentPage() {
               <span className="accordion-title">Responder Assignment</span>
             </div>
             <div className="accordion-header-right">
-              {assignedResponder && <span className="badge badge-ack">Assigned</span>}
+              {assignedResponders.length > 0 && <span className="badge badge-ack">{assignedResponders.length} Assigned</span>}
               <span>{expandedSections[11] ? '▲' : '▼'}</span>
             </div>
           </div>
           {expandedSections[11] && (
             <div className="accordion-content">
-              <div className="form-group" style={{ maxWidth: '400px' }}>
-                <label>Select Responder (Responder / Ranger Staff)</label>
-                <select value={assignedResponder} onChange={e => setAssignedResponder(e.target.value)} className="form-control select-dark">
-                  <option value="">-- Choose Responder (Optional) --</option>
-                  <option value="Ranger John">Ranger John</option>
-                  <option value="Ranger Dave">Ranger Dave</option>
-                  <option value="Ranger Sarah">Ranger Sarah</option>
-                  <option value="Ranger Mike">Ranger Mike</option>
-                </select>
+              <div style={{ maxWidth: '450px' }}>
+                <MultiResponderSelect
+                  value={assignedResponders}
+                  onChange={setAssignedResponders}
+                  label="Select Responder(s) (Responder / Ranger Staff)"
+                />
               </div>
               <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '8px' }}>
                 * Note: Assigning a Responder is optional. Controllers can log and process the incident without assigning a responder to the ground.
@@ -2064,17 +2065,6 @@ export default function NewIncidentPage() {
                   rows={4}
                   required
                 />
-              </div>
-
-              <div className="form-grid" style={{ marginTop: '16px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
-                <div className="form-group">
-                  <label>Closed By</label>
-                  <input type="text" value="TBD" disabled className="form-control" style={{ background: 'var(--bg-inset)', fontStyle: 'italic' }} />
-                </div>
-                <div className="form-group">
-                  <label>Closed At</label>
-                  <input type="text" value="TBD" disabled className="form-control" style={{ background: 'var(--bg-inset)', fontStyle: 'italic' }} />
-                </div>
               </div>
             </div>
           )}

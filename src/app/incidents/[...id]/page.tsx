@@ -14,6 +14,8 @@ import {
   Occurrence 
 } from '@/lib/db';
 import { useRole } from '@/context/RoleContext';
+import { getIncidentTaxonomy } from '@/lib/taxonomy';
+import MultiResponderSelect from '@/components/MultiResponderSelect';
 
 interface HydratedIncident extends Incident {
   relatedTasks?: Task[];
@@ -69,7 +71,7 @@ export default function IncidentDetailsPage() {
   // Modals & Inline Inputs
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [assigneeInput, setAssigneeInput] = useState('');
-  const [completionRemarks, setCompletionRemarks] = useState('');
+  const [assignmentError, setAssignmentError] = useState('');
   const [reviewRemarks, setReviewRemarks] = useState('');
 
   // Persons / Injuries Forms
@@ -80,11 +82,37 @@ export default function IncidentDetailsPage() {
   const [injU16, setInjU16] = useState(false);
   const [parentName, setParentName] = useState('');
   const [parentTel, setParentTel] = useState('');
+  const [injGender, setInjGender] = useState('Male');
+  const [injAddress, setInjAddress] = useState('');
+  const [injMsig, setInjMsig] = useState(false);
+  const [injMsigSerial, setInjMsigSerial] = useState('');
 
   const [pType, setPType] = useState('Guest');
   const [pName, setPName] = useState('');
   const [pContact, setPContact] = useState('');
   const [pRole, setPRole] = useState('Witness');
+  const [pGuestOrNon, setPGuestOrNon] = useState('Guest');
+  const [pAge, setPAge] = useState('');
+  const [pGender, setPGender] = useState('Male');
+  const [pAddress, setPAddress] = useState('');
+  const [pInjuryDetails, setPInjuryDetails] = useState('');
+
+  // Vehicles Form State
+  const [vehSdc, setVehSdc] = useState(false);
+  const [vehModel, setVehModel] = useState('');
+  const [vehPlate, setVehPlate] = useState('');
+  const [vehDriverName, setVehDriverName] = useState('');
+  const [vehDriverContact, setVehDriverContact] = useState('');
+  const [vehLicence, setVehLicence] = useState('');
+  const [vehAddress, setVehAddress] = useState('');
+  const [vehRemarks, setVehRemarks] = useState('');
+
+  // CCTV & BWC Form State
+  const [cctvCameraNo, setCctvCameraNo] = useState('');
+  const [cctvVmsTimestamp, setCctvVmsTimestamp] = useState('');
+  const [cctvBookmark, setCctvBookmark] = useState('');
+  const [cctvBwcNo, setCctvBwcNo] = useState('');
+  const [cctvBwcTimestamp, setCctvBwcTimestamp] = useState('');
 
   // Slave Incident Form
   const [slaveTitle, setSlaveTitle] = useState('');
@@ -99,11 +127,81 @@ export default function IncidentDetailsPage() {
     property: false,
     persons: false,
     duplicates: false,
+    attachments: false,
+    summaryClosure: false,
   });
 
   // Timers/Age calculations
   const [elapsedMinutes, setElapsedMinutes] = useState(0);
   const [elapsedDays, setElapsedDays] = useState(0);
+
+  // Core Particulars Edit Form State
+  const [isEditingCore, setIsEditingCore] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editCategory, setEditCategory] = useState('Standard Incident');
+  const [editType, setEditType] = useState('');
+  const [editSubType, setEditSubType] = useState('');
+  const [editPriority, setEditPriority] = useState('Normal');
+  const [editCrisisLevel, setEditCrisisLevel] = useState('4');
+  const [editRequestedBy, setEditRequestedBy] = useState('Public Phone');
+  const [editReporterName, setEditReporterName] = useState('');
+  const [editDateTime, setEditDateTime] = useState('');
+
+  // Location Info Edit Form State
+  const [isEditingLocation, setIsEditingLocation] = useState(false);
+  const [editRoad, setEditRoad] = useState('');
+  const [editBuilding, setEditBuilding] = useState('');
+  const [editLevelSpace, setEditLevelSpace] = useState('');
+  const [editNearAt, setEditNearAt] = useState('');
+  const [editCommonName, setEditCommonName] = useState('');
+  const [editPostalCode, setEditPostalCode] = useState('000000');
+  const [editTagsStr, setEditTagsStr] = useState('');
+  const [editLat, setEditLat] = useState(1.25);
+  const [editLng, setEditLng] = useState(103.83);
+
+  // Reference Taxonomy Data
+  const [taxonomy, setTaxonomy] = useState<Record<string, string[]>>({});
+  
+  useEffect(() => {
+    setTaxonomy(getIncidentTaxonomy());
+  }, []);
+
+  const startEditingCore = () => {
+    if (!incident) return;
+    setEditTitle(incident.title);
+    setEditCategory(incident.category || 'Standard Incident');
+    setEditType(incident.type);
+    setEditSubType(incident.subType);
+    setEditPriority(incident.priority);
+    setEditCrisisLevel(String(incident.crisisLevel));
+    setEditRequestedBy(incident.requestedBy);
+    setEditReporterName(incident.reporterName);
+    
+    if (incident.dateTime) {
+      const dateObj = new Date(incident.dateTime);
+      const offsetMs = dateObj.getTimezoneOffset() * 60000;
+      const localISOTime = (new Date(dateObj.getTime() - offsetMs)).toISOString().slice(0, 16);
+      setEditDateTime(localISOTime);
+    } else {
+      setEditDateTime('');
+    }
+    
+    setIsEditingCore(true);
+  };
+
+  const startEditingLocation = () => {
+    if (!incident || !incident.location) return;
+    setEditRoad(incident.location.road || '');
+    setEditBuilding(incident.location.building || '');
+    setEditLevelSpace(incident.location.levelSpace || '');
+    setEditNearAt(incident.location.nearAt || '');
+    setEditCommonName(incident.location.commonName || '');
+    setEditPostalCode(incident.location.postalCode || '000000');
+    setEditTagsStr((incident.location.tags || []).join(', '));
+    setEditLat(incident.location.lat);
+    setEditLng(incident.location.lng);
+    setIsEditingLocation(true);
+  };
 
   const toggleSection = (section: string) => {
     setOpenSections(prev => ({ ...prev, [section]: !prev[section] }));
@@ -209,19 +307,104 @@ export default function IncidentDetailsPage() {
     }
   }
 
-  const handleAssign = async () => {
-    if (!assigneeInput.trim()) return;
-    const ok = await performAction('assign', { assignedTo: assigneeInput });
-    if (ok) {
-      setAssigneeInput('');
+  const startMockUpload = async () => {
+    if (!incident) return;
+    const demoFiles = [
+      { name: 'photo_scene_1.jpg', size: 1258291, type: 'image/jpeg' },
+      { name: 'bwc_recording_clip.mp4', size: 16148070, type: 'video/mp4' },
+      { name: 'incident_witness_statement.pdf', size: 245760, type: 'application/pdf' }
+    ];
+    const nextFile = demoFiles[(incident.attachments?.length || 0) % demoFiles.length];
+    const newAttachment = {
+      id: `ATT-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
+      incidentId: incident.id,
+      fileName: nextFile.name,
+      fileUrl: `/mock/uploads/${nextFile.name}`,
+      fileType: nextFile.type,
+      fileSize: nextFile.size,
+      uploadedBy: username || 'Controller Steve',
+      uploadedAt: new Date().toISOString()
+    };
+    const updated = [...(incident.attachments || []), newAttachment];
+    await updateFields({ attachments: updated });
+  };
+
+  const deleteAttachment = async (attId: string) => {
+    if (!incident) return;
+    const updated = (incident.attachments || []).filter(a => a.id !== attId);
+    await updateFields({ attachments: updated });
+  };
+
+  const handleAddResponder = async (name: string) => {
+    setAssignmentError('');
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/incidents/${incidentId}/assign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ addResponder: name, username, role }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        setAssignmentError(err.error || 'Failed to add responder.');
+        return;
+      }
+      await fetchIncidentData();
+    } catch (err: any) {
+      setAssignmentError(err.message || 'Request error occurred.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemoveResponder = async (name: string) => {
+    if (!incident || !incident.assignedTo || incident.assignedTo.length <= 1) {
+      setAssignmentError('At least one Responder must remain assigned to the Incident.');
+      return;
+    }
+    setAssignmentError('');
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/incidents/${incidentId}/assign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ removeResponder: name, username, role }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        setAssignmentError(err.error || 'Failed to remove responder.');
+        return;
+      }
+      await fetchIncidentData();
+    } catch (err: any) {
+      setAssignmentError(err.message || 'Request error occurred.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleResponderChange = async (updatedList: string[]) => {
+    if (!incident) return;
+    const currentList = Array.isArray(incident.assignedTo) ? incident.assignedTo : [];
+    
+    // Find if a responder was added
+    const added = updatedList.find(r => !currentList.includes(r));
+    if (added) {
+      await handleAddResponder(added);
+      return;
+    }
+    
+    // Find if a responder was removed
+    const removed = currentList.find(r => !updatedList.includes(r));
+    if (removed) {
+      await handleRemoveResponder(removed);
+      return;
     }
   };
 
   const handleComplete = async () => {
-    if (!completionRemarks.trim()) return;
-    const ok = await performAction('complete', { completionRemarks });
+    const ok = await performAction('complete');
     if (ok) {
-      setCompletionRemarks('');
       setShowCompleteModal(false);
     }
   };
@@ -352,7 +535,7 @@ export default function IncidentDetailsPage() {
           timestamp: incident.acknowledgedAt || entryTimeStr,
           title: 'Dispatch Acknowledged',
           description: desc,
-          actor: incident.assignedTo || entry.recordedBy,
+          actor: Array.isArray(incident.assignedTo) && incident.assignedTo.length > 0 ? incident.assignedTo.join(', ') : entry.recordedBy,
           attachments
         });
       } else if (lowerDesc.includes('confirmed arrival on-site')) {
@@ -361,7 +544,7 @@ export default function IncidentDetailsPage() {
           timestamp: incident.onSiteAt || entryTimeStr,
           title: 'Arrived On-Site',
           description: desc,
-          actor: incident.assignedTo || entry.recordedBy,
+          actor: Array.isArray(incident.assignedTo) && incident.assignedTo.length > 0 ? incident.assignedTo.join(', ') : entry.recordedBy,
           attachments
         });
       } else if (lowerDesc.includes('approved and closed')) {
@@ -475,6 +658,26 @@ export default function IncidentDetailsPage() {
           margin-bottom: 8px;
           border-bottom: 1px dashed var(--border-color);
           padding-bottom: 4px;
+        }
+        .cd-info-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          font-size: 12.5px;
+          padding: 6px 0;
+          border-bottom: 1px solid var(--border-color);
+        }
+        .cd-info-row:last-child {
+          border-bottom: none;
+        }
+        .cd-info-label {
+          color: var(--text-muted);
+          font-weight: 500;
+        }
+        .cd-info-value {
+          text-align: right;
+          color: var(--text-main);
+          font-weight: 500;
         }
 
         /* Collapsible accordion */
@@ -677,6 +880,10 @@ export default function IncidentDetailsPage() {
           display: flex;
           flex-direction: column;
           gap: 16px;
+          overflow: visible !important;
+        }
+        .right-action-panel-container {
+          overflow: visible !important;
         }
         .console-section-title {
           font-size: 11px;
@@ -784,10 +991,6 @@ export default function IncidentDetailsPage() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span className="badge badge-info">{incident.type} / {incident.subType}</span>
-          <span className="badge badge-ack" style={{ background: 'var(--color-high-bg)', color: 'var(--color-high)', borderColor: 'var(--color-high-border)' }}>
-            Lvl {incident.crisisLevel} Crisis
-          </span>
           <span className={incBadgeClass(incident.status)}>{incident.status}</span>
         </div>
       </div>
@@ -801,23 +1004,219 @@ export default function IncidentDetailsPage() {
           {/* Always Visible Core Overview Card */}
           <div className="glass overview-card">
             <div>
-              <div className="overview-section-title">Core Particulars</div>
-              <div className="cd-info-row"><span className="cd-info-label">Priority</span><span className="cd-info-value"><strong>{incident.priority}</strong></span></div>
-              <div className="cd-info-row"><span className="cd-info-label">Reporter Name</span><span className="cd-info-value">{incident.reporterName || 'TBD'}</span></div>
-              <div className="cd-info-row"><span className="cd-info-label">Requested By</span><span className="cd-info-value">{incident.requestedBy}</span></div>
-              <div className="cd-info-row"><span className="cd-info-label">Created By</span><span className="cd-info-value">{incident.createdBy}</span></div>
-              <div className="cd-info-row"><span className="cd-info-label">Assigned Ranger</span><span className="cd-info-value">{incident.assignedTo ? <strong style={{ color: 'var(--color-info)' }}>{incident.assignedTo}</strong> : <span style={{ color: 'var(--text-faint)' }}>Unassigned</span>}</span></div>
-              <div className="cd-info-row"><span className="cd-info-label">Time Logged</span><span className="cd-info-value">{new Date(incident.dateTime).toLocaleString('en-SG')}</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, borderBottom: '1px dashed var(--border-color)', paddingBottom: 4 }}>
+                <div className="overview-section-title" style={{ borderBottom: 'none', marginBottom: 0, paddingBottom: 0 }}>Core Particulars</div>
+                {!isClosed && !isEditingCore && (
+                  <button className="btn btn-secondary btn-xs" onClick={startEditingCore} style={{ padding: '2px 8px', fontSize: 11 }}>
+                    ✏️ Edit
+                  </button>
+                )}
+              </div>
+              {isEditingCore ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '4px 0' }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Incident Title *</label>
+                    <input className="form-control" type="text" value={editTitle} onChange={e => setEditTitle(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Incident Type *</label>
+                    <select className="form-control select-dark" value={editType} onChange={e => {
+                      const nextType = e.target.value;
+                      setEditType(nextType);
+                      if (taxonomy[nextType] && taxonomy[nextType].length > 0) {
+                        setEditSubType(taxonomy[nextType][0]);
+                      } else {
+                        setEditSubType('');
+                      }
+                    }} style={{ padding: '4px 8px', fontSize: 12 }}>
+                      <option value="">-- Select Type --</option>
+                      {Object.keys(taxonomy).sort().map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Incident Sub-Type *</label>
+                    <select className="form-control select-dark" value={editSubType} onChange={e => setEditSubType(e.target.value)} disabled={!editType} style={{ padding: '4px 8px', fontSize: 12 }}>
+                      <option value="">-- Select Sub-Type --</option>
+                      {editType && taxonomy[editType]?.sort().map(st => <option key={st} value={st}>{st}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Priority *</label>
+                    <select className="form-control select-dark" value={editPriority} onChange={e => setEditPriority(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }}>
+                      <option value="Normal">Normal</option>
+                      <option value="High">High</option>
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Crisis Level *</label>
+                    <select className="form-control select-dark" value={editCrisisLevel} onChange={e => setEditCrisisLevel(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }}>
+                      <option value="1">Level 1 (Crisis)</option>
+                      <option value="2">Level 2</option>
+                      <option value="3">Level 3</option>
+                      <option value="4">Level 4 (Default)</option>
+                      <option value="5">Level 5 (Low)</option>
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Requested By (Source)</label>
+                    <select className="form-control select-dark" value={editRequestedBy} onChange={e => setEditRequestedBy(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }}>
+                      {['Public Phone', 'Email', 'UCS', 'Government Agency'].map(source => (
+                        <option key={source} value={source}>{source}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Reporter Name</label>
+                    <input className="form-control" type="text" value={editReporterName} onChange={e => setEditReporterName(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Date & Time of Occurrence *</label>
+                    <input className="form-control" type="datetime-local" value={editDateTime} onChange={e => setEditDateTime(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                    <button className="btn btn-success btn-xs" style={{ flex: 1 }} onClick={async () => {
+                      if (!editTitle.trim()) { alert('Title is required.'); return; }
+                      if (!editType) { alert('Type is required.'); return; }
+                      if (!editSubType) { alert('Sub-type is required.'); return; }
+                      const isoDateTime = editDateTime ? new Date(editDateTime).toISOString() : new Date().toISOString();
+                      await updateFields({
+                        title: editTitle,
+                        type: editType,
+                        subType: editSubType,
+                        priority: editPriority,
+                        crisisLevel: editCrisisLevel,
+                        requestedBy: editRequestedBy,
+                        reporterName: editReporterName,
+                        dateTime: isoDateTime
+                      });
+                      setIsEditingCore(false);
+                    }}>Save</button>
+                    <button className="btn btn-secondary btn-xs" style={{ flex: 1 }} onClick={() => setIsEditingCore(false)}>Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="cd-info-row"><span className="cd-info-label">Incident Type</span><span className="cd-info-value"><strong>{incident.type}</strong></span></div>
+                  <div className="cd-info-row"><span className="cd-info-label">Incident Sub-Type</span><span className="cd-info-value"><strong>{incident.subType}</strong></span></div>
+                  <div className="cd-info-row"><span className="cd-info-label">Crisis Level</span><span className="cd-info-value"><span className="badge badge-ack" style={{ background: 'var(--color-high-bg)', color: 'var(--color-high)', borderColor: 'var(--color-high-border)', fontSize: '11px', padding: '1px 6px' }}>Level {incident.crisisLevel}</span></span></div>
+                  <div className="cd-info-row"><span className="cd-info-label">Priority</span><span className="cd-info-value"><strong>{incident.priority}</strong></span></div>
+                  <div className="cd-info-row"><span className="cd-info-label">Reporter Name</span><span className="cd-info-value">{incident.reporterName || 'TBD'}</span></div>
+                  <div className="cd-info-row"><span className="cd-info-label">Requested By</span><span className="cd-info-value">{incident.requestedBy}</span></div>
+                  <div className="cd-info-row"><span className="cd-info-label">Created By</span><span className="cd-info-value">{incident.createdBy}</span></div>
+                  <div className="cd-info-row">
+                    <span className="cd-info-label">Assigned Responders</span>
+                    <span className="cd-info-value" style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                      {Array.isArray(incident.assignedTo) && incident.assignedTo.length > 0 ? (
+                        incident.assignedTo.map(name => (
+                          <span
+                            key={name}
+                            className="badge badge-ack"
+                            style={{
+                              background: 'rgba(66, 153, 225, 0.15)',
+                              color: 'var(--color-info, #4299e1)',
+                              borderColor: 'rgba(66, 153, 225, 0.3)',
+                              fontSize: '11px',
+                              padding: '1px 6px'
+                            }}
+                          >
+                            {name}
+                          </span>
+                        ))
+                      ) : (
+                        <span style={{ color: 'var(--text-faint)' }}>Unassigned</span>
+                      )}
+                    </span>
+                  </div>
+                  <div className="cd-info-row"><span className="cd-info-label">Date/Time Occurred</span><span className="cd-info-value">{new Date(incident.dateTime).toLocaleString('en-SG')}</span></div>
+                  <div className="cd-info-row"><span className="cd-info-label">Date/Time Logged</span><span className="cd-info-value" style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{parentCase ? new Date(parentCase.createdAt).toLocaleString('en-SG') : '—'}</span></div>
+                </>
+              )}
             </div>
 
-            <div style={{ marginTop: 8 }}>
-              <div className="overview-section-title">Location Info</div>
-              <div className="cd-info-row"><span className="cd-info-label">Common Name</span><span className="cd-info-value"><strong>{incident.location.commonName || '—'}</strong></span></div>
-              <div className="cd-info-row"><span className="cd-info-label">Road</span><span className="cd-info-value">{incident.location.road || '—'}</span></div>
-              <div className="cd-info-row"><span className="cd-info-label">Building</span><span className="cd-info-value">{incident.location.building || '—'}</span></div>
-              <div className="cd-info-row"><span className="cd-info-label">Level & Space</span><span className="cd-info-value">{incident.location.levelSpace || '—'}</span></div>
-              <div className="cd-info-row"><span className="cd-info-label">Postal Code</span><span className="cd-info-value">{incident.location.postalCode}</span></div>
-              <div className="cd-info-row"><span className="cd-info-label">Coordinates</span><span className="cd-info-value" style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>{incident.location.lat.toFixed(5)}, {incident.location.lng.toFixed(5)}</span></div>
+            <div style={{ marginTop: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, borderBottom: '1px dashed var(--border-color)', paddingBottom: 4 }}>
+                <div className="overview-section-title" style={{ borderBottom: 'none', marginBottom: 0, paddingBottom: 0 }}>Location Info</div>
+                {!isClosed && !isEditingLocation && (
+                  <button className="btn btn-secondary btn-xs" onClick={startEditingLocation} style={{ padding: '2px 8px', fontSize: 11 }}>
+                    ✏️ Edit
+                  </button>
+                )}
+              </div>
+              {isEditingLocation ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '4px 0' }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Common Name</label>
+                    <input className="form-control" type="text" value={editCommonName} onChange={e => setEditCommonName(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Road</label>
+                    <input className="form-control" type="text" value={editRoad} onChange={e => setEditRoad(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Building</label>
+                    <input className="form-control" type="text" value={editBuilding} onChange={e => setEditBuilding(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Level & Space</label>
+                    <input className="form-control" type="text" value={editLevelSpace} onChange={e => setEditLevelSpace(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Beside / Near To / At</label>
+                    <input className="form-control" type="text" value={editNearAt} onChange={e => setEditNearAt(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Postal Code</label>
+                    <input className="form-control" type="text" value={editPostalCode} onChange={e => setEditPostalCode(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Location Tags (Comma separated)</label>
+                    <input className="form-control" type="text" value={editTagsStr} onChange={e => setEditTagsStr(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} placeholder="e.g. Siloso, Beachfront" />
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                    <button className="btn btn-success btn-xs" style={{ flex: 1 }} onClick={async () => {
+                      const tags = editTagsStr.split(',').map(t => t.trim()).filter(Boolean);
+                      await updateFields({
+                        location: {
+                          road: editRoad,
+                          building: editBuilding,
+                          levelSpace: editLevelSpace,
+                          nearAt: editNearAt,
+                          commonName: editCommonName,
+                          postalCode: editPostalCode,
+                          tags,
+                          lat: editLat,
+                          lng: editLng
+                        }
+                      });
+                      setIsEditingLocation(false);
+                    }}>Save</button>
+                    <button className="btn btn-secondary btn-xs" style={{ flex: 1 }} onClick={() => setIsEditingLocation(false)}>Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="cd-info-row"><span className="cd-info-label">Common Name</span><span className="cd-info-value"><strong>{incident.location.commonName || '—'}</strong></span></div>
+                  <div className="cd-info-row"><span className="cd-info-label">Road</span><span className="cd-info-value">{incident.location.road || '—'}</span></div>
+                  <div className="cd-info-row"><span className="cd-info-label">Building</span><span className="cd-info-value">{incident.location.building || '—'}</span></div>
+                  <div className="cd-info-row"><span className="cd-info-label">Level & Space</span><span className="cd-info-value">{incident.location.levelSpace || '—'}</span></div>
+                  <div className="cd-info-row"><span className="cd-info-label">Beside/Near/At</span><span className="cd-info-value">{incident.location.nearAt || '—'}</span></div>
+                  <div className="cd-info-row"><span className="cd-info-label">Postal Code</span><span className="cd-info-value">{incident.location.postalCode}</span></div>
+                  <div className="cd-info-row" style={{ height: 'auto', minHeight: '34px' }}>
+                    <span className="cd-info-label">Location Tags</span>
+                    <span className="cd-info-value" style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end', marginTop: 4, marginBottom: 4 }}>
+                      {incident.location.tags && incident.location.tags.length > 0 ? (
+                        incident.location.tags.map((t, idx) => (
+                          <span key={idx} style={{ background: '#F4F1EA', color: '#2B1F1D', border: '1px solid #E6DFD5', borderRadius: '4px', padding: '1px 6px', fontSize: '10.5px', fontWeight: '500' }}>{t}</span>
+                        ))
+                      ) : (
+                        <span style={{ color: 'var(--text-faint)' }}>None</span>
+                      )}
+                    </span>
+                  </div>
+                  <div className="cd-info-row"><span className="cd-info-label">Coordinates</span><span className="cd-info-value" style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>{incident.location.lat.toFixed(5)}, {incident.location.lng.toFixed(5)}</span></div>
+                </>
+              )}
             </div>
           </div>
 
@@ -837,12 +1236,46 @@ export default function IncidentDetailsPage() {
               </div>
               {openSections.cctv && (
                 <div className="accordion-content">
+                  {!isClosed && (
+                    <div style={{ border: '1px dashed var(--border-color)', borderRadius: 6, padding: 10, marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <input className="form-control" placeholder="CCTV Camera No" value={cctvCameraNo} onChange={e => setCctvCameraNo(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                        <input className="form-control" type="time" placeholder="VMS Timestamp" value={cctvVmsTimestamp} onChange={e => setCctvVmsTimestamp(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                      </div>
+                      <input className="form-control" placeholder="VMS Bookmark Name" value={cctvBookmark} onChange={e => setCctvBookmark(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <input className="form-control" placeholder="BWC Camera No" value={cctvBwcNo} onChange={e => setCctvBwcNo(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                        <input className="form-control" type="time" placeholder="BWC Timestamp" value={cctvBwcTimestamp} onChange={e => setCctvBwcTimestamp(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                      </div>
+                      <button type="button" className="btn btn-primary btn-xs" onClick={() => {
+                        const updated = [...(incident.cctvBwc || []), {
+                          cameraNumber: cctvCameraNo,
+                          vmsTimestamp: cctvVmsTimestamp,
+                          vmsBookmark: cctvBookmark,
+                          bwcNumber: cctvBwcNo,
+                          bwcTimestamp: cctvBwcTimestamp
+                        }];
+                        updateFields({ cctvBwc: updated });
+                        setCctvCameraNo(''); setCctvVmsTimestamp(''); setCctvBookmark(''); setCctvBwcNo(''); setCctvBwcTimestamp('');
+                      }}>Add Camera Reference</button>
+                    </div>
+                  )}
+
                   {incident.cctvBwc && incident.cctvBwc.length > 0 ? (
                     incident.cctvBwc.map((cam, idx) => (
-                      <div key={idx} style={{ padding: '8px 10px', background: 'var(--bg-inset)', border: '1px solid var(--border-color)', borderRadius: 5, marginBottom: 8, fontSize: 12 }}>
-                        <div style={{ fontWeight: 600 }}>CCTV: {cam.cameraNumber || '—'}</div>
-                        <div style={{ color: 'var(--text-muted)', marginTop: 3 }}>Bookmark: {cam.vmsBookmark || '—'}</div>
-                        <div style={{ color: 'var(--text-muted)' }}>BWC: {cam.bwcNumber || '—'}</div>
+                      <div key={idx} style={{ padding: '8px 10px', background: 'var(--bg-inset)', border: '1px solid var(--border-color)', borderRadius: 5, marginBottom: 8, fontSize: 12, position: 'relative' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div style={{ fontWeight: 600 }}>CCTV: {cam.cameraNumber || '—'}</div>
+                          {!isClosed && (
+                            <button type="button" style={{ background: 'transparent', border: 'none', color: 'var(--color-critical)', cursor: 'pointer', fontSize: 13, padding: 0 }} onClick={async () => {
+                              const updated = incident.cctvBwc.filter((_, i) => i !== idx);
+                              await updateFields({ cctvBwc: updated });
+                            }}>✕</button>
+                          )}
+                        </div>
+                        {cam.vmsTimestamp && <div style={{ color: 'var(--text-muted)', marginTop: 2 }}>VMS Time: {cam.vmsTimestamp}</div>}
+                        {cam.vmsBookmark && <div style={{ color: 'var(--text-muted)' }}>Bookmark: {cam.vmsBookmark}</div>}
+                        {cam.bwcNumber && <div style={{ color: 'var(--text-muted)', marginTop: 4 }}>BWC: {cam.bwcNumber} {cam.bwcTimestamp ? `@ ${cam.bwcTimestamp}` : ''}</div>}
                       </div>
                     ))
                   ) : (
@@ -888,6 +1321,18 @@ export default function IncidentDetailsPage() {
                             onChange={e => updateFields({ emergencyServices: { ...incident.emergencyServices, policeIncidentNo: e.target.value } })}
                             disabled={isClosed} style={{ padding: '4px 8px', fontSize: 12 }} />
                         </div>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label>Classification</label>
+                          <input className="form-control" type="text" value={incident.emergencyServices.classification || ''}
+                            onChange={e => updateFields({ emergencyServices: { ...incident.emergencyServices, classification: e.target.value } })}
+                            disabled={isClosed} style={{ padding: '4px 8px', fontSize: 12 }} />
+                        </div>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label>Responding Unit</label>
+                          <input className="form-control" type="text" value={incident.emergencyServices.respondingUnit || ''}
+                            onChange={e => updateFields({ emergencyServices: { ...incident.emergencyServices, respondingUnit: e.target.value } })}
+                            disabled={isClosed} style={{ padding: '4px 8px', fontSize: 12 }} />
+                        </div>
                       </div>
                     )}
                   </div>
@@ -917,6 +1362,18 @@ export default function IncidentDetailsPage() {
                           <label>Call Sign</label>
                           <input className="form-control" type="text" value={incident.emergencyServices.ambulanceCallSign}
                             onChange={e => updateFields({ emergencyServices: { ...incident.emergencyServices, ambulanceCallSign: e.target.value } })}
+                            disabled={isClosed} style={{ padding: '4px 8px', fontSize: 12 }} />
+                        </div>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label>Responding Unit</label>
+                          <input className="form-control" type="text" value={incident.emergencyServices.ambulanceRespondingUnit || ''}
+                            onChange={e => updateFields({ emergencyServices: { ...incident.emergencyServices, ambulanceRespondingUnit: e.target.value } })}
+                            disabled={isClosed} style={{ padding: '4px 8px', fontSize: 12 }} />
+                        </div>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label>Arrival Time</label>
+                          <input className="form-control" type="time" value={incident.emergencyServices.ambulanceArrivalTime || ''}
+                            onChange={e => updateFields({ emergencyServices: { ...incident.emergencyServices, ambulanceArrivalTime: e.target.value } })}
                             disabled={isClosed} style={{ padding: '4px 8px', fontSize: 12 }} />
                         </div>
                         <div className="form-group" style={{ marginBottom: 0 }}>
@@ -1005,12 +1462,66 @@ export default function IncidentDetailsPage() {
                   </div>
                   <div className="section-separator" style={{ margin: '8px 0' }} />
                   <div>
-                    <h4 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 8 }}>Vehicles Involved</h4>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <h4 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', margin: 0 }}>Vehicles Involved</h4>
+                    </div>
+
+                    {!isClosed && (
+                      <div style={{ border: '1px dashed var(--border-color)', borderRadius: 6, padding: 10, marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <input type="checkbox" id="veh-sdc-checkbox" checked={vehSdc} onChange={e => setVehSdc(e.target.checked)} />
+                          <label htmlFor="veh-sdc-checkbox" style={{ fontSize: 11, cursor: 'pointer', userSelect: 'none' }}>SDC Vehicle Involved</label>
+                        </div>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <input className="form-control" placeholder="Model *" value={vehModel} onChange={e => setVehModel(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                          <input className="form-control" placeholder="Plate Number *" value={vehPlate} onChange={e => setVehPlate(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                        </div>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <input className="form-control" placeholder="Driver Name" value={vehDriverName} onChange={e => setVehDriverName(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                          <input className="form-control" placeholder="Driver Contact" value={vehDriverContact} onChange={e => setVehDriverContact(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                        </div>
+                        <input className="form-control" placeholder="Driving Licence No" value={vehLicence} onChange={e => setVehLicence(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                        <input className="form-control" placeholder="Driver Address" value={vehAddress} onChange={e => setVehAddress(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                        <input className="form-control" placeholder="Remarks" value={vehRemarks} onChange={e => setVehRemarks(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                        <button type="button" className="btn btn-primary btn-xs" onClick={async () => {
+                          if (!vehModel.trim() || !vehPlate.trim()) {
+                            alert('Vehicle Model and Plate Number are required.');
+                            return;
+                          }
+                          const updated = [...(incident.vehiclesInvolved || []), {
+                            sdcVehicleInvolved: vehSdc,
+                            vehicleModel: vehModel,
+                            vehicleNumber: vehPlate,
+                            driverName: vehDriverName,
+                            driverContact: vehDriverContact,
+                            drivingLicenceNo: vehLicence,
+                            driverAddress: vehAddress,
+                            remarks: vehRemarks
+                          }];
+                          await updateFields({ vehiclesInvolved: updated });
+                          setVehSdc(false); setVehModel(''); setVehPlate(''); setVehDriverName(''); setVehDriverContact(''); setVehLicence(''); setVehAddress(''); setVehRemarks('');
+                        }}>Add Vehicle</button>
+                      </div>
+                    )}
+
                     {incident.vehiclesInvolved && incident.vehiclesInvolved.length > 0 ? (
                       incident.vehiclesInvolved.map((v, i) => (
-                        <div key={i} className="inset-panel" style={{ padding: 10, marginBottom: 8, fontSize: 11 }}>
-                          <div style={{ fontWeight: 600 }}>{v.vehicleModel} ({v.vehicleNumber})</div>
-                          <div style={{ color: 'var(--text-muted)' }}>Driver: {v.driverName} &bull; Tel: {v.driverContact}</div>
+                        <div key={i} className="inset-panel" style={{ padding: 10, marginBottom: 8, fontSize: 11, position: 'relative' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <div style={{ fontWeight: 600 }}>
+                              {v.vehicleModel} ({v.vehicleNumber})
+                              {v.sdcVehicleInvolved && <span style={{ marginLeft: 6, fontSize: 9, background: 'var(--color-info-bg)', color: 'var(--color-info)', padding: '2px 4px', borderRadius: 3, fontWeight: 700 }}>SDC VEH</span>}
+                            </div>
+                            {!isClosed && (
+                              <button type="button" style={{ background: 'transparent', border: 'none', color: 'var(--color-critical)', cursor: 'pointer', fontSize: 13, padding: 0 }} onClick={async () => {
+                                const updated = incident.vehiclesInvolved.filter((_, idx) => idx !== i);
+                                await updateFields({ vehiclesInvolved: updated });
+                              }}>✕</button>
+                            )}
+                          </div>
+                          <div style={{ color: 'var(--text-muted)', marginTop: 2 }}>Driver: {v.driverName || '—'} &bull; Tel: {v.driverContact || '—'}</div>
+                          {v.drivingLicenceNo && <div style={{ color: 'var(--text-muted)' }}>Licence No: {v.drivingLicenceNo}</div>}
+                          {v.driverAddress && <div style={{ color: 'var(--text-muted)' }}>Address: {v.driverAddress}</div>}
                           {v.remarks && <div style={{ fontStyle: 'italic', marginTop: 4 }}>{v.remarks}</div>}
                         </div>
                       ))
@@ -1040,16 +1551,31 @@ export default function IncidentDetailsPage() {
                     <h4 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 8 }}>Personal Injuries Log</h4>
                     {!isClosed && (
                       <div style={{ border: '1px dashed var(--border-color)', borderRadius: 6, padding: 10, marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        <input className="form-control" placeholder="Full Name" value={injName} onChange={e => setInjName(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                        <input className="form-control" placeholder="Full Name *" value={injName} onChange={e => setInjName(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
                         <div style={{ display: 'flex', gap: 8 }}>
                           <input className="form-control" type="number" placeholder="Age" value={injAge} onChange={e => setInjAge(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                          <select className="form-control select-dark" value={injGender} onChange={e => setInjGender(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }}>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                            <option value="Other">Other</option>
+                          </select>
                           <input className="form-control" placeholder="Contact No" value={injContact} onChange={e => setInjContact(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
                         </div>
+                        <input className="form-control" placeholder="Address" value={injAddress} onChange={e => setInjAddress(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
                         <input className="form-control" placeholder="Hospital / Clinic Attended" value={injHospital} onChange={e => setInjHospital(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
-                        <label className="checkbox-row" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-                          <input type="checkbox" checked={injU16} onChange={e => setInjU16(e.target.checked)} />
-                          Under 16 years old
-                        </label>
+                        
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <input type="checkbox" id="inj-msig-checkbox" checked={injMsig} onChange={e => setInjMsig(e.target.checked)} />
+                          <label htmlFor="inj-msig-checkbox" style={{ fontSize: 11, cursor: 'pointer', userSelect: 'none' }}>MSIG Form Issued</label>
+                        </div>
+                        {injMsig && (
+                          <input className="form-control" placeholder="MSIG Serial Number" value={injMsigSerial} onChange={e => setInjMsigSerial(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                        )}
+
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <input type="checkbox" id="inj-u16-checkbox" checked={injU16} onChange={e => setInjU16(e.target.checked)} />
+                          <label htmlFor="inj-u16-checkbox" style={{ fontSize: 11, cursor: 'pointer', userSelect: 'none' }}>Under 16 years old</label>
+                        </div>
                         {injU16 && (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 8, background: 'var(--bg-inset)', borderRadius: 5 }}>
                             <input className="form-control" placeholder="Parent/Guardian Name" value={parentName} onChange={e => setParentName(e.target.value)} style={{ padding: '4px 8px', fontSize: 11 }} />
@@ -1059,22 +1585,43 @@ export default function IncidentDetailsPage() {
                         <button type="button" className="btn btn-primary btn-xs" onClick={() => {
                           if (!injName) return;
                           const updated = [...incident.personalInjuries, {
-                            name: injName, address: 'TBD', age: parseInt(injAge, 10) || 0, gender: 'TBD', contactNumber: injContact, clinicHospitalAttended: injHospital, msigFormIssued: false, under16: injU16, parentGuardianName: parentName, parentGuardianContact: parentTel
+                            name: injName,
+                            address: injAddress,
+                            age: parseInt(injAge, 10) || 0,
+                            gender: injGender,
+                            contactNumber: injContact,
+                            clinicHospitalAttended: injHospital,
+                            msigFormIssued: injMsig,
+                            msigSerialNo: injMsig ? injMsigSerial : '',
+                            under16: injU16,
+                            parentGuardianName: parentName,
+                            parentGuardianContact: parentTel
                           }];
                           updateFields({ personalInjuries: updated });
-                          setInjName(''); setInjAge(''); setInjContact(''); setInjHospital(''); setInjU16(false); setParentName(''); setParentTel('');
+                          setInjName(''); setInjAge(''); setInjContact(''); setInjHospital(''); setInjU16(false); setParentName(''); setParentTel(''); setInjGender('Male'); setInjAddress(''); setInjMsig(false); setInjMsigSerial('');
                         }}>Add Injury</button>
                       </div>
                     )}
                     {incident.personalInjuries.length === 0 ? (
                       <p style={{ fontSize: 11, color: 'var(--text-faint)', fontStyle: 'italic', margin: '4px 0 12px 0' }}>No injuries recorded.</p>
                     ) : incident.personalInjuries.map((inj, i) => (
-                      <div key={i} className="inset-panel" style={{ padding: 10, marginBottom: 8, fontSize: 12 }}>
-                        <div style={{ fontWeight: 600 }}>
-                          {inj.name} (Age: {inj.age})
-                          {inj.under16 && <span style={{ marginLeft: 6, fontSize: 9, background: 'var(--color-critical-bg)', color: 'var(--color-critical)', padding: '2px 4px', borderRadius: 3, fontWeight: 700 }}>U-16</span>}
+                      <div key={i} className="inset-panel" style={{ padding: 10, marginBottom: 8, fontSize: 12, position: 'relative' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div style={{ fontWeight: 600 }}>
+                            {inj.name} (Age: {inj.age} &bull; {inj.gender || '—'})
+                            {inj.under16 && <span style={{ marginLeft: 6, fontSize: 9, background: 'var(--color-critical-bg)', color: 'var(--color-critical)', padding: '2px 4px', borderRadius: 3, fontWeight: 700 }}>U-16</span>}
+                            {inj.msigFormIssued && <span style={{ marginLeft: 6, fontSize: 9, background: 'var(--color-info-bg)', color: 'var(--color-info)', padding: '2px 4px', borderRadius: 3, fontWeight: 700 }}>MSIG</span>}
+                          </div>
+                          {!isClosed && (
+                            <button type="button" style={{ background: 'transparent', border: 'none', color: 'var(--color-critical)', cursor: 'pointer', fontSize: 13, padding: 0 }} onClick={async () => {
+                              const updated = incident.personalInjuries.filter((_, idx) => idx !== i);
+                              await updateFields({ personalInjuries: updated });
+                            }}>✕</button>
+                          )}
                         </div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>Hospital: {inj.clinicHospitalAttended || '—'} &bull; Tel: {inj.contactNumber}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>Hospital: {inj.clinicHospitalAttended || '—'} &bull; Tel: {inj.contactNumber || '—'}</div>
+                        {inj.address && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Address: {inj.address}</div>}
+                        {inj.msigFormIssued && inj.msigSerialNo && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>MSIG Serial No: {inj.msigSerialNo}</div>}
                         {inj.under16 && <div style={{ fontSize: 10, color: 'var(--text-faint)', marginTop: 3 }}>Guardian: {inj.parentGuardianName} ({inj.parentGuardianContact})</div>}
                       </div>
                     ))}
@@ -1087,30 +1634,65 @@ export default function IncidentDetailsPage() {
                     <h4 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 8 }}>Other Persons</h4>
                     {!isClosed && (
                       <div style={{ border: '1px dashed var(--border-color)', borderRadius: 6, padding: 10, marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        <select className="form-control select-dark" value={pType} onChange={e => setPType(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }}>
-                          {['Guest','Staff','Island Partner','Contractor'].map(o => <option key={o}>{o}</option>)}
-                        </select>
-                        <input className="form-control" placeholder="Full Name" value={pName} onChange={e => setPName(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
-                        <input className="form-control" placeholder="Contact No" value={pContact} onChange={e => setPContact(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <select className="form-control select-dark" value={pGuestOrNon} onChange={e => setPGuestOrNon(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }}>
+                            <option value="Guest">Guest</option>
+                            <option value="Non-Guest">Non-Guest</option>
+                          </select>
+                          <select className="form-control select-dark" value={pType} onChange={e => setPType(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }}>
+                            {['Guest','Staff','Island Partner','Contractor','Resident','Others'].map(o => <option key={o}>{o}</option>)}
+                          </select>
+                        </div>
+                        <input className="form-control" placeholder="Full Name *" value={pName} onChange={e => setPName(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <input className="form-control" type="number" placeholder="Age" value={pAge} onChange={e => setPAge(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                          <select className="form-control select-dark" value={pGender} onChange={e => setPGender(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }}>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                            <option value="Other">Other</option>
+                          </select>
+                          <input className="form-control" placeholder="Contact No" value={pContact} onChange={e => setPContact(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                        </div>
+                        <input className="form-control" placeholder="Address" value={pAddress} onChange={e => setPAddress(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
                         <select className="form-control select-dark" value={pRole} onChange={e => setPRole(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }}>
                           {['Witness','Bystander','Subject','Other'].map(o => <option key={o}>{o}</option>)}
                         </select>
+                        <textarea className="form-control" rows={2} placeholder="Injury details (if any)" value={pInjuryDetails} onChange={e => setPInjuryDetails(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
                         <button type="button" className="btn btn-primary btn-xs" onClick={() => {
                           if (!pName) return;
                           const updated = [...incident.personsInvolved, {
-                            guestOrNonGuest: pType === 'Guest' ? 'Guest' : 'Non-Guest', type: pType, name: pName, address: 'TBD', age: 0, gender: 'TBD', contactNumber: pContact, roleInvolvement: pRole, injuryDetails: ''
+                            guestOrNonGuest: pGuestOrNon,
+                            type: pType,
+                            name: pName,
+                            address: pAddress,
+                            age: parseInt(pAge, 10) || 0,
+                            gender: pGender,
+                            contactNumber: pContact,
+                            roleInvolvement: pRole,
+                            injuryDetails: pInjuryDetails
                           }];
                           updateFields({ personsInvolved: updated });
-                          setPName(''); setPContact(''); setPRole('Witness');
+                          setPName(''); setPContact(''); setPRole('Witness'); setPGuestOrNon('Guest'); setPAge(''); setPGender('Male'); setPAddress(''); setPInjuryDetails('');
                         }}>Add Person</button>
                       </div>
                     )}
                     {incident.personsInvolved.length === 0 ? (
                       <p style={{ fontSize: 11, color: 'var(--text-faint)', fontStyle: 'italic', margin: 0 }}>No other persons recorded.</p>
                     ) : incident.personsInvolved.map((p, i) => (
-                      <div key={i} className="inset-panel" style={{ padding: 10, marginBottom: 8, fontSize: 12 }}>
-                        <div style={{ fontWeight: 600 }}>{p.name} ({p.type})</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Role: {p.roleInvolvement} &bull; Tel: {p.contactNumber}</div>
+                      <div key={i} className="inset-panel" style={{ padding: 10, marginBottom: 8, fontSize: 12, position: 'relative' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div style={{ fontWeight: 600 }}>{p.name} ({p.type} &bull; {p.guestOrNonGuest})</div>
+                          {!isClosed && (
+                            <button type="button" style={{ background: 'transparent', border: 'none', color: 'var(--color-critical)', cursor: 'pointer', fontSize: 13, padding: 0 }} onClick={async () => {
+                              const updated = incident.personsInvolved.filter((_, idx) => idx !== i);
+                              await updateFields({ personsInvolved: updated });
+                            }}>✕</button>
+                          )}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>Role: {p.roleInvolvement} &bull; Tel: {p.contactNumber || '—'}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Age: {p.age || '—'} &bull; Gender: {p.gender || '—'}</div>
+                        {p.address && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Address: {p.address}</div>}
+                        {p.injuryDetails && <div style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic', marginTop: 4 }}>Injury Details: {p.injuryDetails}</div>}
                       </div>
                     ))}
                   </div>
@@ -1168,6 +1750,124 @@ export default function IncidentDetailsPage() {
                       </div>
                     ))}
                   </div>
+                </div>
+              )}
+            </div>
+
+            {/* Accordion: Attachments */}
+            <div className="accordion-item">
+              <div className="accordion-header" onClick={() => toggleSection('attachments')}>
+                <div className="accordion-header-left">
+                  <h3 className="accordion-title">Attachments</h3>
+                  <span className={`accordion-badge ${(incident.attachments && incident.attachments.length > 0) ? 'active' : 'none'}`}>
+                    {incident.attachments && incident.attachments.length > 0 ? `${incident.attachments.length} files` : 'None'}
+                  </span>
+                </div>
+                <span>{openSections.attachments ? '▼' : '▶'}</span>
+              </div>
+              {openSections.attachments && (
+                <div className="accordion-content">
+                  {!isClosed && (
+                    <div 
+                      className="mock-dropzone"
+                      onClick={startMockUpload}
+                      style={{
+                        border: '2px dashed var(--border-color)',
+                        borderRadius: '8px',
+                        padding: '20px',
+                        textAlign: 'center',
+                        cursor: 'pointer',
+                        background: 'var(--bg-inset)',
+                        transition: 'border-color 0.2s'
+                      }}
+                    >
+                      <span style={{ fontSize: '24px' }}>📁</span>
+                      <div style={{ marginTop: '8px', fontSize: '13px', fontWeight: '600', color: 'var(--text-main)' }}>Click here to simulate file upload</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '4px' }}>
+                        Accepted formats: Photos, Videos, and Document files.
+                      </div>
+                    </div>
+                  )}
+
+                  {(incident.attachments && incident.attachments.length > 0) ? (
+                    <div style={{ marginTop: '12px' }}>
+                      <h4 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 8 }}>Uploaded Files</h4>
+                      <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                        {incident.attachments.map((f) => (
+                          <li key={f.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: 'var(--bg-inset)', border: '1px solid var(--border-color)', borderRadius: '6px', marginBottom: '6px', fontSize: '12px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                              <span style={{ fontWeight: 600 }}>📄 {f.fileName}</span>
+                              <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>
+                                {(f.fileSize / (1024 * 1024)).toFixed(2)} MB &bull; Uploaded by {f.uploadedBy}
+                              </span>
+                            </div>
+                            {!isClosed && (
+                              <button type="button" onClick={(e) => { e.stopPropagation(); deleteAttachment(f.id); }} style={{ border: 'none', background: 'transparent', color: 'var(--color-critical)', cursor: 'pointer', fontWeight: 'bold', fontSize: 12 }}>✕</button>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : (
+                    <p style={{ fontSize: 12, color: 'var(--text-faint)', fontStyle: 'italic', textAlign: 'center', margin: '12px 0 0 0' }}>No attachments uploaded.</p>
+                  )}
+                  
+                  <div style={{ background: 'var(--color-critical-bg)', border: '1px solid var(--color-critical-border)', color: 'var(--color-critical)', padding: '10px 14px', borderRadius: '6px', marginTop: '14px', fontSize: '12px', fontWeight: '500' }}>
+                    ⚠️ <strong>Security Disclaimer:</strong> Police reports shall NOT be attached in this section.
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Accordion: Summary & Closure */}
+            <div className="accordion-item">
+              <div className="accordion-header" onClick={() => toggleSection('summaryClosure')}>
+                <div className="accordion-header-left">
+                  <h3 className="accordion-title">Summary & Closure</h3>
+                  <span className={`accordion-badge ${incident.summary ? 'active' : 'none'}`}>
+                    {incident.summary ? 'Ready' : 'Pending'}
+                  </span>
+                </div>
+                <span>{openSections.summaryClosure ? '▼' : '▶'}</span>
+              </div>
+              {openSections.summaryClosure && (
+                <div className="accordion-content" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <div>
+                    <h4 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 8 }}>Incident Summary</h4>
+                    {!isClosed ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <textarea 
+                          className="form-control" 
+                          rows={4} 
+                          value={incident.summary || ''} 
+                          placeholder="Provide a detailed operational summary of the incident..."
+                          onChange={e => updateFields({ summary: e.target.value })} 
+                          style={{ fontSize: 12.5 }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="inset-panel" style={{ padding: 12, fontSize: 12.5, whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
+                        {incident.summary || <span style={{ fontStyle: 'italic', color: 'var(--text-faint)' }}>No summary recorded.</span>}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {(incident.status === 'Closed' || incident.status === 'Returned') && incident.completionRemarks && (
+                    <div>
+                      <h4 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 6 }}>Completion Remarks (Duty Manager)</h4>
+                      <div className="inset-panel" style={{ padding: 10, fontSize: 12, fontStyle: 'italic', background: 'var(--bg-inset)' }}>
+                        {incident.completionRemarks}
+                      </div>
+                    </div>
+                  )}
+
+                  {isClosed && (
+                    <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <h4 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 4 }}>Closure Metadata</h4>
+                      <div className="cd-info-row"><span className="cd-info-label">Closed By</span><span className="cd-info-value">{parentCase?.closedBy || 'System/Duty Manager'}</span></div>
+                      <div className="cd-info-row"><span className="cd-info-label">Closed At</span><span className="cd-info-value">{parentCase?.closedAt ? new Date(parentCase.closedAt).toLocaleString('en-SG') : '—'}</span></div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1591,29 +2291,30 @@ export default function IncidentDetailsPage() {
                 
                 {/* Controller Assignment Control */}
                 {isCtrl && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, background: 'var(--bg-inset)', padding: 10, borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                    <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Assign responder (ranger)</div>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <select 
-                        className="form-control select-dark" 
-                        value={assigneeInput} 
-                        onChange={e => setAssigneeInput(e.target.value)}
-                        style={{ fontSize: '12px', padding: '5px 8px' }}
-                      >
-                        <option value="">-- Choose Ranger --</option>
-                        <option value="Ranger John">Ranger John</option>
-                        <option value="Ranger Dave">Ranger Dave</option>
-                        <option value="Ranger Sarah">Ranger Sarah</option>
-                        <option value="Ranger Mike">Ranger Mike</option>
-                      </select>
-                      <button 
-                        className="btn btn-primary btn-sm" 
-                        onClick={handleAssign}
-                        disabled={!assigneeInput || saving}
-                      >
-                        Assign
-                      </button>
-                    </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, background: 'var(--bg-inset)', padding: 12, borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', overflow: 'visible' }}>
+                    <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px' }}>Assign Responders (Rangers)</div>
+                    
+                    <MultiResponderSelect
+                      value={Array.isArray(incident.assignedTo) ? incident.assignedTo : []}
+                      onChange={handleResponderChange}
+                      disabled={saving}
+                      allowEmpty={false}
+                    />
+
+                    {assignmentError && (
+                      <div style={{
+                        marginTop: '6px',
+                        padding: '6px 10px',
+                        background: 'rgba(255, 85, 85, 0.1)',
+                        border: '1px solid rgba(255, 85, 85, 0.3)',
+                        borderRadius: '4px',
+                        color: 'var(--color-critical, #ff5555)',
+                        fontSize: '12px',
+                        fontWeight: 500
+                      }}>
+                        ⚠️ {assignmentError}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1675,18 +2376,19 @@ export default function IncidentDetailsPage() {
 
       </div>
 
-      {/* Notify Completion Remarks Modal */}
+      {/* Notify Completion Confirmation Modal */}
       {showCompleteModal && (
         <div className="modal-overlay">
           <div className="modal-box glass">
-            <h2 className="modal-title">Notify Completion Remarks</h2>
+            <h2 className="modal-title">Confirm Ground Completion</h2>
             <div className="form-group">
-              <label>Completion Remarks *</label>
-              <textarea className="form-control" rows={3} value={completionRemarks} onChange={e => setCompletionRemarks(e.target.value)} placeholder="Provide summary of final actions taken on ground..." />
+              <p style={{ fontSize: '13px', color: 'var(--text-sub)', margin: '8px 0' }}>
+                Are you sure you want to mark ground activities as completed? This will update the incident status to Live (Completed).
+              </p>
             </div>
             <div className="modal-actions">
               <button className="btn btn-secondary btn-sm" onClick={() => setShowCompleteModal(false)}>Cancel</button>
-              <button className="btn btn-success btn-sm" onClick={handleComplete} disabled={!completionRemarks.trim() || saving}>Submit Completion</button>
+              <button className="btn btn-success btn-sm" onClick={handleComplete} disabled={saving}>Confirm Completion</button>
             </div>
           </div>
         </div>

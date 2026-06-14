@@ -3,30 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { AdminGuard } from '@/components/AdminGuard';
 import { useRole } from '@/context/RoleContext';
-
-interface UserAccount {
-  id: string;
-  name: string;
-  email: string;
-  department: string;
-  orgUnit: string;
-  authSource: 'WOG SSO' | 'Non-SSO';
-  role: string;
-  status: 'Active' | 'Deactivated';
-  lastLogin: string;
-}
-
-const DEFAULT_USERS: UserAccount[] = [
-  { id: '1', name: 'Controller Steve', email: 'steve.rogers@sdc.gov.sg', department: 'IIOC Operations', orgUnit: 'IOH Team Alpha', authSource: 'WOG SSO', role: 'Controller', status: 'Active', lastLogin: '2026-06-13T22:15:00Z' },
-  { id: '2', name: 'DM Gan', email: 'gan.sh@sdc.gov.sg', department: 'IIOC Management', orgUnit: 'IOH Duty Managers', authSource: 'WOG SSO', role: 'Duty Manager', status: 'Active', lastLogin: '2026-06-13T23:05:00Z' },
-  { id: '3', name: 'DO Shin Feng', email: 'shin.feng@sdc.gov.sg', department: 'IIOC Operations', orgUnit: 'IOH Team Beta', authSource: 'WOG SSO', role: 'Duty Officer', status: 'Active', lastLogin: '2026-06-13T20:44:00Z' },
-  { id: '4', name: 'Ranger John', email: 'john.doe@ranger.com.sg', department: 'Security & Ranger Service', orgUnit: 'Siloso Beach Patrol', authSource: 'Non-SSO', role: 'Responder', status: 'Active', lastLogin: '2026-06-13T19:30:00Z' },
-  { id: '5', name: 'Admin Root', email: 'admin.root@sdc.gov.sg', department: 'Information Technology', orgUnit: 'System Administrators', authSource: 'Non-SSO', role: 'System Administrator', status: 'Active', lastLogin: '2026-06-13T23:38:00Z' },
-  { id: '6', name: 'Liaison Officer', email: 'liaison@sdc.gov.sg', department: 'Corporate Communications', orgUnit: 'Public Relations', authSource: 'WOG SSO', role: 'Stakeholder', status: 'Active', lastLogin: '2026-06-12T14:10:00Z' },
-  { id: '7', name: 'Analyst Sarah', email: 'sarah.analyst@sdc.gov.sg', department: 'Business Continuity', orgUnit: 'Operational Resilience', authSource: 'WOG SSO', role: 'Operational Resilience Analyst', status: 'Active', lastLogin: '2026-06-12T09:00:00Z' },
-  { id: '8', name: 'Recipient Tony', email: 'tony.stark@partner.com.sg', department: 'Sentosa Cove Joint Committee', orgUnit: 'External Stakeholder', authSource: 'WOG SSO', role: 'Broadcast Recipient', status: 'Active', lastLogin: '2026-06-10T11:20:00Z' },
-  { id: '9', name: 'Contractor Bob', email: 'bob.builder@coporate.com', department: 'Facilities Maintenance', orgUnit: 'Engie Facility Team', authSource: 'Non-SSO', role: 'Non-SDC Term Contractor', status: 'Active', lastLogin: '2026-06-13T08:15:00Z' },
-];
+import { UserAccount, getUsers, saveUsers } from '@/lib/users';
 
 const ROLES_DETAILS: Record<string, { desc: string; scope: string }> = {
   'System Administrator': { desc: 'Full system management rights including user provisioning, configuration, taxonomy editing, and system settings.', scope: 'Global Administrative access.' },
@@ -64,18 +41,12 @@ export default function UserManagementPage() {
   const [formStatus, setFormStatus] = useState<'Active' | 'Deactivated'>('Active');
 
   useEffect(() => {
-    const stored = localStorage.getItem('admin_users');
-    if (stored) {
-      setUsers(JSON.parse(stored));
-    } else {
-      setUsers(DEFAULT_USERS);
-      localStorage.setItem('admin_users', JSON.stringify(DEFAULT_USERS));
-    }
+    setUsers(getUsers());
   }, []);
 
   const saveUsersState = (updated: UserAccount[]) => {
     setUsers(updated);
-    localStorage.setItem('admin_users', JSON.stringify(updated));
+    saveUsers(updated);
   };
 
   const logAudit = async (action: string, before: any, after: any, details: string) => {
