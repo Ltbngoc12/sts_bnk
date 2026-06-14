@@ -301,6 +301,11 @@ export default function CaseDetailsPage() {
             <Link href="/cases" style={{ color: 'var(--text-faint)', fontSize: 12, textDecoration: 'none' }}>← Case Log</Link>
             <span className="mono-id">{caseData.id}</span>
             <span className={caseBadgeClass(caseData.status)}>{caseData.status}</span>
+            {caseData.linkedIncidentId && (
+              <Link href={`/incidents/${caseData.linkedIncidentId}`} style={{ color: 'var(--color-primary)', fontSize: 12, fontWeight: 600, textDecoration: 'none', marginLeft: 6, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                🔗 Raised from Incident: {caseData.linkedIncidentId}
+              </Link>
+            )}
             {saving && <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>Saving…</span>}
           </div>
 

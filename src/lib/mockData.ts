@@ -132,6 +132,7 @@ export interface Incident {
   onSiteAt?: string;
   completedAt?: string;
   closedAt?: string;
+  closedBy?: string;
 }
 
 const defaultSubStructures = {

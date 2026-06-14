@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getDb, saveDb } from '@/lib/db';
+import { getDb, saveDb, generateCaseId } from '@/lib/db';
 
 // Helper: build a timestamped log entry
 function makeLogEntry(db_incident: any, description: string) {
@@ -10,6 +10,32 @@ function makeLogEntry(db_incident: any, description: string) {
     time: now.toLocaleTimeString('en-US', { hour12: false }),
     description,
   };
+}
+
+function generateFaultId(db: any): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const prefix = `SEN/FR/${year}${month}${day}/`;
+  
+  const todayFaults = (db.faults || []).filter((f: any) => f.id.startsWith(prefix));
+  
+  let nextSeq = 1;
+  if (todayFaults.length > 0) {
+    const sequences = todayFaults.map((f: any) => {
+      const parts = f.id.split('/');
+      const seqStr = parts[parts.length - 1];
+      return parseInt(seqStr, 10);
+    }).filter((num: any) => !isNaN(num));
+    
+    if (sequences.length > 0) {
+      nextSeq = Math.max(...sequences) + 1;
+    }
+  }
+  
+  const seqStr = String(nextSeq).padStart(3, '0');
+  return `${prefix}${seqStr}`;
 }
 
 /**
@@ -208,7 +234,7 @@ export async function POST(
     const knownActions = [
       'assign', 'acknowledge', 'on-site', 'complete', 'close', 'return',
       'submit-review', 'submit-endorsement', 'log', 'update-fields',
-      'reopen', 'mark-incomplete'
+      'reopen', 'mark-incomplete', 'edit-log', 'delete-log', 'raise-fault'
     ];
 
     if (knownActions.includes(lastSegment)) {
@@ -375,11 +401,13 @@ export async function POST(
 
       // ── Duty Manager approves closure ──────────────────────────
       case 'close': {
-        if (!['Pending Endorsement', 'Live (Completed)', 'Live (On-Site)', 'Live (Acknowledged)', 'Live (Incomplete)'].includes(incident.status)) {
-          return NextResponse.json({ error: `Cannot close: incident status is "${incident.status}"` }, { status: 409 });
+        if (incident.status === 'Closed') {
+          return NextResponse.json({ error: 'Incident is already Closed.' }, { status: 409 });
         }
         incident.status = 'Closed';
         incident.completionRemarks = body.closureRemarks || '';
+        incident.closedAt = new Date().toISOString();
+        incident.closedBy = actor;
         
         // Close the parent case only if no other active tasks exist
         const activeTasks = db.tasks.filter(t => t.caseId === caseId && t.status !== 'Closed');
@@ -419,6 +447,8 @@ export async function POST(
         }
         
         incident.status = 'Live';
+        incident.closedAt = undefined;
+        incident.closedBy = undefined;
         
         // Reopen parent Case as active
         if (currentCase.status === 'Closed') {
@@ -451,6 +481,111 @@ export async function POST(
           attachments: body.attachments || []
         };
         incident.log.push(entry);
+        break;
+      }
+
+      // ── Edit manual log entry ────────────────────────────────
+      case 'edit-log': {
+        const eventNumber = parseInt(body.eventNumber, 10);
+        const newDescription = body.description;
+        if (isNaN(eventNumber) || !newDescription) {
+          return NextResponse.json({ error: 'eventNumber and description are required' }, { status: 400 });
+        }
+        const logEntry = incident.log.find(e => e.eventNumber === eventNumber);
+        if (!logEntry) {
+          return NextResponse.json({ error: 'Log entry not found' }, { status: 404 });
+        }
+        
+        let updatedText = newDescription;
+        if (logEntry.description.startsWith('[Ranger Log] ')) {
+          updatedText = `[Ranger Log] ${newDescription}`;
+        } else if (logEntry.description.startsWith('[MANUAL] ')) {
+          const suffixIndex = logEntry.description.lastIndexOf(' — by ');
+          if (suffixIndex !== -1) {
+            const suffix = logEntry.description.slice(suffixIndex);
+            updatedText = `[MANUAL] ${newDescription}${suffix}`;
+          } else {
+            updatedText = `[MANUAL] ${newDescription} — by ${actor}.`;
+          }
+        }
+        
+        logEntry.description = updatedText;
+        logEntry.edited = true;
+        logEntry.editedBy = actor;
+        logEntry.editedAt = new Date().toISOString();
+        break;
+      }
+
+      // ── Soft Delete manual log entry ──────────────────────────
+      case 'delete-log': {
+        const eventNumber = parseInt(body.eventNumber, 10);
+        if (isNaN(eventNumber)) {
+          return NextResponse.json({ error: 'eventNumber is required' }, { status: 400 });
+        }
+        const logEntry = incident.log.find(e => e.eventNumber === eventNumber);
+        if (!logEntry) {
+          return NextResponse.json({ error: 'Log entry not found' }, { status: 404 });
+        }
+        
+        logEntry.deleted = true;
+        logEntry.deletedBy = actor;
+        logEntry.deletedAt = new Date().toISOString();
+        break;
+      }
+
+      // ── Raise Linked Fault (FRD 5.9) ──────────────────────────
+      case 'raise-fault': {
+        const title = body.title;
+        const faultType = body.faultType || 'Facilities';
+        const faultSubType = body.faultSubType || 'Others';
+        const severity = body.severity || 'Medium';
+        const description = body.description || title;
+
+        if (!title) {
+          return NextResponse.json({ error: 'title is required' }, { status: 400 });
+        }
+
+        const newCaseId = generateCaseId(db);
+        const newFaultId = generateFaultId(db);
+        const cmmsTicketId = `CMMS-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(10000 + Math.random() * 90000)}`;
+
+        const newCase: any = {
+          id: newCaseId,
+          title: `Fault: ${title}`,
+          status: 'Active',
+          createdAt: new Date().toISOString(),
+          createdBy: actor,
+          closedAt: null,
+          closedBy: null,
+          cmmsTickets: [cmmsTicketId],
+          incident: null
+        };
+
+        const newFault: any = {
+          id: newFaultId,
+          caseId: newCaseId,
+          faultType,
+          faultSubType,
+          location: {
+            ...incident.location
+          },
+          description,
+          attachments: [],
+          status: 'Created',
+          cmmsTicketId,
+          createdBy: actor,
+          createdAt: new Date().toISOString(),
+          linkedIncidentId: incident.id
+        };
+
+        db.cases.push(newCase);
+        if (!db.faults) db.faults = [];
+        db.faults.push(newFault);
+
+        incident.log.push(makeLogEntry(incident, 
+          `Linked Fault ${newFaultId} raised by Controller ${actor}. CMMS Ticket: ${cmmsTicketId}.`
+        ));
+        
         break;
       }
 

@@ -21,6 +21,12 @@ export interface LogEntry {
   time: string;
   description: string;
   recordedBy?: string;
+  edited?: boolean;
+  editedBy?: string;
+  editedAt?: string;
+  deleted?: boolean;
+  deletedBy?: string;
+  deletedAt?: string;
 }
 
 export interface EmergencyServices {
@@ -157,6 +163,7 @@ export interface Incident {
   onSiteAt?: string;
   completedAt?: string;
   closedAt?: string;
+  closedBy?: string;
   closureRemarks?: string;
 }
 
@@ -177,6 +184,7 @@ export interface Fault {
   resolvedAt?: string;
   closedBy?: string;
   closedAt?: string;
+  linkedIncidentId?: string;
 }
 
 export interface TaskChecklistItem {
@@ -294,6 +302,7 @@ export interface Case {
   closedBy: string | null;
   cmmsTickets: string[]; // Dynamically joined from faults table
   incident: Incident | null; // Dynamically joined from incidents table
+  linkedIncidentId?: string;
 }
 
 // The database schema physically stored on disk (db.json)

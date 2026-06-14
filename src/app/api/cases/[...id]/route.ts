@@ -15,7 +15,13 @@ export async function GET(
       return NextResponse.json({ error: 'Case not found' }, { status: 404 });
     }
     
-    return NextResponse.json(caseObj);
+    const fault = db.faults?.find(f => f.caseId === caseId);
+    const responseData = {
+      ...caseObj,
+      linkedIncidentId: fault?.linkedIncidentId || undefined
+    };
+    
+    return NextResponse.json(responseData);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

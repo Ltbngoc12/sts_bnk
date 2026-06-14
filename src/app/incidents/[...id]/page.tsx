@@ -70,9 +70,25 @@ export default function IncidentDetailsPage() {
 
   // Modals & Inline Inputs
   const [showCompleteModal, setShowCompleteModal] = useState(false);
+  const [showReturnModal, setShowReturnModal] = useState(false);
+  const [showApproveModal, setShowApproveModal] = useState(false);
+  const [modalRemarks, setModalRemarks] = useState('');
   const [assigneeInput, setAssigneeInput] = useState('');
   const [assignmentError, setAssignmentError] = useState('');
   const [reviewRemarks, setReviewRemarks] = useState('');
+
+  // Timeline & Refactoring States
+  const [activeTimelineTab, setActiveTimelineTab] = useState<'log' | 'system' | 'faults' | 'duplicates'>('log');
+  const [editingLogEventNumber, setEditingLogEventNumber] = useState<number | null>(null);
+  const [editingLogText, setEditingLogText] = useState('');
+
+  // Linked Fault Form States
+  const [showRaiseFaultForm, setShowRaiseFaultForm] = useState(false);
+  const [faultTitle, setFaultTitle] = useState('');
+  const [faultType, setFaultType] = useState('Facilities');
+  const [faultSubType, setFaultSubType] = useState('Others');
+  const [faultSeverity, setFaultSeverity] = useState('Medium');
+  const [faultDescription, setFaultDescription] = useState('');
 
   // Persons / Injuries Forms
   const [injName, setInjName] = useState('');
@@ -288,6 +304,37 @@ export default function IncidentDetailsPage() {
     }
   }
 
+  const handleSaveEdit = async (eventNumber: number, description: string) => {
+    const ok = await performAction('edit-log', { eventNumber, description });
+    if (ok) {
+      setEditingLogEventNumber(null);
+      setEditingLogText('');
+    }
+  };
+
+  const handleDeleteLog = async (eventNumber: number) => {
+    if (confirm('Are you sure you want to delete this log entry?')) {
+      await performAction('delete-log', { eventNumber });
+    }
+  };
+
+  const handleRaiseFault = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!faultTitle.trim()) return;
+    const ok = await performAction('raise-fault', {
+      title: faultTitle,
+      faultType,
+      faultSubType,
+      severity: faultSeverity,
+      description: faultDescription
+    });
+    if (ok) {
+      setShowRaiseFaultForm(false);
+      setFaultTitle('');
+      setFaultDescription('');
+    }
+  };
+
   // Ancillary field PUT updates
   async function updateFields(payload: Record<string, any>) {
     setSaving(true);
@@ -444,9 +491,17 @@ export default function IncidentDetailsPage() {
       case 'assignment': return '👤';
       case 'acknowledgement': return '🔔';
       case 'onsite': return '📍';
+      case 'completed': return '✅';
       case 'update': return '📝';
       case 'broadcast': return '📡';
       case 'closure': return '🔒';
+      case 'attachment': return '📎';
+      case 'submission': return '📤';
+      case 'return': return '↩️';
+      case 'reopen': return '🔓';
+      case 'incomplete': return '⚠️';
+      case 'deleted': return '🗑️';
+      case 'audit': return '⚙️';
       default: return '•';
     }
   };
@@ -457,9 +512,17 @@ export default function IncidentDetailsPage() {
       case 'assignment': return 'var(--color-high-bg)';
       case 'acknowledgement': return 'var(--color-high-bg)';
       case 'onsite': return 'var(--color-active-bg)';
+      case 'completed': return 'var(--color-active-bg)';
       case 'update': return 'var(--bg-inset)';
       case 'broadcast': return 'var(--color-review-bg)';
       case 'closure': return 'var(--color-active-bg)';
+      case 'attachment': return 'var(--color-info-bg)';
+      case 'submission': return 'var(--color-review-bg)';
+      case 'return': return 'var(--color-high-bg)';
+      case 'reopen': return 'var(--color-high-bg)';
+      case 'incomplete': return 'var(--color-critical-bg)';
+      case 'deleted': return 'var(--bg-inset)';
+      case 'audit': return 'var(--bg-inset)';
       default: return 'var(--bg-inset)';
     }
   };
@@ -470,9 +533,17 @@ export default function IncidentDetailsPage() {
       case 'assignment': return 'var(--color-high-border)';
       case 'acknowledgement': return 'var(--color-high-border)';
       case 'onsite': return 'var(--color-active-border)';
+      case 'completed': return 'var(--color-active-border)';
       case 'update': return 'var(--border-color)';
       case 'broadcast': return 'var(--color-review-border)';
       case 'closure': return 'var(--color-active-border)';
+      case 'attachment': return 'var(--color-info-border)';
+      case 'submission': return 'var(--color-review-border)';
+      case 'return': return 'var(--color-high-border)';
+      case 'reopen': return 'var(--color-high-border)';
+      case 'incomplete': return 'var(--color-critical-border)';
+      case 'deleted': return 'var(--border-color)';
+      case 'audit': return 'var(--border-color)';
       default: return 'var(--border-color)';
     }
   };
@@ -483,9 +554,17 @@ export default function IncidentDetailsPage() {
       case 'assignment': return 'var(--color-high)';
       case 'acknowledgement': return 'var(--color-high)';
       case 'onsite': return 'var(--color-active)';
+      case 'completed': return 'var(--color-active)';
       case 'update': return 'var(--text-muted)';
       case 'broadcast': return 'var(--color-review)';
       case 'closure': return 'var(--color-active)';
+      case 'attachment': return 'var(--color-info)';
+      case 'submission': return 'var(--color-review)';
+      case 'return': return 'var(--color-high)';
+      case 'reopen': return 'var(--color-high)';
+      case 'incomplete': return 'var(--color-critical)';
+      case 'deleted': return 'var(--text-faint)';
+      case 'audit': return 'var(--text-muted)';
       default: return 'var(--text-main)';
     }
   };
@@ -493,12 +572,21 @@ export default function IncidentDetailsPage() {
   // Compile unified operational timeline events
   const getTimelineEvents = () => {
     const events: {
-      type: 'creation' | 'assignment' | 'acknowledgement' | 'onsite' | 'update' | 'broadcast' | 'closure';
+      type: 'creation' | 'assignment' | 'acknowledgement' | 'onsite' | 'completed' | 'update' | 'broadcast' | 'closure' | 'attachment' | 'submission' | 'return' | 'incomplete' | 'reopen' | 'audit' | 'deleted';
       timestamp: string;
       title: string;
       description: string;
       actor?: string;
       attachments?: string[];
+      eventNumber?: number;
+      rawDescription?: string;
+      isOperational: boolean;
+      edited?: boolean;
+      editedBy?: string;
+      editedAt?: string;
+      deleted?: boolean;
+      deletedBy?: string;
+      deletedAt?: string;
     }[] = [];
 
     // 1. Creation
@@ -509,7 +597,8 @@ export default function IncidentDetailsPage() {
         title: 'Incident Created',
         description: `Incident logged under ID ${incident.id} (Case ID ${incident.caseId}). Title: "${incident.title}"`,
         actor: incident.createdBy,
-        attachments: []
+        attachments: [],
+        isOperational: false
       });
     }
 
@@ -520,14 +609,44 @@ export default function IncidentDetailsPage() {
       const lowerDesc = desc.toLowerCase();
       const attachments = (entry as any).attachments || [];
 
-      if (lowerDesc.includes('responder assigned:')) {
+      if (entry.deleted) {
+        events.push({
+          type: 'deleted',
+          timestamp: entry.deletedAt || entryTimeStr,
+          title: 'Log Entry Removed',
+          description: `Removed by ${entry.deletedBy}`,
+          actor: entry.deletedBy,
+          attachments: [],
+          eventNumber: entry.eventNumber,
+          rawDescription: entry.description,
+          isOperational: true,
+          deleted: true,
+          deletedBy: entry.deletedBy,
+          deletedAt: entry.deletedAt
+        });
+      } else if (lowerDesc.includes('responder assigned:') || lowerDesc.includes('responder added:') || lowerDesc.includes('responder assignment updated')) {
         events.push({
           type: 'assignment',
           timestamp: entryTimeStr,
           title: 'Responder Assigned',
           description: desc,
           actor: entry.recordedBy || 'System',
-          attachments
+          attachments,
+          eventNumber: entry.eventNumber,
+          rawDescription: entry.description,
+          isOperational: false
+        });
+      } else if (lowerDesc.includes('responder removed:')) {
+        events.push({
+          type: 'assignment',
+          timestamp: entryTimeStr,
+          title: 'Responder Removed',
+          description: desc,
+          actor: entry.recordedBy || 'System',
+          attachments,
+          eventNumber: entry.eventNumber,
+          rawDescription: entry.description,
+          isOperational: false
         });
       } else if (lowerDesc.includes('acknowledged dispatch')) {
         events.push({
@@ -536,7 +655,13 @@ export default function IncidentDetailsPage() {
           title: 'Dispatch Acknowledged',
           description: desc,
           actor: Array.isArray(incident.assignedTo) && incident.assignedTo.length > 0 ? incident.assignedTo.join(', ') : entry.recordedBy,
-          attachments
+          attachments,
+          eventNumber: entry.eventNumber,
+          rawDescription: entry.description,
+          isOperational: false,
+          edited: entry.edited,
+          editedBy: entry.editedBy,
+          editedAt: entry.editedAt
         });
       } else if (lowerDesc.includes('confirmed arrival on-site')) {
         events.push({
@@ -545,7 +670,28 @@ export default function IncidentDetailsPage() {
           title: 'Arrived On-Site',
           description: desc,
           actor: Array.isArray(incident.assignedTo) && incident.assignedTo.length > 0 ? incident.assignedTo.join(', ') : entry.recordedBy,
-          attachments
+          attachments,
+          eventNumber: entry.eventNumber,
+          rawDescription: entry.description,
+          isOperational: false,
+          edited: entry.edited,
+          editedBy: entry.editedBy,
+          editedAt: entry.editedAt
+        });
+      } else if (lowerDesc.includes('marked ground activities completed')) {
+        events.push({
+          type: 'completed',
+          timestamp: incident.completedAt || entryTimeStr,
+          title: 'Ground Activities Completed',
+          description: desc,
+          actor: Array.isArray(incident.assignedTo) && incident.assignedTo.length > 0 ? incident.assignedTo.join(', ') : entry.recordedBy,
+          attachments,
+          eventNumber: entry.eventNumber,
+          rawDescription: entry.description,
+          isOperational: false,
+          edited: entry.edited,
+          editedBy: entry.editedBy,
+          editedAt: entry.editedAt
         });
       } else if (lowerDesc.includes('approved and closed')) {
         events.push({
@@ -554,21 +700,106 @@ export default function IncidentDetailsPage() {
           title: 'Incident Closed & Endorsed',
           description: desc,
           actor: entry.recordedBy,
-          attachments
+          attachments,
+          eventNumber: entry.eventNumber,
+          rawDescription: entry.description,
+          isOperational: false
+        });
+      } else if (lowerDesc.includes('submitted for duty manager endorsement') || lowerDesc.includes('submitted for review') || lowerDesc.includes('submitted for endorsement')) {
+        events.push({
+          type: 'submission',
+          timestamp: entryTimeStr,
+          title: 'Closure Submitted',
+          description: desc,
+          actor: entry.recordedBy,
+          attachments,
+          eventNumber: entry.eventNumber,
+          rawDescription: entry.description,
+          isOperational: false
+        });
+      } else if (lowerDesc.includes('returned to controller')) {
+        events.push({
+          type: 'return',
+          timestamp: entryTimeStr,
+          title: 'Incident Returned',
+          description: desc,
+          actor: entry.recordedBy,
+          attachments,
+          eventNumber: entry.eventNumber,
+          rawDescription: entry.description,
+          isOperational: false
+        });
+      } else if (lowerDesc.includes('reopened by')) {
+        events.push({
+          type: 'reopen',
+          timestamp: entryTimeStr,
+          title: 'Incident Reopened',
+          description: desc,
+          actor: entry.recordedBy,
+          attachments,
+          eventNumber: entry.eventNumber,
+          rawDescription: entry.description,
+          isOperational: false
+        });
+      } else if (lowerDesc.includes('marked as incomplete')) {
+        events.push({
+          type: 'incomplete',
+          timestamp: entryTimeStr,
+          title: 'Marked Incomplete',
+          description: desc,
+          actor: entry.recordedBy,
+          attachments,
+          eventNumber: entry.eventNumber,
+          rawDescription: entry.description,
+          isOperational: false
+        });
+      } else if (lowerDesc.includes('ancillary fields updated') || lowerDesc.includes('media presence detected') || lowerDesc.includes('sdc communications team notified')) {
+        events.push({
+          type: 'audit',
+          timestamp: entryTimeStr,
+          title: lowerDesc.includes('media presence') ? 'Media Presence Detected' : lowerDesc.includes('sdc communications') ? 'Communications Team Notified' : 'Incident Details Updated',
+          description: desc,
+          actor: entry.recordedBy || 'System',
+          attachments,
+          eventNumber: entry.eventNumber,
+          rawDescription: entry.description,
+          isOperational: false
         });
       } else {
+        const isOp = desc.startsWith('[Ranger Log]') || desc.startsWith('[MANUAL]');
         events.push({
-          type: 'update',
+          type: isOp ? 'update' : 'audit',
           timestamp: entryTimeStr,
           title: desc.startsWith('[Ranger Log]') ? 'Ranger Activity Update' : desc.startsWith('[MANUAL]') ? 'Chronological Log Entry' : 'Workflow Milestone',
           description: desc,
           actor: entry.recordedBy || 'System',
-          attachments
+          attachments,
+          eventNumber: entry.eventNumber,
+          rawDescription: entry.description,
+          isOperational: isOp,
+          edited: entry.edited,
+          editedBy: entry.editedBy,
+          editedAt: entry.editedAt
         });
       }
     });
 
-    // 3. Broadcast Activities
+    // 3. Virtual Attachment Upload events
+    if (incident.attachments) {
+      incident.attachments.forEach(att => {
+        events.push({
+          type: 'attachment',
+          timestamp: att.uploadedAt,
+          title: 'Attachment Uploaded',
+          description: `File "${att.fileName}" (${(att.fileSize / (1024 * 1024)).toFixed(2)} MB) uploaded.`,
+          actor: att.uploadedBy,
+          attachments: [att.fileUrl],
+          isOperational: false
+        });
+      });
+    }
+
+    // 4. Broadcast Activities
     if (incident.relatedBroadcasts) {
       incident.relatedBroadcasts.forEach(b => {
         events.push({
@@ -576,7 +807,8 @@ export default function IncidentDetailsPage() {
           timestamp: b.sentAt,
           title: `Broadcast Dispatched (${b.type || 'Notice'})`,
           description: `Template: ${b.templateUsed || (b as any).templateName || 'Standard'} | Recipients: ${(Array.isArray(b.recipients) ? b.recipients : [(b as any).recipientGroup || '']).filter(Boolean).join(', ')} | Status: ${b.status} ${b.lastErrorMessage ? `(Err: ${b.lastErrorMessage})` : ''}`,
-          actor: b.sentBy
+          actor: b.sentBy,
+          isOperational: false
         });
       });
     }
@@ -622,24 +854,73 @@ export default function IncidentDetailsPage() {
 
   return (
     <div className="page-content">
-      {/* CSS overrides specific to this 3-column layout */}
+      {/* CSS overrides specific to this layout */}
       <style>{`
-        .incident-detail-grid {
-          display: grid;
-          grid-template-columns: 390px 1fr 345px;
+        .incident-layout-container {
+          display: flex;
+          flex-direction: column;
           gap: 20px;
-          align-items: start;
           margin-top: 1rem;
         }
-        @media (max-width: 1250px) {
-          .incident-detail-grid {
+
+        /* Section A: Unified Info Panel */
+        .incident-info-panel {
+          display: grid;
+          grid-template-columns: 1.2fr 1.2fr 2fr;
+          gap: 20px;
+          padding: 16px 20px;
+          margin-bottom: 20px;
+        }
+        @media (max-width: 1100px) {
+          .incident-info-panel {
             grid-template-columns: 1fr 1fr;
           }
         }
-        @media (max-width: 850px) {
-          .incident-detail-grid {
+        @media (max-width: 650px) {
+          .incident-info-panel {
             grid-template-columns: 1fr;
           }
+        }
+        .info-panel-col {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+        .info-panel-title {
+          font-size: 11px;
+          font-weight: 700;
+          color: var(--text-muted);
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          border-bottom: 1px dashed var(--border-color);
+          padding-bottom: 4px;
+          margin-bottom: 4px;
+        }
+
+        /* Section B: Operational Workspace Split */
+        .workspace-split {
+          display: grid;
+          grid-template-columns: 4fr 6fr;
+          gap: 20px;
+          align-items: start;
+        }
+        @media (max-width: 1200px) {
+          .workspace-split {
+            grid-template-columns: 1fr;
+          }
+          .workspace-split > .sticky-left-col {
+            order: 2;
+          }
+          .workspace-split > div:nth-child(2) {
+            order: 1;
+          }
+        }
+
+        /* Left Column — scrolls naturally with the page */
+        .sticky-left-col {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
         }
         
         /* Overview Panel */
@@ -817,9 +1098,132 @@ export default function IncidentDetailsPage() {
         .timeline-content-card.assignment::before { background-color: var(--color-high); }
         .timeline-content-card.acknowledgement::before { background-color: var(--color-high); }
         .timeline-content-card.onsite::before { background-color: var(--color-active); }
+        .timeline-content-card.completed::before { background-color: var(--color-active); }
         .timeline-content-card.update::before { background-color: var(--color-closed); }
         .timeline-content-card.broadcast::before { background-color: var(--color-review); }
         .timeline-content-card.closure::before { background-color: #10B981; }
+        .timeline-content-card.submission::before { background-color: var(--color-review); }
+        .timeline-content-card.return::before { background-color: var(--color-high); }
+        .timeline-content-card.reopen::before { background-color: var(--color-high); }
+        .timeline-content-card.incomplete::before { background-color: var(--color-critical); }
+        .timeline-content-card.audit::before { background-color: var(--border-color); }
+        .timeline-content-card.attachment::before { background-color: var(--color-info); }
+        
+        .timeline-content-card.deleted {
+          background-color: var(--bg-inset) !important;
+          border: 1px dashed var(--border-color) !important;
+          opacity: 0.7;
+        }
+        .timeline-content-card.deleted::before {
+          background-color: var(--text-faint) !important;
+        }
+        .timeline-content-card.deleted .timeline-title {
+          text-decoration: line-through;
+          color: var(--text-muted);
+        }
+        .timeline-content-card.deleted .timeline-body {
+          font-style: italic;
+          color: var(--text-faint);
+        }
+
+        /* Compact Audit Timeline */
+        .timeline-node.audit-node {
+          gap: 12px;
+          margin-bottom: 12px;
+        }
+        .timeline-node.audit-node .timeline-line {
+          left: 13px;
+          top: 28px;
+          bottom: -12px;
+          width: 1.5px;
+        }
+        .audit-icon-container {
+          width: 26px;
+          height: 26px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1;
+          flex-shrink: 0;
+          font-size: 11px;
+          box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+          margin-left: 4px;
+        }
+        .audit-card {
+          flex-grow: 1;
+          min-width: 0;
+          background: var(--bg-inset);
+          border: 1px solid var(--border-color);
+          border-radius: var(--radius-sm);
+          padding: 6px 12px;
+          box-shadow: none;
+          position: relative;
+        }
+        .audit-card::before {
+          content: '';
+          position: absolute;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          width: 3px;
+          border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+        }
+        .audit-card.creation::before { background-color: var(--color-info); }
+        .audit-card.assignment::before { background-color: var(--color-high); }
+        .audit-card.closure::before { background-color: #10B981; }
+        .audit-card.broadcast::before { background-color: var(--color-review); }
+        .audit-card.attachment::before { background-color: var(--color-info); }
+        .audit-card.submission::before { background-color: var(--color-review); }
+        .audit-card.return::before { background-color: var(--color-high); }
+        .audit-card.reopen::before { background-color: var(--color-high); }
+        .audit-card.incomplete::before { background-color: var(--color-critical); }
+        .audit-card.audit::before { background-color: var(--border-color); }
+        
+        .audit-card .timeline-content-header {
+          margin-bottom: 2px;
+        }
+        .audit-card .timeline-title {
+          font-size: 12px;
+          font-weight: 600;
+        }
+        .audit-card .timeline-timestamp {
+          font-size: 10px;
+        }
+        .audit-card .timeline-body {
+          font-size: 11.5px;
+          color: var(--text-muted);
+        }
+        .audit-card .timeline-footer {
+          margin-top: 2px;
+          font-size: 9.5px;
+        }
+
+        /* Action Buttons on Timeline Cards */
+        .timeline-card-actions {
+          display: flex;
+          gap: 12px;
+          align-items: center;
+        }
+        .timeline-action-btn {
+          background: none;
+          border: none;
+          padding: 0;
+          font-size: 11px;
+          font-weight: 600;
+          color: var(--text-muted);
+          cursor: pointer;
+          transition: color 0.15s ease;
+          display: inline-flex;
+          align-items: center;
+          gap: 3px;
+        }
+        .timeline-action-btn:hover {
+          color: var(--color-primary);
+        }
+        .timeline-action-btn.delete:hover {
+          color: var(--color-critical);
+        }
 
         .timeline-content-header {
           display: flex;
@@ -936,6 +1340,23 @@ export default function IncidentDetailsPage() {
           align-items: center;
           margin-bottom: 3px;
         }
+
+        .data-table {
+          width: 100%;
+          border-collapse: collapse;
+        }
+        .data-table th, .data-table td {
+          padding: 10px 12px;
+          border-bottom: 1px solid var(--border-color);
+        }
+        .data-table th {
+          background: var(--bg-inset);
+          font-weight: 600;
+          color: var(--text-muted);
+        }
+        .data-table tr:hover td {
+          background: var(--bg-hover);
+        }
       `}</style>
 
       {/* Ageing & Warning Alerts */}
@@ -990,239 +1411,457 @@ export default function IncidentDetailsPage() {
           <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>{incident.title}</h1>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span className={incBadgeClass(incident.status)}>{incident.status}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span className={incBadgeClass(incident.status)} style={{ marginRight: 8 }}>{incident.status}</span>
+          
+          {/* Ranger Actions */}
+          {isRanger && !isClosed && (
+            <>
+              {(incident.status === 'Live' || incident.status === 'Live (Assigned)') && (
+                <button className="btn btn-primary btn-sm" onClick={() => performAction('acknowledge')} disabled={saving}>
+                  Acknowledge Dispatch
+                </button>
+              )}
+              {incident.status === 'Live (Acknowledged)' && (
+                <button className="btn btn-success btn-sm" onClick={() => performAction('on-site')} disabled={saving}>
+                  Arrive On-Site
+                </button>
+              )}
+              {['Live (On-Site)', 'Live (Acknowledged)', 'Live (Assigned)', 'Live', 'Live (Incomplete)'].includes(incident.status) && (
+                <button className="btn btn-success btn-sm" onClick={() => setShowCompleteModal(true)} disabled={saving}>
+                  Notify Completion
+                </button>
+              )}
+              {['Live (On-Site)', 'Live (Acknowledged)', 'Live (Assigned)', 'Live'].includes(incident.status) && (
+                <button className="btn btn-secondary btn-sm" onClick={() => {
+                  const r = prompt('Reason for marking incomplete:');
+                  if (r) performAction('mark-incomplete', { remarks: r });
+                }} disabled={saving}>
+                  Mark Incomplete
+                </button>
+              )}
+            </>
+          )}
+
+          {/* Controller/Admin Actions */}
+          {isCtrl && !isClosed && (
+            <>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => {
+                  setActiveTimelineTab('faults');
+                  setShowRaiseFaultForm(true);
+                  const el = document.querySelector('.workspace-tabs-container');
+                  if (el) el.scrollIntoView({ behavior: 'smooth' });
+                }}
+              >
+                🛠️ Raise Fault
+              </button>
+              {['Live (Completed)', 'Live (Incomplete)', 'Returned', 'Live'].includes(incident.status) && (
+                <button className="btn btn-primary btn-sm" onClick={() => performAction('submit-endorsement')} disabled={saving}>
+                  Submit for Endorsement
+                </button>
+              )}
+              {incident.status !== 'Pending Endorsement' && (
+                <button
+                  className="btn btn-danger btn-sm"
+                  onClick={async () => {
+                    if (confirm('Are you sure you want to close this incident report as a FALSE ALARM?')) {
+                      await performAction('close', { closureRemarks: 'Closed as False Alarm' });
+                    }
+                  }}
+                  disabled={saving}
+                >
+                  Close as False Alarm
+                </button>
+              )}
+            </>
+          )}
+
+          {/* Duty Manager/Admin Actions */}
+          {isMgr && incident.status === 'Pending Endorsement' && (
+            <>
+              <button
+                className="btn btn-success btn-sm"
+                onClick={() => {
+                  setModalRemarks('');
+                  setShowApproveModal(true);
+                }}
+                disabled={saving}
+              >
+                Approve & Close
+              </button>
+              <button
+                className="btn btn-danger btn-sm"
+                onClick={() => {
+                  setModalRemarks('');
+                  setShowReturnModal(true);
+                }}
+                disabled={saving}
+              >
+                Return / Reject
+              </button>
+            </>
+          )}
+
+          {/* Admin Reopen Action */}
+          {isAdmin && isClosed && (
+            <button className="btn btn-secondary btn-sm" onClick={() => performAction('reopen')} disabled={saving}>
+              Reopen Incident
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Main Grid Content */}
-      <div className="incident-detail-grid">
-        
-        {/* 2. Left Information Panel */}
-        <div className="left-info-panel" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          
-          {/* Always Visible Core Overview Card */}
-          <div className="glass overview-card">
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, borderBottom: '1px dashed var(--border-color)', paddingBottom: 4 }}>
-                <div className="overview-section-title" style={{ borderBottom: 'none', marginBottom: 0, paddingBottom: 0 }}>Core Particulars</div>
-                {!isClosed && !isEditingCore && (
-                  <button className="btn btn-secondary btn-xs" onClick={startEditingCore} style={{ padding: '2px 8px', fontSize: 11 }}>
-                    ✏️ Edit
-                  </button>
-                )}
-              </div>
-              {isEditingCore ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '4px 0' }}>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Incident Title *</label>
-                    <input className="form-control" type="text" value={editTitle} onChange={e => setEditTitle(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
-                  </div>
-
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Incident Type *</label>
-                    <select className="form-control select-dark" value={editType} onChange={e => {
-                      const nextType = e.target.value;
-                      setEditType(nextType);
-                      if (taxonomy[nextType] && taxonomy[nextType].length > 0) {
-                        setEditSubType(taxonomy[nextType][0]);
-                      } else {
-                        setEditSubType('');
-                      }
-                    }} style={{ padding: '4px 8px', fontSize: 12 }}>
-                      <option value="">-- Select Type --</option>
-                      {Object.keys(taxonomy).sort().map(t => <option key={t} value={t}>{t}</option>)}
-                    </select>
-                  </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Incident Sub-Type *</label>
-                    <select className="form-control select-dark" value={editSubType} onChange={e => setEditSubType(e.target.value)} disabled={!editType} style={{ padding: '4px 8px', fontSize: 12 }}>
-                      <option value="">-- Select Sub-Type --</option>
-                      {editType && taxonomy[editType]?.sort().map(st => <option key={st} value={st}>{st}</option>)}
-                    </select>
-                  </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Priority *</label>
-                    <select className="form-control select-dark" value={editPriority} onChange={e => setEditPriority(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }}>
-                      <option value="Normal">Normal</option>
-                      <option value="High">High</option>
-                    </select>
-                  </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Crisis Level *</label>
-                    <select className="form-control select-dark" value={editCrisisLevel} onChange={e => setEditCrisisLevel(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }}>
-                      <option value="1">Level 1 (Crisis)</option>
-                      <option value="2">Level 2</option>
-                      <option value="3">Level 3</option>
-                      <option value="4">Level 4 (Default)</option>
-                      <option value="5">Level 5 (Low)</option>
-                    </select>
-                  </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Requested By (Source)</label>
-                    <select className="form-control select-dark" value={editRequestedBy} onChange={e => setEditRequestedBy(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }}>
-                      {['Public Phone', 'Email', 'UCS', 'Government Agency'].map(source => (
-                        <option key={source} value={source}>{source}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Reporter Name</label>
-                    <input className="form-control" type="text" value={editReporterName} onChange={e => setEditReporterName(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
-                  </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Date & Time of Occurrence *</label>
-                    <input className="form-control" type="datetime-local" value={editDateTime} onChange={e => setEditDateTime(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
-                  </div>
-                  <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-                    <button className="btn btn-success btn-xs" style={{ flex: 1 }} onClick={async () => {
-                      if (!editTitle.trim()) { alert('Title is required.'); return; }
-                      if (!editType) { alert('Type is required.'); return; }
-                      if (!editSubType) { alert('Sub-type is required.'); return; }
-                      const isoDateTime = editDateTime ? new Date(editDateTime).toISOString() : new Date().toISOString();
-                      await updateFields({
-                        title: editTitle,
-                        type: editType,
-                        subType: editSubType,
-                        priority: editPriority,
-                        crisisLevel: editCrisisLevel,
-                        requestedBy: editRequestedBy,
-                        reporterName: editReporterName,
-                        dateTime: isoDateTime
-                      });
-                      setIsEditingCore(false);
-                    }}>Save</button>
-                    <button className="btn btn-secondary btn-xs" style={{ flex: 1 }} onClick={() => setIsEditingCore(false)}>Cancel</button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div className="cd-info-row"><span className="cd-info-label">Incident Type</span><span className="cd-info-value"><strong>{incident.type}</strong></span></div>
-                  <div className="cd-info-row"><span className="cd-info-label">Incident Sub-Type</span><span className="cd-info-value"><strong>{incident.subType}</strong></span></div>
-                  <div className="cd-info-row"><span className="cd-info-label">Crisis Level</span><span className="cd-info-value"><span className="badge badge-ack" style={{ background: 'var(--color-high-bg)', color: 'var(--color-high)', borderColor: 'var(--color-high-border)', fontSize: '11px', padding: '1px 6px' }}>Level {incident.crisisLevel}</span></span></div>
-                  <div className="cd-info-row"><span className="cd-info-label">Priority</span><span className="cd-info-value"><strong>{incident.priority}</strong></span></div>
-                  <div className="cd-info-row"><span className="cd-info-label">Reporter Name</span><span className="cd-info-value">{incident.reporterName || 'TBD'}</span></div>
-                  <div className="cd-info-row"><span className="cd-info-label">Requested By</span><span className="cd-info-value">{incident.requestedBy}</span></div>
-                  <div className="cd-info-row"><span className="cd-info-label">Created By</span><span className="cd-info-value">{incident.createdBy}</span></div>
-                  <div className="cd-info-row">
-                    <span className="cd-info-label">Assigned Responders</span>
-                    <span className="cd-info-value" style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                      {Array.isArray(incident.assignedTo) && incident.assignedTo.length > 0 ? (
-                        incident.assignedTo.map(name => (
-                          <span
-                            key={name}
-                            className="badge badge-ack"
-                            style={{
-                              background: 'rgba(66, 153, 225, 0.15)',
-                              color: 'var(--color-info, #4299e1)',
-                              borderColor: 'rgba(66, 153, 225, 0.3)',
-                              fontSize: '11px',
-                              padding: '1px 6px'
-                            }}
-                          >
-                            {name}
-                          </span>
-                        ))
-                      ) : (
-                        <span style={{ color: 'var(--text-faint)' }}>Unassigned</span>
-                      )}
-                    </span>
-                  </div>
-                  <div className="cd-info-row"><span className="cd-info-label">Date/Time Occurred</span><span className="cd-info-value">{new Date(incident.dateTime).toLocaleString('en-SG')}</span></div>
-                  <div className="cd-info-row"><span className="cd-info-label">Date/Time Logged</span><span className="cd-info-value" style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{parentCase ? new Date(parentCase.createdAt).toLocaleString('en-SG') : '—'}</span></div>
-                </>
-              )}
-            </div>
-
-            <div style={{ marginTop: 16 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, borderBottom: '1px dashed var(--border-color)', paddingBottom: 4 }}>
-                <div className="overview-section-title" style={{ borderBottom: 'none', marginBottom: 0, paddingBottom: 0 }}>Location Info</div>
-                {!isClosed && !isEditingLocation && (
-                  <button className="btn btn-secondary btn-xs" onClick={startEditingLocation} style={{ padding: '2px 8px', fontSize: 11 }}>
-                    ✏️ Edit
-                  </button>
-                )}
-              </div>
-              {isEditingLocation ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '4px 0' }}>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Common Name</label>
-                    <input className="form-control" type="text" value={editCommonName} onChange={e => setEditCommonName(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
-                  </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Road</label>
-                    <input className="form-control" type="text" value={editRoad} onChange={e => setEditRoad(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
-                  </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Building</label>
-                    <input className="form-control" type="text" value={editBuilding} onChange={e => setEditBuilding(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
-                  </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Level & Space</label>
-                    <input className="form-control" type="text" value={editLevelSpace} onChange={e => setEditLevelSpace(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
-                  </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Beside / Near To / At</label>
-                    <input className="form-control" type="text" value={editNearAt} onChange={e => setEditNearAt(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
-                  </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Postal Code</label>
-                    <input className="form-control" type="text" value={editPostalCode} onChange={e => setEditPostalCode(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
-                  </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Location Tags (Comma separated)</label>
-                    <input className="form-control" type="text" value={editTagsStr} onChange={e => setEditTagsStr(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} placeholder="e.g. Siloso, Beachfront" />
-                  </div>
-                  <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-                    <button className="btn btn-success btn-xs" style={{ flex: 1 }} onClick={async () => {
-                      const tags = editTagsStr.split(',').map(t => t.trim()).filter(Boolean);
-                      await updateFields({
-                        location: {
-                          road: editRoad,
-                          building: editBuilding,
-                          levelSpace: editLevelSpace,
-                          nearAt: editNearAt,
-                          commonName: editCommonName,
-                          postalCode: editPostalCode,
-                          tags,
-                          lat: editLat,
-                          lng: editLng
-                        }
-                      });
-                      setIsEditingLocation(false);
-                    }}>Save</button>
-                    <button className="btn btn-secondary btn-xs" style={{ flex: 1 }} onClick={() => setIsEditingLocation(false)}>Cancel</button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div className="cd-info-row"><span className="cd-info-label">Common Name</span><span className="cd-info-value"><strong>{incident.location.commonName || '—'}</strong></span></div>
-                  <div className="cd-info-row"><span className="cd-info-label">Road</span><span className="cd-info-value">{incident.location.road || '—'}</span></div>
-                  <div className="cd-info-row"><span className="cd-info-label">Building</span><span className="cd-info-value">{incident.location.building || '—'}</span></div>
-                  <div className="cd-info-row"><span className="cd-info-label">Level & Space</span><span className="cd-info-value">{incident.location.levelSpace || '—'}</span></div>
-                  <div className="cd-info-row"><span className="cd-info-label">Beside/Near/At</span><span className="cd-info-value">{incident.location.nearAt || '—'}</span></div>
-                  <div className="cd-info-row"><span className="cd-info-label">Postal Code</span><span className="cd-info-value">{incident.location.postalCode}</span></div>
-                  <div className="cd-info-row" style={{ height: 'auto', minHeight: '34px' }}>
-                    <span className="cd-info-label">Location Tags</span>
-                    <span className="cd-info-value" style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end', marginTop: 4, marginBottom: 4 }}>
-                      {incident.location.tags && incident.location.tags.length > 0 ? (
-                        incident.location.tags.map((t, idx) => (
-                          <span key={idx} style={{ background: '#F4F1EA', color: '#2B1F1D', border: '1px solid #E6DFD5', borderRadius: '4px', padding: '1px 6px', fontSize: '10.5px', fontWeight: '500' }}>{t}</span>
-                        ))
-                      ) : (
-                        <span style={{ color: 'var(--text-faint)' }}>None</span>
-                      )}
-                    </span>
-                  </div>
-                  <div className="cd-info-row"><span className="cd-info-label">Coordinates</span><span className="cd-info-value" style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>{incident.location.lat.toFixed(5)}, {incident.location.lng.toFixed(5)}</span></div>
-                </>
-              )}
-            </div>
+      {/* Section A: Unified Info Panel (Top Grid) */}
+      <div className="glass incident-info-panel" style={{ marginTop: 20 }}>
+        {/* Core Particulars */}
+        <div className="info-panel-col">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, borderBottom: '1px dashed var(--border-color)', paddingBottom: 4 }}>
+            <div className="info-panel-title" style={{ borderBottom: 'none', marginBottom: 0, paddingBottom: 0 }}>Core Particulars</div>
+            {!isClosed && !isEditingCore && (
+              <button className="btn btn-secondary btn-xs" onClick={startEditingCore} style={{ padding: '2px 8px', fontSize: 11 }}>✏️ Edit</button>
+            )}
           </div>
+          {isEditingCore ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '4px 0' }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Incident Title *</label>
+                <input className="form-control" type="text" value={editTitle} onChange={e => setEditTitle(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Incident Type *</label>
+                <select className="form-control select-dark" value={editType} onChange={e => {
+                  const nextType = e.target.value;
+                  setEditType(nextType);
+                  if (taxonomy[nextType] && taxonomy[nextType].length > 0) {
+                    setEditSubType(taxonomy[nextType][0]);
+                  } else {
+                    setEditSubType('');
+                  }
+                }} style={{ padding: '4px 8px', fontSize: 12 }}>
+                  <option value="">-- Select Type --</option>
+                  {Object.keys(taxonomy).sort().map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Incident Sub-Type *</label>
+                <select className="form-control select-dark" value={editSubType} onChange={e => setEditSubType(e.target.value)} disabled={!editType} style={{ padding: '4px 8px', fontSize: 12 }}>
+                  <option value="">-- Select Sub-Type --</option>
+                  {editType && taxonomy[editType]?.sort().map(st => <option key={st} value={st}>{st}</option>)}
+                </select>
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Priority *</label>
+                <select className="form-control select-dark" value={editPriority} onChange={e => setEditPriority(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }}>
+                  <option value="Normal">Normal</option>
+                  <option value="High">High</option>
+                </select>
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Crisis Level *</label>
+                <select className="form-control select-dark" value={editCrisisLevel} onChange={e => setEditCrisisLevel(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }}>
+                  <option value="1">Level 1 (Crisis)</option>
+                  <option value="2">Level 2</option>
+                  <option value="3">Level 3</option>
+                  <option value="4">Level 4 (Default)</option>
+                  <option value="5">Level 5 (Low)</option>
+                </select>
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Requested By (Source)</label>
+                <select className="form-control select-dark" value={editRequestedBy} onChange={e => setEditRequestedBy(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }}>
+                  {['Public Phone', 'Email', 'UCS', 'Government Agency'].map(source => (
+                    <option key={source} value={source}>{source}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Reporter Name</label>
+                <input className="form-control" type="text" value={editReporterName} onChange={e => setEditReporterName(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Date & Time of Occurrence *</label>
+                <input className="form-control" type="datetime-local" value={editDateTime} onChange={e => setEditDateTime(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                <button className="btn btn-brand btn-xs" style={{ flex: 1 }} onClick={async () => {
+                  if (!editTitle.trim()) { alert('Title is required.'); return; }
+                  if (!editType) { alert('Type is required.'); return; }
+                  if (!editSubType) { alert('Sub-type is required.'); return; }
+                  const isoDateTime = editDateTime ? new Date(editDateTime).toISOString() : new Date().toISOString();
+                  await updateFields({
+                    title: editTitle,
+                    type: editType,
+                    subType: editSubType,
+                    priority: editPriority,
+                    crisisLevel: editCrisisLevel,
+                    requestedBy: editRequestedBy,
+                    reporterName: editReporterName,
+                    dateTime: isoDateTime
+                  });
+                  setIsEditingCore(false);
+                }}>Save</button>
+                <button className="btn btn-secondary btn-xs" style={{ flex: 1 }} onClick={() => setIsEditingCore(false)}>Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
+              <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Incident Type</span><span className="cd-info-value"><strong>{incident.type}</strong></span></div>
+              <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Sub-Type</span><span className="cd-info-value"><strong>{incident.subType}</strong></span></div>
+              <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Crisis Level</span><span className="cd-info-value"><span className="badge badge-ack" style={{ background: 'var(--color-high-bg)', color: 'var(--color-high)', borderColor: 'var(--color-high-border)', fontSize: '11px', padding: '1px 6px' }}>Level {incident.crisisLevel}</span></span></div>
+              <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Priority</span><span className="cd-info-value"><strong>{incident.priority}</strong></span></div>
+              <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Reporter Name</span><span className="cd-info-value">{incident.reporterName || 'TBD'}</span></div>
+              <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Requested By</span><span className="cd-info-value">{incident.requestedBy}</span></div>
+              <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Created By</span><span className="cd-info-value">{incident.createdBy}</span></div>
+              <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Occurred</span><span className="cd-info-value">{new Date(incident.dateTime).toLocaleString('en-SG')}</span></div>
+              <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Logged</span><span className="cd-info-value" style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{parentCase ? new Date(parentCase.createdAt).toLocaleString('en-SG') : '—'}</span></div>
+            </div>
+          )}
+        </div>
 
-          {/* Cohesive Accordion for Modules */}
-          <div className="accordion-container">
+        {/* Location Info */}
+        <div className="info-panel-col">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, borderBottom: '1px dashed var(--border-color)', paddingBottom: 4 }}>
+            <div className="info-panel-title" style={{ borderBottom: 'none', marginBottom: 0, paddingBottom: 0 }}>Location Details</div>
+            {!isClosed && !isEditingLocation && (
+              <button className="btn btn-secondary btn-xs" onClick={startEditingLocation} style={{ padding: '2px 8px', fontSize: 11 }}>✏️ Edit</button>
+            )}
+          </div>
+          {isEditingLocation ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '4px 0' }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Common Name</label>
+                <input className="form-control" type="text" value={editCommonName} onChange={e => setEditCommonName(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Road</label>
+                <input className="form-control" type="text" value={editRoad} onChange={e => setEditRoad(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Building</label>
+                <input className="form-control" type="text" value={editBuilding} onChange={e => setEditBuilding(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Level & Space</label>
+                <input className="form-control" type="text" value={editLevelSpace} onChange={e => setEditLevelSpace(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Beside / Near To / At</label>
+                <input className="form-control" type="text" value={editNearAt} onChange={e => setEditNearAt(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Postal Code</label>
+                <input className="form-control" type="text" value={editPostalCode} onChange={e => setEditPostalCode(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Location Tags (Comma separated)</label>
+                <input className="form-control" type="text" value={editTagsStr} onChange={e => setEditTagsStr(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} placeholder="e.g. Siloso, Beachfront" />
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                <button className="btn btn-brand btn-xs" style={{ flex: 1 }} onClick={async () => {
+                  const tags = editTagsStr.split(',').map(t => t.trim()).filter(Boolean);
+                  await updateFields({
+                    location: {
+                      road: editRoad,
+                      building: editBuilding,
+                      levelSpace: editLevelSpace,
+                      nearAt: editNearAt,
+                      commonName: editCommonName,
+                      postalCode: editPostalCode,
+                      tags,
+                      lat: editLat,
+                      lng: editLng
+                    }
+                  });
+                  setIsEditingLocation(false);
+                }}>Save</button>
+                <button className="btn btn-secondary btn-xs" style={{ flex: 1 }} onClick={() => setIsEditingLocation(false)}>Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
+              <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Common Name</span><span className="cd-info-value"><strong>{incident.location.commonName || '—'}</strong></span></div>
+              <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Road</span><span className="cd-info-value">{incident.location.road || '—'}</span></div>
+              <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Building</span><span className="cd-info-value">{incident.location.building || '—'}</span></div>
+              <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Level & Space</span><span className="cd-info-value">{incident.location.levelSpace || '—'}</span></div>
+              <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Beside/Near/At</span><span className="cd-info-value">{incident.location.nearAt || '—'}</span></div>
+              <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Postal Code</span><span className="cd-info-value">{incident.location.postalCode}</span></div>
+              <div className="cd-info-row" style={{ height: 'auto', minHeight: '34px', padding: '4px 0' }}>
+                <span className="cd-info-label">Location Tags</span>
+                <span className="cd-info-value" style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end', marginTop: 4, marginBottom: 4 }}>
+                  {incident.location.tags && incident.location.tags.length > 0 ? (
+                    incident.location.tags.map((t, idx) => (
+                      <span key={idx} style={{ background: '#F4F1EA', color: '#2B1F1D', border: '1px solid #E6DFD5', borderRadius: '4px', padding: '1px 6px', fontSize: '10.5px', fontWeight: '500' }}>{t}</span>
+                    ))
+                  ) : (
+                    <span style={{ color: 'var(--text-faint)' }}>None</span>
+                  )}
+                </span>
+              </div>
+              <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Coordinates</span><span className="cd-info-value" style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>{incident.location.lat.toFixed(5)}, {incident.location.lng.toFixed(5)}</span></div>
+            </div>
+          )}
+        </div>
+
+        {/* Assigned Responders */}
+        <div className="info-panel-col">
+          <div className="info-panel-title">Assigned Responders</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+              {Array.isArray(incident.assignedTo) && incident.assignedTo.length > 0 ? (
+                incident.assignedTo.map(name => (
+                  <span
+                    key={name}
+                    className="badge badge-ack"
+                    style={{
+                      background: 'rgba(66, 153, 225, 0.15)',
+                      color: 'var(--color-info, #4299e1)',
+                      borderColor: 'rgba(66, 153, 225, 0.3)',
+                      fontSize: '11px',
+                      padding: '1px 6px'
+                    }}
+                  >
+                    {name}
+                  </span>
+                ))
+              ) : (
+                <span style={{ color: 'var(--text-faint)', fontSize: '12px', fontStyle: 'italic' }}>Unassigned</span>
+              )}
+            </div>
+
+            {/* Inline Dispatcher Controls */}
+            {isCtrl && !isClosed && (
+              <div style={{ marginTop: 8 }}>
+                <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>RE-ASSIGN RESPONDERS</label>
+                <MultiResponderSelect
+                  value={Array.isArray(incident.assignedTo) ? incident.assignedTo : []}
+                  onChange={handleResponderChange}
+                  disabled={saving}
+                  allowEmpty={false}
+                />
+                {assignmentError && (
+                  <div style={{ marginTop: 6, color: 'var(--color-critical)', fontSize: 11 }}>
+                    ⚠️ {assignmentError}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Section B: Operational Workspace Tabs */}
+      <div className="workspace-tabs-container">
+        <div className="tabs-bar" style={{ marginBottom: 16, borderBottom: '1px solid var(--border-color)', display: 'flex', gap: 10 }}>
+          <button
+            type="button"
+            className={`tab-btn ${activeTimelineTab === 'log' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTimelineTab('log');
+              setEditingLogEventNumber(null);
+            }}
+          >
+            Incident Details
+          </button>
+          <button
+            type="button"
+            className={`tab-btn ${activeTimelineTab === 'system' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTimelineTab('system');
+              setEditingLogEventNumber(null);
+            }}
+          >
+            System Activity
+          </button>
+          <button
+            type="button"
+            className={`tab-btn ${activeTimelineTab === 'faults' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTimelineTab('faults');
+              setEditingLogEventNumber(null);
+            }}
+          >
+            Linked Faults ({incident.relatedFaults?.length || 0})
+          </button>
+          <button
+            type="button"
+            className={`tab-btn ${activeTimelineTab === 'duplicates' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTimelineTab('duplicates');
+              setEditingLogEventNumber(null);
+            }}
+          >
+            Duplicate Reports ({incident.slaveIncidents?.length || 0})
+          </button>
+        </div>
+
+        {/* Tab 1: Incident Details Split Layout */}
+        {activeTimelineTab === 'log' && (
+          <div className="workspace-split">
+            {/* Left Column (40% - Sticky Reference Accordions) */}
+            <div className="sticky-left-col">
+              <div className="accordion-container">
             
+            {/* Accordion: Summary & Closure */}
+            <div className="accordion-item">
+              <div className="accordion-header" onClick={() => toggleSection('summaryClosure')}>
+                <div className="accordion-header-left">
+                  <h3 className="accordion-title">Summary & Closure</h3>
+                  <span className={`accordion-badge ${incident.summary ? 'active' : 'none'}`}>
+                    {incident.summary ? 'Ready' : 'Pending'}
+                  </span>
+                </div>
+                <span>{openSections.summaryClosure ? '▼' : '▶'}</span>
+              </div>
+              {openSections.summaryClosure && (
+                <div className="accordion-content" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <div>
+                    <h4 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 8 }}>Incident Summary</h4>
+                    {!isClosed ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <textarea 
+                          className="form-control" 
+                          rows={4} 
+                          value={incident.summary || ''} 
+                          placeholder="Provide a detailed operational summary of the incident..."
+                          onChange={e => updateFields({ summary: e.target.value })} 
+                          style={{ fontSize: 12.5 }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="inset-panel" style={{ padding: 12, fontSize: 12.5, whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
+                        {incident.summary || <span style={{ fontStyle: 'italic', color: 'var(--text-faint)' }}>No summary recorded.</span>}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {incident.completionRemarks && (
+                    <div>
+                      <h4 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 6 }}>Completion Remarks</h4>
+                      <div className="inset-panel" style={{ padding: 10, fontSize: 12, fontStyle: 'italic', background: 'var(--bg-inset)' }}>
+                        {incident.completionRemarks}
+                      </div>
+                    </div>
+                  )}
+
+                  {isClosed && (
+                    <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <h4 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 4 }}>Closure Metadata</h4>
+                      <div className="cd-info-row">
+                        <span className="cd-info-label">Closed By</span>
+                        <span className="cd-info-value">{incident.closedBy || 'System/Duty Manager'}</span>
+                      </div>
+                      <div className="cd-info-row">
+                        <span className="cd-info-label">Closed At</span>
+                        <span className="cd-info-value">{incident.closedAt ? new Date(incident.closedAt).toLocaleString('en-SG') : '—'}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Accordion: CCTV */}
             <div className="accordion-item">
               <div className="accordion-header" onClick={() => toggleSection('cctv')}>
@@ -1700,59 +2339,7 @@ export default function IncidentDetailsPage() {
               )}
             </div>
 
-            {/* Accordion: Duplicates */}
-            <div className="accordion-item">
-              <div className="accordion-header" onClick={() => toggleSection('duplicates')}>
-                <div className="accordion-header-left">
-                  <h3 className="accordion-title">Linked duplicate reports</h3>
-                  <span className={`accordion-badge ${getDuplicatesBadge() !== 'None' ? 'active' : 'none'}`}>
-                    {getDuplicatesBadge()}
-                  </span>
-                </div>
-                <span>{openSections.duplicates ? '▼' : '▶'}</span>
-              </div>
-              {openSections.duplicates && (
-                <div className="accordion-content" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  {!isClosed ? (
-                    <form onSubmit={async (e) => {
-                      e.preventDefault();
-                      if (!slaveTitle.trim()) return;
-                      const slave = {
-                        id: `DUP-${String((incident.slaveIncidents?.length ?? 0) + 1).padStart(3, '0')}`,
-                        title: slaveTitle, dateTime: new Date().toISOString(), reporterName: slaveReporter || 'Anonymous Guest', summary: slaveSummary, status: incident.status === 'Closed' ? 'Closed' : 'Open'
-                      };
-                      const updated = [...(incident.slaveIncidents ?? []), slave];
-                      await updateFields({
-                        slaveIncidents: updated,
-                        newLogEntry: `[Duplicate] Linked duplicate report ${slave.id}: "${slaveTitle}" to this incident.`
-                      });
-                      setSlaveTitle(''); setSlaveReporter(''); setSlaveSummary('');
-                    }} style={{ border: '1px dashed var(--border-color)', borderRadius: 6, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      <input className="form-control" required placeholder="Report Title *" value={slaveTitle} onChange={e => setSlaveTitle(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
-                      <input className="form-control" placeholder="Reporter Details" value={slaveReporter} onChange={e => setSlaveReporter(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
-                      <textarea className="form-control" rows={2} placeholder="Summary Remarks" value={slaveSummary} onChange={e => setSlaveSummary(e.target.value)} style={{ fontSize: 12 }} />
-                      <button type="submit" className="btn btn-primary btn-xs">Link Duplicate</button>
-                    </form>
-                  ) : <p style={{ fontSize: 12, color: 'var(--text-faint)', fontStyle: 'italic', margin: 0 }}>Incident is Closed. Duplicates cannot be linked.</p>}
-
-                  <div>
-                    <h4 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 8 }}>Linked Duplicates</h4>
-                    {!incident.slaveIncidents?.length ? (
-                      <p style={{ fontSize: 11, color: 'var(--text-faint)', fontStyle: 'italic', margin: 0 }}>No duplicate reports linked.</p>
-                    ) : incident.slaveIncidents.map((s: any, i: number) => (
-                      <div key={i} className="inset-panel" style={{ padding: 10, marginBottom: 8, fontSize: 12 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
-                          <span style={{ fontWeight: 700, color: 'var(--color-info)' }}>{s.id}</span>
-                          <span className={s.status === 'Closed' ? 'badge badge-closed' : 'badge badge-live'} style={{ scale: '0.85', transformOrigin: 'right center' }}>{s.status}</span>
-                        </div>
-                        <div style={{ fontWeight: 600 }}>{s.title}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>Reporter: {s.reporterName}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
+            {/* Duplicate Accordion removed (promoted to Tab 4) */}
 
             {/* Accordion: Attachments */}
             <div className="accordion-item">
@@ -1819,65 +2406,13 @@ export default function IncidentDetailsPage() {
               )}
             </div>
 
-            {/* Accordion: Summary & Closure */}
-            <div className="accordion-item">
-              <div className="accordion-header" onClick={() => toggleSection('summaryClosure')}>
-                <div className="accordion-header-left">
-                  <h3 className="accordion-title">Summary & Closure</h3>
-                  <span className={`accordion-badge ${incident.summary ? 'active' : 'none'}`}>
-                    {incident.summary ? 'Ready' : 'Pending'}
-                  </span>
-                </div>
-                <span>{openSections.summaryClosure ? '▼' : '▶'}</span>
-              </div>
-              {openSections.summaryClosure && (
-                <div className="accordion-content" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  <div>
-                    <h4 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 8 }}>Incident Summary</h4>
-                    {!isClosed ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        <textarea 
-                          className="form-control" 
-                          rows={4} 
-                          value={incident.summary || ''} 
-                          placeholder="Provide a detailed operational summary of the incident..."
-                          onChange={e => updateFields({ summary: e.target.value })} 
-                          style={{ fontSize: 12.5 }}
-                        />
-                      </div>
-                    ) : (
-                      <div className="inset-panel" style={{ padding: 12, fontSize: 12.5, whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
-                        {incident.summary || <span style={{ fontStyle: 'italic', color: 'var(--text-faint)' }}>No summary recorded.</span>}
-                      </div>
-                    )}
-                  </div>
-                  
-                  {(incident.status === 'Closed' || incident.status === 'Returned') && incident.completionRemarks && (
-                    <div>
-                      <h4 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 6 }}>Completion Remarks (Duty Manager)</h4>
-                      <div className="inset-panel" style={{ padding: 10, fontSize: 12, fontStyle: 'italic', background: 'var(--bg-inset)' }}>
-                        {incident.completionRemarks}
-                      </div>
-                    </div>
-                  )}
-
-                  {isClosed && (
-                    <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      <h4 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 4 }}>Closure Metadata</h4>
-                      <div className="cd-info-row"><span className="cd-info-label">Closed By</span><span className="cd-info-value">{parentCase?.closedBy || 'System/Duty Manager'}</span></div>
-                      <div className="cd-info-row"><span className="cd-info-label">Closed At</span><span className="cd-info-value">{parentCase?.closedAt ? new Date(parentCase.closedAt).toLocaleString('en-SG') : '—'}</span></div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
 
           </div>
 
         </div>
 
-        {/* 3. Center Operational Timeline */}
-        <div className="center-timeline-panel" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {/* Right Column (60% - Main Operational Feed) */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           
           {/* Streamlined Log Composer */}
           {!isClosed && (
@@ -2032,348 +2567,422 @@ export default function IncidentDetailsPage() {
             </div>
           )}
 
-          {/* Timeline Feed Panel */}
+          {/* Timeline Feed Panel — Operational logs only (System Activity is in its own top-level tab) */}
           <div className="glass timeline-feed-card">
-            <h2 className="panel-title" style={{ marginBottom: 20 }}>Operational Activity Log</h2>
-            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <h2 className="panel-title" style={{ margin: 0 }}>Operational Activity Log</h2>
+            </div>
+
             <div className="timeline-container">
-              {timelineEvents.map((evt, idx) => (
-                <div key={idx} className="timeline-node">
-                  
-                  {/* Vertical Line Connector */}
-                  {idx < timelineEvents.length - 1 && (
-                    <div className="timeline-line" />
-                  )}
-                  
-                  {/* Dot / Icon */}
-                  <div className="timeline-icon-container" style={{
-                    background: getEventBgColor(evt.type),
-                    border: `2px solid ${getEventBorderColor(evt.type)}`,
-                    color: getEventTextColor(evt.type),
-                  }}>
-                    {getEventIcon(evt.type)}
-                  </div>
-                  
-                  {/* Sleek chat-bubble style card */}
-                  <div className={`timeline-content-card ${evt.type}`}>
-                    <div className="timeline-content-header">
-                      <span className="timeline-title">{evt.title}</span>
-                      <span className="timeline-timestamp">
-                        {new Date(evt.timestamp).toLocaleString('en-SG', {
-                          day: '2-digit',
-                          month: 'short',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          second: '2-digit',
-                          hour12: false
-                        })}
-                      </span>
+              {(() => {
+                const operationalEvents = timelineEvents.filter(evt => evt.isOperational);
+
+                if (operationalEvents.length === 0) {
+                  return (
+                    <div style={{ padding: '20px 10px', textAlign: 'center', color: 'var(--text-faint)', fontSize: '13px', fontStyle: 'italic' }}>
+                      No operational log entries yet.
                     </div>
-                    <div className="timeline-body">{evt.description}</div>
-                    {evt.attachments && evt.attachments.length > 0 && (
-                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-                        {evt.attachments.map((img, imgIdx) => (
-                          <div key={imgIdx} style={{ border: '1px solid var(--border-color)', borderRadius: 6, overflow: 'hidden', cursor: 'zoom-in', width: 70, height: 70 }}
-                            onClick={() => {
-                              const w = window.open();
-                              if (w) w.document.write(`<img src="${img}" style="max-width:100%; max-height:100%; display:block; margin:auto;" />`);
-                            }}
-                          >
-                            <img src={img} alt="timeline attachment" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {evt.actor && (
-                      <div className="timeline-footer">
-                        Recorded by: <strong>{evt.actor}</strong>
-                      </div>
-                    )}
-                  </div>
+                  );
+                }
 
-                </div>
-              ))}
-            </div>
-          </div>
+                return operationalEvents.map((evt, idx) => {
+                  const filteredEvents = operationalEvents;
 
-        </div>
-
-        {/* 4. Right Action Panel (Control Console) */}
-        <div className="right-action-panel-container">
-          
-          <div className="glass console-card">
-            <h2 className="panel-title" style={{ margin: 0 }}>Workflow Console</h2>
-            
-            {/* Status Section */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, background: 'var(--bg-inset)', padding: 12, borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-              <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Current Status</div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span className={incBadgeClass(incident.status)} style={{ padding: '4px 10px', fontSize: '11px' }}>{incident.status}</span>
-                <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600 }}>Crisis Level {incident.crisisLevel}</span>
-              </div>
-            </div>
-
-            {/* Workflow Actions Based on Status */}
-            
-            {/* Status: Pending Endorsement */}
-            {incident.status === 'Pending Endorsement' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label style={{ fontSize: 10, fontWeight: 700 }}>Review / Endorsement Remarks</label>
-                  <textarea
-                    className="form-control"
-                    rows={3}
-                    placeholder="Provide remarks for approving or reason for returning to controller..."
-                    value={reviewRemarks}
-                    onChange={e => setReviewRemarks(e.target.value)}
-                    style={{ fontSize: 12 }}
-                  />
-                </div>
-                
-                {isMgr ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <button 
-                      className="btn btn-success" 
-                      onClick={async () => {
-                        const ok = await performAction('close', { closureRemarks: reviewRemarks });
-                        if (ok) setReviewRemarks('');
-                      }}
-                      disabled={saving}
-                      style={{ fontSize: 13 }}
-                    >
-                      Approve & Close Incident
-                    </button>
-                    <button 
-                      className="btn btn-danger" 
-                      onClick={async () => {
-                        if (!reviewRemarks.trim()) {
-                          alert('Review remarks are required when returning an incident.');
-                          return;
-                        }
-                        const ok = await performAction('return', { returnRemarks: reviewRemarks });
-                        if (ok) setReviewRemarks('');
-                      }}
-                      disabled={saving}
-                      style={{ fontSize: 13 }}
-                    >
-                      Return to Controller
-                    </button>
-                  </div>
-                ) : (
-                  <p style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic', textAlign: 'center', margin: '8px 0 0 0' }}>
-                    Awaiting Duty Manager action. (Your role: {role})
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Status: Closed */}
-            {incident.status === 'Closed' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div style={{ background: 'var(--color-closed-bg)', border: '1px solid var(--color-closed-border)', borderRadius: 6, padding: '10px 12px', fontSize: 12, color: 'var(--color-closed)' }}>
-                  <strong>🔒 Read Only:</strong> This incident report has been fully closed and approved. It is locked for modifications.
-                </div>
-                
-                {isAdmin && (
-                  <button className="btn btn-brand btn-sm" onClick={() => performAction('reopen')} disabled={saving}>
-                    Reopen Incident
-                  </button>
-                )}
-
-                {/* Closed Status Related Lists Display */}
-                <div className="section-separator" style={{ margin: '8px 0' }} />
-                
-                {/* Related Tasks */}
-                <div className="related-list-section" style={{ marginTop: 0 }}>
-                  <div className="related-list-header">
-                    <span className="related-list-title">Related Tasks</span>
-                    <span className="related-count-badge">{incident.relatedTasks?.length || 0}</span>
-                  </div>
-                  {(!incident.relatedTasks || incident.relatedTasks.length === 0) ? (
-                    <div style={{ fontSize: '11px', color: 'var(--text-faint)', fontStyle: 'italic', paddingLeft: 4 }}>No linked tasks found.</div>
-                  ) : (
-                    incident.relatedTasks.map(t => (
-                      <div key={t.id} className="related-item-row">
-                        <div className="related-item-row-header">
-                          <span className="case-id" style={{ color: 'var(--color-info)' }}>{t.id}</span>
-                          <span className={`badge ${t.status === 'Closed' ? 'badge-closed' : 'badge-live'}`} style={{ scale: '0.8', transformOrigin: 'right center' }}>{t.status}</span>
-                        </div>
-                        <div style={{ fontWeight: 600, margin: '2px 0', wordBreak: 'break-word' }}>{t.title}</div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-faint)' }}>
-                          <span>Assignee: {t.assignee}</span>
-                          <span>Due: {t.dueDate ? new Date(t.dueDate).toLocaleDateString('en-SG') : '—'}</span>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                {/* Related Faults */}
-                <div className="related-list-section">
-                  <div className="related-list-header">
-                    <span className="related-list-title">Related Faults</span>
-                    <span className="related-count-badge">{incident.relatedFaults?.length || 0}</span>
-                  </div>
-                  {(!incident.relatedFaults || incident.relatedFaults.length === 0) ? (
-                    <div style={{ fontSize: '11px', color: 'var(--text-faint)', fontStyle: 'italic', paddingLeft: 4 }}>No linked faults.</div>
-                  ) : (
-                    incident.relatedFaults.map(f => (
-                      <div key={f.id} className="related-item-row">
-                        <div className="related-item-row-header">
-                          <span className="case-id" style={{ color: 'var(--color-info)' }}>{f.id}</span>
-                          <span className="badge badge-onsite" style={{ fontSize: '9px', scale: '0.8', transformOrigin: 'right center' }}>Sync'd</span>
-                        </div>
-                        <div style={{ fontWeight: 600, margin: '2px 0', wordBreak: 'break-word' }}>{f.description || f.faultType}</div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-faint)' }}>
-                          <span>Ticket: {f.cmmsTicketId || '—'}</span>
-                          <span>Status: {f.status}</span>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                {/* Related Broadcasts */}
-                <div className="related-list-section">
-                  <div className="related-list-header">
-                    <span className="related-list-title">Related Broadcasts</span>
-                    <span className="related-count-badge">{incident.relatedBroadcasts?.length || 0}</span>
-                  </div>
-                  {(!incident.relatedBroadcasts || incident.relatedBroadcasts.length === 0) ? (
-                    <div style={{ fontSize: '11px', color: 'var(--text-faint)', fontStyle: 'italic', paddingLeft: 4 }}>No broadcasts dispatched.</div>
-                  ) : (
-                    incident.relatedBroadcasts.map(b => (
-                      <div key={b.id} className="related-item-row">
-                        <div className="related-item-row-header">
-                          <span className="case-id" style={{ color: 'var(--color-info)' }}>{b.id}</span>
-                          <span className={`badge ${b.status === 'SENT' ? 'badge-onsite' : 'badge-live'}`} style={{ scale: '0.8', transformOrigin: 'right center' }}>{b.status}</span>
-                        </div>
-                        <div style={{ fontWeight: 500, margin: '2px 0', fontStyle: 'italic' }}>{b.templateUsed || (b as any).templateName || 'Standard Broadcast'}</div>
-                        <div style={{ fontSize: '10px', color: 'var(--text-faint)', wordBreak: 'break-word' }}>
-                          To: {(Array.isArray(b.recipients) ? b.recipients : [(b as any).recipientGroup || '']).filter(Boolean).join(', ')}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                {/* Related e-Diary */}
-                <div className="related-list-section">
-                  <div className="related-list-header">
-                    <span className="related-list-title">Related e-Diary</span>
-                    <span className="related-count-badge">{incident.relatedOccurrences?.length || 0}</span>
-                  </div>
-                  {(!incident.relatedOccurrences || incident.relatedOccurrences.length === 0) ? (
-                    <div style={{ fontSize: '11px', color: 'var(--text-faint)', fontStyle: 'italic', paddingLeft: 4 }}>No linked occurrences.</div>
-                  ) : (
-                    incident.relatedOccurrences.map(o => (
-                      <div key={o.id} className="related-item-row">
-                        <div className="related-item-row-header">
-                          <span className="case-id" style={{ color: 'var(--color-info)' }}>{o.id}</span>
-                          <span>{new Date(o.dateTime).toLocaleDateString('en-SG')}</span>
-                        </div>
-                        <div style={{ fontWeight: 600, margin: '2px 0' }}>{o.topic}</div>
-                        <div style={{ color: 'var(--text-muted)', fontSize: '11.5px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {o.content}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-              </div>
-            )}
-
-            {/* Status: Other Active Statuses */}
-            {incident.status !== 'Pending Endorsement' && incident.status !== 'Closed' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                
-                {/* Controller Assignment Control */}
-                {isCtrl && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, background: 'var(--bg-inset)', padding: 12, borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', overflow: 'visible' }}>
-                    <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px' }}>Assign Responders (Rangers)</div>
-                    
-                    <MultiResponderSelect
-                      value={Array.isArray(incident.assignedTo) ? incident.assignedTo : []}
-                      onChange={handleResponderChange}
-                      disabled={saving}
-                      allowEmpty={false}
-                    />
-
-                    {assignmentError && (
-                      <div style={{
-                        marginTop: '6px',
-                        padding: '6px 10px',
-                        background: 'rgba(255, 85, 85, 0.1)',
-                        border: '1px solid rgba(255, 85, 85, 0.3)',
-                        borderRadius: '4px',
-                        color: 'var(--color-critical, #ff5555)',
-                        fontSize: '12px',
-                        fontWeight: 500
+                  // Render large visual timeline layout
+                  return (
+                    <div key={idx} className="timeline-node">
+                      {idx < filteredEvents.length - 1 && (
+                        <div className="timeline-line" />
+                      )}
+                      <div className="timeline-icon-container" style={{
+                        background: getEventBgColor(evt.type),
+                        border: `2px solid ${getEventBorderColor(evt.type)}`,
+                        color: getEventTextColor(evt.type),
                       }}>
-                        ⚠️ {assignmentError}
+                        {getEventIcon(evt.type)}
                       </div>
-                    )}
-                  </div>
+                      
+                      <div className={`timeline-content-card ${evt.type}`}>
+                        <div className="timeline-content-header">
+                          <span className="timeline-title">{evt.title}</span>
+                          
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <span className="timeline-timestamp">
+                              {new Date(evt.timestamp).toLocaleString('en-SG', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                second: '2-digit',
+                                hour12: false
+                              })}
+                            </span>
+                            
+                            {incident.status !== 'Pending Endorsement' && incident.status !== 'Closed' && 
+                             evt.eventNumber && 
+                             !evt.deleted && 
+                             (evt.rawDescription?.startsWith('[MANUAL]') || evt.rawDescription?.startsWith('[Ranger Log]')) && (
+                              <div className="timeline-card-actions">
+                                <button
+                                  type="button"
+                                  className="timeline-action-btn"
+                                  onClick={() => {
+                                    setEditingLogEventNumber(evt.eventNumber!);
+                                    let cleanText = evt.rawDescription || '';
+                                    if (cleanText.startsWith('[Ranger Log] ')) {
+                                      cleanText = cleanText.slice('[Ranger Log] '.length);
+                                    } else if (cleanText.startsWith('[MANUAL] ')) {
+                                      const suffixIndex = cleanText.lastIndexOf(' — by ');
+                                      if (suffixIndex !== -1) {
+                                        cleanText = cleanText.slice('[MANUAL] '.length, suffixIndex);
+                                      } else {
+                                        cleanText = cleanText.slice('[MANUAL] '.length);
+                                      }
+                                    }
+                                    setEditingLogText(cleanText);
+                                  }}
+                                >
+                                  ✏️ Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  className="timeline-action-btn delete"
+                                  onClick={() => handleDeleteLog(evt.eventNumber!)}
+                                >
+                                  🗑️ Delete
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {editingLogEventNumber === evt.eventNumber ? (
+                          <form 
+                            onSubmit={(e) => {
+                              e.preventDefault();
+                              if (!editingLogText.trim()) return;
+                              handleSaveEdit(evt.eventNumber!, editingLogText);
+                            }} 
+                            style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 }}
+                          >
+                            <textarea
+                              className="form-control"
+                              rows={2}
+                              value={editingLogText}
+                              onChange={(e) => setEditingLogText(e.target.value)}
+                              style={{ fontSize: '12.5px', padding: '6px 10px', background: 'var(--bg-inset)', width: '100%' }}
+                              autoFocus
+                            />
+                            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                              <button 
+                                type="button" 
+                                className="btn btn-secondary btn-xs" 
+                                onClick={() => {
+                                  setEditingLogEventNumber(null);
+                                  setEditingLogText('');
+                                }}
+                              >
+                                Cancel
+                              </button>
+                              <button 
+                                type="submit" 
+                                className="btn btn-primary btn-xs" 
+                                disabled={saving || !editingLogText.trim()}
+                              >
+                                Save
+                              </button>
+                            </div>
+                          </form>
+                        ) : (
+                          <>
+                            <div className="timeline-body">
+                              {evt.description.startsWith('[MANUAL] ') 
+                                ? evt.description.slice('[MANUAL] '.length) 
+                                : evt.description.startsWith('[Ranger Log] ') 
+                                ? evt.description.slice('[Ranger Log] '.length) 
+                                : evt.description}
+                            </div>
+                            
+                            {evt.attachments && evt.attachments.length > 0 && (
+                              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+                                {evt.attachments.map((img, imgIdx) => (
+                                  <div key={imgIdx} style={{ border: '1px solid var(--border-color)', borderRadius: 6, overflow: 'hidden', cursor: 'zoom-in', width: 70, height: 70 }}
+                                    onClick={() => {
+                                      const w = window.open();
+                                      if (w) w.document.write(`<img src="${img}" style="max-width:100%; max-height:100%; display:block; margin:auto;" />`);
+                                    }}
+                                  >
+                                    <img src={img} alt="timeline attachment" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            
+                            {evt.edited && !evt.deleted && (
+                              <div style={{ fontSize: '10px', color: 'var(--text-faint)', fontStyle: 'italic', marginTop: 4 }}>
+                                Edited by {evt.editedBy} at {new Date(evt.editedAt!).toLocaleTimeString('en-SG', { hour12: false })}
+                              </div>
+                            )}
+                            
+                            {evt.deleted && (
+                              <div style={{ fontSize: '10px', color: 'var(--text-faint)', fontStyle: 'italic', marginTop: 4 }}>
+                                Removed at: <strong>{new Date(evt.deletedAt!).toLocaleString('en-SG')}</strong>
+                              </div>
+                            )}
+
+                            {evt.actor && !evt.deleted && (
+                              <div className="timeline-footer">
+                                Recorded by: <strong>{evt.actor}</strong>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              })()}
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Tab 2: System Activity */}
+    {activeTimelineTab === 'system' && (
+      <div className="glass timeline-feed-card" style={{ padding: 20 }}>
+        <h2 className="panel-title" style={{ marginBottom: 16 }}>System Activity (Audit Trail)</h2>
+        <div className="timeline-container">
+          {(() => {
+            const systemEvents = timelineEvents.filter(evt => !evt.isOperational);
+            if (systemEvents.length === 0) {
+              return (
+                <div style={{ padding: '20px 10px', textAlign: 'center', color: 'var(--text-faint)', fontSize: '13px', fontStyle: 'italic' }}>
+                  No system activity logs found.
+                </div>
+              );
+            }
+            return systemEvents.map((evt, idx) => (
+              <div key={idx} className="timeline-node audit-node">
+                {idx < systemEvents.length - 1 && (
+                  <div className="timeline-line" />
                 )}
-
-                {/* Workflow Buttons */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  
-                  {/* Ranger Actions */}
-                  {isRanger && (
-                    <>
-                      {(incident.status === 'Live' || incident.status === 'Live (Assigned)') && (
-                        <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => performAction('acknowledge')} disabled={saving}>
-                          Acknowledge Dispatch
-                        </button>
-                      )}
-                      
-                      {incident.status === 'Live (Acknowledged)' && (
-                        <button className="btn btn-success" style={{ width: '100%' }} onClick={() => performAction('on-site')} disabled={saving}>
-                          Arrive On-Site
-                        </button>
-                      )}
-                      
-                      {['Live (On-Site)', 'Live (Acknowledged)', 'Live (Assigned)', 'Live', 'Live (Incomplete)'].includes(incident.status) && (
-                        <button className="btn btn-success" style={{ width: '100%' }} onClick={() => setShowCompleteModal(true)} disabled={saving}>
-                          Notify Completion
-                        </button>
-                      )}
-                      
-                      {['Live (On-Site)', 'Live (Acknowledged)', 'Live (Assigned)', 'Live'].includes(incident.status) && (
-                        <button className="btn btn-secondary" style={{ width: '100%' }} onClick={() => {
-                          const r = prompt('Reason for marking incomplete:');
-                          if (r) performAction('mark-incomplete', { remarks: r });
-                        }} disabled={saving}>
-                          Mark Incomplete
-                        </button>
-                      )}
-                    </>
-                  )}
-
-                  {/* Controller Actions */}
-                  {isCtrl && ['Live (Completed)', 'Live (Incomplete)', 'Returned', 'Live'].includes(incident.status) && (
-                    <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => performAction('submit-endorsement')} disabled={saving}>
-                      Submit for Endorsement
-                    </button>
-                  )}
-
-                  {/* Message for non-matching role context */}
-                  {!isRanger && !isCtrl && !isMgr && (
-                    <p style={{ fontSize: '12px', color: 'var(--text-faint)', fontStyle: 'italic', textAlign: 'center', margin: 0 }}>
-                      No actions available for role: {role}
-                    </p>
+                <div className="audit-icon-container" style={{
+                  background: getEventBgColor(evt.type),
+                  border: `1.5px solid ${getEventBorderColor(evt.type)}`,
+                  color: getEventTextColor(evt.type),
+                }}>
+                  {getEventIcon(evt.type)}
+                </div>
+                <div className={`audit-card ${evt.type}`}>
+                  <div className="timeline-content-header">
+                    <span className="timeline-title">{evt.title}</span>
+                    <span className="timeline-timestamp">
+                      {new Date(evt.timestamp).toLocaleString('en-SG', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false
+                      })}
+                    </span>
+                  </div>
+                  <div className="timeline-body">{evt.description}</div>
+                  {evt.actor && (
+                    <div className="timeline-footer">
+                      Recorded by: <strong>{evt.actor}</strong>
+                    </div>
                   )}
                 </div>
               </div>
-            )}
+            ));
+          })()}
+        </div>
+      </div>
+    )}
 
-          </div>
-
+    {/* Tab 3: Linked Faults */}
+    {activeTimelineTab === 'faults' && (
+      <div className="glass console-card" style={{ padding: 20 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, borderBottom: '1px solid var(--border-color)', paddingBottom: 10 }}>
+          <h2 className="panel-title" style={{ margin: 0 }}>Linked Faults</h2>
+          {!isClosed && (
+            <button
+              className="btn btn-brand btn-sm"
+              onClick={() => setShowRaiseFaultForm(!showRaiseFaultForm)}
+            >
+              {showRaiseFaultForm ? 'Cancel' : '+ Raise Fault'}
+            </button>
+          )}
         </div>
 
+        {showRaiseFaultForm && (
+          <form onSubmit={handleRaiseFault} className="glass" style={{ padding: 16, marginBottom: 20, display: 'flex', flexDirection: 'column', gap: 12, background: 'var(--bg-inset)', border: '1px dashed var(--border-color)' }}>
+            <h3 style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>Raise Linked Fault</h3>
+            <div className="form-group">
+              <label style={{ fontSize: 12 }}>Fault Title *</label>
+              <input
+                className="form-control"
+                required
+                value={faultTitle}
+                onChange={e => setFaultTitle(e.target.value)}
+                placeholder="e.g. Broken water pipe near main entrance"
+              />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+              <div className="form-group">
+                <label style={{ fontSize: 12 }}>Type</label>
+                <select className="form-control select-dark" value={faultType} onChange={e => setFaultType(e.target.value)}>
+                  <option value="Facilities">Facilities</option>
+                  <option value="Mechanical & Electrical">Mechanical & Electrical</option>
+                  <option value="Horticulture">Horticulture</option>
+                  <option value="IT & Telecom">IT & Telecom</option>
+                  <option value="Others">Others</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label style={{ fontSize: 12 }}>Sub-Type</label>
+                <input className="form-control" value={faultSubType} onChange={e => setFaultSubType(e.target.value)} placeholder="Others" />
+              </div>
+              <div className="form-group">
+                <label style={{ fontSize: 12 }}>Severity</label>
+                <select className="form-control select-dark" value={faultSeverity} onChange={e => setFaultSeverity(e.target.value)}>
+                  <option value="Low">Low</option>
+                  <option value="Medium">Medium</option>
+                  <option value="High">High</option>
+                </select>
+              </div>
+            </div>
+            <div className="form-group">
+              <label style={{ fontSize: 12 }}>Description</label>
+              <textarea
+                className="form-control"
+                rows={3}
+                value={faultDescription}
+                onChange={e => setFaultDescription(e.target.value)}
+                placeholder="Provide details of the fault..."
+              />
+            </div>
+            <button type="submit" className="btn btn-success btn-sm" disabled={saving}>Create & Link Fault</button>
+          </form>
+        )}
+
+        <div style={{ overflowX: 'auto' }}>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Fault ID</th>
+                <th>Type</th>
+                <th>Description</th>
+                <th>CMMS Ticket</th>
+                <th>Status</th>
+                <th>Date Logged</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(!incident.relatedFaults || incident.relatedFaults.length === 0) ? (
+                <tr>
+                  <td colSpan={6} style={{ padding: '20px 10px', textAlign: 'center', color: 'var(--text-faint)', fontStyle: 'italic' }}>
+                    No linked faults found.
+                  </td>
+                </tr>
+              ) : (
+                incident.relatedFaults.map(f => (
+                  <tr key={f.id}>
+                    <td>
+                      <Link href={`/cases/${f.caseId}`} style={{ color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>
+                        {f.id}
+                      </Link>
+                    </td>
+                    <td>{f.faultType}</td>
+                    <td style={{ maxWidth: '300px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.description}</td>
+                    <td style={{ fontFamily: 'var(--font-mono)' }}>{f.cmmsTicketId || '—'}</td>
+                    <td>
+                      <span className={`badge ${f.status === 'Resolved' ? 'badge-closed' : 'badge-live'}`}>
+                        {f.status}
+                      </span>
+                    </td>
+                    <td style={{ color: 'var(--text-muted)' }}>
+                      {new Date(f.createdAt).toLocaleDateString('en-SG')}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )}
+
+    {/* Tab 4: Duplicate Reports */}
+    {activeTimelineTab === 'duplicates' && (
+      <div className="glass console-card" style={{ padding: 20 }}>
+        <h2 className="panel-title" style={{ marginBottom: 16, borderBottom: '1px solid var(--border-color)', paddingBottom: 10 }}>Duplicate Detection & Reports</h2>
+        
+        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 2fr', gap: 24 }}>
+          {/* Link Form */}
+          <div>
+            <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>Link Duplicate Report</h3>
+            {!isClosed ? (
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                if (!slaveTitle.trim()) return;
+                const slave = {
+                  id: `DUP-${String((incident.slaveIncidents?.length ?? 0) + 1).padStart(3, '0')}`,
+                  title: slaveTitle, dateTime: new Date().toISOString(), reporterName: slaveReporter || 'Anonymous Guest', summary: slaveSummary, status: incident.status === 'Closed' ? 'Closed' : 'Open'
+                };
+                const updated = [...(incident.slaveIncidents ?? []), slave];
+                await updateFields({
+                  slaveIncidents: updated,
+                  newLogEntry: `[Duplicate] Linked duplicate report ${slave.id}: "${slaveTitle}" to this incident.`
+                });
+                setSlaveTitle(''); setSlaveReporter(''); setSlaveSummary('');
+              }} style={{ display: 'flex', flexDirection: 'column', gap: 10, background: 'var(--bg-inset)', border: '1px solid var(--border-color)', padding: 16, borderRadius: 'var(--radius-md)' }}>
+                <div className="form-group">
+                  <label style={{ fontSize: 12 }}>Report Title *</label>
+                  <input className="form-control" required placeholder="e.g. Guest reported oil spill" value={slaveTitle} onChange={e => setSlaveTitle(e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label style={{ fontSize: 12 }}>Reporter Details</label>
+                  <input className="form-control" placeholder="e.g. John Doe, Ranger team B" value={slaveReporter} onChange={e => setSlaveReporter(e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label style={{ fontSize: 12 }}>Summary Remarks</label>
+                  <textarea className="form-control" rows={3} placeholder="Provide summary remarks..." value={slaveSummary} onChange={e => setSlaveSummary(e.target.value)} />
+                </div>
+                <button type="submit" className="btn btn-primary btn-sm">Link Duplicate</button>
+              </form>
+            ) : (
+              <p style={{ fontSize: 12, color: 'var(--text-faint)', fontStyle: 'italic', margin: 0 }}>Incident is Closed. Duplicates cannot be linked.</p>
+            )}
+          </div>
+
+          {/* Linked List */}
+          <div>
+            <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>Linked Duplicate Reports</h3>
+            {!incident.slaveIncidents?.length ? (
+              <p style={{ fontSize: 11, color: 'var(--text-faint)', fontStyle: 'italic', margin: 0 }}>No duplicate reports linked.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {incident.slaveIncidents.map((s: any, i: number) => (
+                  <div key={i} className="inset-panel" style={{ padding: 12, background: 'var(--bg-inset)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', margin: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <span style={{ fontWeight: 700, color: 'var(--color-info)' }}>{s.id}</span>
+                      <span className={s.status === 'Closed' ? 'badge badge-closed' : 'badge badge-live'} style={{ scale: '0.9', transformOrigin: 'right center' }}>{s.status}</span>
+                    </div>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{s.title}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>Reporter: {s.reporterName}</div>
+                    {s.summary && <div style={{ fontSize: 12, color: 'var(--text-sub)', marginTop: 6, fontStyle: 'italic', borderTop: '1px dashed var(--border-color)', paddingTop: 6 }}>{s.summary}</div>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )}
       </div>
 
       {/* Notify Completion Confirmation Modal */}
@@ -2389,6 +2998,78 @@ export default function IncidentDetailsPage() {
             <div className="modal-actions">
               <button className="btn btn-secondary btn-sm" onClick={() => setShowCompleteModal(false)}>Cancel</button>
               <button className="btn btn-success btn-sm" onClick={handleComplete} disabled={saving}>Confirm Completion</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Return Incident to Controller Modal */}
+      {showReturnModal && (
+        <div className="modal-overlay">
+          <div className="modal-box glass">
+            <h2 className="modal-title">Return Incident to Controller</h2>
+            <div className="form-group" style={{ marginTop: '12px' }}>
+              <label style={{ fontSize: '13px', fontWeight: '600', display: 'block', marginBottom: '6px' }}>Completion Remarks *</label>
+              <textarea
+                className="form-control"
+                rows={4}
+                value={modalRemarks}
+                onChange={(e) => setModalRemarks(e.target.value)}
+                placeholder="Specify the revision required by the Controller..."
+                style={{ width: '100%', padding: '8px', fontSize: '13px' }}
+                required
+              />
+            </div>
+            <div className="modal-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
+              <button className="btn btn-secondary btn-sm" onClick={() => setShowReturnModal(false)}>Cancel</button>
+              <button 
+                className="btn btn-danger btn-sm" 
+                onClick={async () => {
+                  if (!modalRemarks.trim()) return;
+                  const ok = await performAction('return', { returnRemarks: modalRemarks.trim() });
+                  if (ok) {
+                    setShowReturnModal(false);
+                  }
+                }}
+                disabled={saving || !modalRemarks.trim()}
+              >
+                Return to Controller
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Approve Incident Closure Modal */}
+      {showApproveModal && (
+        <div className="modal-overlay">
+          <div className="modal-box glass">
+            <h2 className="modal-title">Approve Incident Closure</h2>
+            <div className="form-group" style={{ marginTop: '12px' }}>
+              <label style={{ fontSize: '13px', fontWeight: '600', display: 'block', marginBottom: '6px' }}>Completion Remarks (Optional)</label>
+              <textarea
+                className="form-control"
+                rows={4}
+                value={modalRemarks}
+                onChange={(e) => setModalRemarks(e.target.value)}
+                placeholder="Enter approval notes or remarks..."
+                style={{ width: '100%', padding: '8px', fontSize: '13px' }}
+              />
+            </div>
+            <div className="modal-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
+              <button className="btn btn-secondary btn-sm" onClick={() => setShowApproveModal(false)}>Cancel</button>
+              <button 
+                className="btn btn-success btn-sm" 
+                onClick={async () => {
+                  const ok = await performAction('close', { closureRemarks: modalRemarks.trim() });
+                  if (ok) {
+                    setShowApproveModal(false);
+                  }
+                }}
+                disabled={saving}
+              >
+                Approve & Close
+              </button>
             </div>
           </div>
         </div>
