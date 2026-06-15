@@ -1,5 +1,7 @@
 import fs from 'fs';
 import path from 'path';
+import { Db } from 'mongodb';
+import clientPromise from './mongodb';
 
 // Core entities matching the normalized database structure
 
@@ -330,360 +332,346 @@ export interface DbSchema {
   auditLogs?: AuditLog[];
 }
 
+// Path to db.json — used only for one-time seeding when MongoDB is empty
 const DB_PATH = path.join(process.cwd(), 'src', 'lib', 'db.json');
 
-// Helper to check if file exists, read, and run migration/hydration on-the-fly
-export function getDb(): DbSchema {
-  try {
-    if (!fs.existsSync(DB_PATH)) {
-      return { cases: [], tasks: [], occurrences: [] };
-    }
-    const raw = fs.readFileSync(DB_PATH, 'utf-8');
-    const parsed = JSON.parse(raw);
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-    // MIGRATION BLOCK: If read JSON has old nested/flat layout, migrate to fully normalized storage
-    let normalizedDb: NormalizedDbSchema;
-    
-    if (parsed.cases && parsed.cases.length > 0 && ('incident' in parsed.cases[0] || 'cmmsTickets' in parsed.cases[0])) {
-      console.log('Migrating legacy nested db.json to normalized relational schema...');
-      normalizedDb = {
-        cases: [],
-        incidents: [],
-        faults: [],
-        tasks: parsed.tasks || [],
-        occurrences: [],
-        events: parsed.events || [],
-        nops: parsed.nops || [],
-        broadcasts: parsed.broadcasts || [],
-        auditLogs: parsed.auditLogs || []
-      };
-
-      // Extract incidents and faults from legacy cases
-      for (const c of parsed.cases) {
-        const { incident, cmmsTickets, ...caseMeta } = c;
-        
-        // Save case metadata
-        normalizedDb.cases.push({
-          id: caseMeta.id,
-          title: caseMeta.title,
-          status: caseMeta.status || 'Active',
-          createdAt: caseMeta.createdAt || new Date().toISOString(),
-          createdBy: caseMeta.createdBy || 'system',
-          closedAt: caseMeta.closedAt || null,
-          closedBy: caseMeta.closedBy || null
-        });
-
-        // Extract and format nested Incident
-        if (incident) {
-          const incidentId = incident.id || `SEN/IR/${incident.dateTime?.split('T')[0].replace(/-/g, '') || new Date().toISOString().split('T')[0].replace(/-/g, '')}/${String(normalizedDb.incidents.length + 1).padStart(4, '0')}`;
-          normalizedDb.incidents.push({
-            id: incidentId,
-            caseId: caseMeta.id,
-            title: incident.title || caseMeta.title,
-            dateTime: incident.dateTime || new Date().toISOString(),
-            type: incident.type || 'Others',
-            subType: incident.subType || 'Others',
-            priority: incident.priority || 'Normal',
-            crisisLevel: incident.crisisLevel || 4,
-            reporterName: incident.reporterName || 'Unknown',
-            requestedBy: incident.requestedBy || 'IIOC Controller',
-            createdBy: incident.createdBy || 'system',
-            category: incident.category || 'Standard Incident',
-            status: incident.status || 'Live',
-            assignedTo: incident.assignedTo || '',
-            location: incident.location || {
-              road: '', building: '', levelSpace: '', nearAt: '', commonName: '', postalCode: '000000', tags: [], lat: 1.25, lng: 103.83
-            },
-            log: incident.log || [],
-            emergencyServices: incident.emergencyServices || {
-              policeAtScene: false, officerNameRank: '', policeIncidentNo: '', classification: '', respondingUnit: '',
-              ambulanceScdfType: '', ambulanceOfficerName: '', ambulanceCallSign: '', ambulanceRespondingUnit: '', ambulanceArrivalTime: '', hospitalConveyedTo: ''
-            },
-            mediaInvolvement: incident.mediaInvolvement || { mediaAtScene: false, mediaName: '', commsNotified: false },
-            propertyDamage: incident.propertyDamage || { sdcPropertyDamaged: false, description: '' },
-            vehiclesInvolved: incident.vehiclesInvolved || [],
-            personalInjuries: incident.personalInjuries || [],
-            personsInvolved: incident.personsInvolved || [],
-            cctvBwc: incident.cctvBwc || [],
-            summary: incident.summary || '',
-            completionRemarks: incident.completionRemarks || '',
-            slaveIncidents: incident.slaveIncidents || [],
-            attachments: incident.attachments || []
-          });
-        }
-
-        // Extract and format faults
-        if (cmmsTickets && cmmsTickets.length > 0) {
-          cmmsTickets.forEach((tId: string, idx: number) => {
-            const faultId = `SEN/FR/${caseMeta.createdAt?.split('T')[0].replace(/-/g, '') || new Date().toISOString().split('T')[0].replace(/-/g, '')}/${String(normalizedDb.faults.length + 1).padStart(3, '0')}`;
-            normalizedDb.faults.push({
-              id: faultId,
-              caseId: caseMeta.id,
-              faultType: incident?.type || 'Facilities',
-              faultSubType: incident?.subType || 'Others',
-              location: incident?.location || {
-                road: '', building: '', levelSpace: '', nearAt: '', commonName: '', postalCode: '000000', tags: [], lat: 1.25, lng: 103.83
-              },
-              description: incident?.summary || caseMeta.title,
-              attachments: [],
-              status: 'Closed', // Prototype auto-closed
-              cmmsTicketId: tId,
-              createdBy: 'system',
-              createdAt: caseMeta.createdAt || new Date().toISOString(),
-              submittedAt: caseMeta.createdAt || new Date().toISOString()
-            });
-          });
-        }
+function hydrateDb(normalizedDb: NormalizedDbSchema): DbSchema {
+  // Ensure all incidents follow strict FRD status and category taxonomy
+  const normalizedIncidents = normalizedDb.incidents.map(inc => {
+    const legacyResponders = inc.responders || [];
+    let finalResponders = legacyResponders;
+    if (legacyResponders.length === 0) {
+      let legacyAssigned: string[] = [];
+      if (typeof inc.assignedTo === 'string') {
+        legacyAssigned = inc.assignedTo ? [inc.assignedTo] : [];
+      } else if (Array.isArray(inc.assignedTo)) {
+        legacyAssigned = inc.assignedTo;
       }
-
-      // Map occurrences (e-Diary) flat list. Link to legacy cases if possible, otherwise create dummy cases
-      if (parsed.occurrences) {
-        for (const o of parsed.occurrences) {
-          let linkedCaseId = o.caseId;
-          if (!linkedCaseId) {
-            // Auto-create dummy Case for legacy occurrences
-            linkedCaseId = `SEN/CI/${o.dateTime?.split('T')[0].replace(/-/g, '') || new Date().toISOString().split('T')[0].replace(/-/g, '')}/${String(normalizedDb.cases.length + 1).padStart(3, '0')}`;
-            normalizedDb.cases.push({
-              id: linkedCaseId,
-              title: `e-Diary: ${o.topic}`,
-              status: 'No Action Required',
-              createdAt: o.dateTime || new Date().toISOString(),
-              createdBy: o.user || 'system',
-              closedAt: o.dateTime || new Date().toISOString(),
-              closedBy: o.user || 'system'
-            });
-          }
-          normalizedDb.occurrences.push({
-            id: o.id,
-            caseId: linkedCaseId,
-            user: o.user,
-            dateTime: o.dateTime,
-            topic: o.topic,
-            content: o.content
-          });
-        }
-      }
-
-      // Save legacy migrated database back to disk immediately
-      fs.writeFileSync(DB_PATH, JSON.stringify(normalizedDb, null, 2), 'utf-8');
-      console.log('Legacy db.json successfully normalized and written back to disk.');
-    } else {
-      // It is already normalized structure
-      normalizedDb = {
-        cases: parsed.cases || [],
-        incidents: parsed.incidents || [],
-        faults: parsed.faults || [],
-        tasks: parsed.tasks || [],
-        occurrences: parsed.occurrences || [],
-        events: parsed.events || [],
-        nops: parsed.nops || [],
-        broadcasts: parsed.broadcasts || [],
-        auditLogs: parsed.auditLogs || []
-      };
+      finalResponders = legacyAssigned.map(r => ({
+        responderId: r,
+        assignedBy: inc.createdBy || 'System',
+        assignedAt: inc.dateTime || new Date().toISOString(),
+        status: 'Active' as const
+      }));
     }
 
-    // Ensure all incidents follow strict FRD status and category taxonomy
-    if (normalizedDb.incidents) {
-      normalizedDb.incidents = normalizedDb.incidents.map(inc => {
-        // Migrate legacy assignedTo string/array to responders metadata if empty/missing
-        const legacyResponders = inc.responders || [];
-        let finalResponders = legacyResponders;
-        if (legacyResponders.length === 0) {
-          let legacyAssigned: string[] = [];
-          if (typeof inc.assignedTo === 'string') {
-            legacyAssigned = inc.assignedTo ? [inc.assignedTo] : [];
-          } else if (Array.isArray(inc.assignedTo)) {
-            legacyAssigned = inc.assignedTo;
-          }
-          finalResponders = legacyAssigned.map(r => ({
-            responderId: r,
-            assignedBy: inc.createdBy || 'System',
-            assignedAt: inc.dateTime || new Date().toISOString(),
-            status: 'Active' as const
-          }));
-        }
+    const derivedAssignedTo = finalResponders
+      .filter(r => r.status === 'Active')
+      .map(r => r.responderId);
 
-        // Derive assignedTo dynamically from active responders (single source of truth)
-        const derivedAssignedTo = finalResponders
-          .filter(r => r.status === 'Active')
-          .map(r => r.responderId);
+    let mappedStatus = inc.status || 'Live';
+    if (mappedStatus === 'Live Acknowledged') mappedStatus = 'Live (Acknowledged)';
+    else if (mappedStatus === 'Live On-Site') mappedStatus = 'Live (On-Site)';
+    else if (mappedStatus === 'Live Completed') mappedStatus = 'Live (Completed)';
+    else if (mappedStatus === 'Pending Review') mappedStatus = 'Pending Endorsement';
 
-        let mappedStatus = inc.status || 'Live';
-        if (mappedStatus === 'Live Acknowledged') mappedStatus = 'Live (Acknowledged)';
-        else if (mappedStatus === 'Live On-Site') mappedStatus = 'Live (On-Site)';
-        else if (mappedStatus === 'Live Completed') mappedStatus = 'Live (Completed)';
-        else if (mappedStatus === 'Pending Review') mappedStatus = 'Pending Endorsement';
-
-        // Set Live (Assigned) if there are assignees but status is still Live
-        if (mappedStatus === 'Live' && derivedAssignedTo.length > 0) {
-          mappedStatus = 'Live (Assigned)';
-        }
-
-        const mappedCategory = inc.category || 'Standard Incident';
-
-        return {
-          ...inc,
-          status: mappedStatus,
-          category: mappedCategory,
-          attachments: inc.attachments || [],
-          responders: finalResponders,
-          assignedTo: derivedAssignedTo
-        };
-      });
+    if (mappedStatus === 'Live' && derivedAssignedTo.length > 0) {
+      mappedStatus = 'Live (Assigned)';
     }
-
-    // HYDRATION LOGIC: Join normalized tables into the legacy nested models returned to the app
-    const hydratedCases: Case[] = normalizedDb.cases.map(c => {
-      const caseIncident = normalizedDb.incidents.find(i => i.caseId === c.id) || null;
-      
-      const caseFaults = normalizedDb.faults.filter(f => f.caseId === c.id);
-      const cmmsTickets = caseFaults
-        .map(f => f.cmmsTicketId)
-        .filter((tId): tId is string => !!tId);
-
-      return {
-        ...c,
-        cmmsTickets,
-        incident: caseIncident
-      };
-    });
 
     return {
-      cases: hydratedCases,
-      tasks: normalizedDb.tasks,
-      occurrences: normalizedDb.occurrences,
-      faults: normalizedDb.faults,
-      events: normalizedDb.events,
-      nops: normalizedDb.nops,
-      broadcasts: normalizedDb.broadcasts,
-      auditLogs: normalizedDb.auditLogs
+      ...inc,
+      status: mappedStatus,
+      category: inc.category || 'Standard Incident',
+      attachments: inc.attachments || [],
+      responders: finalResponders,
+      assignedTo: derivedAssignedTo
     };
+  });
+
+  const hydratedCases: Case[] = normalizedDb.cases.map(c => {
+    const caseIncident = normalizedIncidents.find(i => i.caseId === c.id) || null;
+    const caseFaults = normalizedDb.faults.filter(f => f.caseId === c.id);
+    const cmmsTickets = caseFaults
+      .map(f => f.cmmsTicketId)
+      .filter((tId): tId is string => !!tId);
+
+    return { ...c, cmmsTickets, incident: caseIncident };
+  });
+
+  return {
+    cases: hydratedCases,
+    tasks: normalizedDb.tasks,
+    occurrences: normalizedDb.occurrences,
+    faults: normalizedDb.faults,
+    events: normalizedDb.events,
+    nops: normalizedDb.nops,
+    broadcasts: normalizedDb.broadcasts,
+    auditLogs: normalizedDb.auditLogs
+  };
+}
+
+function dehydrateDb(data: DbSchema): NormalizedDbSchema {
+  const normalizedDb: NormalizedDbSchema = {
+    cases: [],
+    incidents: [],
+    faults: data.faults || [],
+    tasks: data.tasks,
+    occurrences: data.occurrences,
+    events: data.events || [],
+    nops: data.nops || [],
+    broadcasts: data.broadcasts || [],
+    auditLogs: data.auditLogs || []
+  };
+
+  for (const c of data.cases) {
+    const { incident, cmmsTickets, ...caseMeta } = c;
+
+    normalizedDb.cases.push({
+      id: caseMeta.id,
+      title: caseMeta.title,
+      status: caseMeta.status as any,
+      createdAt: caseMeta.createdAt,
+      createdBy: caseMeta.createdBy || 'system',
+      closedAt: caseMeta.closedAt,
+      closedBy: caseMeta.closedBy
+    });
+
+    if (incident) {
+      if (!incident.id) {
+        incident.id = `SEN/IR/${incident.dateTime?.split('T')[0].replace(/-/g, '') || new Date().toISOString().split('T')[0].replace(/-/g, '')}/${String(normalizedDb.incidents.length + 1).padStart(4, '0')}`;
+      }
+      // Strip assignedTo — derived dynamically on load from responders
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { assignedTo, ...incidentMeta } = incident;
+      normalizedDb.incidents.push({ ...(incidentMeta as any), caseId: caseMeta.id });
+    }
+
+    if (cmmsTickets && cmmsTickets.length > 0) {
+      cmmsTickets.forEach(ticketId => {
+        const existingFault = normalizedDb.faults.find(f => f.cmmsTicketId === ticketId);
+        if (!existingFault) {
+          const faultId = `SEN/FR/${caseMeta.createdAt?.split('T')[0].replace(/-/g, '') || new Date().toISOString().split('T')[0].replace(/-/g, '')}/${String(normalizedDb.faults.length + 1).padStart(3, '0')}`;
+          normalizedDb.faults.push({
+            id: faultId,
+            caseId: caseMeta.id,
+            faultType: incident?.type || 'Facilities',
+            faultSubType: incident?.subType || 'Others',
+            location: incident?.location || {
+              road: '', building: '', levelSpace: '', nearAt: '', commonName: '', postalCode: '000000', tags: [], lat: 1.25, lng: 103.83
+            },
+            description: incident?.summary || caseMeta.title,
+            attachments: [],
+            status: 'Closed',
+            cmmsTicketId: ticketId,
+            createdBy: caseMeta.createdBy || 'system',
+            createdAt: caseMeta.createdAt || new Date().toISOString(),
+            submittedAt: new Date().toISOString()
+          });
+        }
+      });
+    }
+  }
+
+  return normalizedDb;
+}
+
+async function getMongoDB(): Promise<Db> {
+  const client = await clientPromise;
+  return client.db('sentosa-cms');
+}
+
+async function saveCollection(mdb: Db, collectionName: string, docs: any[]): Promise<void> {
+  const col = mdb.collection(collectionName);
+  if (docs.length === 0) {
+    await col.deleteMany({});
+    return;
+  }
+  await col.bulkWrite(
+    docs.map(doc => ({
+      replaceOne: {
+        filter: { id: doc.id },
+        replacement: { ...doc },
+        upsert: true
+      }
+    }))
+  );
+  const currentIds = docs.map(d => d.id);
+  await col.deleteMany({ id: { $nin: currentIds } });
+}
+
+async function seedFromJson(mdb: Db): Promise<NormalizedDbSchema> {
+  console.log('MongoDB empty — seeding from db.json...');
+  const raw = fs.readFileSync(DB_PATH, 'utf-8');
+  const parsed = JSON.parse(raw);
+
+  let normalizedDb: NormalizedDbSchema;
+
+  // Handle legacy nested format
+  if (parsed.cases && parsed.cases.length > 0 && ('incident' in parsed.cases[0] || 'cmmsTickets' in parsed.cases[0])) {
+    console.log('Migrating legacy nested db.json to normalized schema...');
+    normalizedDb = {
+      cases: [], incidents: [], faults: [],
+      tasks: parsed.tasks || [], occurrences: [],
+      events: parsed.events || [], nops: parsed.nops || [],
+      broadcasts: parsed.broadcasts || [], auditLogs: parsed.auditLogs || []
+    };
+
+    for (const c of parsed.cases) {
+      const { incident, cmmsTickets, ...caseMeta } = c;
+      normalizedDb.cases.push({
+        id: caseMeta.id, title: caseMeta.title,
+        status: caseMeta.status || 'Active',
+        createdAt: caseMeta.createdAt || new Date().toISOString(),
+        createdBy: caseMeta.createdBy || 'system',
+        closedAt: caseMeta.closedAt || null, closedBy: caseMeta.closedBy || null
+      });
+      if (incident) {
+        normalizedDb.incidents.push({
+          id: incident.id || `SEN/IR/${new Date().toISOString().split('T')[0].replace(/-/g, '')}/${String(normalizedDb.incidents.length + 1).padStart(4, '0')}`,
+          caseId: caseMeta.id,
+          ...incident
+        });
+      }
+    }
+
+    if (parsed.occurrences) {
+      for (const o of parsed.occurrences) {
+        normalizedDb.occurrences.push({ id: o.id, caseId: o.caseId || caseMeta_fallback(normalizedDb, o), ...o });
+      }
+    }
+  } else {
+    normalizedDb = {
+      cases: parsed.cases || [],
+      incidents: parsed.incidents || [],
+      faults: parsed.faults || [],
+      tasks: parsed.tasks || [],
+      occurrences: parsed.occurrences || [],
+      events: parsed.events || [],
+      nops: parsed.nops || [],
+      broadcasts: parsed.broadcasts || [],
+      auditLogs: parsed.auditLogs || []
+    };
+  }
+
+  // Seed all collections in parallel
+  await Promise.all([
+    normalizedDb.cases.length > 0 ? mdb.collection('cases').insertMany(normalizedDb.cases as any[]) : Promise.resolve(),
+    normalizedDb.incidents.length > 0 ? mdb.collection('incidents').insertMany(normalizedDb.incidents as any[]) : Promise.resolve(),
+    normalizedDb.faults.length > 0 ? mdb.collection('faults').insertMany(normalizedDb.faults as any[]) : Promise.resolve(),
+    normalizedDb.tasks.length > 0 ? mdb.collection('tasks').insertMany(normalizedDb.tasks as any[]) : Promise.resolve(),
+    normalizedDb.occurrences.length > 0 ? mdb.collection('occurrences').insertMany(normalizedDb.occurrences as any[]) : Promise.resolve(),
+    normalizedDb.events.length > 0 ? mdb.collection('events').insertMany(normalizedDb.events as any[]) : Promise.resolve(),
+    normalizedDb.nops.length > 0 ? mdb.collection('nops').insertMany(normalizedDb.nops as any[]) : Promise.resolve(),
+    normalizedDb.broadcasts.length > 0 ? mdb.collection('broadcasts').insertMany(normalizedDb.broadcasts as any[]) : Promise.resolve(),
+    normalizedDb.auditLogs.length > 0 ? mdb.collection('auditLogs').insertMany(normalizedDb.auditLogs as any[]) : Promise.resolve(),
+  ]);
+
+  console.log(`Seeded: ${normalizedDb.cases.length} cases, ${normalizedDb.incidents.length} incidents, ${normalizedDb.tasks.length} tasks.`);
+  return normalizedDb;
+}
+
+// Fallback caseId generator used during legacy migration
+function caseMeta_fallback(db: NormalizedDbSchema, o: any): string {
+  const dateStr = o.dateTime?.split('T')[0].replace(/-/g, '') || new Date().toISOString().split('T')[0].replace(/-/g, '');
+  const newId = `SEN/CI/${dateStr}/${String(db.cases.length + 1).padStart(3, '0')}`;
+  db.cases.push({
+    id: newId, title: `e-Diary: ${o.topic}`,
+    status: 'No Action Required',
+    createdAt: o.dateTime || new Date().toISOString(),
+    createdBy: o.user || 'system',
+    closedAt: o.dateTime || new Date().toISOString(),
+    closedBy: o.user || 'system'
+  });
+  return newId;
+}
+
+// ─── Public API ───────────────────────────────────────────────────────────────
+
+export async function getDb(): Promise<DbSchema> {
+  try {
+    const mdb = await getMongoDB();
+
+    const [cases, incidents, faults, tasks, occurrences, events, nops, broadcasts, auditLogs] = await Promise.all([
+      mdb.collection('cases').find({}, { projection: { _id: 0 } }).toArray(),
+      mdb.collection('incidents').find({}, { projection: { _id: 0 } }).toArray(),
+      mdb.collection('faults').find({}, { projection: { _id: 0 } }).toArray(),
+      mdb.collection('tasks').find({}, { projection: { _id: 0 } }).toArray(),
+      mdb.collection('occurrences').find({}, { projection: { _id: 0 } }).toArray(),
+      mdb.collection('events').find({}, { projection: { _id: 0 } }).toArray(),
+      mdb.collection('nops').find({}, { projection: { _id: 0 } }).toArray(),
+      mdb.collection('broadcasts').find({}, { projection: { _id: 0 } }).toArray(),
+      mdb.collection('auditLogs').find({}, { projection: { _id: 0 } }).toArray(),
+    ]);
+
+    let normalizedDb: NormalizedDbSchema;
+
+    // Seed from db.json on first run
+    if (cases.length === 0 && fs.existsSync(DB_PATH)) {
+      normalizedDb = await seedFromJson(mdb);
+    } else {
+      normalizedDb = {
+        cases: cases as any,
+        incidents: incidents as any,
+        faults: faults as any,
+        tasks: tasks as any,
+        occurrences: occurrences as any,
+        events: events as any,
+        nops: nops as any,
+        broadcasts: broadcasts as any,
+        auditLogs: auditLogs as any,
+      };
+    }
+
+    return hydrateDb(normalizedDb);
   } catch (err) {
-    console.error('Error reading database file:', err);
+    console.error('Error reading from MongoDB:', err);
     return { cases: [], tasks: [], occurrences: [] };
   }
 }
 
-// Helper to write database, converting hydrated view structures back to normalized files
-export function saveDb(data: DbSchema): void {
+export async function saveDb(data: DbSchema): Promise<void> {
   try {
-    const dir = path.dirname(DB_PATH);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
+    const mdb = await getMongoDB();
+    const normalizedDb = dehydrateDb(data);
 
-    // DE-HYDRATION LOGIC: Split the nested structures into flat normalized database tables
-    const normalizedDb: NormalizedDbSchema = {
-      cases: [],
-      incidents: [],
-      faults: data.faults || [],
-      tasks: data.tasks,
-      occurrences: data.occurrences,
-      events: data.events || [],
-      nops: data.nops || [],
-      broadcasts: data.broadcasts || [],
-      auditLogs: data.auditLogs || []
-    };
-
-    for (const c of data.cases) {
-      const { incident, cmmsTickets, ...caseMeta } = c;
-      
-      // Save Case metadata table row
-      normalizedDb.cases.push({
-        id: caseMeta.id,
-        title: caseMeta.title,
-        status: caseMeta.status as any,
-        createdAt: caseMeta.createdAt,
-        createdBy: caseMeta.createdBy || 'system',
-        closedAt: caseMeta.closedAt,
-        closedBy: caseMeta.closedBy
-      });
-
-      // Save Incident table row
-      if (incident) {
-        // Double check incident has correct ID
-        if (!incident.id) {
-          incident.id = `SEN/IR/${incident.dateTime?.split('T')[0].replace(/-/g, '') || new Date().toISOString().split('T')[0].replace(/-/g, '')}/${String(normalizedDb.incidents.length + 1).padStart(4, '0')}`;
-        }
-        // Strip assignedTo to avoid duplicate storage on disk, since it is dynamically derived on load
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { assignedTo, ...incidentMeta } = incident;
-        normalizedDb.incidents.push({
-          ...(incidentMeta as any),
-          caseId: caseMeta.id
-        });
-      }
-
-      // Save/Merge CMMS tickets into faults table
-      if (cmmsTickets && cmmsTickets.length > 0) {
-        cmmsTickets.forEach(ticketId => {
-          // Check if fault row already exists
-          const existingFault = normalizedDb.faults.find(f => f.cmmsTicketId === ticketId);
-          if (!existingFault) {
-            const faultId = `SEN/FR/${caseMeta.createdAt?.split('T')[0].replace(/-/g, '') || new Date().toISOString().split('T')[0].replace(/-/g, '')}/${String(normalizedDb.faults.length + 1).padStart(3, '0')}`;
-            normalizedDb.faults.push({
-              id: faultId,
-              caseId: caseMeta.id,
-              faultType: incident?.type || 'Facilities',
-              faultSubType: incident?.subType || 'Others',
-              location: incident?.location || {
-                road: '', building: '', levelSpace: '', nearAt: '', commonName: '', postalCode: '000000', tags: [], lat: 1.25, lng: 103.83
-              },
-              description: incident?.summary || caseMeta.title,
-              attachments: [],
-              status: 'Closed',
-              cmmsTicketId: ticketId,
-              createdBy: caseMeta.createdBy || 'system',
-              createdAt: caseMeta.createdAt || new Date().toISOString(),
-              submittedAt: new Date().toISOString()
-            });
-          }
-        });
-      }
-    }
-
-    fs.writeFileSync(DB_PATH, JSON.stringify(normalizedDb, null, 2), 'utf-8');
+    await Promise.all([
+      saveCollection(mdb, 'cases', normalizedDb.cases as any[]),
+      saveCollection(mdb, 'incidents', normalizedDb.incidents as any[]),
+      saveCollection(mdb, 'faults', normalizedDb.faults as any[]),
+      saveCollection(mdb, 'tasks', normalizedDb.tasks as any[]),
+      saveCollection(mdb, 'occurrences', normalizedDb.occurrences as any[]),
+      saveCollection(mdb, 'events', normalizedDb.events as any[]),
+      saveCollection(mdb, 'nops', normalizedDb.nops as any[]),
+      saveCollection(mdb, 'broadcasts', normalizedDb.broadcasts as any[]),
+      saveCollection(mdb, 'auditLogs', normalizedDb.auditLogs as any[]),
+    ]);
   } catch (err) {
-    console.error('Error writing to database file:', err);
+    console.error('Error writing to MongoDB:', err);
+    throw err;
   }
 }
 
-// Generate Case ID following the SEN/CI/YYYYMMDD/NNN format (FRD v0.2)
+// ─── ID Generators ────────────────────────────────────────────────────────────
+
 export function generateCaseId(db: DbSchema): string {
   const now = new Date();
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, '0');
   const day = String(now.getDate()).padStart(2, '0');
   const prefix = `SEN/CI/${year}${month}${day}/`;
-  
-  // Count cases created today
+
   const todayCases = db.cases.filter(c => c.id.startsWith(prefix));
-  
   let nextSeq = 1;
   if (todayCases.length > 0) {
     const sequences = todayCases.map(c => {
       const parts = c.id.split('/');
-      const seqStr = parts[parts.length - 1];
-      return parseInt(seqStr, 10);
+      return parseInt(parts[parts.length - 1], 10);
     }).filter(num => !isNaN(num));
-    
-    if (sequences.length > 0) {
-      nextSeq = Math.max(...sequences) + 1;
-    }
+    if (sequences.length > 0) nextSeq = Math.max(...sequences) + 1;
   }
-  
-  const seqStr = String(nextSeq).padStart(3, '0');
-  return `${prefix}${seqStr}`;
+  return `${prefix}${String(nextSeq).padStart(3, '0')}`;
 }
 
-// Generate Incident ID following the SEN/IR/YYYYMMDD/NNNN format (FSD)
 export function generateIncidentId(db: DbSchema): string {
   const now = new Date();
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, '0');
   const day = String(now.getDate()).padStart(2, '0');
   const prefix = `SEN/IR/${year}${month}${day}/`;
-  
+
   const todayIncidents = db.cases
     .map(c => c.incident)
     .filter((inc): inc is Incident => !!inc && inc.id.startsWith(prefix));
@@ -692,20 +680,13 @@ export function generateIncidentId(db: DbSchema): string {
   if (todayIncidents.length > 0) {
     const sequences = todayIncidents.map(inc => {
       const parts = inc.id.split('/');
-      const seqStr = parts[parts.length - 1];
-      return parseInt(seqStr, 10);
+      return parseInt(parts[parts.length - 1], 10);
     }).filter(num => !isNaN(num));
-    
-    if (sequences.length > 0) {
-      nextSeq = Math.max(...sequences) + 1;
-    }
+    if (sequences.length > 0) nextSeq = Math.max(...sequences) + 1;
   }
-  
-  const seqStr = String(nextSeq).padStart(4, '0');
-  return `${prefix}${seqStr}`;
+  return `${prefix}${String(nextSeq).padStart(4, '0')}`;
 }
 
-// Generate Task ID following TASK-XXX format
 export function generateTaskId(db: DbSchema): string {
   let nextSeq = 1;
   if (db.tasks.length > 0) {
@@ -713,35 +694,26 @@ export function generateTaskId(db: DbSchema): string {
       const parts = t.id.split('-');
       return parseInt(parts[1], 10);
     }).filter(num => !isNaN(num));
-    
-    if (sequences.length > 0) {
-      nextSeq = Math.max(...sequences) + 1;
-    }
+    if (sequences.length > 0) nextSeq = Math.max(...sequences) + 1;
   }
   return `TASK-${String(nextSeq).padStart(3, '0')}`;
 }
 
-// Generate e-Diary/Occurrence ID following SEN/ED/YYYYMMDD/NNN format
 export function generateOccurrenceId(db: DbSchema): string {
   const now = new Date();
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, '0');
   const day = String(now.getDate()).padStart(2, '0');
   const prefix = `SEN/ED/${year}${month}${day}/`;
-  
+
   const todayOccs = db.occurrences.filter(o => o.id.startsWith(prefix));
-  
   let nextSeq = 1;
   if (todayOccs.length > 0) {
     const sequences = todayOccs.map(o => {
       const parts = o.id.split('/');
-      const seqStr = parts[parts.length - 1];
-      return parseInt(seqStr, 10);
+      return parseInt(parts[parts.length - 1], 10);
     }).filter(num => !isNaN(num));
-    
-    if (sequences.length > 0) {
-      nextSeq = Math.max(...sequences) + 1;
-    }
+    if (sequences.length > 0) nextSeq = Math.max(...sequences) + 1;
   }
   return `${prefix}${String(nextSeq).padStart(3, '0')}`;
 }

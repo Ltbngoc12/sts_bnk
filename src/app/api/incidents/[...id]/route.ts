@@ -52,7 +52,7 @@ export async function GET(
   try {
     const { id } = await params;
     const queryId = id.join('/');
-    const db = getDb();
+    const db = await getDb();
     const caseObj = db.cases.find(c => c.id === queryId || (c.incident && c.incident.id === queryId));
     if (!caseObj?.incident) {
       return NextResponse.json({ error: 'Incident not found' }, { status: 404 });
@@ -90,7 +90,7 @@ export async function PUT(
     const { id } = await params;
     const queryId = id.join('/');
     const body = await request.json();
-    const db = getDb();
+    const db = await getDb();
 
     const caseIndex = db.cases.findIndex(c => c.id === queryId || (c.incident && c.incident.id === queryId));
     if (caseIndex === -1 || !db.cases[caseIndex].incident) {
@@ -210,7 +210,7 @@ export async function PUT(
 
     currentCase.incident = incident;
     db.cases[caseIndex] = currentCase;
-    saveDb(db);
+    await saveDb(db);
 
     return NextResponse.json(incident);
   } catch (err: any) {
@@ -243,7 +243,7 @@ export async function POST(
     }
 
     const body = await request.json().catch(() => ({}));
-    const db = getDb();
+    const db = await getDb();
 
     const caseIndex = db.cases.findIndex(c => c.id === queryId || (c.incident && c.incident.id === queryId));
     if (caseIndex === -1 || !db.cases[caseIndex].incident) {
@@ -616,7 +616,7 @@ export async function POST(
 
     currentCase.incident = incident;
     db.cases[caseIndex] = currentCase;
-    saveDb(db);
+    await saveDb(db);
 
     return NextResponse.json({ ok: true, incident, case: currentCase });
   } catch (err: any) {

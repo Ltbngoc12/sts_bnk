@@ -3,7 +3,7 @@ import { getDb, saveDb, generateTaskId, generateCaseId, Task } from '@/lib/db';
 
 export async function GET() {
   try {
-    const db = getDb();
+    const db = await getDb();
     return NextResponse.json(db.tasks);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -13,7 +13,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const db = getDb();
+    const db = await getDb();
     
     const taskId = generateTaskId(db);
     const caseId = body.caseId;
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
       };
       
       db.tasks.push(newTask);
-      saveDb(db); // Commit transaction
+      await saveDb(db); // Commit transaction
       
       return NextResponse.json(newTask, { status: 201 });
     } catch (validationError: any) {

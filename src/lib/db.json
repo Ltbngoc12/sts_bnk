@@ -187,6 +187,15 @@
       "createdBy": "DM Gan",
       "closedAt": "2026-06-14T14:53:35.938Z",
       "closedBy": "Controller Steve"
+    },
+    {
+      "id": "SEN/CI/20260615/001",
+      "title": "Hie1",
+      "status": "Active",
+      "createdAt": "2026-06-15T08:36:37.507Z",
+      "createdBy": "Controller Steve",
+      "closedAt": null,
+      "closedBy": null
     }
   ],
   "incidents": [
@@ -1998,6 +2007,72 @@
           "status": "Active"
         }
       ]
+    },
+    {
+      "id": "SEN/IR/20260615/0001",
+      "caseId": "SEN/CI/20260615/001",
+      "title": "Hie1",
+      "dateTime": "2026-06-15T01:36:00.000Z",
+      "type": "Environmental",
+      "subType": "Fallen Tree",
+      "priority": "High",
+      "crisisLevel": 4,
+      "reporterName": "1",
+      "requestedBy": "Public Phone",
+      "createdBy": "Controller Steve",
+      "category": "Standard Incident",
+      "status": "Live",
+      "location": {
+        "road": "Siloso Beach Walk",
+        "building": "Costa Sands Resort",
+        "levelSpace": "Ground Floor - Hotel Lobby",
+        "nearAt": "",
+        "commonName": "Hotel Lobby",
+        "postalCode": "000000",
+        "tags": [
+          "Resort",
+          "Public"
+        ],
+        "lat": 1.2505,
+        "lng": 103.815
+      },
+      "log": [
+        {
+          "eventNumber": 1,
+          "date": "2026-06-15",
+          "time": "15:36:37",
+          "description": "Incident logged under ID SEN/IR/20260615/0001 (Case ID SEN/CI/20260615/001). Classification: Environmental - Fallen Tree."
+        }
+      ],
+      "emergencyServices": {
+        "policeAtScene": false,
+        "officerNameRank": "",
+        "policeIncidentNo": "",
+        "classification": "",
+        "respondingUnit": "",
+        "ambulanceScdfType": "None",
+        "ambulanceOfficerName": "",
+        "ambulanceCallSign": "",
+        "ambulanceRespondingUnit": "",
+        "ambulanceArrivalTime": "",
+        "hospitalConveyedTo": ""
+      },
+      "mediaInvolvement": {
+        "mediaAtScene": false,
+        "mediaName": "",
+        "commsNotified": false
+      },
+      "propertyDamage": {
+        "sdcPropertyDamaged": false,
+        "description": ""
+      },
+      "vehiclesInvolved": [],
+      "personalInjuries": [],
+      "personsInvolved": [],
+      "cctvBwc": [],
+      "summary": "",
+      "completionRemarks": "",
+      "slaveIncidents": []
     }
   ],
   "faults": [

@@ -3,7 +3,7 @@ import { getDb, saveDb, generateOccurrenceId, generateCaseId, Occurrence } from 
 
 export async function GET() {
   try {
-    const db = getDb();
+    const db = await getDb();
     // Sort occurrences by date descending
     const sortedOccurrences = [...db.occurrences].sort(
       (a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()
@@ -17,7 +17,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const db = getDb();
+    const db = await getDb();
     
     const occurrenceId = generateOccurrenceId(db);
     const caseId = body.caseId;
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
       };
       
       db.occurrences.push(newOccurrence);
-      saveDb(db); // Commit transaction
+      await saveDb(db); // Commit transaction
       
       return NextResponse.json(newOccurrence, { status: 201 });
     } catch (validationError: any) {

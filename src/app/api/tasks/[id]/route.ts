@@ -7,7 +7,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const db = getDb();
+    const db = await getDb();
     const task = db.tasks.find(t => t.id === id);
     
     if (!task) {
@@ -26,7 +26,7 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const db = getDb();
+    const db = await getDb();
     
     const taskIndex = db.tasks.findIndex(t => t.id === id);
     if (taskIndex === -1) {
@@ -53,7 +53,7 @@ export async function PUT(
     if (body.dueDate) task.dueDate = body.dueDate;
     
     db.tasks[taskIndex] = task;
-    saveDb(db);
+    await saveDb(db);
     
     return NextResponse.json(task);
   } catch (error: any) {

@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     const hasFaults = searchParams.get('hasFaults') === 'true';
     const hasEDiary = searchParams.get('hasEDiary') === 'true';
 
-    const db = getDb();
+    const db = await getDb();
     let cases = [...db.cases];
 
     // 1. Text Search Filter (Case ID or Case Title)
@@ -123,8 +123,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const db = getDb();
-    
+    const db = await getDb();
+
     // Title Validation (sanitize and enforce length limit of 255)
     let title = body.title ? String(body.title).replace(/<[^>]*>/g, '').trim() : '';
     if (title.length > 255) {
@@ -233,7 +233,7 @@ export async function POST(request: Request) {
       }
 
       db.cases.push(newCase);
-      saveDb(db); // Commit transaction
+      await saveDb(db); // Commit transaction
 
       return NextResponse.json(newCase, { status: 201 });
     } catch (validationError: any) {

@@ -8,7 +8,7 @@ export async function GET(
   try {
     const { id } = await params;
     const caseId = id.join('/');
-    const db = getDb();
+    const db = await getDb();
     
     const caseObj = db.cases.find(c => c.id === caseId);
     if (!caseObj) {
@@ -35,7 +35,7 @@ export async function PUT(
     const { id } = await params;
     const caseId = id.join('/');
     const body = await request.json();
-    const db = getDb();
+    const db = await getDb();
     
     const caseIndex = db.cases.findIndex(c => c.id === caseId);
     if (caseIndex === -1) {
@@ -186,7 +186,7 @@ export async function PUT(
     }
     
     db.cases[caseIndex] = existingCase;
-    saveDb(db);
+    await saveDb(db);
     
     return NextResponse.json(existingCase);
   } catch (error: any) {

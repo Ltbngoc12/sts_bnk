@@ -66,10 +66,10 @@ const SEED_AUDITS: AuditLog[] = [
 
 export async function GET() {
   try {
-    const db = getDb();
+    const db = await getDb();
     if (!db.auditLogs || db.auditLogs.length === 0) {
       db.auditLogs = SEED_AUDITS;
-      saveDb(db);
+      await saveDb(db);
     }
     
     const logs = db.auditLogs;
@@ -86,7 +86,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const db = getDb();
+    const db = await getDb();
 
     if (!body.action || !body.module || !body.user) {
       return NextResponse.json({ error: 'Missing required audit fields: action, module, user' }, { status: 400 });
