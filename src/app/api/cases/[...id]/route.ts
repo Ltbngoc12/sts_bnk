@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, saveDb, Case, Incident, generateIncidentId } from '@/lib/db';
+import { tryAutoCloseCase } from '@/lib/autoclose';
 
 export async function GET(
   request: Request,
@@ -42,7 +43,7 @@ export async function PUT(
       return NextResponse.json({ error: 'Case not found' }, { status: 404 });
     }
     
-    const existingCase = db.cases[caseIndex];
+    let existingCase = db.cases[caseIndex];
 
     // Closed cases are read-only
     if (existingCase.status === 'Closed') {
@@ -58,56 +59,26 @@ export async function PUT(
       existingCase.title = title || 'New Unnamed Case';
     }
 
-    // Update Case status with validation
+    // Manual status transitions (case closure is system-managed and not allowed here)
     if (body.status) {
       const currentStatus = existingCase.status;
       const targetStatus = body.status;
 
-      const validStatuses = ['Pending Triage', 'Active', 'No Action Required', 'Closed'];
-      if (!validStatuses.includes(targetStatus)) {
-        return NextResponse.json({ error: `Invalid status: ${targetStatus}` }, { status: 400 });
+      // Only allow: Pending Triage → Active, No Action Required → Active (admin reactivation)
+      const allowed =
+        (currentStatus === 'Pending Triage' && targetStatus === 'Active') ||
+        (currentStatus === 'No Action Required' && targetStatus === 'Active');
+
+      if (!allowed) {
+        return NextResponse.json({
+          error: `Manual status change from "${currentStatus}" to "${targetStatus}" is not permitted. Case closure is managed automatically by the system.`
+        }, { status: 400 });
       }
 
-      // Check transition rules
-      if (currentStatus === 'Pending Triage') {
-        if (targetStatus !== 'Active' && targetStatus !== 'No Action Required') {
-          return NextResponse.json({ error: `Invalid transition from ${currentStatus} to ${targetStatus}` }, { status: 400 });
-        }
-      } else if (currentStatus === 'Active') {
-        if (targetStatus !== 'Closed') {
-          return NextResponse.json({ error: `Invalid transition from ${currentStatus} to ${targetStatus}` }, { status: 400 });
-        }
-      } else if (currentStatus === 'No Action Required') {
-        if (targetStatus !== 'Active') {
-          return NextResponse.json({ error: `Invalid transition from ${currentStatus} to ${targetStatus}` }, { status: 400 });
-        }
-      }
-
-      // Enforce closure validation rules
-      if (targetStatus === 'Closed') {
-        // 1. Check if there is an active incident
-        const activeIncident = db.cases
-          .map(c => c.id === caseId ? c.incident : null)
-          .filter(Boolean)
-          .find(inc => inc && inc.status !== 'Closed');
-        
-        if (activeIncident) {
-          return NextResponse.json({ 
-            error: `Cannot close Case. The linked Incident (${activeIncident.id}) must be Closed first.` 
-          }, { status: 400 });
-        }
-
-        // 2. Check if there are active tasks
-        const activeTasks = db.tasks.filter(t => t.caseId === caseId && t.status !== 'Closed');
-        if (activeTasks.length > 0) {
-          return NextResponse.json({ 
-            error: `Cannot close Case. Please close all linked Tasks first (${activeTasks.length} active task(s) remaining).` 
-          }, { status: 400 });
-        }
-
-        // Apply closure metadata
-        existingCase.closedAt = new Date().toISOString();
-        existingCase.closedBy = body.username || 'admin';
+      // Reactivation — clear closure metadata
+      if (targetStatus === 'Active') {
+        existingCase.closedAt = null;
+        existingCase.closedBy = null;
       }
 
       existingCase.status = targetStatus;
@@ -174,15 +145,17 @@ export async function PUT(
       }
     }
 
-    // Link CMMS Ticket ID
+    // Link CMMS Ticket ID — receipt of ID means CMMS has accepted the job (system-closed)
     if (body.cmmsTicketId) {
       if (!existingCase.cmmsTickets.includes(body.cmmsTicketId)) {
         existingCase.cmmsTickets.push(body.cmmsTicketId);
-        // Automatically transition Case to Active if it was in Pending Triage
         if (existingCase.status === 'Pending Triage') {
           existingCase.status = 'Active';
         }
       }
+      db.cases[caseIndex] = existingCase;
+      tryAutoCloseCase(db, caseId);
+      existingCase = db.cases[caseIndex];
     }
     
     db.cases[caseIndex] = existingCase;

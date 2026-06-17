@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useRole } from '@/context/RoleContext';
 import Link from 'next/link';
-import LocationSelector from '@/components/LocationSelector';
+import LocationSelector, { DEFAULT_NODES, type LocationNode } from '@/components/LocationSelector';
 import MultiResponderSelect from '@/components/MultiResponderSelect';
 
 import { getIncidentTaxonomy } from '@/lib/taxonomy';
@@ -25,6 +25,11 @@ export default function NewIncidentPage() {
   const [successModal, setSuccessModal] = useState(false);
   const [generatedCaseId, setGeneratedCaseId] = useState('');
   const [generatedIncidentId, setGeneratedIncidentId] = useState('');
+
+  // Duplicate Detection State
+  const [duplicateCandidates, setDuplicateCandidates] = useState<any[]>([]);
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [pendingPayload, setPendingPayload] = useState<any>(null);
 
   // 1. General Information State
   const [title, setTitle] = useState('');
@@ -113,6 +118,7 @@ export default function NewIncidentPage() {
     building: string;
     levelSpace: string;
     commonName: string;
+    postalCode: string;
     lat: number;
     lng: number;
     tags: string[];
@@ -120,10 +126,29 @@ export default function NewIncidentPage() {
     setRoad(details.road);
     setBuilding(details.building);
     setLevelSpace(details.levelSpace);
-    setCommonName(details.commonName);
-    setPinCoords({ lat: details.lat, lng: details.lng });
-    setTagsStr(details.tags.join(', '));
+    // Only overwrite free-text fields when the selector provides a value from the hierarchy
+    if (details.commonName) setCommonName(details.commonName);
+    if (details.postalCode) setPostalCode(details.postalCode);
+    if (details.lat !== 1.2500 || details.lng !== 103.8300) setPinCoords({ lat: details.lat, lng: details.lng });
+    if (details.tags.length > 0) setTagsStr(details.tags.join(', '));
   };
+
+  // Postal code → unique building lookup: auto-populate Road, Building, Common Name
+  useEffect(() => {
+    const trimmed = postalCode.trim();
+    if (!trimmed || trimmed === '000000' || trimmed.length < 6) return;
+    const stored = localStorage.getItem('admin_location_hierarchy');
+    const allNodes: LocationNode[] = stored ? JSON.parse(stored) : DEFAULT_NODES;
+    const matches = allNodes.filter(n => n.type === 'Building' && n.status === 'Active' && n.postalCode === trimmed);
+    if (matches.length === 1) {
+      const bld = matches[0];
+      const rdNode = allNodes.find(n => n.id === bld.parentId && n.type === 'Road');
+      setBuilding(bld.name);
+      if (rdNode) setRoad(rdNode.name);
+      if (bld.commonName) setCommonName(prev => prev || bld.commonName!);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [postalCode]);
 
   // Time simulation effects
   useEffect(() => {
@@ -347,6 +372,30 @@ export default function NewIncidentPage() {
       }
     };
 
+    // Check for potential duplicates (FRD 5.7) before submitting
+    if (incType && incidentDateTime && category !== 'Backdated Incident') {
+      try {
+        const params = new URLSearchParams({ type: incType, date: new Date(incidentDateTime).toISOString() });
+        if (incSubType) params.set('subType', incSubType);
+        const dupRes = await fetch(`/api/incidents/check-duplicates?${params}`);
+        if (dupRes.ok) {
+          const dupData = await dupRes.json();
+          if (dupData.count > 0) {
+            setDuplicateCandidates(dupData.candidates);
+            setPendingPayload(payload);
+            setShowDuplicateModal(true);
+            return;
+          }
+        }
+      } catch {
+        // If duplicate check fails, proceed normally
+      }
+    }
+
+    await submitIncident(payload);
+  };
+
+  const submitIncident = async (payload: any) => {
     try {
       const res = await fetch('/api/cases', {
         method: 'POST',
@@ -897,6 +946,7 @@ export default function NewIncidentPage() {
                     initialBuilding={building}
                     initialLevelSpace={levelSpace}
                     initialCommonName={commonName}
+                    initialPostalCode={postalCode}
                   />
                 </div>
 
@@ -2107,6 +2157,90 @@ export default function NewIncidentPage() {
           </aside>
         </div>
       </form>
+
+      {/* Duplicate Detection Modal (FRD 5.7) */}
+      {showDuplicateModal && (
+        <div className="modal-overlay">
+          <div className="modal-content glass" style={{ maxWidth: '560px', width: '100%', padding: '28px', borderTop: '4px solid #EA580C' }}>
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ fontSize: '22px', marginBottom: '8px' }}>⚠️</div>
+              <h2 style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '6px' }}>
+                Possible Duplicate Detected
+              </h2>
+              <p style={{ fontSize: '13px', color: 'var(--text-sub)', lineHeight: '1.5' }}>
+                {duplicateCandidates.length} open incident{duplicateCandidates.length > 1 ? 's' : ''} of the same type were logged within 2 hours. Please review before proceeding.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px', maxHeight: '220px', overflowY: 'auto' }}>
+              {duplicateCandidates.map(c => (
+                <div key={c.incidentId} style={{ padding: '12px 14px', background: 'var(--bg-inset)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-muted)' }}>{c.incidentId}</span>
+                    <span className="badge badge-live" style={{ fontSize: '10px' }}>{c.status}</span>
+                  </div>
+                  <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '2px' }}>{c.type} — {c.subType}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-sub)' }}>
+                    {c.location?.commonName || c.location?.road || 'Unknown location'} &bull; {new Date(c.dateTime).toLocaleString('en-SG', { hour12: false })}
+                  </div>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    style={{ marginTop: '8px', fontSize: '11px' }}
+                    onClick={async () => {
+                      // Link this new incident as duplicate of the candidate, then submit
+                      setShowDuplicateModal(false);
+                      try {
+                        const newRes = await fetch('/api/cases', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify(pendingPayload)
+                        });
+                        if (newRes.ok) {
+                          const newCase = await newRes.json();
+                          // Link as duplicate
+                          await fetch(`/api/incidents/${newCase.incident.id}/link-duplicate`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ masterIncidentId: c.incidentId, username: pendingPayload.username })
+                          });
+                          setGeneratedCaseId(newCase.id);
+                          setGeneratedIncidentId(newCase.incident.id);
+                          setSuccessModal(true);
+                        } else {
+                          const err = await newRes.json();
+                          alert(`Failed to log incident: ${err.error || 'Server error'}`);
+                        }
+                      } catch (err: any) {
+                        alert(`Failed to log incident: ${err.message}`);
+                      }
+                    }}
+                  >
+                    Link as Duplicate of {c.incidentId}
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setShowDuplicateModal(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  setShowDuplicateModal(false);
+                  if (pendingPayload) submitIncident(pendingPayload);
+                }}
+              >
+                Proceed as New Incident
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Success Confirmation Modal */}
       {successModal && (

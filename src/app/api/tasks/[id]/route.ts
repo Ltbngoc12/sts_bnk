@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDb, saveDb } from '@/lib/db';
+import { tryAutoCloseCase } from '@/lib/autoclose';
 
 export async function GET(
   request: Request,
@@ -53,8 +54,14 @@ export async function PUT(
     if (body.dueDate) task.dueDate = body.dueDate;
     
     db.tasks[taskIndex] = task;
+
+    // When the last open task for a case is closed, attempt case auto-closure
+    if (task.status === 'Closed' && task.caseId) {
+      tryAutoCloseCase(db, task.caseId);
+    }
+
     await saveDb(db);
-    
+
     return NextResponse.json(task);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

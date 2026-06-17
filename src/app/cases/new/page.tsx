@@ -180,7 +180,6 @@ export default function NewCasePage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            caseId,
             topic: finalTopic || 'General Interaction',
             content: ediaryContent,
             username
