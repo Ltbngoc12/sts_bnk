@@ -233,6 +233,7 @@ export interface Task {
 
 export interface Occurrence {
   id: string; // SEN/ED/YYYYMMDD/NNN
+  caseId?: string;
   user: string;
   dateTime: string;
   topic: string;
