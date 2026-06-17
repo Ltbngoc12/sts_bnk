@@ -251,7 +251,7 @@ export const mockIncidents: Incident[] = [
     requestedBy: "Public Email",
     createdBy: "Controller Steve",
     category: "Standard Incident",
-    status: "Live (Assigned)",
+    status: "Live",
     assignedTo: "Ranger Sarah",
     location: {
       road: "Beach View",
@@ -351,7 +351,7 @@ export const mockIncidents: Incident[] = [
     requestedBy: "Public Phone",
     createdBy: "Controller Steve",
     category: "Standard Incident",
-    status: "Live (Incomplete)",
+    status: "Live",
     assignedTo: "Ranger John",
     location: {
       road: "Siloso Road",
@@ -999,7 +999,7 @@ export const mockIncidents: Incident[] = [
     requestedBy: "Controller Observation",
     createdBy: "system",
     category: "Ongoing Incident",
-    status: "Live (Assigned)",
+    status: "Live",
     assignedTo: "Ranger Dave",
     location: {
       road: "Imbiah Road",

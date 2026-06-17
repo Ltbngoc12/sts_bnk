@@ -40,24 +40,24 @@ const statusDetails: Record<string, StatusDetail> = {
     actionPanelState: 'Assignable: Displays list of available Rangers/Responders for dispatch.',
     relatedElements: ['Incident log record', 'UCS alarm feed', 'Case Detail header']
   },
-  'Live (Assigned)': {
-    name: 'Live (Assigned)',
+  'Live (Incomplete)': {
+    name: 'Live (Incomplete)',
     badgeClass: 'badge-ack',
     color: '#EA580C',
     bgColor: 'rgba(234, 88, 12, 0.08)',
     borderColor: 'rgba(234, 88, 12, 0.25)',
-    description: 'One or more ground Responders (Rangers) have been selected and dispatched to resolve the incident.',
-    whoCanTransition: ['Controller', 'Duty Officer', 'Duty Manager'],
+    description: 'The Duty Manager reviewed the submitted report and determined further on-site action is required from the Responder before closure can be approved.',
+    whoCanTransition: ['Duty Manager', 'Duty Officer'],
     actionTriggers: [
-      'Controller/DM selects one or more Responders from the active Ranger list and dispatches them.'
+      'Duty Manager clicks "Return to Responder" on a Pending Endorsement incident and enters a reason.'
     ],
     operationalImpacts: [
-      'Sends a high-priority push notification to each assigned Responder\'s mobile app.',
-      'Logs a Chronological Timeline entry: "Responder [Name] assigned".',
-      'Updates Incident assignment metadata (plural) in Case Log.'
+      'Sends a push notification to the assigned Responder\'s mobile app with the return reason.',
+      'Logs a Chronological Timeline entry: "Incident returned to Responder for further action".',
+      'Unlocks ground activities (Responder can mark on-site, complete, etc.).'
     ],
-    actionPanelState: 'Manage Responders: Controller can add additional Responders or remove existing ones (enforcing that at least one remains assigned).',
-    relatedElements: ['Ranger Mobile Dispatch Queue', 'Timeline: Dispatched']
+    actionPanelState: 'Ground Activity Mode: Responder must complete additional on-site activities and re-submit.',
+    relatedElements: ['Ranger App inbox alert', 'Return reason log', 'Timeline: Returned to Responder']
   },
   'Live (Acknowledged)': {
     name: 'Live (Acknowledged)',
@@ -111,30 +111,11 @@ const statusDetails: Record<string, StatusDetail> = {
       'Controller clicks "Mark Completed" on behalf of the ranger.'
     ],
     operationalImpacts: [
-      'Triggers automatic state transition to "Pending Endorsement" for supervisor review.',
+      'Controller submits the report for Duty Manager review via "Submit for Review".',
       'Logs a Chronological Timeline entry: "Ranger marked ground activities completed".'
     ],
     actionPanelState: 'Review-Ready: Readies the file for official submission.',
     relatedElements: ['Resolution checklist', 'Closure timeline events']
-  },
-  'Live (Incomplete)': {
-    name: 'Live (Incomplete)',
-    badgeClass: 'badge-live',
-    color: '#DC2626',
-    bgColor: 'rgba(220, 38, 38, 0.08)',
-    borderColor: 'rgba(220, 38, 38, 0.25)',
-    description: 'Ground activities could not be completed successfully (e.g. false alarm, incident site could not be located, or situation escalated beyond Ranger capability).',
-    whoCanTransition: ['Responder (Ranger)', 'Controller', 'Duty Officer', 'Duty Manager'],
-    actionTriggers: [
-      'Ranger selects "Unable to Complete" on their app, enters justification, and submits.',
-      'Controller changes status to Incomplete with explanation.'
-    ],
-    operationalImpacts: [
-      'Triggers immediate submission to "Pending Endorsement" with special warning tag.',
-      'Logs a Chronological Timeline entry: "Ranger marked ground activities incomplete".'
-    ],
-    actionPanelState: 'Review-Ready (Aborted): Requires supervisor review of unfinished tasks.',
-    relatedElements: ['Rework details', 'Escalation tags']
   },
   'Pending Endorsement': {
     name: 'Pending Endorsement',
@@ -142,17 +123,17 @@ const statusDetails: Record<string, StatusDetail> = {
     color: '#4A148C',
     bgColor: 'rgba(74, 20, 140, 0.08)',
     borderColor: 'rgba(74, 20, 140, 0.25)',
-    description: 'The incident ground work is finished and is awaiting audit and validation by a supervisor (Duty Manager or Duty Officer).',
+    description: 'The incident report has been submitted by the Controller for Duty Manager review. Awaiting audit and endorsement before closure.',
     whoCanTransition: ['Duty Officer', 'Duty Manager'],
     actionTriggers: [
-      'Automatically transitioned upon a Ranger setting status to Completed or Incomplete.'
+      'Controller clicks "Submit for Review" after ground activities are completed or returned.'
     ],
     operationalImpacts: [
       'Locks ground edits for general users.',
-      'Displays the Approve/Return action panel for authorized supervisors.',
-      'Highlights incident in the supervisor review queue.'
+      'Displays the Approve / Return to Controller / Return to Responder action panel for supervisors.',
+      'Highlights incident in the Duty Manager review queue.'
     ],
-    actionPanelState: 'Endorsement Action Panel: Displays "Approve" (close case) and "Return" (send back to ground for correction) buttons.',
+    actionPanelState: 'Review Action Panel: Displays "Approve & Close", "Return to Controller", and "Return to Responder" buttons.',
     relatedElements: ['Duty Manager review dashboard', 'Approve/Return action panel']
   },
   'Returned': {
@@ -164,7 +145,7 @@ const statusDetails: Record<string, StatusDetail> = {
     description: 'The supervisor rejected the incident report due to insufficient resolution details, missing photos, or required follow-ups. The incident is returned back to active status.',
     whoCanTransition: ['Duty Officer', 'Duty Manager'],
     actionTriggers: [
-      'Duty Manager or Duty Officer clicks "Return" button on a Pending Endorsement incident and inputs return justification notes.'
+      'Duty Manager or Duty Officer clicks "Return to Controller" button on a Pending Endorsement incident and inputs return justification notes.'
     ],
     operationalImpacts: [
       'Unlocks the incident details page for editing by Ranger or Controller.',
@@ -183,7 +164,7 @@ const statusDetails: Record<string, StatusDetail> = {
     description: 'The incident has been approved and endorsed. It is officially archived and closed.',
     whoCanTransition: ['Duty Officer', 'Duty Manager'],
     actionTriggers: [
-      'Duty Manager or Duty Officer clicks "Approve" on a Pending Endorsement incident.'
+      'Duty Manager or Duty Officer clicks "Approve & Close" on a Pending Endorsement incident.'
     ],
     operationalImpacts: [
       'Sets incident status to Closed and Case status to Closed.',
@@ -224,9 +205,9 @@ export default function IncidentLifecyclePage() {
   const isNodeInPath = (nodeName: string) => {
     if (selectedPath === 'all') return true;
 
-    const happyNodes = ['Live', 'Live (Assigned)', 'Live (Acknowledged)', 'Live (On-Site)', 'Live (Completed)', 'Live (Incomplete)', 'Pending Endorsement', 'Closed'];
-    const returnedNodes = ['Pending Endorsement', 'Returned', 'Live', 'Live (Assigned)', 'Live (Acknowledged)', 'Live (On-Site)', 'Live (Completed)', 'Live (Incomplete)', 'Closed'];
-    const reopenedNodes = ['Closed', 'Reopened by Administrator', 'Live', 'Live (Assigned)', 'Live (Acknowledged)', 'Live (On-Site)', 'Live (Completed)', 'Live (Incomplete)', 'Pending Endorsement'];
+    const happyNodes = ['Live', 'Live (Acknowledged)', 'Live (On-Site)', 'Live (Completed)', 'Pending Endorsement', 'Closed'];
+    const returnedNodes = ['Pending Endorsement', 'Returned', 'Live', 'Live (Acknowledged)', 'Live (On-Site)', 'Live (Completed)', 'Live (Incomplete)', 'Closed'];
+    const reopenedNodes = ['Closed', 'Reopened by Administrator', 'Live', 'Live (Acknowledged)', 'Live (On-Site)', 'Live (Completed)', 'Pending Endorsement'];
 
     if (selectedPath === 'happy') return happyNodes.includes(nodeName);
     if (selectedPath === 'returned') return returnedNodes.includes(nodeName);
@@ -238,15 +219,11 @@ export default function IncidentLifecyclePage() {
   const isEdgeInPath = (fromNode: string, toNode: string) => {
     if (selectedPath === 'all') return true;
 
-    // Happy Path transitions
     const happyEdges = [
-      ['Live', 'Live (Assigned)'],
-      ['Live (Assigned)', 'Live (Acknowledged)'],
+      ['Live', 'Live (Acknowledged)'],
       ['Live (Acknowledged)', 'Live (On-Site)'],
       ['Live (On-Site)', 'Live (Completed)'],
-      ['Live (On-Site)', 'Live (Incomplete)'],
       ['Live (Completed)', 'Pending Endorsement'],
-      ['Live (Incomplete)', 'Pending Endorsement'],
       ['Pending Endorsement', 'Closed']
     ];
 
@@ -255,17 +232,17 @@ export default function IncidentLifecyclePage() {
     }
 
     if (selectedPath === 'returned') {
-      // Returned Path includes the return transitions + happy path segments afterwards
       const returnedEdges = [
         ['Pending Endorsement', 'Returned'],
         ['Returned', 'Live'],
+        ['Pending Endorsement', 'Live (Incomplete)'],
+        ['Live (Incomplete)', 'Live (Completed)'],
         ...happyEdges
       ];
       return returnedEdges.some(e => e[0] === fromNode && e[1] === toNode);
     }
 
     if (selectedPath === 'reopened') {
-      // Reopened Path includes the reopen transitions + happy path segments afterwards
       const reopenedEdges = [
         ['Closed', 'Reopened by Administrator'],
         ['Reopened by Administrator', 'Live'],
@@ -566,24 +543,14 @@ export default function IncidentLifecyclePage() {
 
               {/* TRANSITION PATHS (EDGES) */}
               
-              {/* 1. Live -> Live (Assigned) */}
-              <path 
-                d="M 180 185 H 200" 
-                stroke={isEdgeInPath('Live', 'Live (Assigned)') ? '#FF8200' : '#E8E3D8'} 
-                strokeWidth={isEdgeInPath('Live', 'Live (Assigned)') ? '3' : '1.5'} 
-                markerEnd={isEdgeInPath('Live', 'Live (Assigned)') ? 'url(#arrow-highlight)' : 'url(#arrow-default)'}
-                className={`transition-arrow ${isEdgeInPath('Live', 'Live (Assigned)') ? 'arrow-active' : ''}`}
-                opacity={isEdgeInPath('Live', 'Live (Assigned)') ? '1' : '0.2'}
-              />
-
-              {/* 2. Live (Assigned) -> Live (Acknowledged) */}
-              <path 
-                d="M 360 185 H 400" 
-                stroke={isEdgeInPath('Live (Assigned)', 'Live (Acknowledged)') ? '#FF8200' : '#E8E3D8'} 
-                strokeWidth={isEdgeInPath('Live (Assigned)', 'Live (Acknowledged)') ? '3' : '1.5'} 
-                markerEnd={isEdgeInPath('Live (Assigned)', 'Live (Acknowledged)') ? 'url(#arrow-highlight)' : 'url(#arrow-default)'}
-                className={`transition-arrow ${isEdgeInPath('Live (Assigned)', 'Live (Acknowledged)') ? 'arrow-active' : ''}`}
-                opacity={isEdgeInPath('Live (Assigned)', 'Live (Acknowledged)') ? '1' : '0.2'}
+              {/* 1. Live -> Live (Acknowledged) */}
+              <path
+                d="M 180 185 H 400"
+                stroke={isEdgeInPath('Live', 'Live (Acknowledged)') ? '#FF8200' : '#E8E3D8'}
+                strokeWidth={isEdgeInPath('Live', 'Live (Acknowledged)') ? '3' : '1.5'}
+                markerEnd={isEdgeInPath('Live', 'Live (Acknowledged)') ? 'url(#arrow-highlight)' : 'url(#arrow-default)'}
+                className={`transition-arrow ${isEdgeInPath('Live', 'Live (Acknowledged)') ? 'arrow-active' : ''}`}
+                opacity={isEdgeInPath('Live', 'Live (Acknowledged)') ? '1' : '0.2'}
               />
 
               {/* 3. Live (Acknowledged) -> Live (On-Site) */}
@@ -607,44 +574,44 @@ export default function IncidentLifecyclePage() {
                 opacity={isEdgeInPath('Live (On-Site)', 'Live (Completed)') ? '1' : '0.2'}
               />
 
-              {/* 5. Live (On-Site) -> Live (Incomplete) */}
-              <path 
-                d="M 760 185 C 780 185, 780 255, 800 255" 
+              {/* 5. Pending Endorsement → Live (Incomplete) */}
+              <path
+                d="M 1080 210 C 1080 265, 820 265, 800 265"
                 fill="none"
-                stroke={isEdgeInPath('Live (On-Site)', 'Live (Incomplete)') ? '#FF8200' : '#E8E3D8'} 
-                strokeWidth={isEdgeInPath('Live (On-Site)', 'Live (Incomplete)') ? '3' : '1.5'} 
-                markerEnd={isEdgeInPath('Live (On-Site)', 'Live (Incomplete)') ? 'url(#arrow-highlight)' : 'url(#arrow-default)'}
-                className={`transition-arrow ${isEdgeInPath('Live (On-Site)', 'Live (Incomplete)') ? 'arrow-active' : ''}`}
-                opacity={isEdgeInPath('Live (On-Site)', 'Live (Incomplete)') ? '1' : '0.2'}
+                stroke={isEdgeInPath('Pending Endorsement', 'Live (Incomplete)') ? '#EA580C' : '#E8E3D8'}
+                strokeWidth={isEdgeInPath('Pending Endorsement', 'Live (Incomplete)') ? '2.5' : '1.5'}
+                markerEnd={isEdgeInPath('Pending Endorsement', 'Live (Incomplete)') ? 'url(#arrow-highlight)' : 'url(#arrow-default)'}
+                className={`transition-arrow ${isEdgeInPath('Pending Endorsement', 'Live (Incomplete)') ? 'arrow-active' : ''}`}
+                opacity={isEdgeInPath('Pending Endorsement', 'Live (Incomplete)') ? '1' : '0.1'}
               />
 
               {/* 6. Live (Completed) -> Pending Endorsement */}
-              <path 
-                d="M 960 115 C 980 115, 980 185, 1000 185" 
+              <path
+                d="M 960 115 C 980 115, 980 185, 1000 185"
                 fill="none"
-                stroke={isEdgeInPath('Live (Completed)', 'Pending Endorsement') ? '#FF8200' : '#E8E3D8'} 
-                strokeWidth={isEdgeInPath('Live (Completed)', 'Pending Endorsement') ? '3' : '1.5'} 
+                stroke={isEdgeInPath('Live (Completed)', 'Pending Endorsement') ? '#FF8200' : '#E8E3D8'}
+                strokeWidth={isEdgeInPath('Live (Completed)', 'Pending Endorsement') ? '3' : '1.5'}
                 markerEnd={isEdgeInPath('Live (Completed)', 'Pending Endorsement') ? 'url(#arrow-highlight)' : 'url(#arrow-default)'}
                 className={`transition-arrow ${isEdgeInPath('Live (Completed)', 'Pending Endorsement') ? 'arrow-active' : ''}`}
                 opacity={isEdgeInPath('Live (Completed)', 'Pending Endorsement') ? '1' : '0.2'}
               />
 
-              {/* 7. Live (Incomplete) -> Pending Endorsement */}
-              <path 
-                d="M 960 255 C 980 255, 980 185, 1000 185" 
+              {/* 7. Live (Incomplete) → Live (Completed) */}
+              <path
+                d="M 960 255 C 980 255, 980 115, 800 115"
                 fill="none"
-                stroke={isEdgeInPath('Live (Incomplete)', 'Pending Endorsement') ? '#FF8200' : '#E8E3D8'} 
-                strokeWidth={isEdgeInPath('Live (Incomplete)', 'Pending Endorsement') ? '3' : '1.5'} 
-                markerEnd={isEdgeInPath('Live (Incomplete)', 'Pending Endorsement') ? 'url(#arrow-highlight)' : 'url(#arrow-default)'}
-                className={`transition-arrow ${isEdgeInPath('Live (Incomplete)', 'Pending Endorsement') ? 'arrow-active' : ''}`}
-                opacity={isEdgeInPath('Live (Incomplete)', 'Pending Endorsement') ? '1' : '0.2'}
+                stroke={isEdgeInPath('Live (Incomplete)', 'Live (Completed)') ? '#EA580C' : '#E8E3D8'}
+                strokeWidth={isEdgeInPath('Live (Incomplete)', 'Live (Completed)') ? '2.5' : '1.5'}
+                markerEnd={isEdgeInPath('Live (Incomplete)', 'Live (Completed)') ? 'url(#arrow-highlight)' : 'url(#arrow-default)'}
+                className={`transition-arrow ${isEdgeInPath('Live (Incomplete)', 'Live (Completed)') ? 'arrow-active' : ''}`}
+                opacity={isEdgeInPath('Live (Incomplete)', 'Live (Completed)') ? '1' : '0.1'}
               />
 
               {/* 8. Pending Endorsement -> Closed */}
-              <path 
-                d="M 1160 185 H 1200" 
-                stroke={isEdgeInPath('Pending Endorsement', 'Closed') ? '#FF8200' : '#E8E3D8'} 
-                strokeWidth={isEdgeInPath('Pending Endorsement', 'Closed') ? '3' : '1.5'} 
+              <path
+                d="M 1160 185 H 1200"
+                stroke={isEdgeInPath('Pending Endorsement', 'Closed') ? '#FF8200' : '#E8E3D8'}
+                strokeWidth={isEdgeInPath('Pending Endorsement', 'Closed') ? '3' : '1.5'}
                 markerEnd={isEdgeInPath('Pending Endorsement', 'Closed') ? 'url(#arrow-highlight)' : 'url(#arrow-default)'}
                 className={`transition-arrow ${isEdgeInPath('Pending Endorsement', 'Closed') ? 'arrow-active' : ''}`}
                 opacity={isEdgeInPath('Pending Endorsement', 'Closed') ? '1' : '0.2'}
@@ -652,11 +619,11 @@ export default function IncidentLifecyclePage() {
 
               {/* RETURNED PATH EDGES */}
               {/* 9. Pending Endorsement -> Returned */}
-              <path 
-                d="M 1080 210 C 1080 285, 620 285, 540 310" 
+              <path
+                d="M 1080 210 C 1080 285, 620 285, 540 310"
                 fill="none"
-                stroke={isEdgeInPath('Pending Endorsement', 'Returned') ? '#DC2626' : '#E8E3D8'} 
-                strokeWidth={isEdgeInPath('Pending Endorsement', 'Returned') ? '2.5' : '1.5'} 
+                stroke={isEdgeInPath('Pending Endorsement', 'Returned') ? '#DC2626' : '#E8E3D8'}
+                strokeWidth={isEdgeInPath('Pending Endorsement', 'Returned') ? '2.5' : '1.5'}
                 markerEnd={isEdgeInPath('Pending Endorsement', 'Returned') ? 'url(#arrow-returned)' : 'url(#arrow-default)'}
                 className={`transition-arrow ${isEdgeInPath('Pending Endorsement', 'Returned') && selectedPath === 'returned' ? 'arrow-active' : ''}`}
                 opacity={isEdgeInPath('Pending Endorsement', 'Returned') ? '1' : '0.1'}
@@ -712,19 +679,6 @@ export default function IncidentLifecyclePage() {
                 <text x="64" y="190" fontFamily="var(--font-body)" fontSize="12.5" fontWeight="600" fill="var(--text-main)">Live</text>
               </g>
 
-              {/* 2. Live (Assigned) */}
-              <g 
-                className={`svg-node ${selectedNode === 'Live (Assigned)' ? 'selected' : ''}`} 
-                style={{ color: '#EA580C' }}
-                onClick={() => setSelectedNode('Live (Assigned)')}
-                opacity={isNodeInPath('Live (Assigned)') ? '1' : '0.2'}
-              >
-                <rect x="200" y="160" width="160" height="50" rx="8" fill="#FDFCF8" stroke={selectedNode === 'Live (Assigned)' ? '#EA580C' : 'var(--border-color)'} strokeWidth={selectedNode === 'Live (Assigned)' ? '2.5' : '1'} />
-                <circle cx="220" cy="185" r="12" fill="rgba(234, 88, 12, 0.08)" />
-                <text x="220" y="189" fontFamily="var(--font-body)" fontSize="12" fontWeight="700" textAnchor="middle" fill="#EA580C">👤</text>
-                <text x="244" y="190" fontFamily="var(--font-body)" fontSize="11.5" fontWeight="600" fill="var(--text-main)">Live (Assigned)</text>
-              </g>
-
               {/* 3. Live (Acknowledged) */}
               <g 
                 className={`svg-node ${selectedNode === 'Live (Acknowledged)' ? 'selected' : ''}`} 
@@ -765,21 +719,22 @@ export default function IncidentLifecyclePage() {
               </g>
 
               {/* 6. Live (Incomplete) */}
-              <g 
-                className={`svg-node ${selectedNode === 'Live (Incomplete)' ? 'selected' : ''}`} 
-                style={{ color: '#DC2626' }}
+              <g
+                className={`svg-node ${selectedNode === 'Live (Incomplete)' ? 'selected' : ''}`}
+                style={{ color: '#EA580C' }}
                 onClick={() => setSelectedNode('Live (Incomplete)')}
                 opacity={isNodeInPath('Live (Incomplete)') ? '1' : '0.2'}
               >
-                <rect x="800" y="230" width="160" height="50" rx="8" fill="#FDFCF8" stroke={selectedNode === 'Live (Incomplete)' ? '#DC2626' : 'var(--border-color)'} strokeWidth={selectedNode === 'Live (Incomplete)' ? '2.5' : '1'} />
-                <circle cx="820" cy="255" r="12" fill="rgba(220, 38, 38, 0.08)" />
-                <text x="820" y="259" fontFamily="var(--font-body)" fontSize="12" fontWeight="700" textAnchor="middle" fill="#DC2626">✗</text>
-                <text x="844" y="260" fontFamily="var(--font-body)" fontSize="11" fontWeight="600" fill="var(--text-main)">Live (Incomplete)</text>
+                <rect x="800" y="230" width="160" height="50" rx="8" fill="#FDFCF8" stroke={selectedNode === 'Live (Incomplete)' ? '#EA580C' : 'var(--border-color)'} strokeWidth={selectedNode === 'Live (Incomplete)' ? '2.5' : '1'} />
+                <circle cx="820" cy="255" r="12" fill="rgba(234, 88, 12, 0.08)" />
+                <text x="820" y="259" fontFamily="var(--font-body)" fontSize="12" fontWeight="700" textAnchor="middle" fill="#EA580C">↩</text>
+                <text x="844" y="257" fontFamily="var(--font-body)" fontSize="9.5" fontWeight="600" fill="var(--text-main)">Live (Returned</text>
+                <text x="844" y="270" fontFamily="var(--font-body)" fontSize="9.5" fontWeight="600" fill="var(--text-main)">to Responder)</text>
               </g>
 
               {/* 7. Pending Endorsement */}
-              <g 
-                className={`svg-node ${selectedNode === 'Pending Endorsement' ? 'selected' : ''}`} 
+              <g
+                className={`svg-node ${selectedNode === 'Pending Endorsement' ? 'selected' : ''}`}
                 style={{ color: '#4A148C' }}
                 onClick={() => setSelectedNode('Pending Endorsement')}
                 opacity={isNodeInPath('Pending Endorsement') ? '1' : '0.2'}
@@ -787,7 +742,7 @@ export default function IncidentLifecyclePage() {
                 <rect x="1000" y="160" width="160" height="50" rx="8" fill="#FDFCF8" stroke={selectedNode === 'Pending Endorsement' ? '#4A148C' : 'var(--border-color)'} strokeWidth={selectedNode === 'Pending Endorsement' ? '2.5' : '1'} />
                 <circle cx="1020" cy="185" r="12" fill="rgba(74, 20, 140, 0.08)" />
                 <text x="1020" y="189" fontFamily="var(--font-body)" fontSize="12" fontWeight="700" textAnchor="middle" fill="#4A148C">📝</text>
-                <text x="1044" y="190" fontFamily="var(--font-body)" fontSize="11.5" fontWeight="600" fill="var(--text-main)">Pending Endors.</text>
+                <text x="1044" y="190" fontFamily="var(--font-body)" fontSize="11.5" fontWeight="600" fill="var(--text-main)">Pending Endorsement</text>
               </g>
 
               {/* 8. Closed */}

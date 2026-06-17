@@ -16,10 +16,9 @@ function caseBadgeClass(status: string) {
 function incBadgeClass(status: string) {
   switch (status) {
     case 'Live': return 'badge badge-live';
-    case 'Live (Assigned)': return 'badge badge-ack';
     case 'Live (Acknowledged)': return 'badge badge-ack';
+    case 'Live (Incomplete)': return 'badge badge-ack';
     case 'Live (On-Site)': return 'badge badge-onsite';
-    case 'Live (Incomplete)': return 'badge badge-live';
     case 'Live (Completed)': return 'badge badge-completed';
     case 'Pending Endorsement': return 'badge badge-review';
     case 'Returned': return 'badge badge-live';
@@ -350,28 +349,14 @@ export default function CaseDetailsPage() {
 
           <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>
             Logged {new Date(caseData.createdAt).toLocaleString('en-SG')} &bull; Creator: {caseData.createdBy}
-            {caseData.closedAt ? ` &bull; Closed ${new Date(caseData.closedAt).toLocaleString('en-SG')} by ${caseData.closedBy}` : ''}
+            {caseData.closedAt ? ` • Closed ${new Date(caseData.closedAt).toLocaleString('en-SG')} — System` : ''}
           </p>
         </div>
 
-        {/* Case Actions */}
+        {/* Case Actions — closure is system-managed; only manual activation is permitted */}
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
           {isCtrl && caseData.status === 'Pending Triage' && (
             <button className="btn btn-success btn-sm" onClick={() => caseUpdate({ status: 'Active' })}>Activate Case</button>
-          )}
-          {(isCtrl || isMgr) && (caseData.status === 'Active' || caseData.status === 'Pending Triage') && (
-            <button className="btn btn-success btn-sm" onClick={async () => {
-              const activeTasks = tasks.filter(t => t.status !== 'Closed');
-              if (activeTasks.length > 0) {
-                alert(`Cannot close Case. Please close all linked Tasks first (${activeTasks.length} active task(s) remaining).`);
-                return;
-              }
-              if (caseData.incident && caseData.incident.status !== 'Closed') {
-                alert(`Cannot close Case. The linked Incident (${caseData.incident.id}) must be Closed first.`);
-                return;
-              }
-              await caseUpdate({ status: 'Closed', username });
-            }}>Close Case</button>
           )}
         </div>
       </div>
@@ -543,34 +528,19 @@ export default function CaseDetailsPage() {
 
         {/* Right Sidebar */}
         <div className="case-side-col">
-          {/* Case Components overview */}
-          <div className="glass" style={{ padding: '14px 16px' }}>
-            <h3 className="section-title">Case Components</h3>
-            <InfoRow label="Incident Report" value={inc ? <span className="badge badge-live">Attached</span> : <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>Not Attached</span>} />
-            <InfoRow label="Ground Tasks" value={tasks.length > 0 ? <span className="badge badge-onsite">{tasks.length} Tasks</span> : <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>None</span>} />
-            <InfoRow label="CMMS Faults" value={(caseData.cmmsTickets?.length ?? 0) > 0 ? <span className="badge badge-ack">{caseData.cmmsTickets.length} Linked</span> : <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>None</span>} />
-          </div>
-
-          {/* Incident Details (If attached) */}
-          {inc && (
-            <div className="glass" style={{ padding: '14px 16px' }}>
-              <h3 className="section-title">Incident Summary</h3>
-              <InfoRow label="Incident ID" value={<span className="mono-id" style={{ fontSize: '10px', padding: '1px 5px' }}>{inc.id}</span>} />
-              <InfoRow label="Priority" value={<strong>{inc.priority}</strong>} />
-              <InfoRow label="Type" value={`${inc.type} · ${inc.subType}`} />
-              <InfoRow label="Assigned" value={inc.assignedTo || 'Unassigned'} />
-            </div>
-          )}
-
           {/* Case Audit Trail */}
           <div className="glass" style={{ padding: '14px 16px' }}>
             <h3 className="section-title">Case Audit Trail</h3>
-            <div className="timeline" style={{ maxHeight: 280, overflowY: 'auto' }}>
+            <div className="timeline" style={{ maxHeight: 480, overflowY: 'auto' }}>
               {caseData.closedAt && (
                 <div className="timeline-item">
                   <div className="timeline-dot" style={{ background: 'var(--color-closed)' }} />
                   <div className="timeline-header"><span>{new Date(caseData.closedAt).toLocaleDateString('en-SG')}</span></div>
-                  <div className="timeline-desc" style={{ fontSize: 11, padding: '6px 10px' }}>Case container closed.</div>
+                  <div className="timeline-desc" style={{ fontSize: 11, padding: '6px 10px' }}>
+                    {caseData.status === 'No Action Required'
+                      ? 'Case closed — No Action Required (System).'
+                      : 'Case container closed automatically by System.'}
+                  </div>
                 </div>
               )}
               {inc?.log && [...inc.log].reverse().slice(0, 5).map(entry => (
@@ -828,7 +798,7 @@ export default function CaseDetailsPage() {
         /* ── Case detail layout ───────────────────────────────────────── */
         .case-content-grid {
           display: grid;
-          grid-template-columns: 1fr 280px;
+          grid-template-columns: 1fr 300px;
           gap: 16px;
           align-items: start;
         }

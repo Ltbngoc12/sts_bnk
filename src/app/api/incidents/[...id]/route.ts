@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDb, saveDb, generateCaseId } from '@/lib/db';
+import { tryAutoCloseCase } from '@/lib/autoclose';
 
 // Helper: build a timestamped log entry
 function makeLogEntry(db_incident: any, description: string) {
@@ -65,7 +66,7 @@ export async function GET(
     const relatedTasks = db.tasks.filter(t => t.caseId === caseId);
     const relatedFaults = db.faults?.filter(f => f.caseId === caseId) || [];
     const relatedBroadcasts = db.broadcasts?.filter(b => b.caseId === caseId || b.incidentId === incidentData.id) || [];
-    const relatedOccurrences = db.occurrences.filter(o => o.caseId === caseId);
+    const relatedOccurrences: any[] = []; // Occurrences are standalone per FRD 4.1
     
     const responsePayload = {
       ...incidentData,
@@ -143,12 +144,11 @@ export async function PUT(
         incident.assignedTo = incoming;
 
         if (incoming.length > 0) {
-          incident.status = 'Live (Assigned)';
           incident.log.push({
             eventNumber: incident.log.length + 1,
             date: logDate,
             time: logTime,
-            description: `Responders assigned: ${incoming.join(', ')} (by ${actor}). Status set to Live (Assigned).`
+            description: `Responders assigned: ${incoming.join(', ')} (by ${actor}).`
           });
         }
       }
@@ -225,16 +225,16 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    
-    // Resolve queryId and action correctly
+
     const lastSegment = id[id.length - 1];
     let action: string | null = null;
     let queryId = id.join('/');
 
     const knownActions = [
       'assign', 'acknowledge', 'on-site', 'complete', 'close', 'return',
-      'submit-review', 'submit-endorsement', 'log', 'update-fields',
-      'reopen', 'mark-incomplete', 'edit-log', 'delete-log', 'raise-fault'
+      'return-to-responder', 'submit-review', 'submit-endorsement', 'log',
+      'update-fields', 'reopen', 'mark-false-alarm', 'link-duplicate',
+      'edit-log', 'delete-log', 'raise-fault'
     ];
 
     if (knownActions.includes(lastSegment)) {
@@ -258,95 +258,58 @@ export async function POST(
     switch (action) {
       // ── Assign / Add / Remove responder ───────────────────────────────────
       case 'assign': {
-        // Normalise current list
         const activeResponders = (incident.responders || []).filter(r => r.status === 'Active');
         const currentList = activeResponders.map(r => r.responderId);
 
-        // ── ADD a single responder ────────────────────────────────────────
         if (body.addResponder) {
           if (currentList.includes(body.addResponder)) {
             return NextResponse.json({ error: `${body.addResponder} is already assigned to this Incident.` }, { status: 409 });
           }
-          const updatedList = [...currentList, body.addResponder];
-          incident.assignedTo = updatedList;
-          // First assignment: transition to Live (Assigned)
-          if (currentList.length === 0) {
-            incident.status = 'Live (Assigned)';
-          }
-          // Record rich metadata
+          incident.assignedTo = [...currentList, body.addResponder];
           incident.responders = [
             ...(incident.responders || []),
-            {
-              responderId: body.addResponder,
-              assignedBy: actor,
-              assignedAt: new Date().toISOString(),
-              status: 'Active'
-            }
+            { responderId: body.addResponder, assignedBy: actor, assignedAt: new Date().toISOString(), status: 'Active' }
           ];
-          incident.log.push(makeLogEntry(incident,
-            `Responder added: ${body.addResponder} — assigned by ${actor}.`
-          ));
+          if (incident.status === 'Live') {
+            incident.status = 'Live (Assigned)';
+            incident.log.push(makeLogEntry(incident, `Responder assigned: ${body.addResponder} — by ${actor}. Status changed to Live (Assigned).`));
+          } else {
+            incident.log.push(makeLogEntry(incident, `Responder added: ${body.addResponder} — assigned by ${actor}.`));
+          }
           break;
         }
 
-        // ── REMOVE a single responder ───────────────────────────────────
         if (body.removeResponder) {
           if (currentList.length <= 1) {
-            return NextResponse.json(
-              { error: 'At least one Responder must remain assigned to the Incident.' },
-              { status: 409 }
-            );
+            return NextResponse.json({ error: 'At least one Responder must remain assigned to the Incident.' }, { status: 409 });
           }
           if (!currentList.includes(body.removeResponder)) {
             return NextResponse.json({ error: `${body.removeResponder} is not assigned to this Incident.` }, { status: 404 });
           }
           incident.assignedTo = currentList.filter(r => r !== body.removeResponder);
-          // Update rich metadata — mark as Removed
           incident.responders = (incident.responders || []).map(r =>
             r.responderId === body.removeResponder ? { ...r, status: 'Removed' } : r
           );
-          incident.log.push(makeLogEntry(incident,
-            `Responder removed: ${body.removeResponder} — unassigned by ${actor}.`
-          ));
+          incident.log.push(makeLogEntry(incident, `Responder removed: ${body.removeResponder} — unassigned by ${actor}.`));
           break;
         }
 
-        // ── REPLACE full list (e.g. from legacy or bulk re-assign) ──────────
         if (body.assignedTo !== undefined) {
           const incoming: string[] = Array.isArray(body.assignedTo)
-            ? body.assignedTo
-            : (body.assignedTo ? [body.assignedTo] : []);
-          
+            ? body.assignedTo : (body.assignedTo ? [body.assignedTo] : []);
+
           const updatedResponders = (incident.responders || []).map(r => {
-            if (!incoming.includes(r.responderId) && r.status === 'Active') {
-              return { ...r, status: 'Removed' as const };
-            }
+            if (!incoming.includes(r.responderId) && r.status === 'Active') return { ...r, status: 'Removed' as const };
             return r;
           });
-
           incoming.forEach(r => {
             const exists = updatedResponders.find(x => x.responderId === r);
-            if (exists) {
-              exists.status = 'Active';
-            } else {
-              updatedResponders.push({
-                responderId: r,
-                assignedBy: actor,
-                assignedAt: new Date().toISOString(),
-                status: 'Active'
-              });
-            }
+            if (exists) { exists.status = 'Active'; }
+            else { updatedResponders.push({ responderId: r, assignedBy: actor, assignedAt: new Date().toISOString(), status: 'Active' }); }
           });
-
           incident.responders = updatedResponders;
           incident.assignedTo = incoming;
-
-          if (incoming.length > 0) {
-            incident.status = 'Live (Assigned)';
-          }
-          incident.log.push(makeLogEntry(incident,
-            `Responder assignment updated to: ${incoming.join(', ')} — by ${actor}.`
-          ));
+          incident.log.push(makeLogEntry(incident, `Responder assignment updated to: ${incoming.join(', ')} — by ${actor}.`));
           break;
         }
 
@@ -388,11 +351,11 @@ export async function POST(
         break;
       }
 
-      // ── Submit for review / endorsement ────────────────────────
+      // ── Submit for Duty Manager review ─────────────────────────
       case 'submit-review':
       case 'submit-endorsement': {
-        if (!['Live (Completed)', 'Live (Incomplete)', 'Returned', 'Live'].includes(incident.status)) {
-          return NextResponse.json({ error: `Can only submit for endorsement from completed, incomplete, or returned status. Current: "${incident.status}"` }, { status: 409 });
+        if (!['Live', 'Returned', 'Live (Incomplete)'].includes(incident.status)) {
+          return NextResponse.json({ error: `Cannot submit for endorsement from current status "${incident.status}".` }, { status: 409 });
         }
         incident.status = 'Pending Endorsement';
         incident.log.push(makeLogEntry(incident, `Incident submitted for Duty Manager endorsement by ${actor}.`));
@@ -408,29 +371,52 @@ export async function POST(
         incident.completionRemarks = body.closureRemarks || '';
         incident.closedAt = new Date().toISOString();
         incident.closedBy = actor;
-        
-        // Close the parent case only if no other active tasks exist
-        const activeTasks = db.tasks.filter(t => t.caseId === caseId && t.status !== 'Closed');
-        if (activeTasks.length === 0) {
-          currentCase.status = 'Closed';
-          currentCase.closedAt = new Date().toISOString();
-          currentCase.closedBy = actor;
-        }
-        
-        // Close any linked duplicate records
+
         if (incident.slaveIncidents) {
           incident.slaveIncidents = incident.slaveIncidents.map((s: any) => ({ ...s, status: 'Closed' }));
         }
         incident.log.push(makeLogEntry(incident,
           `Incident approved and closed by ${actor} (Duty Manager).${body.closureRemarks ? ` Closure remarks: ${body.closureRemarks}` : ''} Record is now read-only.`
         ));
+
+        // ── Auto-trigger Closure Broadcast (FRD 5.12.1) ───────────
+        if (!db.broadcasts) db.broadcasts = [];
+        const broadcastSeq = db.broadcasts.filter(b => b.caseId === caseId).length + 1;
+        const broadcastId = `${caseId}-BC${String(broadcastSeq).padStart(3, '0')}`;
+        db.broadcasts.push({
+          id: broadcastId,
+          caseId,
+          incidentId: incident.id,
+          type: 'Closure',
+          recipients: ['duty-manager@sentosa.gov.sg', 'operations@sentosa.gov.sg'],
+          templateUsed: 'Closure Broadcast Template',
+          contentDispatched: [
+            'INCIDENT CLOSURE NOTICE',
+            `Case ID: ${caseId}`,
+            `Incident ID: ${incident.id}`,
+            `Title: ${incident.title}`,
+            `Type: ${incident.type} — ${incident.subType}`,
+            `Location: ${incident.location?.commonName || 'N/A'}`,
+            `Closed At: ${incident.closedAt}`,
+            `Closed By: ${actor}`,
+            `Closure Remarks: ${body.closureRemarks || 'N/A'}`,
+          ].join('\n'),
+          sentAt: new Date().toISOString(),
+          sentBy: actor,
+          status: 'SENT',
+          deliveryAttempts: 1
+        });
+
+        currentCase.incident = incident;
+        db.cases[caseIndex] = currentCase;
+        tryAutoCloseCase(db, caseId);
         break;
       }
 
-      // ── Duty Manager returns to controller ─────────────────────
+      // ── Duty Manager returns to Controller ─────────────────────
       case 'return': {
-        if (incident.status !== 'Pending Endorsement') {
-          return NextResponse.json({ error: `Cannot return: incident status is "${incident.status}" (must be Pending Endorsement)` }, { status: 409 });
+        if (!['Live (Completed)', 'Pending Endorsement'].includes(incident.status)) {
+          return NextResponse.json({ error: `Cannot return: incident status is "${incident.status}"` }, { status: 409 });
         }
         incident.status = 'Returned';
         incident.completionRemarks = body.returnRemarks || '';
@@ -440,34 +426,95 @@ export async function POST(
         break;
       }
 
+      // ── Duty Manager returns to Responder for further action ───
+      case 'return-to-responder': {
+        if (!['Live (Completed)', 'Pending Endorsement'].includes(incident.status)) {
+          return NextResponse.json({ error: `Cannot return to responder: incident status is "${incident.status}"` }, { status: 409 });
+        }
+        incident.status = 'Live (Incomplete)';
+        incident.log.push(makeLogEntry(incident,
+          `Incident returned to Responder for further action by ${actor}${body.returnRemarks ? `. Reason: ${body.returnRemarks}` : '.'}`
+        ));
+        break;
+      }
+
       // ── System Administrator Reopens closed incident ───────────
       case 'reopen': {
         if (incident.status !== 'Closed') {
           return NextResponse.json({ error: 'Incident is not closed and cannot be reopened.' }, { status: 400 });
         }
-        
         incident.status = 'Live';
         incident.closedAt = undefined;
         incident.closedBy = undefined;
-        
-        // Reopen parent Case as active
         if (currentCase.status === 'Closed') {
           currentCase.status = 'Active';
           currentCase.closedAt = null;
           currentCase.closedBy = null;
         }
-        
         incident.log.push(makeLogEntry(incident, `Incident reopened by System Administrator (${actor}). Status reset to Live.`));
         break;
       }
 
-      // ── Mark Incomplete ────────────────────────────────────────
-      case 'mark-incomplete': {
-        if (!['Live (On-Site)', 'Live (Acknowledged)', 'Live (Assigned)', 'Live'].includes(incident.status)) {
-          return NextResponse.json({ error: `Cannot mark incomplete: current status is "${incident.status}"` }, { status: 409 });
+      // ── Mark as False Alarm (FRD 5.10) ────────────────────────
+      case 'mark-false-alarm': {
+        if (incident.status === 'Closed') {
+          return NextResponse.json({ error: 'Incident is already Closed.' }, { status: 409 });
         }
-        incident.status = 'Live (Incomplete)';
-        incident.log.push(makeLogEntry(incident, `Incident marked as Incomplete by ${actor}.${body.remarks ? ` Remarks: ${body.remarks}` : ''}`));
+        if (incident.status === 'Pending Endorsement') {
+          return NextResponse.json({ error: 'Cannot mark as false alarm while Pending Endorsement. The Duty Manager must first return the record.' }, { status: 409 });
+        }
+        const prevStatus = incident.status;
+        incident.status = 'Closed';
+        (incident as any).isFalseAlarm = true;
+        incident.completionRemarks = body.remarks || 'Closed as False Alarm. No further action required.';
+        incident.closedAt = new Date().toISOString();
+        incident.closedBy = actor;
+        incident.log.push(makeLogEntry(incident,
+          `Incident marked as FALSE ALARM and closed by ${actor}. Previous status: "${prevStatus}". Record retained for audit purposes.`
+        ));
+        const activeTasks = db.tasks.filter(t => t.caseId === caseId && t.status !== 'Closed');
+        if (activeTasks.length === 0) {
+          currentCase.status = 'Closed';
+          currentCase.closedAt = new Date().toISOString();
+          currentCase.closedBy = actor;
+        }
+        break;
+      }
+
+      // ── Link as Duplicate of a Master Incident (FRD 5.7) ──────
+      case 'link-duplicate': {
+        const { masterIncidentId } = body;
+        if (!masterIncidentId) {
+          return NextResponse.json({ error: 'masterIncidentId is required' }, { status: 400 });
+        }
+        const masterCaseIndex = db.cases.findIndex(c => c.incident?.id === masterIncidentId);
+        if (masterCaseIndex === -1) {
+          return NextResponse.json({ error: `Master incident ${masterIncidentId} not found` }, { status: 404 });
+        }
+        const masterIncident = db.cases[masterCaseIndex].incident!;
+
+        if (!masterIncident.slaveIncidents) masterIncident.slaveIncidents = [];
+        masterIncident.slaveIncidents.push({
+          id: incident.id,
+          caseId: incident.caseId,
+          title: incident.title,
+          dateTime: incident.dateTime,
+          reporterName: incident.reporterName,
+          summary: incident.summary || '',
+          status: 'Closed'
+        });
+        masterIncident.log.push(makeLogEntry(masterIncident,
+          `Duplicate report ${incident.id} linked to this incident by ${actor}.`
+        ));
+        db.cases[masterCaseIndex].incident = masterIncident;
+
+        incident.isDuplicate = true;
+        incident.masterIncidentId = masterIncidentId;
+        incident.status = 'Closed';
+        incident.closedAt = new Date().toISOString();
+        incident.closedBy = actor;
+        incident.completionRemarks = `Linked as duplicate of ${masterIncidentId}. Closed automatically.`;
+        incident.log.push(makeLogEntry(incident, `Incident linked as duplicate of ${masterIncidentId} by ${actor}. Record closed.`));
         break;
       }
 
@@ -476,15 +523,12 @@ export async function POST(
         if (!body.description) return NextResponse.json({ error: 'description is required' }, { status: 400 });
         const isRangerLog = body.description.startsWith('[Ranger Log]');
         const text = isRangerLog ? body.description : `[MANUAL] ${body.description} — by ${actor}.`;
-        const entry = {
-          ...makeLogEntry(incident, text),
-          attachments: body.attachments || []
-        };
+        const entry = { ...makeLogEntry(incident, text), attachments: body.attachments || [] };
         incident.log.push(entry);
         break;
       }
 
-      // ── Edit manual log entry ────────────────────────────────
+      // ── Edit manual log entry ──────────────────────────────────
       case 'edit-log': {
         const eventNumber = parseInt(body.eventNumber, 10);
         const newDescription = body.description;
@@ -492,23 +536,17 @@ export async function POST(
           return NextResponse.json({ error: 'eventNumber and description are required' }, { status: 400 });
         }
         const logEntry = incident.log.find(e => e.eventNumber === eventNumber);
-        if (!logEntry) {
-          return NextResponse.json({ error: 'Log entry not found' }, { status: 404 });
-        }
-        
+        if (!logEntry) return NextResponse.json({ error: 'Log entry not found' }, { status: 404 });
+
         let updatedText = newDescription;
         if (logEntry.description.startsWith('[Ranger Log] ')) {
           updatedText = `[Ranger Log] ${newDescription}`;
         } else if (logEntry.description.startsWith('[MANUAL] ')) {
           const suffixIndex = logEntry.description.lastIndexOf(' — by ');
-          if (suffixIndex !== -1) {
-            const suffix = logEntry.description.slice(suffixIndex);
-            updatedText = `[MANUAL] ${newDescription}${suffix}`;
-          } else {
-            updatedText = `[MANUAL] ${newDescription} — by ${actor}.`;
-          }
+          updatedText = suffixIndex !== -1
+            ? `[MANUAL] ${newDescription}${logEntry.description.slice(suffixIndex)}`
+            : `[MANUAL] ${newDescription} — by ${actor}.`;
         }
-        
         logEntry.description = updatedText;
         logEntry.edited = true;
         logEntry.editedBy = actor;
@@ -519,14 +557,9 @@ export async function POST(
       // ── Soft Delete manual log entry ──────────────────────────
       case 'delete-log': {
         const eventNumber = parseInt(body.eventNumber, 10);
-        if (isNaN(eventNumber)) {
-          return NextResponse.json({ error: 'eventNumber is required' }, { status: 400 });
-        }
+        if (isNaN(eventNumber)) return NextResponse.json({ error: 'eventNumber is required' }, { status: 400 });
         const logEntry = incident.log.find(e => e.eventNumber === eventNumber);
-        if (!logEntry) {
-          return NextResponse.json({ error: 'Log entry not found' }, { status: 404 });
-        }
-        
+        if (!logEntry) return NextResponse.json({ error: 'Log entry not found' }, { status: 404 });
         logEntry.deleted = true;
         logEntry.deletedBy = actor;
         logEntry.deletedAt = new Date().toISOString();
@@ -538,54 +571,28 @@ export async function POST(
         const title = body.title;
         const faultType = body.faultType || 'Facilities';
         const faultSubType = body.faultSubType || 'Others';
-        const severity = body.severity || 'Medium';
         const description = body.description || title;
 
-        if (!title) {
-          return NextResponse.json({ error: 'title is required' }, { status: 400 });
-        }
+        if (!title) return NextResponse.json({ error: 'title is required' }, { status: 400 });
 
         const newCaseId = generateCaseId(db);
         const newFaultId = generateFaultId(db);
         const cmmsTicketId = `CMMS-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(10000 + Math.random() * 90000)}`;
 
-        const newCase: any = {
-          id: newCaseId,
-          title: `Fault: ${title}`,
-          status: 'Active',
-          createdAt: new Date().toISOString(),
-          createdBy: actor,
-          closedAt: null,
-          closedBy: null,
-          cmmsTickets: [cmmsTicketId],
-          incident: null
-        };
-
-        const newFault: any = {
-          id: newFaultId,
-          caseId: newCaseId,
-          faultType,
-          faultSubType,
-          location: {
-            ...incident.location
-          },
-          description,
-          attachments: [],
-          status: 'Created',
-          cmmsTicketId,
-          createdBy: actor,
-          createdAt: new Date().toISOString(),
-          linkedIncidentId: incident.id
-        };
-
-        db.cases.push(newCase);
+        db.cases.push({
+          id: newCaseId, title: `Fault: ${title}`, status: 'Active',
+          createdAt: new Date().toISOString(), createdBy: actor,
+          closedAt: null, closedBy: null, cmmsTickets: [cmmsTicketId], incident: null
+        });
         if (!db.faults) db.faults = [];
-        db.faults.push(newFault);
-
-        incident.log.push(makeLogEntry(incident, 
-          `Linked Fault ${newFaultId} raised by Controller ${actor}. CMMS Ticket: ${cmmsTicketId}.`
-        ));
-        
+        db.faults.push({
+          id: newFaultId, caseId: newCaseId, faultType, faultSubType,
+          location: { ...incident.location }, description, attachments: [],
+          status: 'Created', cmmsTicketId, createdBy: actor,
+          createdAt: new Date().toISOString(), linkedIncidentId: incident.id
+        });
+        incident.log.push(makeLogEntry(incident, `Linked Fault ${newFaultId} raised by Controller ${actor}. CMMS Ticket: ${cmmsTicketId}.`));
+        tryAutoCloseCase(db, newCaseId);
         break;
       }
 
@@ -605,7 +612,6 @@ export async function POST(
         if (body.cctvBwc) incident.cctvBwc = body.cctvBwc;
         if (body.summary) incident.summary = body.summary;
         if (body.category) incident.category = body.category;
-        
         incident.log.push(makeLogEntry(incident, `Ancillary fields updated by ${actor}.`));
         break;
       }

@@ -28,21 +28,19 @@ interface HydratedIncident extends Incident {
 function incBadgeClass(status: string) {
   switch (status) {
     case 'Live':
+    case 'Returned':
       return 'badge badge-live';
     case 'Live (Assigned)':
-      return 'badge badge-ack';
+      return 'badge badge-assigned';
     case 'Live (Acknowledged)':
+    case 'Live (Incomplete)':
       return 'badge badge-ack';
     case 'Live (On-Site)':
       return 'badge badge-onsite';
-    case 'Live (Incomplete)':
-      return 'badge badge-live';
     case 'Live (Completed)':
       return 'badge badge-completed';
     case 'Pending Endorsement':
       return 'badge badge-review';
-    case 'Returned':
-      return 'badge badge-live';
     case 'Closed':
       return 'badge badge-closed';
     default:
@@ -75,6 +73,7 @@ export default function IncidentDetailsPage() {
   const [modalRemarks, setModalRemarks] = useState('');
   const [assigneeInput, setAssigneeInput] = useState('');
   const [assignmentError, setAssignmentError] = useState('');
+  const [pendingResponders, setPendingResponders] = useState<string[] | null>(null);
   const [reviewRemarks, setReviewRemarks] = useState('');
 
   // Timeline & Refactoring States
@@ -130,10 +129,9 @@ export default function IncidentDetailsPage() {
   const [cctvBwcNo, setCctvBwcNo] = useState('');
   const [cctvBwcTimestamp, setCctvBwcTimestamp] = useState('');
 
-  // Slave Incident Form
-  const [slaveTitle, setSlaveTitle] = useState('');
-  const [slaveReporter, setSlaveReporter] = useState('');
-  const [slaveSummary, setSlaveSummary] = useState('');
+  // Link Duplicate Form
+  const [linkDupId, setLinkDupId] = useState('');
+  const [linkDupError, setLinkDupError] = useState('');
 
   // Collapsible Left Panel sections
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
@@ -382,70 +380,56 @@ export default function IncidentDetailsPage() {
     await updateFields({ attachments: updated });
   };
 
-  const handleAddResponder = async (name: string) => {
-    setAssignmentError('');
-    setSaving(true);
-    try {
-      const res = await fetch(`/api/incidents/${incidentId}/assign`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ addResponder: name, username, role }),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        setAssignmentError(err.error || 'Failed to add responder.');
-        return;
-      }
-      await fetchIncidentData();
-    } catch (err: any) {
-      setAssignmentError(err.message || 'Request error occurred.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleRemoveResponder = async (name: string) => {
-    if (!incident || !incident.assignedTo || incident.assignedTo.length <= 1) {
+  const handleResponderChange = (updatedList: string[]) => {
+    if (updatedList.length === 0) {
       setAssignmentError('At least one Responder must remain assigned to the Incident.');
       return;
     }
     setAssignmentError('');
+    setPendingResponders(updatedList);
+  };
+
+  const handleAssignResponders = async () => {
+    if (!incident) return;
+    const currentList = Array.isArray(incident.assignedTo) ? incident.assignedTo : [];
+    const pending = pendingResponders ?? currentList;
+    const toAdd = pending.filter(r => !currentList.includes(r));
+    const toRemove = currentList.filter(r => !pending.includes(r));
+    if (toAdd.length === 0 && toRemove.length === 0) return;
+
+    setAssignmentError('');
     setSaving(true);
     try {
-      const res = await fetch(`/api/incidents/${incidentId}/assign`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ removeResponder: name, username, role }),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        setAssignmentError(err.error || 'Failed to remove responder.');
-        return;
+      for (const name of toAdd) {
+        const res = await fetch(`/api/incidents/${incidentId}/assign`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ addResponder: name, username, role }),
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          setAssignmentError(err.error || 'Failed to add responder.');
+          return;
+        }
       }
+      for (const name of toRemove) {
+        const res = await fetch(`/api/incidents/${incidentId}/assign`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ removeResponder: name, username, role }),
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          setAssignmentError(err.error || 'Failed to remove responder.');
+          return;
+        }
+      }
+      setPendingResponders(null);
       await fetchIncidentData();
     } catch (err: any) {
       setAssignmentError(err.message || 'Request error occurred.');
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleResponderChange = async (updatedList: string[]) => {
-    if (!incident) return;
-    const currentList = Array.isArray(incident.assignedTo) ? incident.assignedTo : [];
-    
-    // Find if a responder was added
-    const added = updatedList.find(r => !currentList.includes(r));
-    if (added) {
-      await handleAddResponder(added);
-      return;
-    }
-    
-    // Find if a responder was removed
-    const removed = currentList.find(r => !updatedList.includes(r));
-    if (removed) {
-      await handleRemoveResponder(removed);
-      return;
     }
   };
 
@@ -453,6 +437,19 @@ export default function IncidentDetailsPage() {
     const ok = await performAction('complete');
     if (ok) {
       setShowCompleteModal(false);
+    }
+  };
+
+  const handleMarkAsDuplicate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const masterId = linkDupId.trim();
+    if (!masterId) return;
+    setLinkDupError('');
+    const ok = await performAction('link-duplicate', { masterIncidentId: masterId });
+    if (ok) {
+      setLinkDupId('');
+    } else {
+      setLinkDupError('Failed to link. Check that the master Incident ID exists and is not closed.');
     }
   };
 
@@ -1392,6 +1389,24 @@ export default function IncidentDetailsPage() {
           <span><strong>Media Alert:</strong> Press/media present at scene. SDC Communications notified.</span>
         </div>
       )}
+      {incident.isDuplicate && incident.masterIncidentId && (
+        <div className="alert-banner info-banner glass" style={{ marginBottom: '10px', borderColor: 'var(--color-info-border)' }}>
+          <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10.172 14.828a4 4 0 015.656 0l.868.868" />
+          </svg>
+          <span>
+            <strong>Duplicate Record:</strong> This incident was linked as a duplicate of master incident{' '}
+            <Link href={`/incidents/${incident.masterIncidentId}`} style={{ color: 'var(--color-info)', fontWeight: 700, textDecoration: 'underline' }}>
+              {incident.masterIncidentId}
+            </Link>
+            {' — '}
+            <Link href={`/cases/${incident.caseId}`} style={{ color: 'var(--color-info)', fontWeight: 700, textDecoration: 'underline' }}>
+              View Case {incident.caseId}
+            </Link>
+          </span>
+        </div>
+      )}
 
       {/* 1. Header Card (Compact & High Density) */}
       <div className="glass" style={{ padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
@@ -1417,7 +1432,7 @@ export default function IncidentDetailsPage() {
           {/* Ranger Actions */}
           {isRanger && !isClosed && (
             <>
-              {(incident.status === 'Live' || incident.status === 'Live (Assigned)') && (
+              {['Live', 'Live (Assigned)'].includes(incident.status) && (
                 <button className="btn btn-primary btn-sm" onClick={() => performAction('acknowledge')} disabled={saving}>
                   Acknowledge Dispatch
                 </button>
@@ -1427,17 +1442,9 @@ export default function IncidentDetailsPage() {
                   Arrive On-Site
                 </button>
               )}
-              {['Live (On-Site)', 'Live (Acknowledged)', 'Live (Assigned)', 'Live', 'Live (Incomplete)'].includes(incident.status) && (
+              {['Live (On-Site)', 'Live (Acknowledged)', 'Live', 'Live (Assigned)', 'Live (Incomplete)'].includes(incident.status) && (
                 <button className="btn btn-success btn-sm" onClick={() => setShowCompleteModal(true)} disabled={saving}>
                   Notify Completion
-                </button>
-              )}
-              {['Live (On-Site)', 'Live (Acknowledged)', 'Live (Assigned)', 'Live'].includes(incident.status) && (
-                <button className="btn btn-secondary btn-sm" onClick={() => {
-                  const r = prompt('Reason for marking incomplete:');
-                  if (r) performAction('mark-incomplete', { remarks: r });
-                }} disabled={saving}>
-                  Mark Incomplete
                 </button>
               )}
             </>
@@ -1446,40 +1453,43 @@ export default function IncidentDetailsPage() {
           {/* Controller/Admin Actions */}
           {isCtrl && !isClosed && (
             <>
-              <button
-                className="btn btn-secondary btn-sm"
-                onClick={() => {
-                  setActiveTimelineTab('faults');
-                  setShowRaiseFaultForm(true);
-                  const el = document.querySelector('.workspace-tabs-container');
-                  if (el) el.scrollIntoView({ behavior: 'smooth' });
-                }}
-              >
-                🛠️ Raise Fault
-              </button>
-              {['Live (Completed)', 'Live (Incomplete)', 'Returned', 'Live'].includes(incident.status) && (
-                <button className="btn btn-primary btn-sm" onClick={() => performAction('submit-endorsement')} disabled={saving}>
-                  Submit for Endorsement
+              {['Live', 'Live (Assigned)', 'Live (Acknowledged)'].includes(incident.status) && (
+                <button
+                  className="btn btn-info btn-sm"
+                  onClick={handleAssignResponders}
+                  disabled={saving || pendingResponders === null || JSON.stringify(pendingResponders) === JSON.stringify(Array.isArray(incident.assignedTo) ? incident.assignedTo : [])}
+                >
+                  {incident.status === 'Live' ? 'Assign Responder' : 'Reassign Responder'}
                 </button>
               )}
-              {incident.status !== 'Pending Endorsement' && (
+              {incident.status === 'Live' && (
+                <button className="btn btn-primary btn-sm" onClick={() => performAction('submit-review')} disabled={saving}>
+                  Submit for Closure
+                </button>
+              )}
+              {['Returned', 'Live (Incomplete)'].includes(incident.status) && (
+                <button className="btn btn-primary btn-sm" onClick={() => performAction('submit-review')} disabled={saving}>
+                  Resubmit
+                </button>
+              )}
+              {incident.status === 'Live' && (
                 <button
                   className="btn btn-danger btn-sm"
                   onClick={async () => {
                     if (confirm('Are you sure you want to close this incident report as a FALSE ALARM?')) {
-                      await performAction('close', { closureRemarks: 'Closed as False Alarm' });
+                      await performAction('mark-false-alarm', { remarks: 'Closed as False Alarm. No further action required.' });
                     }
                   }}
                   disabled={saving}
                 >
-                  Close as False Alarm
+                  Mark False Alarm
                 </button>
               )}
             </>
           )}
 
           {/* Duty Manager/Admin Actions */}
-          {isMgr && incident.status === 'Pending Endorsement' && (
+          {isMgr && ['Live (Completed)', 'Pending Endorsement'].includes(incident.status) && (
             <>
               <button
                 className="btn btn-success btn-sm"
@@ -1491,6 +1501,18 @@ export default function IncidentDetailsPage() {
               >
                 Approve & Close
               </button>
+              {incident.status === 'Pending Endorsement' && (
+                <button
+                  className="btn btn-warning btn-sm"
+                  onClick={async () => {
+                    const r = prompt('Reason for returning to responder:');
+                    if (r !== null) await performAction('return-to-responder', { returnRemarks: r });
+                  }}
+                  disabled={saving}
+                >
+                  Return to Responder
+                </button>
+              )}
               <button
                 className="btn btn-danger btn-sm"
                 onClick={() => {
@@ -1499,7 +1521,7 @@ export default function IncidentDetailsPage() {
                 }}
                 disabled={saving}
               >
-                Return / Reject
+                Return to Controller
               </button>
             </>
           )}
@@ -1705,7 +1727,7 @@ export default function IncidentDetailsPage() {
         </div>
 
         {/* Assigned Responders */}
-        <div className="info-panel-col">
+        <div className="info-panel-col assigned-responders-section">
           <div className="info-panel-title">Assigned Responders</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
@@ -1733,9 +1755,14 @@ export default function IncidentDetailsPage() {
             {/* Inline Dispatcher Controls */}
             {isCtrl && !isClosed && (
               <div style={{ marginTop: 8 }}>
-                <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>RE-ASSIGN RESPONDERS</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)' }}>RE-ASSIGN RESPONDERS</label>
+                  {pendingResponders !== null && JSON.stringify(pendingResponders) !== JSON.stringify(Array.isArray(incident.assignedTo) ? incident.assignedTo : []) && (
+                    <span style={{ fontSize: 10, color: 'var(--color-warning)', fontWeight: 600 }}>● Unsaved</span>
+                  )}
+                </div>
                 <MultiResponderSelect
-                  value={Array.isArray(incident.assignedTo) ? incident.assignedTo : []}
+                  value={pendingResponders ?? (Array.isArray(incident.assignedTo) ? incident.assignedTo : [])}
                   onChange={handleResponderChange}
                   disabled={saving}
                   allowEmpty={false}
@@ -2619,7 +2646,7 @@ export default function IncidentDetailsPage() {
                               })}
                             </span>
                             
-                            {incident.status !== 'Pending Endorsement' && incident.status !== 'Closed' && 
+                            {incident.status !== 'Pending Endorsement' && incident.status !== 'Closed' &&
                              evt.eventNumber && 
                              !evt.deleted && 
                              (evt.rawDescription?.startsWith('[MANUAL]') || evt.rawDescription?.startsWith('[Ranger Log]')) && (
@@ -2920,60 +2947,76 @@ export default function IncidentDetailsPage() {
     {activeTimelineTab === 'duplicates' && (
       <div className="glass console-card" style={{ padding: 20 }}>
         <h2 className="panel-title" style={{ marginBottom: 16, borderBottom: '1px solid var(--border-color)', paddingBottom: 10 }}>Duplicate Detection & Reports</h2>
-        
+
         <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 2fr', gap: 24 }}>
           {/* Link Form */}
           <div>
-            <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>Link Duplicate Report</h3>
-            {!isClosed ? (
-              <form onSubmit={async (e) => {
-                e.preventDefault();
-                if (!slaveTitle.trim()) return;
-                const slave = {
-                  id: `DUP-${String((incident.slaveIncidents?.length ?? 0) + 1).padStart(3, '0')}`,
-                  title: slaveTitle, dateTime: new Date().toISOString(), reporterName: slaveReporter || 'Anonymous Guest', summary: slaveSummary, status: incident.status === 'Closed' ? 'Closed' : 'Open'
-                };
-                const updated = [...(incident.slaveIncidents ?? []), slave];
-                await updateFields({
-                  slaveIncidents: updated,
-                  newLogEntry: `[Duplicate] Linked duplicate report ${slave.id}: "${slaveTitle}" to this incident.`
-                });
-                setSlaveTitle(''); setSlaveReporter(''); setSlaveSummary('');
-              }} style={{ display: 'flex', flexDirection: 'column', gap: 10, background: 'var(--bg-inset)', border: '1px solid var(--border-color)', padding: 16, borderRadius: 'var(--radius-md)' }}>
+            <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>Mark This Incident as Duplicate</h3>
+            {incident.isDuplicate ? (
+              <div style={{ background: 'var(--color-info-bg)', border: '1px solid var(--color-info-border)', borderRadius: 'var(--radius-md)', padding: 14 }}>
+                <p style={{ fontSize: 12, color: 'var(--color-info)', margin: 0, fontWeight: 600 }}>Already linked as duplicate</p>
+                <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '6px 0 0' }}>
+                  This incident is a duplicate of{' '}
+                  <Link href={`/incidents/${incident.masterIncidentId}`} style={{ color: 'var(--color-info)', fontWeight: 700, textDecoration: 'underline', fontFamily: 'monospace' }}>
+                    {incident.masterIncidentId}
+                  </Link>.
+                </p>
+              </div>
+            ) : isCtrl && !isClosed ? (
+              <form onSubmit={handleMarkAsDuplicate} style={{ display: 'flex', flexDirection: 'column', gap: 10, background: 'var(--bg-inset)', border: '1px solid var(--border-color)', padding: 16, borderRadius: 'var(--radius-md)' }}>
+                <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0 }}>
+                  If this incident is a duplicate of an earlier report, enter the <strong>original</strong> Incident ID below. <strong>This record will be closed</strong> and linked to the master.
+                </p>
                 <div className="form-group">
-                  <label style={{ fontSize: 12 }}>Report Title *</label>
-                  <input className="form-control" required placeholder="e.g. Guest reported oil spill" value={slaveTitle} onChange={e => setSlaveTitle(e.target.value)} />
+                  <label style={{ fontSize: 12 }}>Original (Master) Incident ID *</label>
+                  <input
+                    className="form-control"
+                    required
+                    placeholder="e.g. SEN/IR/20260617/0001"
+                    value={linkDupId}
+                    onChange={e => { setLinkDupId(e.target.value); setLinkDupError(''); }}
+                    style={{ fontFamily: 'monospace', fontSize: 12 }}
+                  />
                 </div>
-                <div className="form-group">
-                  <label style={{ fontSize: 12 }}>Reporter Details</label>
-                  <input className="form-control" placeholder="e.g. John Doe, Ranger team B" value={slaveReporter} onChange={e => setSlaveReporter(e.target.value)} />
-                </div>
-                <div className="form-group">
-                  <label style={{ fontSize: 12 }}>Summary Remarks</label>
-                  <textarea className="form-control" rows={3} placeholder="Provide summary remarks..." value={slaveSummary} onChange={e => setSlaveSummary(e.target.value)} />
-                </div>
-                <button type="submit" className="btn btn-primary btn-sm">Link Duplicate</button>
+                {linkDupError && <p style={{ fontSize: 11, color: 'var(--color-critical)', margin: 0 }}>{linkDupError}</p>}
+                <button type="submit" className="btn btn-danger btn-sm" disabled={saving || !linkDupId.trim()}>
+                  {saving ? 'Linking…' : 'Close & Link as Duplicate'}
+                </button>
               </form>
+            ) : isClosed && !incident.isDuplicate ? (
+              <p style={{ fontSize: 12, color: 'var(--text-faint)', fontStyle: 'italic', margin: 0 }}>Incident is Closed.</p>
             ) : (
-              <p style={{ fontSize: 12, color: 'var(--text-faint)', fontStyle: 'italic', margin: 0 }}>Incident is Closed. Duplicates cannot be linked.</p>
+              <p style={{ fontSize: 12, color: 'var(--text-faint)', fontStyle: 'italic', margin: 0 }}>Only Controllers can link duplicate incidents.</p>
             )}
           </div>
 
           {/* Linked List */}
           <div>
-            <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>Linked Duplicate Reports</h3>
+            <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>Linked Duplicate Incidents ({incident.slaveIncidents?.length || 0})</h3>
             {!incident.slaveIncidents?.length ? (
-              <p style={{ fontSize: 11, color: 'var(--text-faint)', fontStyle: 'italic', margin: 0 }}>No duplicate reports linked.</p>
+              <p style={{ fontSize: 11, color: 'var(--text-faint)', fontStyle: 'italic', margin: 0 }}>No duplicate incidents linked.</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {incident.slaveIncidents.map((s: any, i: number) => (
                   <div key={i} className="inset-panel" style={{ padding: 12, background: 'var(--bg-inset)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', margin: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                      <span style={{ fontWeight: 700, color: 'var(--color-info)' }}>{s.id}</span>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <Link href={`/incidents/${s.id}`} style={{ fontWeight: 700, color: 'var(--color-info)', fontFamily: 'monospace', fontSize: 12, textDecoration: 'underline' }}>
+                          {s.id}
+                        </Link>
+                        {s.caseId && (
+                          <Link href={`/cases/${s.caseId}`} style={{ fontSize: 11, color: 'var(--text-muted)', textDecoration: 'underline' }}>
+                            {s.caseId}
+                          </Link>
+                        )}
+                      </div>
                       <span className={s.status === 'Closed' ? 'badge badge-closed' : 'badge badge-live'} style={{ scale: '0.9', transformOrigin: 'right center' }}>{s.status}</span>
                     </div>
                     <div style={{ fontWeight: 600, fontSize: 13 }}>{s.title}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>Reporter: {s.reporterName}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                      Reporter: {s.reporterName}
+                      {s.dateTime && <span style={{ marginLeft: 10 }}>{new Date(s.dateTime).toLocaleString('en-SG', { dateStyle: 'short', timeStyle: 'short' })}</span>}
+                    </div>
                     {s.summary && <div style={{ fontSize: 12, color: 'var(--text-sub)', marginTop: 6, fontStyle: 'italic', borderTop: '1px dashed var(--border-color)', paddingTop: 6 }}>{s.summary}</div>}
                   </div>
                 ))}

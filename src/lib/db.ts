@@ -114,6 +114,7 @@ export interface Attachment {
 
 export interface SlaveIncident {
   id: string; // SEN/IR/YYYYMMDD/NNNN
+  caseId?: string; // SEN/CI/YYYYMMDD/NNN
   title: string;
   dateTime: string;
   reporterName: string;
@@ -141,7 +142,7 @@ export interface Incident {
   requestedBy: string;
   createdBy: string;
   category: string; // "Standard Incident" | "Proactive Incident" | "Backdated Incident" | "Ongoing Incident" | "Operational Record"
-  status: string; // "Live" | "Live (Assigned)" | "Live (Acknowledged)" | "Live (On-Site)" | "Live (Incomplete)" | "Live (Completed)" | "Pending Endorsement" | "Returned" | "Closed"
+  status: string; // "Live" | "Live (Assigned)" | "Live (Acknowledged)" | "Live (On-Site)" | "Live (Completed)" | "Live (Incomplete)" | "Pending Endorsement" | "Returned" | "Closed"
   assignedTo: string[]; // Array of responder display names, e.g. ["Ranger John", "Ranger Dave"]
   responders?: IncidentResponder[]; // Rich metadata per assignment (assignedBy, assignedAt, status)
   location: Location;
@@ -157,6 +158,7 @@ export interface Incident {
   summary: string;
   completionRemarks: string;
   slaveIncidents: SlaveIncident[];
+  isFalseAlarm?: boolean;
   isDuplicate?: boolean;
   masterIncidentId?: string;
   version?: number;
@@ -230,8 +232,7 @@ export interface Task {
 }
 
 export interface Occurrence {
-  id: string; // OCC-YYYY-NNNN or SEN/ED/YYYYMMDD/NNN
-  caseId: string; // Linkage to Case
+  id: string; // SEN/ED/YYYYMMDD/NNN
   user: string;
   dateTime: string;
   topic: string;
@@ -366,10 +367,7 @@ function hydrateDb(normalizedDb: NormalizedDbSchema): DbSchema {
     else if (mappedStatus === 'Live On-Site') mappedStatus = 'Live (On-Site)';
     else if (mappedStatus === 'Live Completed') mappedStatus = 'Live (Completed)';
     else if (mappedStatus === 'Pending Review') mappedStatus = 'Pending Endorsement';
-
-    if (mappedStatus === 'Live' && derivedAssignedTo.length > 0) {
-      mappedStatus = 'Live (Assigned)';
-    }
+    else if (mappedStatus === 'Live (Returned to Responder)') mappedStatus = 'Live (Incomplete)';
 
     return {
       ...inc,

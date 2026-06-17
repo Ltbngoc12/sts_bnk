@@ -95,9 +95,9 @@ export default function IncidentsPage() {
   const matchesTab = (tab: string, inc: Incident) => {
     if (tab === 'All') return true;
     const status = inc.status;
-    
+
     if (tab === 'Active') {
-      return ['Live', 'Live (Assigned)', 'Live (Acknowledged)', 'Live (On-Site)', 'Live (Incomplete)', 'Live (Completed)'].includes(status);
+      return ['Live', 'Live (Assigned)', 'Live (Acknowledged)', 'Live (On-Site)', 'Live (Completed)', 'Live (Incomplete)'].includes(status);
     }
     if (tab === 'Pending Endorsement') {
       return status === 'Pending Endorsement';
@@ -134,10 +134,10 @@ export default function IncidentsPage() {
   });
 
   const totalIncidentsCount = dateFilteredIncidents.length;
-  const activeIncidentsCount = dateFilteredIncidents.filter(inc => 
-    ['Live', 'Live (Assigned)', 'Live (Acknowledged)', 'Live (On-Site)', 'Live (Incomplete)', 'Live (Completed)'].includes(inc.status)
+  const activeIncidentsCount = dateFilteredIncidents.filter(inc =>
+    ['Live', 'Live (Assigned)', 'Live (Acknowledged)', 'Live (On-Site)', 'Live (Completed)', 'Live (Incomplete)'].includes(inc.status)
   ).length;
-  const pendingEndorsementCount = dateFilteredIncidents.filter(inc => inc.status === 'Pending Endorsement').length;
+  const pendingReviewCount = dateFilteredIncidents.filter(inc => inc.status === 'Pending Endorsement').length;
 
 
   // Apply all filter rules to line items
@@ -173,11 +173,12 @@ export default function IncidentsPage() {
   const getStatusBadgeClass = (status: string) => {
     switch (status) {
       case 'Live':
-      case 'Live (Incomplete)':
       case 'Returned':
         return 'badge-live';
       case 'Live (Assigned)':
+        return 'badge-assigned';
       case 'Live (Acknowledged)':
+      case 'Live (Incomplete)':
         return 'badge-ack';
       case 'Live (On-Site)':
         return 'badge-onsite';
@@ -443,7 +444,7 @@ export default function IncidentsPage() {
         <div className="metric-card glass pending-endorsement">
           <div className="metric-info">
             <h3>Pending Endorsement</h3>
-            <div className="metric-value text-warning">{pendingEndorsementCount}</div>
+            <div className="metric-value text-warning">{pendingReviewCount}</div>
           </div>
           <div className="metric-icon" style={{ fontSize: '20px' }}>📝</div>
         </div>
@@ -498,8 +499,8 @@ export default function IncidentsPage() {
               <option value="Live (Assigned)">Live (Assigned)</option>
               <option value="Live (Acknowledged)">Live (Acknowledged)</option>
               <option value="Live (On-Site)">Live (On-Site)</option>
-              <option value="Live (Incomplete)">Live (Incomplete)</option>
               <option value="Live (Completed)">Live (Completed)</option>
+              <option value="Live (Incomplete)">Live (Incomplete)</option>
               <option value="Pending Endorsement">Pending Endorsement</option>
               <option value="Returned">Returned</option>
               <option value="Closed">Closed</option>
