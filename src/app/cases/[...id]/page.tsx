@@ -3,9 +3,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Case, Task, PersonalInjury, PersonInvolved } from '@/lib/db';
+import { Case, Task, Fault } from '@/lib/db';
 import { useRole } from '@/context/RoleContext';
-import { getIncidentTaxonomy } from '@/lib/taxonomy';
+import { getIncidentTaxonomy, getFaultTaxonomy } from '@/lib/taxonomy';
 
 // ─── Helper: case status → badge class ───────────────────────────────────────
 function caseBadgeClass(status: string) {
@@ -87,13 +87,23 @@ export default function CaseDetailsPage() {
   // Task manage
   const [newAssignee, setNewAssignee] = useState('');
 
-  // CMMS
-  const [cmmsLoading, setCmmsLoading] = useState(false);
+  // Faults
+  const [caseFaults, setCaseFaults] = useState<Fault[]>([]);
+  const [showFaultModal, setShowFaultModal] = useState(false);
+  const [faultFormType, setFaultFormType] = useState('');
+  const [faultFormSubType, setFaultFormSubType] = useState('');
+  const [faultFormLocation, setFaultFormLocation] = useState('');
+  const [faultFormDesc, setFaultFormDesc] = useState('');
+  const [faultSubmitting, setFaultSubmitting] = useState(false);
+  const [faultSubmitResult, setFaultSubmitResult] = useState<{ faultId?: string } | null>(null);
+  const [faultTaxonomy, setFaultTaxonomy] = useState<Record<string, string[]>>({});
+  const [cmmsStatusMap, setCmmsStatusMap] = useState<Record<string, string>>({});
 
   const [taxonomy, setTaxonomy] = useState<Record<string, string[]>>({});
 
   useEffect(() => {
     setTaxonomy(getIncidentTaxonomy());
+    setFaultTaxonomy(getFaultTaxonomy());
   }, []);
 
   useEffect(() => {
@@ -103,10 +113,11 @@ export default function CaseDetailsPage() {
   // ─── Data fetching ──────────────────────────────────────────────────────────
   const refresh = useCallback(async () => {
     try {
-      const [caseRes, taskRes, ediaryRes] = await Promise.all([
+      const [caseRes, taskRes, ediaryRes, faultsRes] = await Promise.all([
         fetch(`/api/cases/${caseId}`),
         fetch('/api/tasks'),
         fetch('/api/occurrences'),
+        fetch(`/api/faults?caseId=${encodeURIComponent(caseId)}`),
       ]);
       if (caseRes.ok) {
         const c: Case = await caseRes.json();
@@ -120,6 +131,10 @@ export default function CaseDetailsPage() {
       if (ediaryRes.ok) {
         const all: any[] = await ediaryRes.json();
         setEdiaryLogs(all.filter(o => o.caseId === caseId));
+      }
+      if (faultsRes.ok) {
+        const data = await faultsRes.json();
+        setCaseFaults(data.faults || []);
       }
     } catch (e) {
       console.error(e);
@@ -176,25 +191,54 @@ export default function CaseDetailsPage() {
     }
   };
 
-  const handleCMMS = async () => {
-    if (!caseData || cmmsLoading) return;
-    setCmmsLoading(true);
+  const handleRaiseFault = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!faultFormType || !faultFormSubType || !faultFormDesc.trim() || faultSubmitting) return;
+    setFaultSubmitting(true);
+    setFaultSubmitResult(null);
     try {
-      const res = await fetch('/api/cmms-mock', {
+      const res = await fetch('/api/faults', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          location: caseData.incident?.location.commonName || 'Sentosa Ground',
-          description: caseData.incident?.summary || caseData.title,
+          faultType: faultFormType,
+          faultSubType: faultFormSubType,
+          location: {
+            commonName: faultFormLocation || caseData?.incident?.location?.commonName || 'Sentosa Island',
+          },
+          description: faultFormDesc,
+          caseId,
+          linkedIncidentId: caseData?.incident?.id || undefined,
+          username,
         }),
       });
       if (res.ok) {
         const data = await res.json();
-        await caseUpdate({ cmmsTicketId: data.ticketId });
+        setFaultSubmitResult({ faultId: data.fault?.id });
+        setTimeout(() => {
+          setShowFaultModal(false);
+          setFaultSubmitResult(null);
+          setFaultFormType(''); setFaultFormSubType(''); setFaultFormLocation(''); setFaultFormDesc('');
+          refresh();
+        }, 2500);
+      } else {
+        const err = await res.json();
+        alert(`Failed to raise fault: ${err.error}`);
       }
-    } catch (e) { console.error(e); }
-    finally { setCmmsLoading(false); }
+    } catch (err) { console.error(err); }
+    finally { setFaultSubmitting(false); }
   };
+
+  async function fetchCmmsStatus(ticketId: string) {
+    if (cmmsStatusMap[ticketId] || !ticketId) return;
+    try {
+      const res = await fetch(`/api/cmms-mock?ticketId=${encodeURIComponent(ticketId)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setCmmsStatusMap(prev => ({ ...prev, [ticketId]: data.status }));
+      }
+    } catch (_) { /* silent */ }
+  }
 
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -454,19 +498,35 @@ export default function CaseDetailsPage() {
             <div className="glass comp-card">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 style={{ color: 'var(--color-high)' }}>🛠 IFM MAINTENANCE FAULTS</h3>
-                <span className="count-badge">{caseData.cmmsTickets?.length ?? 0}</span>
+                <span className="count-badge">{caseFaults.length}</span>
               </div>
 
               <div className="comp-card-body" style={{ maxHeight: '130px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {(caseData.cmmsTickets?.length ?? 0) === 0 ? (
+                {caseFaults.length === 0 ? (
                   <div className="empty-comp-state" style={{ padding: '24px 0', minHeight: '100px' }}>
-                    <p style={{ fontSize: '12px', color: 'var(--text-faint)' }}>No active infrastructure faults logged with contractor CMMS.</p>
+                    <p style={{ fontSize: '12px', color: 'var(--text-faint)' }}>No infrastructure faults logged for this case.</p>
                   </div>
                 ) : (
-                  caseData.cmmsTickets.map((t, i) => (
-                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', background: 'var(--color-info-bg)', border: '1px solid var(--color-info-border)', borderRadius: 5 }}>
-                      <code style={{ fontFamily: 'var(--font-mono)', fontSize: '11.5px', fontWeight: 600, color: 'var(--color-info)' }}>{t}</code>
-                      <span className="badge badge-info" style={{ fontSize: '9px', padding: '1px 5px' }}>Active in CMMS</span>
+                  caseFaults.map(f => (
+                    <div key={f.id} style={{ padding: '6px 10px', background: 'var(--bg-inset)', border: '1px solid var(--border-color)', borderRadius: 5 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                        <Link href={`/faults/${f.id}`} style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, color: 'var(--color-primary)', textDecoration: 'none' }}>{f.id}</Link>
+                        <span className={`badge ${f.status === 'Closed' ? 'badge-closed' : f.status === 'Pending Submission' ? 'badge-ack' : 'badge-live'}`} style={{ fontSize: '9px', padding: '1px 5px' }}>
+                          {f.status}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{f.faultType} — {f.faultSubType}</div>
+                      {f.cmmsTicketId && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                          <code style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--color-info)' }}>{f.cmmsTicketId}</code>
+                          <button
+                            style={{ fontSize: 9, color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                            onClick={() => fetchCmmsStatus(f.cmmsTicketId!)}
+                          >
+                            {cmmsStatusMap[f.cmmsTicketId] ? `CMMS: ${cmmsStatusMap[f.cmmsTicketId]}` : '↻ Check CMMS'}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))
                 )}
@@ -475,8 +535,8 @@ export default function CaseDetailsPage() {
               <div className="action-row" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '10px', marginTop: 0, justifyContent: 'space-between' }}>
                 {!isClosed ? (
                   <>
-                    <button className="btn btn-secondary btn-sm" onClick={handleCMMS} disabled={cmmsLoading}>
-                      {cmmsLoading ? 'Raising...' : '+ Raise CMMS Ticket'}
+                    <button className="btn btn-secondary btn-sm" onClick={() => { setShowFaultModal(true); setFaultSubmitResult(null); }}>
+                      + Log Infrastructure Fault
                     </button>
                     <Link href="/faults" className="view-all-link">Go to Fault Log →</Link>
                   </>
@@ -743,6 +803,89 @@ export default function CaseDetailsPage() {
             <div className="modal-actions">
               <button className="btn btn-secondary" onClick={() => setSelectedTask(null)}>Close</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Log Infrastructure Fault Modal */}
+      {showFaultModal && (
+        <div className="modal-overlay">
+          <div className="modal-box" style={{ maxWidth: 520 }}>
+            {faultSubmitResult ? (
+              <>
+                <div className="modal-title">✓ Fault Saved as Draft</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '4px 0 16px' }}>
+                  {faultSubmitResult.faultId && (
+                    <div style={{ fontSize: 13 }}>Fault ID: <code style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-primary)' }}>{faultSubmitResult.faultId}</code></div>
+                  )}
+                  <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>Status: Created. Use <strong>Submit to CMMS</strong> in the fault list or fault detail page to send to IFM.</div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="modal-title">Log Infrastructure Fault — {caseId}</div>
+                <form onSubmit={handleRaiseFault}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <div className="form-group">
+                      <label>Fault Type *</label>
+                      <select
+                        className="form-control select-dark"
+                        required
+                        value={faultFormType}
+                        onChange={e => { setFaultFormType(e.target.value); setFaultFormSubType(''); }}
+                      >
+                        <option value="">-- Select Type --</option>
+                        {Object.keys(faultTaxonomy).sort().map(t => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label>Fault Sub-type *</label>
+                      <select
+                        className="form-control select-dark"
+                        required
+                        value={faultFormSubType}
+                        onChange={e => setFaultFormSubType(e.target.value)}
+                        disabled={!faultFormType}
+                      >
+                        <option value="">-- Select Sub-type --</option>
+                        {faultFormType && faultTaxonomy[faultFormType]?.map(st => (
+                          <option key={st} value={st}>{st}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="form-group" style={{ marginTop: 10 }}>
+                    <label>Location (Common Name)</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder={caseData?.incident?.location?.commonName || 'e.g. Siloso Beach Station Carpark Entrance'}
+                      value={faultFormLocation}
+                      onChange={e => setFaultFormLocation(e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group" style={{ marginTop: 10 }}>
+                    <label>Fault Description *</label>
+                    <textarea
+                      className="form-control"
+                      rows={3}
+                      required
+                      placeholder="Describe the defect and its impact..."
+                      value={faultFormDesc}
+                      onChange={e => setFaultFormDesc(e.target.value)}
+                    />
+                  </div>
+                  <div className="modal-actions">
+                    <button type="button" className="btn btn-secondary" onClick={() => { setShowFaultModal(false); setFaultFormType(''); setFaultFormSubType(''); setFaultFormLocation(''); setFaultFormDesc(''); }}>Cancel</button>
+                    <button type="submit" className="btn btn-primary" disabled={faultSubmitting || !faultFormType || !faultFormSubType}>
+                      {faultSubmitting ? 'Saving...' : 'Save Fault'}
+                    </button>
+                  </div>
+                </form>
+              </>
+            )}
           </div>
         </div>
       )}

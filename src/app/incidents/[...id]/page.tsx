@@ -14,7 +14,7 @@ import {
   Occurrence 
 } from '@/lib/db';
 import { useRole } from '@/context/RoleContext';
-import { getIncidentTaxonomy } from '@/lib/taxonomy';
+import { getIncidentTaxonomy, getFaultTaxonomy } from '@/lib/taxonomy';
 import MultiResponderSelect from '@/components/MultiResponderSelect';
 
 interface HydratedIncident extends Incident {
@@ -83,11 +83,10 @@ export default function IncidentDetailsPage() {
 
   // Linked Fault Form States
   const [showRaiseFaultForm, setShowRaiseFaultForm] = useState(false);
-  const [faultTitle, setFaultTitle] = useState('');
-  const [faultType, setFaultType] = useState('Facilities');
-  const [faultSubType, setFaultSubType] = useState('Others');
-  const [faultSeverity, setFaultSeverity] = useState('Medium');
+  const [faultType, setFaultType] = useState('');
+  const [faultSubType, setFaultSubType] = useState('');
   const [faultDescription, setFaultDescription] = useState('');
+  const [faultTaxonomy, setFaultTaxonomy] = useState<Record<string, string[]>>({});
 
   // Persons / Injuries Forms
   const [injName, setInjName] = useState('');
@@ -178,6 +177,7 @@ export default function IncidentDetailsPage() {
   
   useEffect(() => {
     setTaxonomy(getIncidentTaxonomy());
+    setFaultTaxonomy(getFaultTaxonomy());
   }, []);
 
   const startEditingCore = () => {
@@ -318,18 +318,36 @@ export default function IncidentDetailsPage() {
 
   const handleRaiseFault = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!faultTitle.trim()) return;
-    const ok = await performAction('raise-fault', {
-      title: faultTitle,
-      faultType,
-      faultSubType,
-      severity: faultSeverity,
-      description: faultDescription
-    });
-    if (ok) {
-      setShowRaiseFaultForm(false);
-      setFaultTitle('');
-      setFaultDescription('');
+    if (!faultType || !faultSubType || !faultDescription.trim()) return;
+    setSaving(true);
+    try {
+      const res = await fetch('/api/faults', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          faultType,
+          faultSubType,
+          description: faultDescription,
+          location: incident?.location,
+          caseId: parentCase?.id,
+          linkedIncidentId: incident?.id,
+          username,
+        }),
+      });
+      if (res.ok) {
+        setShowRaiseFaultForm(false);
+        setFaultType('');
+        setFaultSubType('');
+        setFaultDescription('');
+        await fetchIncidentData();
+      } else {
+        const err = await res.json();
+        alert(`Failed to raise fault: ${err.error}`);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -2847,52 +2865,59 @@ export default function IncidentDetailsPage() {
 
         {showRaiseFaultForm && (
           <form onSubmit={handleRaiseFault} className="glass" style={{ padding: 16, marginBottom: 20, display: 'flex', flexDirection: 'column', gap: 12, background: 'var(--bg-inset)', border: '1px dashed var(--border-color)' }}>
-            <h3 style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>Raise Linked Fault</h3>
-            <div className="form-group">
-              <label style={{ fontSize: 12 }}>Fault Title *</label>
-              <input
-                className="form-control"
-                required
-                value={faultTitle}
-                onChange={e => setFaultTitle(e.target.value)}
-                placeholder="e.g. Broken water pipe near main entrance"
-              />
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+            <h3 style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>Raise Linked Infrastructure Fault</h3>
+            <p style={{ fontSize: 11, color: 'var(--text-faint)', margin: 0 }}>
+              Location pre-filled from incident. Fault saved as draft (Created) — submit to IFM CMMS from the fault list or fault detail page.
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div className="form-group">
-                <label style={{ fontSize: 12 }}>Type</label>
-                <select className="form-control select-dark" value={faultType} onChange={e => setFaultType(e.target.value)}>
-                  <option value="Facilities">Facilities</option>
-                  <option value="Mechanical & Electrical">Mechanical & Electrical</option>
-                  <option value="Horticulture">Horticulture</option>
-                  <option value="IT & Telecom">IT & Telecom</option>
-                  <option value="Others">Others</option>
+                <label style={{ fontSize: 12 }}>Fault Type *</label>
+                <select
+                  className="form-control select-dark"
+                  required
+                  value={faultType}
+                  onChange={e => { setFaultType(e.target.value); setFaultSubType(''); }}
+                >
+                  <option value="">-- Select Type --</option>
+                  {Object.keys(faultTaxonomy).sort().map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
                 </select>
               </div>
               <div className="form-group">
-                <label style={{ fontSize: 12 }}>Sub-Type</label>
-                <input className="form-control" value={faultSubType} onChange={e => setFaultSubType(e.target.value)} placeholder="Others" />
-              </div>
-              <div className="form-group">
-                <label style={{ fontSize: 12 }}>Severity</label>
-                <select className="form-control select-dark" value={faultSeverity} onChange={e => setFaultSeverity(e.target.value)}>
-                  <option value="Low">Low</option>
-                  <option value="Medium">Medium</option>
-                  <option value="High">High</option>
+                <label style={{ fontSize: 12 }}>Fault Sub-type *</label>
+                <select
+                  className="form-control select-dark"
+                  required
+                  value={faultSubType}
+                  onChange={e => setFaultSubType(e.target.value)}
+                  disabled={!faultType}
+                >
+                  <option value="">-- Select Sub-type --</option>
+                  {faultType && faultTaxonomy[faultType]?.map(st => (
+                    <option key={st} value={st}>{st}</option>
+                  ))}
                 </select>
               </div>
             </div>
             <div className="form-group">
-              <label style={{ fontSize: 12 }}>Description</label>
+              <label style={{ fontSize: 12 }}>Fault Description *</label>
               <textarea
                 className="form-control"
                 rows={3}
+                required
                 value={faultDescription}
                 onChange={e => setFaultDescription(e.target.value)}
-                placeholder="Provide details of the fault..."
+                placeholder="Describe the defect, its impact and location specifics..."
               />
             </div>
-            <button type="submit" className="btn btn-success btn-sm" disabled={saving}>Create & Link Fault</button>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', padding: '6px 10px', background: 'var(--bg-surface)', borderRadius: 4, border: '1px solid var(--border-color)' }}>
+              📍 Location: {incident?.location?.commonName || incident?.location?.road || 'From Incident'} &nbsp;|&nbsp;
+              🔗 Linked to: {incident?.id}
+            </div>
+            <button type="submit" className="btn btn-success btn-sm" disabled={saving || !faultType || !faultSubType}>
+              {saving ? 'Saving...' : 'Save Fault Draft'}
+            </button>
           </form>
         )}
 
@@ -2919,7 +2944,7 @@ export default function IncidentDetailsPage() {
                 incident.relatedFaults.map(f => (
                   <tr key={f.id}>
                     <td>
-                      <Link href={`/cases/${f.caseId}`} style={{ color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>
+                      <Link href={`/faults/${f.id}`} style={{ color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
                         {f.id}
                       </Link>
                     </td>
@@ -2927,7 +2952,11 @@ export default function IncidentDetailsPage() {
                     <td style={{ maxWidth: '300px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.description}</td>
                     <td style={{ fontFamily: 'var(--font-mono)' }}>{f.cmmsTicketId || '—'}</td>
                     <td>
-                      <span className={`badge ${f.status === 'Resolved' ? 'badge-closed' : 'badge-live'}`}>
+                      <span className={`badge ${
+                        f.status === 'Closed' ? 'badge-closed' :
+                        f.status === 'Pending Submission' ? 'badge-ack' :
+                        'badge-live'
+                      }`}>
                         {f.status}
                       </span>
                     </td>

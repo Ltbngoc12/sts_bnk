@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getDb, saveDb, generateCaseId } from '@/lib/db';
+import { getDb, saveDb, generateCaseId, generateFaultId } from '@/lib/db';
 import { tryAutoCloseCase } from '@/lib/autoclose';
 
 // Helper: build a timestamped log entry
@@ -11,32 +11,6 @@ function makeLogEntry(db_incident: any, description: string) {
     time: now.toLocaleTimeString('en-US', { hour12: false }),
     description,
   };
-}
-
-function generateFaultId(db: any): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  const prefix = `SEN/FR/${year}${month}${day}/`;
-  
-  const todayFaults = (db.faults || []).filter((f: any) => f.id.startsWith(prefix));
-  
-  let nextSeq = 1;
-  if (todayFaults.length > 0) {
-    const sequences = todayFaults.map((f: any) => {
-      const parts = f.id.split('/');
-      const seqStr = parts[parts.length - 1];
-      return parseInt(seqStr, 10);
-    }).filter((num: any) => !isNaN(num));
-    
-    if (sequences.length > 0) {
-      nextSeq = Math.max(...sequences) + 1;
-    }
-  }
-  
-  const seqStr = String(nextSeq).padStart(3, '0');
-  return `${prefix}${seqStr}`;
 }
 
 /**
@@ -566,33 +540,36 @@ export async function POST(
         break;
       }
 
-      // ── Raise Linked Fault (FRD 5.9) ──────────────────────────
+      // ── Raise Linked Fault (FRD §6.1 — from active Incident) ─────────────
       case 'raise-fault': {
-        const title = body.title;
-        const faultType = body.faultType || 'Facilities';
-        const faultSubType = body.faultSubType || 'Others';
-        const description = body.description || title;
+        const faultType = body.faultType;
+        const faultSubType = body.faultSubType;
+        const description = body.description;
 
-        if (!title) return NextResponse.json({ error: 'title is required' }, { status: 400 });
+        if (!faultType || !faultSubType || !description) {
+          return NextResponse.json({ error: 'faultType, faultSubType, and description are required' }, { status: 400 });
+        }
 
-        const newCaseId = generateCaseId(db);
+        const faultNow = new Date().toISOString();
         const newFaultId = generateFaultId(db);
-        const cmmsTicketId = `CMMS-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(10000 + Math.random() * 90000)}`;
 
-        db.cases.push({
-          id: newCaseId, title: `Fault: ${title}`, status: 'Active',
-          createdAt: new Date().toISOString(), createdBy: actor,
-          closedAt: null, closedBy: null, cmmsTickets: [cmmsTicketId], incident: null
-        });
         if (!db.faults) db.faults = [];
         db.faults.push({
-          id: newFaultId, caseId: newCaseId, faultType, faultSubType,
-          location: { ...incident.location }, description, attachments: [],
-          status: 'Created', cmmsTicketId, createdBy: actor,
-          createdAt: new Date().toISOString(), linkedIncidentId: incident.id
+          id: newFaultId,
+          caseId,
+          faultType,
+          faultSubType,
+          location: { ...incident.location },
+          description,
+          attachments: [],
+          status: 'Pending Submission',
+          createdBy: actor,
+          createdAt: faultNow,
+          submittedAt: faultNow,
+          linkedIncidentId: incident.id,
         });
-        incident.log.push(makeLogEntry(incident, `Linked Fault ${newFaultId} raised by Controller ${actor}. CMMS Ticket: ${cmmsTicketId}.`));
-        tryAutoCloseCase(db, newCaseId);
+
+        incident.log.push(makeLogEntry(incident, `Fault ${newFaultId} (${faultType} — ${faultSubType}) raised and submitted to IFM CMMS by ${actor}.`));
         break;
       }
 

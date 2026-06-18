@@ -627,6 +627,7 @@ textarea.form-control { resize: vertical; min-height: 72px; line-height: 1.5; }
   animation: spin 0.7s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+@keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-6px); } }
 
 /* ─── Live dot ───────────────────────────────────────────────────── */
 .live-dot {

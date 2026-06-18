@@ -33,6 +33,30 @@ export const DEFAULT_REFERENCE_DATA: TaxonomyItem[] = [
   { id: 'ed-4', category: 'eDiary', name: 'VIP Visit', description: 'Security detail coordination for state visitors', status: 'Active' }
 ];
 
+export function getFaultTaxonomy(): Record<string, string[]> {
+  if (typeof window === 'undefined') {
+    const mapping: Record<string, string[]> = {};
+    DEFAULT_REFERENCE_DATA
+      .filter(item => item.category === 'Fault' && item.status === 'Active')
+      .forEach(item => {
+        mapping[item.name] = item.subTypes || [];
+      });
+    return mapping;
+  }
+
+  const stored = localStorage.getItem('admin_reference_data');
+  const items: TaxonomyItem[] = stored ? JSON.parse(stored) : [];
+
+  const activeFaultItems = (items.length > 0 ? items : DEFAULT_REFERENCE_DATA)
+    .filter(item => item.category === 'Fault' && item.status === 'Active');
+
+  const mapping: Record<string, string[]> = {};
+  activeFaultItems.forEach(item => {
+    mapping[item.name] = item.subTypes || [];
+  });
+  return mapping;
+}
+
 export function getIncidentTaxonomy(): Record<string, string[]> {
   if (typeof window === 'undefined') {
     // Return default mapping if server-side rendered
