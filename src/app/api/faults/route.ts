@@ -38,7 +38,6 @@ export async function GET(request: NextRequest) {
       faults,
       stats: {
         total: faults.length,
-        created: faults.filter(f => f.status === 'Created').length,
         pendingSubmission: faults.filter(f => f.status === 'Pending Submission').length,
         closed: faults.filter(f => f.status === 'Closed').length,
       },
@@ -85,7 +84,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Step 2 — create Fault record with status "Created" (draft)
+    // Step 2 — create Fault record
     const faultId = generateFaultId(db);
     const newFault: Fault = {
       id: faultId,
@@ -105,7 +104,7 @@ export async function POST(request: NextRequest) {
       },
       description,
       attachments: Array.isArray(attachments) ? attachments : [],
-      status: 'Created',
+      status: 'Pending Submission',
       createdBy: username || 'system',
       createdAt: now,
       linkedIncidentId: linkedIncidentId || undefined,

@@ -205,7 +205,7 @@ export async function POST(
     let queryId = id.join('/');
 
     const knownActions = [
-      'assign', 'acknowledge', 'on-site', 'complete', 'close', 'return',
+      'assign', 'acknowledge', 'on-site', 'complete', 'notify-complete', 'close', 'return',
       'return-to-responder', 'submit-review', 'submit-endorsement', 'log',
       'update-fields', 'reopen', 'mark-false-alarm', 'link-duplicate',
       'edit-log', 'delete-log', 'raise-fault'
@@ -312,15 +312,26 @@ export async function POST(
         break;
       }
 
-      // ── Responder completes ground activities ──────────────────
+      // ── Responder notifies Controller of completion (log only) ───
+      case 'notify-complete': {
+        if (!['Live (On-Site)', 'Live (Acknowledged)', 'Live', 'Live (Assigned)', 'Live (Incomplete)'].includes(incident.status)) {
+          return NextResponse.json({ error: `Cannot notify completion: current status is "${incident.status}"` }, { status: 409 });
+        }
+        incident.log.push(makeLogEntry(incident,
+          `${actor} has notified completion of ground activities and is awaiting Controller review.`
+        ));
+        break;
+      }
+
+      // ── Controller locks incident (all responders done) ────────
       case 'complete': {
         if (!['Live (On-Site)', 'Live (Acknowledged)', 'Live', 'Live (Assigned)', 'Live (Incomplete)'].includes(incident.status)) {
-          return NextResponse.json({ error: `Cannot complete: current status is "${incident.status}"` }, { status: 409 });
+          return NextResponse.json({ error: `Cannot lock incident: current status is "${incident.status}"` }, { status: 409 });
         }
         incident.status = 'Live (Completed)';
         incident.completedAt = new Date().toISOString();
         incident.log.push(makeLogEntry(incident,
-          `Responder ${Array.isArray(incident.assignedTo) && incident.assignedTo.length > 0 ? incident.assignedTo.join(', ') : actor} marked ground activities completed. Status changed to Live (Completed).`
+          `Incident locked by Controller ${actor}. All ground activities verified. Status changed to Live (Completed).`
         ));
         break;
       }
@@ -328,7 +339,7 @@ export async function POST(
       // ── Submit for Duty Manager review ─────────────────────────
       case 'submit-review':
       case 'submit-endorsement': {
-        if (!['Live', 'Returned', 'Live (Incomplete)'].includes(incident.status)) {
+        if (!['Live', 'Returned', 'Live (Incomplete)', 'Live (Completed)'].includes(incident.status)) {
           return NextResponse.json({ error: `Cannot submit for endorsement from current status "${incident.status}".` }, { status: 409 });
         }
         incident.status = 'Pending Endorsement';
@@ -400,9 +411,9 @@ export async function POST(
         break;
       }
 
-      // ── Duty Manager returns to Responder for further action ───
+      // ── Controller/DM returns to Responder for further action ──
       case 'return-to-responder': {
-        if (!['Live (Completed)', 'Pending Endorsement'].includes(incident.status)) {
+        if (!['Live (On-Site)', 'Live (Completed)', 'Pending Endorsement', 'Returned'].includes(incident.status)) {
           return NextResponse.json({ error: `Cannot return to responder: incident status is "${incident.status}"` }, { status: 409 });
         }
         incident.status = 'Live (Incomplete)';

@@ -180,7 +180,7 @@ export interface Fault {
   location: Location;
   description: string;
   attachments: string[];
-  status: string; // "Created" | "Pending Submission" | "Closed"
+  status: string; // "Pending Submission" | "Closed"
   cmmsTicketId?: string;
   createdBy: string;
   createdAt: string;

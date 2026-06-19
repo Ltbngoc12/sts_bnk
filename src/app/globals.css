@@ -491,6 +491,9 @@ h3 { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform
 .btn-danger    { background: var(--color-critical); border-color: var(--color-critical); }
 .btn-danger:hover:not(:disabled)    { background: #B91C1C; transform: translateY(-1px); }
 
+.btn-warning   { background: var(--color-high);     border-color: var(--color-high); color: #fff; }
+.btn-warning:hover:not(:disabled)   { background: #C2410C; transform: translateY(-1px); }
+
 .btn-secondary {
   background: var(--bg-card); border-color: var(--border-color);
   color: var(--text-main);

@@ -1450,7 +1450,7 @@ export default function IncidentDetailsPage() {
           {/* Ranger Actions */}
           {isRanger && !isClosed && (
             <>
-              {['Live', 'Live (Assigned)'].includes(incident.status) && (
+              {incident.status === 'Live (Assigned)' && (
                 <button className="btn btn-primary btn-sm" onClick={() => performAction('acknowledge')} disabled={saving}>
                   Acknowledge Dispatch
                 </button>
@@ -1460,8 +1460,16 @@ export default function IncidentDetailsPage() {
                   Arrive On-Site
                 </button>
               )}
-              {['Live (On-Site)', 'Live (Acknowledged)', 'Live', 'Live (Assigned)', 'Live (Incomplete)'].includes(incident.status) && (
-                <button className="btn btn-success btn-sm" onClick={() => setShowCompleteModal(true)} disabled={saving}>
+              {['Live (On-Site)', 'Live (Incomplete)'].includes(incident.status) && (
+                <button
+                  className="btn btn-success btn-sm"
+                  onClick={async () => {
+                    if (confirm('Notify Controller that your ground activities are complete?')) {
+                      await performAction('notify-complete');
+                    }
+                  }}
+                  disabled={saving}
+                >
                   Notify Completion
                 </button>
               )}
@@ -1480,14 +1488,43 @@ export default function IncidentDetailsPage() {
                   {incident.status === 'Live' ? 'Assign Responder' : 'Reassign Responder'}
                 </button>
               )}
-              {incident.status === 'Live' && (
-                <button className="btn btn-primary btn-sm" onClick={() => performAction('submit-review')} disabled={saving}>
+              {incident.status === 'Live (Acknowledged)' && (
+                <button className="btn btn-primary btn-sm" onClick={() => performAction('on-site')} disabled={saving}>
+                  Update to On-site
+                </button>
+              )}
+              {['Live (On-Site)', 'Live (Incomplete)'].includes(incident.status) && (
+                <button
+                  className="btn btn-warning btn-sm"
+                  onClick={async () => {
+                    const r = prompt('Reason for returning to responder:');
+                    if (r !== null) await performAction('return-to-responder', { returnRemarks: r });
+                  }}
+                  disabled={saving}
+                >
+                  Return to Responder
+                </button>
+              )}
+              {['Live (On-Site)', 'Live (Incomplete)'].includes(incident.status) && (
+                <button className="btn btn-success btn-sm" onClick={() => setShowCompleteModal(true)} disabled={saving}>
+                  Confirm Completion
+                </button>
+              )}
+              {['Live (Completed)', 'Returned'].includes(incident.status) && (
+                <button className="btn btn-primary btn-sm" onClick={() => performAction('submit-endorsement')} disabled={saving}>
                   Submit for Closure
                 </button>
               )}
-              {['Returned', 'Live (Incomplete)'].includes(incident.status) && (
-                <button className="btn btn-primary btn-sm" onClick={() => performAction('submit-review')} disabled={saving}>
-                  Resubmit
+              {incident.status === 'Returned' && (
+                <button
+                  className="btn btn-warning btn-sm"
+                  onClick={async () => {
+                    const r = prompt('Reason for returning to responder:');
+                    if (r !== null) await performAction('return-to-responder', { returnRemarks: r });
+                  }}
+                  disabled={saving}
+                >
+                  Return to Responder
                 </button>
               )}
               {incident.status === 'Live' && (
@@ -1506,8 +1543,8 @@ export default function IncidentDetailsPage() {
             </>
           )}
 
-          {/* Duty Manager/Admin Actions */}
-          {isMgr && ['Live (Completed)', 'Pending Endorsement'].includes(incident.status) && (
+          {/* Duty Manager Actions — Pending Endorsement */}
+          {isMgr && incident.status === 'Pending Endorsement' && (
             <>
               <button
                 className="btn btn-success btn-sm"
@@ -1519,18 +1556,6 @@ export default function IncidentDetailsPage() {
               >
                 Approve & Close
               </button>
-              {incident.status === 'Pending Endorsement' && (
-                <button
-                  className="btn btn-warning btn-sm"
-                  onClick={async () => {
-                    const r = prompt('Reason for returning to responder:');
-                    if (r !== null) await performAction('return-to-responder', { returnRemarks: r });
-                  }}
-                  disabled={saving}
-                >
-                  Return to Responder
-                </button>
-              )}
               <button
                 className="btn btn-danger btn-sm"
                 onClick={() => {
@@ -1542,6 +1567,20 @@ export default function IncidentDetailsPage() {
                 Return to Controller
               </button>
             </>
+          )}
+
+          {/* Duty Manager Actions — Returned */}
+          {isMgr && incident.status === 'Returned' && (
+            <button
+              className="btn btn-warning btn-sm"
+              onClick={async () => {
+                const r = prompt('Reason for returning to responder:');
+                if (r !== null) await performAction('return-to-responder', { returnRemarks: r });
+              }}
+              disabled={saving}
+            >
+              Return to Responder
+            </button>
           )}
 
           {/* Admin Reopen Action */}
@@ -3057,19 +3096,19 @@ export default function IncidentDetailsPage() {
     )}
       </div>
 
-      {/* Notify Completion Confirmation Modal */}
+      {/* Controller Confirm Completion Modal */}
       {showCompleteModal && (
         <div className="modal-overlay">
           <div className="modal-box glass">
-            <h2 className="modal-title">Confirm Ground Completion</h2>
+            <h2 className="modal-title">Confirm Completion</h2>
             <div className="form-group">
               <p style={{ fontSize: '13px', color: 'var(--text-sub)', margin: '8px 0' }}>
-                Are you sure you want to mark ground activities as completed? This will update the incident status to Live (Completed).
+                Confirm that all Responder inputs have been reviewed and the Incident record is complete. Status will change to <strong>Live (Completed)</strong>.
               </p>
             </div>
             <div className="modal-actions">
               <button className="btn btn-secondary btn-sm" onClick={() => setShowCompleteModal(false)}>Cancel</button>
-              <button className="btn btn-success btn-sm" onClick={handleComplete} disabled={saving}>Confirm Completion</button>
+              <button className="btn btn-success btn-sm" onClick={handleComplete} disabled={saving}>Confirm</button>
             </div>
           </div>
         </div>

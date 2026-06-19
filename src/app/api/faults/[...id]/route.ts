@@ -37,16 +37,15 @@ export async function PATCH(
     const fault = db.faults![idx];
     const now = new Date().toISOString();
 
-    // action: "submit" — FRD §6.5 two-step flow
+    // action: "submit" — FRD §6.5
     if (body.action === 'submit') {
-      if (fault.status !== 'Created') {
+      if (fault.status !== 'Pending Submission') {
         return NextResponse.json(
-          { error: `Cannot submit fault in status "${fault.status}" — only "Created" faults can be submitted` },
+          { error: `Cannot submit fault in status "${fault.status}" — only "Pending Submission" faults can be submitted` },
           { status: 400 }
         );
       }
 
-      fault.status = 'Pending Submission';
       fault.submittedAt = now;
 
       db.faults![idx] = fault;
