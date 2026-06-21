@@ -20,14 +20,33 @@ const NAV_GROUPS = [
   {
     label: 'Operations',
     items: [
-      { name: 'Dashboard',       path: '/',            d: 'M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z', d2: 'M9 22V12h6v10' },
+      { name: 'Dashboard',       path: '/',             d: 'M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z', d2: 'M9 22V12h6v10' },
       { name: 'Case Log',        path: '/cases',        d: 'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z' },
       { name: 'Incident Log',    path: '/incidents',    d: 'M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z', d2: 'M12 9v4M12 17h.01' },
       { name: 'Fault Log',       path: '/faults',       d: 'M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z' },
       { name: 'Task Board',      path: '/tasks',        d: 'M9 11l3 3L22 4', d2: 'M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11' },
       { name: 'e-Diary',         path: '/occurrences',  d: 'M4 19.5A2.5 2.5 0 0 1 6.5 17H20', d2: 'M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z' },
     ]
-  }
+  },
+  {
+    label: 'Planning',
+    items: [
+      { name: 'Events',          path: '/events',       d: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z' },
+      { name: 'NOP',             path: '/nops',         d: 'M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z' },
+    ]
+  },
+  {
+    label: 'Communications',
+    items: [
+      { name: 'Broadcasts',      path: '/broadcasts',   d: 'M15.05 5A5 5 0 0 1 19 8.95M15.05 1A9 9 0 0 1 23 8.94m-1 7.98v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.72 9.5a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.63 1h3.18a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 8.91a16 16 0 0 0 5.86 5.86l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 15.92z' },
+    ]
+  },
+  {
+    label: 'Analytics',
+    items: [
+      { name: 'Statistics',      path: '/statistics',   d: 'M18 20V10M12 20V4M6 20v-6' },
+    ]
+  },
 ];
 
 const ADMIN_ITEMS = [
@@ -465,34 +484,4 @@ export const Sidebar: React.FC = () => {
           display: flex; flex-direction: column; gap: 5px;
         }
 
-        .toggle-label {
-          display: flex; align-items: center; justify-content: space-between;
-          font-size: 11px; color: rgba(255,255,255,0.55); cursor: pointer;
-        }
-
-        .toggle-switch {
-          width: 32px; height: 18px; border-radius: 9px;
-          background: rgba(255,255,255,0.15); border: none;
-          cursor: pointer; position: relative;
-          transition: background 0.2s;
-          padding: 0; flex-shrink: 0;
-        }
-        .toggle-switch.on { background: #16A34A; }
-
-        .toggle-thumb {
-          position: absolute; top: 2px; left: 2px;
-          width: 14px; height: 14px; border-radius: 50%;
-          background: #fff;
-          transition: transform 0.2s;
-          display: block;
-        }
-        .toggle-switch.on .toggle-thumb { transform: translateX(14px); }
-
-        .elevation-badge {
-          font-size: 9.5px; font-weight: 700; letter-spacing: 0.06em;
-          color: #16A34A; text-transform: uppercase;
-        }
-      `}</style>
-    </div>
-  );
-};
+        .toggle-lab

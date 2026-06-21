@@ -24,13 +24,12 @@ const statusDetails: Record<string, StatusDetail> = {
     color: '#DC2626',
     bgColor: 'rgba(220, 38, 38, 0.08)',
     borderColor: 'rgba(220, 38, 38, 0.25)',
-    description: 'The incident has been registered in the system (either logged manually by a Controller or auto-triggered by a VA/UCS sensor) and is currently active but not yet dispatched to a field responder.',
+    description: 'The incident has been registered in the system (either logged manually by a Controller or auto-triggered by a VA/UCS sensor) and is currently active with no Responder assigned.',
     whoCanTransition: ['System Administrator', 'Controller', 'Duty Officer', 'Duty Manager'],
     actionTriggers: [
       'Creating a new incident via the Incident Log creation page.',
       'Auto-triggering of a Video Analytics (VA) sensor or UCS fire alarm.',
-      'Administrator reopening a Closed incident.',
-      'A Pending Endorsement incident being Returned by DM/DO and then updated by ground team.'
+      'Administrator reopening a Closed incident.'
     ],
     operationalImpacts: [
       'Creates a new unique Case & Incident ID.',
@@ -40,24 +39,25 @@ const statusDetails: Record<string, StatusDetail> = {
     actionPanelState: 'Assignable: Displays list of available Rangers/Responders for dispatch.',
     relatedElements: ['Incident log record', 'UCS alarm feed', 'Case Detail header']
   },
-  'Live (Incomplete)': {
-    name: 'Live (Incomplete)',
+  'Live (Assigned)': {
+    name: 'Live (Assigned)',
     badgeClass: 'badge-ack',
     color: '#EA580C',
     bgColor: 'rgba(234, 88, 12, 0.08)',
     borderColor: 'rgba(234, 88, 12, 0.25)',
-    description: 'The Duty Manager reviewed the submitted report and determined further on-site action is required from the Responder before closure can be approved.',
-    whoCanTransition: ['Duty Manager', 'Duty Officer'],
+    description: 'Responder has been assigned by Controller and is awaiting Responder acknowledgement of the dispatch.',
+    whoCanTransition: ['Controller', 'Duty Officer', 'Duty Manager'],
     actionTriggers: [
-      'Duty Manager clicks "Return to Responder" on a Pending Endorsement incident and enters a reason.'
+      'Controller assigns a Responder from the Incident Log dashboard.',
+      'Controller reassigns to a different Responder if needed.'
     ],
     operationalImpacts: [
-      'Sends a push notification to the assigned Responder\'s mobile app with the return reason.',
-      'Logs a Chronological Timeline entry: "Incident returned to Responder for further action".',
-      'Unlocks ground activities (Responder can mark on-site, complete, etc.).'
+      'Sends a push notification to the assigned Ranger\'s mobile device.',
+      'Logs a Chronological Timeline entry: "Responder [Name] assigned to incident".',
+      'Starts dispatch response SLA timer.'
     ],
-    actionPanelState: 'Ground Activity Mode: Responder must complete additional on-site activities and re-submit.',
-    relatedElements: ['Ranger App inbox alert', 'Return reason log', 'Timeline: Returned to Responder']
+    actionPanelState: 'Dispatched: Awaiting Responder acknowledgement. Controller may reassign if no acknowledgement received.',
+    relatedElements: ['Ranger App dispatch alert', 'SLA tracking database', 'Timeline: Assigned']
   },
   'Live (Acknowledged)': {
     name: 'Live (Acknowledged)',
@@ -75,7 +75,7 @@ const statusDetails: Record<string, StatusDetail> = {
       'Logs a Chronological Timeline entry: "Responder [Name] acknowledged dispatch".',
       'Stops dispatch response SLA timer.'
     ],
-    actionPanelState: 'In-Transit: Action panel shows ranger is en route with ETA.',
+    actionPanelState: 'In-Transit: Action panel shows Ranger is en route. Controller may reassign or update to On-site.',
     relatedElements: ['SLA tracking database', 'Timeline: Acknowledged']
   },
   'Live (On-Site)': {
@@ -98,23 +98,43 @@ const statusDetails: Record<string, StatusDetail> = {
     actionPanelState: 'On-Site Management: Ranger can post live updates and upload case photos directly.',
     relatedElements: ['Base64 Photo Uploads', 'Incident Updates timeline', 'e-Diary record']
   },
+  'Live (Incomplete)': {
+    name: 'Live (Incomplete)',
+    badgeClass: 'badge-ack',
+    color: '#EA580C',
+    bgColor: 'rgba(234, 88, 12, 0.08)',
+    borderColor: 'rgba(234, 88, 12, 0.25)',
+    description: 'Controller has reviewed all required Responder updates and determined that further information or amendments are required. The incident is returned to the Responder for additional on-site action.',
+    whoCanTransition: ['Controller', 'Duty Officer', 'Duty Manager'],
+    actionTriggers: [
+      'Controller clicks "Return to Responder" during incident review and enters the required amendments.'
+    ],
+    operationalImpacts: [
+      'Sends a push notification to the assigned Responder\'s mobile app with the return reason.',
+      'Logs a Chronological Timeline entry: "Incident returned to Responder for further action".',
+      'Unlocks ground activities — Responder can update incident and submit for Controller review.'
+    ],
+    actionPanelState: 'Ground Activity Mode: Responder must complete additional on-site activities and re-submit for Controller review.',
+    relatedElements: ['Ranger App inbox alert', 'Return reason log', 'Timeline: Returned to Responder']
+  },
   'Live (Completed)': {
     name: 'Live (Completed)',
     badgeClass: 'badge-completed',
     color: '#10B981',
     bgColor: 'rgba(16, 185, 129, 0.08)',
     borderColor: 'rgba(16, 185, 129, 0.25)',
-    description: 'Ground resolution activities are completed. All required checklists have been checked, and a final summary has been logged.',
-    whoCanTransition: ['Responder (Ranger)', 'Controller', 'Duty Officer', 'Duty Manager'],
+    description: 'Controller has reviewed all required Responder updates and confirmed that the Incident record is complete. The incident record is locked pending formal closure submission.',
+    whoCanTransition: ['Controller', 'Duty Officer', 'Duty Manager'],
     actionTriggers: [
-      'Ranger completes all checklists, adds resolution remarks, and taps "Submit Report".',
-      'Controller clicks "Mark Completed" on behalf of the ranger.'
+      'Controller verifies all Responder inputs are complete and locks the incident record.',
+      'Controller clicks "Submit for Closure" to escalate for Duty Manager endorsement.'
     ],
     operationalImpacts: [
+      'Locks ground editing for general users.',
       'Controller submits the report for Duty Manager review via "Submit for Review".',
-      'Logs a Chronological Timeline entry: "Ranger marked ground activities completed".'
+      'Logs a Chronological Timeline entry: "Incident record completed and locked by Controller".'
     ],
-    actionPanelState: 'Review-Ready: Readies the file for official submission.',
+    actionPanelState: 'Review-Ready: Incident locked. Controller can submit for Duty Manager endorsement.',
     relatedElements: ['Resolution checklist', 'Closure timeline events']
   },
   'Pending Endorsement': {
@@ -123,17 +143,17 @@ const statusDetails: Record<string, StatusDetail> = {
     color: '#4A148C',
     bgColor: 'rgba(74, 20, 140, 0.08)',
     borderColor: 'rgba(74, 20, 140, 0.25)',
-    description: 'The incident report has been submitted by the Controller for Duty Manager review. Awaiting audit and endorsement before closure.',
+    description: 'The incident report has been submitted by the Controller for Duty Manager approval to close the incident. Awaiting audit and endorsement before closure.',
     whoCanTransition: ['Duty Officer', 'Duty Manager'],
     actionTriggers: [
-      'Controller clicks "Submit for Review" after ground activities are completed or returned.'
+      'Controller clicks "Submit for Review" after the incident is in Live (Completed) status.'
     ],
     operationalImpacts: [
       'Locks ground edits for general users.',
-      'Displays the Approve / Return to Controller / Return to Responder action panel for supervisors.',
+      'Displays the Approve / Return to Controller action panel for Duty Manager.',
       'Highlights incident in the Duty Manager review queue.'
     ],
-    actionPanelState: 'Review Action Panel: Displays "Approve & Close", "Return to Controller", and "Return to Responder" buttons.',
+    actionPanelState: 'DM Review Panel: Displays "Approve & Close" and "Return to Controller" buttons. Controller has View Only access.',
     relatedElements: ['Duty Manager review dashboard', 'Approve/Return action panel']
   },
   'Returned': {
@@ -142,18 +162,18 @@ const statusDetails: Record<string, StatusDetail> = {
     color: '#DC2626',
     bgColor: 'rgba(220, 38, 38, 0.08)',
     borderColor: 'rgba(220, 38, 38, 0.25)',
-    description: 'The supervisor rejected the incident report due to insufficient resolution details, missing photos, or required follow-ups. The incident is returned back to active status.',
+    description: 'Duty Manager has returned the incident to the Controller for amendment, with Completion Remarks specifying the required changes.',
     whoCanTransition: ['Duty Officer', 'Duty Manager'],
     actionTriggers: [
-      'Duty Manager or Duty Officer clicks "Return to Controller" button on a Pending Endorsement incident and inputs return justification notes.'
+      'Duty Manager clicks "Return to Controller" on a Pending Endorsement incident and inputs return justification notes.'
     ],
     operationalImpacts: [
-      'Unlocks the incident details page for editing by Ranger or Controller.',
-      'Sends a correction alert/push notification back to the ground responder.',
-      'Logs a Chronological Timeline entry: "Incident returned by supervisor. Reason: [Notes]".'
+      'Unlocks the incident details page for editing by Controller.',
+      'Logs a Chronological Timeline entry: "Incident returned by Duty Manager. Reason: [Notes]".',
+      'Controller may edit and resubmit, or return to Responder for further on-site work.'
     ],
-    actionPanelState: 'Rework Mode: Displays return remarks and allows ground team to update information and photos.',
-    relatedElements: ['Ranger App inbox alert', 'Return comments log']
+    actionPanelState: 'Rework Mode: Controller can edit the incident or return to Responder. After amendments, Controller resubmits for Duty Manager endorsement.',
+    relatedElements: ['Return comments log', 'Duty Manager remarks', 'Timeline: Returned by DM']
   },
   'Closed': {
     name: 'Closed',
@@ -161,7 +181,7 @@ const statusDetails: Record<string, StatusDetail> = {
     color: '#6B7280',
     bgColor: 'rgba(107, 114, 128, 0.08)',
     borderColor: 'rgba(107, 114, 128, 0.20)',
-    description: 'The incident has been approved and endorsed. It is officially archived and closed.',
+    description: 'The incident has been approved and endorsed by the Duty Manager. It is officially archived and the record is read-only.',
     whoCanTransition: ['Duty Officer', 'Duty Manager'],
     actionTriggers: [
       'Duty Manager or Duty Officer clicks "Approve & Close" on a Pending Endorsement incident.'
@@ -180,10 +200,10 @@ const statusDetails: Record<string, StatusDetail> = {
     color: '#DC2626',
     bgColor: 'rgba(220, 38, 38, 0.08)',
     borderColor: 'rgba(220, 38, 38, 0.25)',
-    description: 'An administrative action that allows a closed incident to be reopened for audit or corrective logging.',
+    description: 'An administrative action that allows a closed incident to be reopened for audit or corrective logging. Only System Administrators may revert a Closed incident.',
     whoCanTransition: ['System Administrator'],
     actionTriggers: [
-      'System Administrator clicks "Reopen" button on a Closed incident detail page and logs justification.'
+      'System Administrator clicks "Revert Status" on a Closed incident detail page and logs justification.'
     ],
     operationalImpacts: [
       'Reverts incident status back to "Live".',
@@ -201,13 +221,12 @@ export default function IncidentLifecyclePage() {
   const [selectedPath, setSelectedPath] = useState<Pathway>('all');
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
 
-  // Helper to check if a node is part of the selected path
   const isNodeInPath = (nodeName: string) => {
     if (selectedPath === 'all') return true;
 
-    const happyNodes = ['Live', 'Live (Acknowledged)', 'Live (On-Site)', 'Live (Completed)', 'Pending Endorsement', 'Closed'];
-    const returnedNodes = ['Pending Endorsement', 'Returned', 'Live', 'Live (Acknowledged)', 'Live (On-Site)', 'Live (Completed)', 'Live (Incomplete)', 'Closed'];
-    const reopenedNodes = ['Closed', 'Reopened by Administrator', 'Live', 'Live (Acknowledged)', 'Live (On-Site)', 'Live (Completed)', 'Pending Endorsement'];
+    const happyNodes = ['Live', 'Live (Assigned)', 'Live (Acknowledged)', 'Live (On-Site)', 'Live (Completed)', 'Pending Endorsement', 'Closed'];
+    const returnedNodes = ['Live', 'Live (Assigned)', 'Live (Acknowledged)', 'Live (On-Site)', 'Live (Incomplete)', 'Live (Completed)', 'Pending Endorsement', 'Returned', 'Closed'];
+    const reopenedNodes = ['Closed', 'Reopened by Administrator', 'Live', 'Live (Assigned)', 'Live (Acknowledged)', 'Live (On-Site)', 'Live (Completed)', 'Pending Endorsement'];
 
     if (selectedPath === 'happy') return happyNodes.includes(nodeName);
     if (selectedPath === 'returned') return returnedNodes.includes(nodeName);
@@ -215,12 +234,12 @@ export default function IncidentLifecyclePage() {
     return true;
   };
 
-  // Helper to check if an edge (transition arrow) is part of the selected path
   const isEdgeInPath = (fromNode: string, toNode: string) => {
     if (selectedPath === 'all') return true;
 
     const happyEdges = [
-      ['Live', 'Live (Acknowledged)'],
+      ['Live', 'Live (Assigned)'],
+      ['Live (Assigned)', 'Live (Acknowledged)'],
       ['Live (Acknowledged)', 'Live (On-Site)'],
       ['Live (On-Site)', 'Live (Completed)'],
       ['Live (Completed)', 'Pending Endorsement'],
@@ -233,10 +252,10 @@ export default function IncidentLifecyclePage() {
 
     if (selectedPath === 'returned') {
       const returnedEdges = [
-        ['Pending Endorsement', 'Returned'],
-        ['Returned', 'Live'],
-        ['Pending Endorsement', 'Live (Incomplete)'],
+        ['Live (On-Site)', 'Live (Incomplete)'],
         ['Live (Incomplete)', 'Live (Completed)'],
+        ['Pending Endorsement', 'Returned'],
+        ['Returned', 'Live (Completed)'],
         ...happyEdges
       ];
       return returnedEdges.some(e => e[0] === fromNode && e[1] === toNode);
@@ -266,7 +285,7 @@ export default function IncidentLifecyclePage() {
           padding: 16px 20px;
           margin-bottom: 4px;
         }
-        
+
         .lifecycle-header h1 {
           font-family: var(--font-headline);
           font-size: 18px;
@@ -287,7 +306,6 @@ export default function IncidentLifecyclePage() {
           }
         }
 
-        /* Path Selector Tabs */
         .path-selectors {
           display: flex;
           flex-wrap: wrap;
@@ -345,7 +363,6 @@ export default function IncidentLifecyclePage() {
           padding-bottom: 10px;
         }
 
-        /* Interactive SVG Nodes Styling */
         .svg-node {
           cursor: pointer;
           transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
@@ -369,7 +386,6 @@ export default function IncidentLifecyclePage() {
           transition: stroke 0.3s, stroke-width 0.3s, stroke-dasharray 0.3s, opacity 0.3s;
         }
 
-        /* Pulsing indicator for active arrows */
         .arrow-active {
           stroke-dasharray: 6;
           animation: dash 20s linear infinite;
@@ -381,7 +397,6 @@ export default function IncidentLifecyclePage() {
           }
         }
 
-        /* Inspector Details panel */
         .inspector-card {
           background: var(--bg-card);
           border: 1px solid var(--border-color);
@@ -433,7 +448,6 @@ export default function IncidentLifecyclePage() {
             Interactive blueprint visualizing standard SOP status transitions, workflow branching, and role permissions.
           </p>
         </div>
-        
         <div>
           <Link href="/incidents" className="btn btn-secondary btn-sm" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             ← Back to Incidents
@@ -443,34 +457,22 @@ export default function IncidentLifecyclePage() {
 
       {/* Path Selector Tabs */}
       <div className="path-selectors glass">
-        <button 
-          className={`path-btn ${selectedPath === 'all' ? 'active' : ''}`}
-          onClick={() => setSelectedPath('all')}
-        >
+        <button className={`path-btn ${selectedPath === 'all' ? 'active' : ''}`} onClick={() => setSelectedPath('all')}>
           🌐 Show All Pathways
         </button>
-        <button 
-          className={`path-btn ${selectedPath === 'happy' ? 'active' : ''}`}
-          onClick={() => setSelectedPath('happy')}
-        >
+        <button className={`path-btn ${selectedPath === 'happy' ? 'active' : ''}`} onClick={() => setSelectedPath('happy')}>
           🟢 Main Happy Path
         </button>
-        <button 
-          className={`path-btn ${selectedPath === 'returned' ? 'active' : ''}`}
-          onClick={() => setSelectedPath('returned')}
-        >
+        <button className={`path-btn ${selectedPath === 'returned' ? 'active' : ''}`} onClick={() => setSelectedPath('returned')}>
           🔄 Returned Path
         </button>
-        <button 
-          className={`path-btn ${selectedPath === 'reopened' ? 'active' : ''}`}
-          onClick={() => setSelectedPath('reopened')}
-        >
+        <button className={`path-btn ${selectedPath === 'reopened' ? 'active' : ''}`} onClick={() => setSelectedPath('reopened')}>
           🔓 Reopened Path
         </button>
       </div>
 
       <div className="lifecycle-container">
-        
+
         {/* Left Column: Interactive SVG Flowchart */}
         <div className="flowchart-card glass">
           <div style={{ marginBottom: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -483,111 +485,106 @@ export default function IncidentLifecyclePage() {
           </div>
 
           <div className="flowchart-scroll-wrapper">
-            <svg 
-              viewBox="0 0 1480 430" 
-              style={{ width: '100%', minWidth: '1400px', height: 'auto', display: 'block' }}
+            {/*
+              Layout (FSD v3):
+              Main row y=185: Live → Live(Assigned) → Live(Acknowledged) → Live(On-Site) → [branch] → Pending Endorsement → Closed
+              Upper y=90:  Live(Completed)
+              Lower y=230: Live(Incomplete)
+              Below y=315: Returned
+              Top y=20:    Reopened by Admin
+            */}
+            <svg
+              viewBox="0 0 1520 430"
+              style={{ width: '100%', minWidth: '1420px', height: 'auto', display: 'block' }}
             >
               <defs>
-                {/* Standard Arrow Marker */}
-                <marker 
-                  id="arrow-default" 
-                  viewBox="0 0 10 10" 
-                  refX="8" 
-                  refY="5" 
-                  markerWidth="5" 
-                  markerHeight="5" 
-                  orient="auto-start-reverse"
-                >
+                <marker id="arrow-default" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
                   <path d="M 0 1 L 10 5 L 0 9 z" fill="#D9D0C4" />
                 </marker>
-                
-                {/* Highlight Arrow Marker */}
-                <marker 
-                  id="arrow-highlight" 
-                  viewBox="0 0 10 10" 
-                  refX="8" 
-                  refY="5" 
-                  markerWidth="6" 
-                  markerHeight="6" 
-                  orient="auto-start-reverse"
-                >
+                <marker id="arrow-highlight" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
                   <path d="M 0 1 L 10 5 L 0 9 z" fill="#FF8200" />
                 </marker>
-
-                {/* Return path Arrow Marker (Red-ish or secondary color) */}
-                <marker 
-                  id="arrow-returned" 
-                  viewBox="0 0 10 10" 
-                  refX="8" 
-                  refY="5" 
-                  markerWidth="6" 
-                  markerHeight="6" 
-                  orient="auto-start-reverse"
-                >
+                <marker id="arrow-returned" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
                   <path d="M 0 1 L 10 5 L 0 9 z" fill="#DC2626" />
                 </marker>
-
-                {/* Reopen path Arrow Marker (Teal or Blue) */}
-                <marker 
-                  id="arrow-reopened" 
-                  viewBox="0 0 10 10" 
-                  refX="8" 
-                  refY="5" 
-                  markerWidth="6" 
-                  markerHeight="6" 
-                  orient="auto-start-reverse"
-                >
+                <marker id="arrow-reopened" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
                   <path d="M 0 1 L 10 5 L 0 9 z" fill="#008C95" />
+                </marker>
+                <marker id="arrow-orange-dashed" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M 0 1 L 10 5 L 0 9 z" fill="#EA580C" />
                 </marker>
               </defs>
 
-              {/* TRANSITION PATHS (EDGES) */}
-              
-              {/* 1. Live -> Live (Acknowledged) */}
+              {/* ── EDGES ── */}
+
+              {/* 1. Live → Live (Assigned) */}
               <path
-                d="M 180 185 H 400"
-                stroke={isEdgeInPath('Live', 'Live (Acknowledged)') ? '#FF8200' : '#E8E3D8'}
-                strokeWidth={isEdgeInPath('Live', 'Live (Acknowledged)') ? '3' : '1.5'}
-                markerEnd={isEdgeInPath('Live', 'Live (Acknowledged)') ? 'url(#arrow-highlight)' : 'url(#arrow-default)'}
-                className={`transition-arrow ${isEdgeInPath('Live', 'Live (Acknowledged)') ? 'arrow-active' : ''}`}
-                opacity={isEdgeInPath('Live', 'Live (Acknowledged)') ? '1' : '0.2'}
+                d="M 170 185 H 200"
+                stroke={isEdgeInPath('Live', 'Live (Assigned)') ? '#FF8200' : '#E8E3D8'}
+                strokeWidth={isEdgeInPath('Live', 'Live (Assigned)') ? '3' : '1.5'}
+                markerEnd={isEdgeInPath('Live', 'Live (Assigned)') ? 'url(#arrow-highlight)' : 'url(#arrow-default)'}
+                className={`transition-arrow ${isEdgeInPath('Live', 'Live (Assigned)') ? 'arrow-active' : ''}`}
+                opacity={isEdgeInPath('Live', 'Live (Assigned)') ? '1' : '0.2'}
               />
 
-              {/* 3. Live (Acknowledged) -> Live (On-Site) */}
-              <path 
-                d="M 560 185 H 600" 
-                stroke={isEdgeInPath('Live (Acknowledged)', 'Live (On-Site)') ? '#FF8200' : '#E8E3D8'} 
-                strokeWidth={isEdgeInPath('Live (Acknowledged)', 'Live (On-Site)') ? '3' : '1.5'} 
+              {/* 2. Live (Assigned) → Live (Acknowledged) */}
+              <path
+                d="M 360 185 H 390"
+                stroke={isEdgeInPath('Live (Assigned)', 'Live (Acknowledged)') ? '#FF8200' : '#E8E3D8'}
+                strokeWidth={isEdgeInPath('Live (Assigned)', 'Live (Acknowledged)') ? '3' : '1.5'}
+                markerEnd={isEdgeInPath('Live (Assigned)', 'Live (Acknowledged)') ? 'url(#arrow-highlight)' : 'url(#arrow-default)'}
+                className={`transition-arrow ${isEdgeInPath('Live (Assigned)', 'Live (Acknowledged)') ? 'arrow-active' : ''}`}
+                opacity={isEdgeInPath('Live (Assigned)', 'Live (Acknowledged)') ? '1' : '0.2'}
+              />
+
+              {/* 3. Live (Acknowledged) → Live (On-Site) */}
+              <path
+                d="M 555 185 H 585"
+                stroke={isEdgeInPath('Live (Acknowledged)', 'Live (On-Site)') ? '#FF8200' : '#E8E3D8'}
+                strokeWidth={isEdgeInPath('Live (Acknowledged)', 'Live (On-Site)') ? '3' : '1.5'}
                 markerEnd={isEdgeInPath('Live (Acknowledged)', 'Live (On-Site)') ? 'url(#arrow-highlight)' : 'url(#arrow-default)'}
                 className={`transition-arrow ${isEdgeInPath('Live (Acknowledged)', 'Live (On-Site)') ? 'arrow-active' : ''}`}
                 opacity={isEdgeInPath('Live (Acknowledged)', 'Live (On-Site)') ? '1' : '0.2'}
               />
 
-              {/* 4. Live (On-Site) -> Live (Completed) */}
-              <path 
-                d="M 760 185 C 780 185, 780 115, 800 115" 
+              {/* 4. Live (On-Site) → Live (Completed) [happy path — curve up] */}
+              <path
+                d="M 745 185 C 765 185, 765 115, 785 115"
                 fill="none"
-                stroke={isEdgeInPath('Live (On-Site)', 'Live (Completed)') ? '#FF8200' : '#E8E3D8'} 
-                strokeWidth={isEdgeInPath('Live (On-Site)', 'Live (Completed)') ? '3' : '1.5'} 
+                stroke={isEdgeInPath('Live (On-Site)', 'Live (Completed)') ? '#FF8200' : '#E8E3D8'}
+                strokeWidth={isEdgeInPath('Live (On-Site)', 'Live (Completed)') ? '3' : '1.5'}
                 markerEnd={isEdgeInPath('Live (On-Site)', 'Live (Completed)') ? 'url(#arrow-highlight)' : 'url(#arrow-default)'}
                 className={`transition-arrow ${isEdgeInPath('Live (On-Site)', 'Live (Completed)') ? 'arrow-active' : ''}`}
                 opacity={isEdgeInPath('Live (On-Site)', 'Live (Completed)') ? '1' : '0.2'}
               />
 
-              {/* 5. Pending Endorsement → Live (Incomplete) */}
+              {/* 5. Live (On-Site) → Live (Incomplete) [Controller returns to Responder — curve down] */}
               <path
-                d="M 1080 210 C 1080 265, 820 265, 800 265"
+                d="M 745 195 C 765 195, 765 255, 785 255"
                 fill="none"
-                stroke={isEdgeInPath('Pending Endorsement', 'Live (Incomplete)') ? '#EA580C' : '#E8E3D8'}
-                strokeWidth={isEdgeInPath('Pending Endorsement', 'Live (Incomplete)') ? '2.5' : '1.5'}
-                markerEnd={isEdgeInPath('Pending Endorsement', 'Live (Incomplete)') ? 'url(#arrow-highlight)' : 'url(#arrow-default)'}
-                className={`transition-arrow ${isEdgeInPath('Pending Endorsement', 'Live (Incomplete)') ? 'arrow-active' : ''}`}
-                opacity={isEdgeInPath('Pending Endorsement', 'Live (Incomplete)') ? '1' : '0.1'}
+                stroke={isEdgeInPath('Live (On-Site)', 'Live (Incomplete)') ? '#EA580C' : '#E8E3D8'}
+                strokeWidth={isEdgeInPath('Live (On-Site)', 'Live (Incomplete)') ? '2.5' : '1.5'}
+                strokeDasharray={isEdgeInPath('Live (On-Site)', 'Live (Incomplete)') ? '6 3' : 'none'}
+                markerEnd={isEdgeInPath('Live (On-Site)', 'Live (Incomplete)') ? 'url(#arrow-orange-dashed)' : 'url(#arrow-default)'}
+                className="transition-arrow"
+                opacity={isEdgeInPath('Live (On-Site)', 'Live (Incomplete)') ? '1' : '0.1'}
               />
 
-              {/* 6. Live (Completed) -> Pending Endorsement */}
+              {/* 6. Live (Incomplete) → Live (Completed) [Responder re-submits — loop on right side] */}
               <path
-                d="M 960 115 C 980 115, 980 185, 1000 185"
+                d="M 945 255 C 970 255, 970 115, 945 115"
+                fill="none"
+                stroke={isEdgeInPath('Live (Incomplete)', 'Live (Completed)') ? '#EA580C' : '#E8E3D8'}
+                strokeWidth={isEdgeInPath('Live (Incomplete)', 'Live (Completed)') ? '2.5' : '1.5'}
+                strokeDasharray={isEdgeInPath('Live (Incomplete)', 'Live (Completed)') ? '6 3' : 'none'}
+                markerEnd={isEdgeInPath('Live (Incomplete)', 'Live (Completed)') ? 'url(#arrow-orange-dashed)' : 'url(#arrow-default)'}
+                className="transition-arrow"
+                opacity={isEdgeInPath('Live (Incomplete)', 'Live (Completed)') ? '1' : '0.1'}
+              />
+
+              {/* 7. Live (Completed) → Pending Endorsement [curve down] */}
+              <path
+                d="M 945 115 C 965 115, 965 185, 985 185"
                 fill="none"
                 stroke={isEdgeInPath('Live (Completed)', 'Pending Endorsement') ? '#FF8200' : '#E8E3D8'}
                 strokeWidth={isEdgeInPath('Live (Completed)', 'Pending Endorsement') ? '3' : '1.5'}
@@ -596,20 +593,9 @@ export default function IncidentLifecyclePage() {
                 opacity={isEdgeInPath('Live (Completed)', 'Pending Endorsement') ? '1' : '0.2'}
               />
 
-              {/* 7. Live (Incomplete) → Live (Completed) */}
+              {/* 8. Pending Endorsement → Closed */}
               <path
-                d="M 960 255 C 980 255, 980 115, 800 115"
-                fill="none"
-                stroke={isEdgeInPath('Live (Incomplete)', 'Live (Completed)') ? '#EA580C' : '#E8E3D8'}
-                strokeWidth={isEdgeInPath('Live (Incomplete)', 'Live (Completed)') ? '2.5' : '1.5'}
-                markerEnd={isEdgeInPath('Live (Incomplete)', 'Live (Completed)') ? 'url(#arrow-highlight)' : 'url(#arrow-default)'}
-                className={`transition-arrow ${isEdgeInPath('Live (Incomplete)', 'Live (Completed)') ? 'arrow-active' : ''}`}
-                opacity={isEdgeInPath('Live (Incomplete)', 'Live (Completed)') ? '1' : '0.1'}
-              />
-
-              {/* 8. Pending Endorsement -> Closed */}
-              <path
-                d="M 1160 185 H 1200"
+                d="M 1155 185 H 1190"
                 stroke={isEdgeInPath('Pending Endorsement', 'Closed') ? '#FF8200' : '#E8E3D8'}
                 strokeWidth={isEdgeInPath('Pending Endorsement', 'Closed') ? '3' : '1.5'}
                 markerEnd={isEdgeInPath('Pending Endorsement', 'Closed') ? 'url(#arrow-highlight)' : 'url(#arrow-default)'}
@@ -617,10 +603,9 @@ export default function IncidentLifecyclePage() {
                 opacity={isEdgeInPath('Pending Endorsement', 'Closed') ? '1' : '0.2'}
               />
 
-              {/* RETURNED PATH EDGES */}
-              {/* 9. Pending Endorsement -> Returned */}
+              {/* 9. Pending Endorsement → Returned [DM returns to Controller] */}
               <path
-                d="M 1080 210 C 1080 285, 620 285, 540 310"
+                d="M 1070 210 C 1070 340, 555 340, 555 315"
                 fill="none"
                 stroke={isEdgeInPath('Pending Endorsement', 'Returned') ? '#DC2626' : '#E8E3D8'}
                 strokeWidth={isEdgeInPath('Pending Endorsement', 'Returned') ? '2.5' : '1.5'}
@@ -629,93 +614,105 @@ export default function IncidentLifecyclePage() {
                 opacity={isEdgeInPath('Pending Endorsement', 'Returned') ? '1' : '0.1'}
               />
 
-              {/* 10. Returned -> Live */}
-              <path 
-                d="M 460 335 C 250 335, 100 265, 100 210" 
+              {/* 10. Returned → Live (Completed) [Controller resubmits after DM return] */}
+              <path
+                d="M 540 315 C 540 250, 865 250, 865 140"
                 fill="none"
-                stroke={isEdgeInPath('Returned', 'Live') ? '#DC2626' : '#E8E3D8'} 
-                strokeWidth={isEdgeInPath('Returned', 'Live') ? '2.5' : '1.5'} 
-                markerEnd={isEdgeInPath('Returned', 'Live') ? 'url(#arrow-returned)' : 'url(#arrow-default)'}
-                className={`transition-arrow ${isEdgeInPath('Returned', 'Live') && selectedPath === 'returned' ? 'arrow-active' : ''}`}
-                opacity={isEdgeInPath('Returned', 'Live') ? '1' : '0.1'}
+                stroke={isEdgeInPath('Returned', 'Live (Completed)') ? '#DC2626' : '#E8E3D8'}
+                strokeWidth={isEdgeInPath('Returned', 'Live (Completed)') ? '2.5' : '1.5'}
+                markerEnd={isEdgeInPath('Returned', 'Live (Completed)') ? 'url(#arrow-returned)' : 'url(#arrow-default)'}
+                className={`transition-arrow ${isEdgeInPath('Returned', 'Live (Completed)') && selectedPath === 'returned' ? 'arrow-active' : ''}`}
+                opacity={isEdgeInPath('Returned', 'Live (Completed)') ? '1' : '0.1'}
               />
 
-              {/* REOPENED PATH EDGES */}
-              {/* 11. Closed -> Reopened Action */}
-              <path 
-                d="M 1280 160 C 1280 85, 950 45, 780 45" 
+              {/* 11. Closed → Reopened by Administrator */}
+              <path
+                d="M 1260 160 C 1260 50, 790 30, 755 30"
                 fill="none"
-                stroke={isEdgeInPath('Closed', 'Reopened by Administrator') ? '#008C95' : '#E8E3D8'} 
-                strokeWidth={isEdgeInPath('Closed', 'Reopened by Administrator') ? '2.5' : '1.5'} 
+                stroke={isEdgeInPath('Closed', 'Reopened by Administrator') ? '#008C95' : '#E8E3D8'}
+                strokeWidth={isEdgeInPath('Closed', 'Reopened by Administrator') ? '2.5' : '1.5'}
                 markerEnd={isEdgeInPath('Closed', 'Reopened by Administrator') ? 'url(#arrow-reopened)' : 'url(#arrow-default)'}
                 className={`transition-arrow ${isEdgeInPath('Closed', 'Reopened by Administrator') && selectedPath === 'reopened' ? 'arrow-active' : ''}`}
                 opacity={isEdgeInPath('Closed', 'Reopened by Administrator') ? '1' : '0.1'}
               />
 
-              {/* 12. Reopened Action -> Live */}
-              <path 
-                d="M 580 45 C 350 45, 100 85, 100 160" 
+              {/* 12. Reopened by Administrator → Live */}
+              <path
+                d="M 555 30 C 320 30, 85 80, 85 160"
                 fill="none"
-                stroke={isEdgeInPath('Reopened by Administrator', 'Live') ? '#008C95' : '#E8E3D8'} 
-                strokeWidth={isEdgeInPath('Reopened by Administrator', 'Live') ? '2.5' : '1.5'} 
+                stroke={isEdgeInPath('Reopened by Administrator', 'Live') ? '#008C95' : '#E8E3D8'}
+                strokeWidth={isEdgeInPath('Reopened by Administrator', 'Live') ? '2.5' : '1.5'}
                 markerEnd={isEdgeInPath('Reopened by Administrator', 'Live') ? 'url(#arrow-reopened)' : 'url(#arrow-default)'}
                 className={`transition-arrow ${isEdgeInPath('Reopened by Administrator', 'Live') && selectedPath === 'reopened' ? 'arrow-active' : ''}`}
                 opacity={isEdgeInPath('Reopened by Administrator', 'Live') ? '1' : '0.1'}
               />
 
 
-              {/* STATUS NODES */}
-              
+              {/* ── NODES ── */}
+
               {/* 1. Live */}
-              <g 
-                className={`svg-node ${selectedNode === 'Live' ? 'selected' : ''}`} 
+              <g
+                className={`svg-node ${selectedNode === 'Live' ? 'selected' : ''}`}
                 style={{ color: '#DC2626' }}
                 onClick={() => setSelectedNode('Live')}
                 opacity={isNodeInPath('Live') ? '1' : '0.2'}
               >
-                <rect x="20" y="160" width="160" height="50" rx="8" fill="#FDFCF8" stroke={selectedNode === 'Live' ? '#DC2626' : '#DC2626'} strokeWidth={selectedNode === 'Live' ? '2.5' : '1.5'} />
-                <circle cx="40" cy="185" r="12" fill="rgba(220, 38, 38, 0.08)" />
-                <text x="40" y="189" fontFamily="var(--font-body)" fontSize="12" fontWeight="700" textAnchor="middle" fill="#DC2626">🚨</text>
+                <rect x="20" y="160" width="150" height="50" rx="8" fill="#FDFCF8" stroke="#DC2626" strokeWidth={selectedNode === 'Live' ? '2.5' : '1.5'} />
+                <circle cx="42" cy="185" r="12" fill="rgba(220, 38, 38, 0.08)" />
+                <text x="42" y="189" fontFamily="var(--font-body)" fontSize="12" fontWeight="700" textAnchor="middle" fill="#DC2626">🚨</text>
                 <text x="64" y="190" fontFamily="var(--font-body)" fontSize="12.5" fontWeight="600" fill="var(--text-main)">Live</text>
               </g>
 
+              {/* 2. Live (Assigned) — NEW */}
+              <g
+                className={`svg-node ${selectedNode === 'Live (Assigned)' ? 'selected' : ''}`}
+                style={{ color: '#EA580C' }}
+                onClick={() => setSelectedNode('Live (Assigned)')}
+                opacity={isNodeInPath('Live (Assigned)') ? '1' : '0.2'}
+              >
+                <rect x="200" y="160" width="160" height="50" rx="8" fill="#FDFCF8" stroke={selectedNode === 'Live (Assigned)' ? '#EA580C' : 'var(--border-color)'} strokeWidth={selectedNode === 'Live (Assigned)' ? '2.5' : '1'} />
+                <circle cx="220" cy="185" r="12" fill="rgba(234, 88, 12, 0.08)" />
+                <text x="220" y="189" fontFamily="var(--font-body)" fontSize="12" fontWeight="700" textAnchor="middle" fill="#EA580C">📡</text>
+                <text x="242" y="190" fontFamily="var(--font-body)" fontSize="11" fontWeight="600" fill="var(--text-main)">Live (Assigned)</text>
+              </g>
+
               {/* 3. Live (Acknowledged) */}
-              <g 
-                className={`svg-node ${selectedNode === 'Live (Acknowledged)' ? 'selected' : ''}`} 
+              <g
+                className={`svg-node ${selectedNode === 'Live (Acknowledged)' ? 'selected' : ''}`}
                 style={{ color: '#EA580C' }}
                 onClick={() => setSelectedNode('Live (Acknowledged)')}
                 opacity={isNodeInPath('Live (Acknowledged)') ? '1' : '0.2'}
               >
-                <rect x="400" y="160" width="160" height="50" rx="8" fill="#FDFCF8" stroke={selectedNode === 'Live (Acknowledged)' ? '#EA580C' : 'var(--border-color)'} strokeWidth={selectedNode === 'Live (Acknowledged)' ? '2.5' : '1'} />
-                <circle cx="420" cy="185" r="12" fill="rgba(234, 88, 12, 0.08)" />
-                <text x="420" y="189" fontFamily="var(--font-body)" fontSize="12" fontWeight="700" textAnchor="middle" fill="#EA580C">✉️</text>
-                <text x="444" y="190" fontFamily="var(--font-body)" fontSize="11" fontWeight="600" fill="var(--text-main)">Live (Ack)</text>
+                <rect x="390" y="160" width="165" height="50" rx="8" fill="#FDFCF8" stroke={selectedNode === 'Live (Acknowledged)' ? '#EA580C' : 'var(--border-color)'} strokeWidth={selectedNode === 'Live (Acknowledged)' ? '2.5' : '1'} />
+                <circle cx="410" cy="185" r="12" fill="rgba(234, 88, 12, 0.08)" />
+                <text x="410" y="189" fontFamily="var(--font-body)" fontSize="12" fontWeight="700" textAnchor="middle" fill="#EA580C">✉️</text>
+                <text x="432" y="190" fontFamily="var(--font-body)" fontSize="10.5" fontWeight="600" fill="var(--text-main)">Live (Acknowledged)</text>
               </g>
 
               {/* 4. Live (On-Site) */}
-              <g 
-                className={`svg-node ${selectedNode === 'Live (On-Site)' ? 'selected' : ''}`} 
+              <g
+                className={`svg-node ${selectedNode === 'Live (On-Site)' ? 'selected' : ''}`}
                 style={{ color: '#008C95' }}
                 onClick={() => setSelectedNode('Live (On-Site)')}
                 opacity={isNodeInPath('Live (On-Site)') ? '1' : '0.2'}
               >
-                <rect x="600" y="160" width="160" height="50" rx="8" fill="#FDFCF8" stroke={selectedNode === 'Live (On-Site)' ? '#008C95' : 'var(--border-color)'} strokeWidth={selectedNode === 'Live (On-Site)' ? '2.5' : '1'} />
-                <circle cx="620" cy="185" r="12" fill="rgba(0, 140, 149, 0.08)" />
-                <text x="620" y="189" fontFamily="var(--font-body)" fontSize="12" fontWeight="700" textAnchor="middle" fill="#008C95">📍</text>
-                <text x="644" y="190" fontFamily="var(--font-body)" fontSize="11.5" fontWeight="600" fill="var(--text-main)">Live (On-Site)</text>
+                <rect x="585" y="160" width="160" height="50" rx="8" fill="#FDFCF8" stroke={selectedNode === 'Live (On-Site)' ? '#008C95' : 'var(--border-color)'} strokeWidth={selectedNode === 'Live (On-Site)' ? '2.5' : '1'} />
+                <circle cx="605" cy="185" r="12" fill="rgba(0, 140, 149, 0.08)" />
+                <text x="605" y="189" fontFamily="var(--font-body)" fontSize="12" fontWeight="700" textAnchor="middle" fill="#008C95">📍</text>
+                <text x="627" y="190" fontFamily="var(--font-body)" fontSize="11.5" fontWeight="600" fill="var(--text-main)">Live (On-Site)</text>
               </g>
 
               {/* 5. Live (Completed) */}
-              <g 
-                className={`svg-node ${selectedNode === 'Live (Completed)' ? 'selected' : ''}`} 
+              <g
+                className={`svg-node ${selectedNode === 'Live (Completed)' ? 'selected' : ''}`}
                 style={{ color: '#10B981' }}
                 onClick={() => setSelectedNode('Live (Completed)')}
                 opacity={isNodeInPath('Live (Completed)') ? '1' : '0.2'}
               >
-                <rect x="800" y="90" width="160" height="50" rx="8" fill="#FDFCF8" stroke={selectedNode === 'Live (Completed)' ? '#10B981' : 'var(--border-color)'} strokeWidth={selectedNode === 'Live (Completed)' ? '2.5' : '1'} />
-                <circle cx="820" cy="115" r="12" fill="rgba(16, 185, 129, 0.08)" />
-                <text x="820" y="119" fontFamily="var(--font-body)" fontSize="12" fontWeight="700" textAnchor="middle" fill="#10B981">✓</text>
-                <text x="844" y="120" fontFamily="var(--font-body)" fontSize="11" fontWeight="600" fill="var(--text-main)">Live (Completed)</text>
+                <rect x="785" y="90" width="160" height="50" rx="8" fill="#FDFCF8" stroke={selectedNode === 'Live (Completed)' ? '#10B981' : 'var(--border-color)'} strokeWidth={selectedNode === 'Live (Completed)' ? '2.5' : '1'} />
+                <circle cx="805" cy="115" r="12" fill="rgba(16, 185, 129, 0.08)" />
+                <text x="805" y="119" fontFamily="var(--font-body)" fontSize="12" fontWeight="700" textAnchor="middle" fill="#10B981">✓</text>
+                <text x="827" y="120" fontFamily="var(--font-body)" fontSize="11" fontWeight="600" fill="var(--text-main)">Live (Completed)</text>
               </g>
 
               {/* 6. Live (Incomplete) */}
@@ -725,11 +722,10 @@ export default function IncidentLifecyclePage() {
                 onClick={() => setSelectedNode('Live (Incomplete)')}
                 opacity={isNodeInPath('Live (Incomplete)') ? '1' : '0.2'}
               >
-                <rect x="800" y="230" width="160" height="50" rx="8" fill="#FDFCF8" stroke={selectedNode === 'Live (Incomplete)' ? '#EA580C' : 'var(--border-color)'} strokeWidth={selectedNode === 'Live (Incomplete)' ? '2.5' : '1'} />
-                <circle cx="820" cy="255" r="12" fill="rgba(234, 88, 12, 0.08)" />
-                <text x="820" y="259" fontFamily="var(--font-body)" fontSize="12" fontWeight="700" textAnchor="middle" fill="#EA580C">↩</text>
-                <text x="844" y="257" fontFamily="var(--font-body)" fontSize="9.5" fontWeight="600" fill="var(--text-main)">Live (Returned</text>
-                <text x="844" y="270" fontFamily="var(--font-body)" fontSize="9.5" fontWeight="600" fill="var(--text-main)">to Responder)</text>
+                <rect x="785" y="230" width="160" height="50" rx="8" fill="#FDFCF8" stroke={selectedNode === 'Live (Incomplete)' ? '#EA580C' : 'var(--border-color)'} strokeWidth={selectedNode === 'Live (Incomplete)' ? '2.5' : '1'} strokeDasharray="4 2" />
+                <circle cx="805" cy="255" r="12" fill="rgba(234, 88, 12, 0.08)" />
+                <text x="805" y="259" fontFamily="var(--font-body)" fontSize="12" fontWeight="700" textAnchor="middle" fill="#EA580C">↩</text>
+                <text x="827" y="260" fontFamily="var(--font-body)" fontSize="10.5" fontWeight="600" fill="var(--text-main)">Live (Incomplete)</text>
               </g>
 
               {/* 7. Pending Endorsement */}
@@ -739,49 +735,49 @@ export default function IncidentLifecyclePage() {
                 onClick={() => setSelectedNode('Pending Endorsement')}
                 opacity={isNodeInPath('Pending Endorsement') ? '1' : '0.2'}
               >
-                <rect x="1000" y="160" width="160" height="50" rx="8" fill="#FDFCF8" stroke={selectedNode === 'Pending Endorsement' ? '#4A148C' : 'var(--border-color)'} strokeWidth={selectedNode === 'Pending Endorsement' ? '2.5' : '1'} />
-                <circle cx="1020" cy="185" r="12" fill="rgba(74, 20, 140, 0.08)" />
-                <text x="1020" y="189" fontFamily="var(--font-body)" fontSize="12" fontWeight="700" textAnchor="middle" fill="#4A148C">📝</text>
-                <text x="1044" y="190" fontFamily="var(--font-body)" fontSize="11.5" fontWeight="600" fill="var(--text-main)">Pending Endorsement</text>
+                <rect x="985" y="160" width="170" height="50" rx="8" fill="#FDFCF8" stroke={selectedNode === 'Pending Endorsement' ? '#4A148C' : 'var(--border-color)'} strokeWidth={selectedNode === 'Pending Endorsement' ? '2.5' : '1'} />
+                <circle cx="1005" cy="185" r="12" fill="rgba(74, 20, 140, 0.08)" />
+                <text x="1005" y="189" fontFamily="var(--font-body)" fontSize="12" fontWeight="700" textAnchor="middle" fill="#4A148C">📝</text>
+                <text x="1027" y="190" fontFamily="var(--font-body)" fontSize="11" fontWeight="600" fill="var(--text-main)">Pending Endorsement</text>
               </g>
 
               {/* 8. Closed */}
-              <g 
-                className={`svg-node ${selectedNode === 'Closed' ? 'selected' : ''}`} 
+              <g
+                className={`svg-node ${selectedNode === 'Closed' ? 'selected' : ''}`}
                 style={{ color: '#6B7280' }}
                 onClick={() => setSelectedNode('Closed')}
                 opacity={isNodeInPath('Closed') ? '1' : '0.2'}
               >
-                <rect x="1200" y="160" width="160" height="50" rx="8" fill="#FDFCF8" stroke={selectedNode === 'Closed' ? '#6B7280' : 'var(--border-color)'} strokeWidth={selectedNode === 'Closed' ? '2.5' : '1'} />
-                <circle cx="1220" cy="185" r="12" fill="rgba(107, 114, 128, 0.08)" />
-                <text x="1220" y="189" fontFamily="var(--font-body)" fontSize="12" fontWeight="700" textAnchor="middle" fill="#6B7280">🔒</text>
-                <text x="1244" y="190" fontFamily="var(--font-body)" fontSize="12.5" fontWeight="600" fill="var(--text-main)">Closed</text>
+                <rect x="1190" y="160" width="140" height="50" rx="8" fill="#FDFCF8" stroke={selectedNode === 'Closed' ? '#6B7280' : 'var(--border-color)'} strokeWidth={selectedNode === 'Closed' ? '2.5' : '1'} />
+                <circle cx="1210" cy="185" r="12" fill="rgba(107, 114, 128, 0.08)" />
+                <text x="1210" y="189" fontFamily="var(--font-body)" fontSize="12" fontWeight="700" textAnchor="middle" fill="#6B7280">🔒</text>
+                <text x="1232" y="190" fontFamily="var(--font-body)" fontSize="12.5" fontWeight="600" fill="var(--text-main)">Closed</text>
               </g>
 
               {/* 9. Returned */}
-              <g 
-                className={`svg-node ${selectedNode === 'Returned' ? 'selected' : ''}`} 
+              <g
+                className={`svg-node ${selectedNode === 'Returned' ? 'selected' : ''}`}
                 style={{ color: '#DC2626' }}
                 onClick={() => setSelectedNode('Returned')}
                 opacity={isNodeInPath('Returned') ? '1' : '0.2'}
               >
-                <rect x="460" y="310" width="160" height="50" rx="8" fill="#FDFCF8" stroke={selectedNode === 'Returned' ? '#DC2626' : 'var(--border-color)'} strokeWidth={selectedNode === 'Returned' ? '2.5' : '1'} />
-                <circle cx="480" cy="335" r="12" fill="rgba(220, 38, 38, 0.08)" />
-                <text x="480" y="339" fontFamily="var(--font-body)" fontSize="12" fontWeight="700" textAnchor="middle" fill="#DC2626">🔄</text>
-                <text x="504" y="340" fontFamily="var(--font-body)" fontSize="12" fontWeight="600" fill="var(--text-main)">Returned</text>
+                <rect x="470" y="315" width="150" height="50" rx="8" fill="#FDFCF8" stroke={selectedNode === 'Returned' ? '#DC2626' : 'var(--border-color)'} strokeWidth={selectedNode === 'Returned' ? '2.5' : '1'} />
+                <circle cx="490" cy="340" r="12" fill="rgba(220, 38, 38, 0.08)" />
+                <text x="490" y="344" fontFamily="var(--font-body)" fontSize="12" fontWeight="700" textAnchor="middle" fill="#DC2626">🔄</text>
+                <text x="512" y="345" fontFamily="var(--font-body)" fontSize="12" fontWeight="600" fill="var(--text-main)">Returned</text>
               </g>
 
-              {/* 10. Reopened by Administrator (Administrative action transition node) */}
-              <g 
-                className={`svg-node ${selectedNode === 'Reopened by Administrator' ? 'selected' : ''}`} 
+              {/* 10. Reopened by Administrator */}
+              <g
+                className={`svg-node ${selectedNode === 'Reopened by Administrator' ? 'selected' : ''}`}
                 style={{ color: '#008C95' }}
                 onClick={() => setSelectedNode('Reopened by Administrator')}
                 opacity={isNodeInPath('Reopened by Administrator') ? '1' : '0.2'}
               >
-                <rect x="580" y="20" width="200" height="50" rx="8" fill="#FDFCF8" stroke={selectedNode === 'Reopened by Administrator' ? '#008C95' : 'var(--border-color)'} strokeWidth={selectedNode === 'Reopened by Administrator' ? '2.5' : '1'} strokeDasharray="4 2" />
-                <circle cx="600" cy="45" r="12" fill="rgba(0, 140, 149, 0.08)" />
-                <text x="600" y="49" fontFamily="var(--font-body)" fontSize="12" fontWeight="700" textAnchor="middle" fill="#008C95">🔓</text>
-                <text x="624" y="50" fontFamily="var(--font-body)" fontSize="11" fontWeight="600" fill="var(--text-main)">Reopened by Admin</text>
+                <rect x="555" y="10" width="200" height="45" rx="8" fill="#FDFCF8" stroke={selectedNode === 'Reopened by Administrator' ? '#008C95' : 'var(--border-color)'} strokeWidth={selectedNode === 'Reopened by Administrator' ? '2.5' : '1'} strokeDasharray="4 2" />
+                <circle cx="575" cy="32" r="11" fill="rgba(0, 140, 149, 0.08)" />
+                <text x="575" y="36" fontFamily="var(--font-body)" fontSize="11" fontWeight="700" textAnchor="middle" fill="#008C95">🔓</text>
+                <text x="597" y="37" fontFamily="var(--font-body)" fontSize="11" fontWeight="600" fill="var(--text-main)">Reopened by Admin</text>
               </g>
             </svg>
           </div>
@@ -866,34 +862,4 @@ export default function IncidentLifecyclePage() {
 
                 <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
                   <div className="section-label">Action Triggers</div>
-                  <ul style={{ paddingLeft: '14px', listStyleType: 'disc', fontSize: '11.5px', color: 'var(--text-sub)', display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                    {activeNodeDetails.actionTriggers.map((trig, idx) => (
-                      <li key={idx}>{trig}</li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
-                  <div className="section-label">Action Panel Representation</div>
-                  <div style={{ padding: '8px 10px', background: 'var(--bg-inset)', borderRadius: '6px', border: '1px solid var(--border-color)', fontSize: '11.5px', color: 'var(--text-sub)', fontWeight: '500' }}>
-                    {activeNodeDetails.actionPanelState}
-                  </div>
-                </div>
-
-                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
-                  <div className="section-label">Operational Impacts</div>
-                  <ul style={{ paddingLeft: '14px', listStyleType: 'disc', fontSize: '11.5px', color: 'var(--text-sub)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    {activeNodeDetails.operationalImpacts.map((imp, idx) => (
-                      <li key={idx}>{imp}</li>
-                    ))}
-                  </ul>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-
-      </div>
-    </>
-  );
-}
+                  <ul style={{ paddingLeft: '14px', listS

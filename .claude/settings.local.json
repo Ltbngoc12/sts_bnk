@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(git -C \"D:\\\\Huy Sentosa\" remote -v)",
+      "PowerShell(git -C \"D:\\\\Huy Sentosa\" status)",
+      "PowerShell(git -C \"D:\\\\Huy Sentosa\" pull origin main)",
+      "Skill(run)",
+      "Skill(run:*)",
+      "Bash(mkdir -p \"D:/Huy Sentosa/.claude/skills/startsentosa\")",
+      "Bash(git -C \"d:/Huy Sentosa\" log --oneline -5 -- \".env.local\" \"*.env*\")",
+      "Bash(xargs grep -l \"CaseComponent\\\\|case-side-col\\\\|Case Audit Trail\")",
+      "Bash(xargs grep -l \"useParams\\\\|params\")",
+      "Skill(code-review)",
+      "Skill(code-review:*)",
+      "Bash(npx tsc *)",
+      "Bash(git stash *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(curl -I --max-time 10 https://sts-bnk.vercel.app)",
+      "Bash(nslookup sts-bnk.vercel.app)"
+    ],
+    "additionalDirectories": [
+      "D:\\Huy Sentosa\\.claude\\skills"
+    ]
+  }
+}

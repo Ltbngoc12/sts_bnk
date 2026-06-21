@@ -1,13 +1,31 @@
 import { NextResponse } from 'next/server';
-import { getDb, saveDb, generateOccurrenceId, Occurrence } from '@/lib/db';
+import { getDb, saveDb, generateOccurrenceId, generateCaseId, Occurrence } from '@/lib/db';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const dateStart = searchParams.get('dateStart');
+    const dateEnd   = searchParams.get('dateEnd');
+    const user      = searchParams.get('user');
+
     const db = await getDb();
-    const sortedOccurrences = [...db.occurrences].sort(
-      (a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()
-    );
-    return NextResponse.json(sortedOccurrences);
+    let results = [...db.occurrences];
+
+    if (dateStart) {
+      const start = new Date(dateStart).getTime();
+      results = results.filter(o => new Date(o.dateTime).getTime() >= start);
+    }
+    if (dateEnd) {
+      const end = new Date(dateEnd);
+      end.setHours(23, 59, 59, 999);
+      results = results.filter(o => new Date(o.dateTime).getTime() <= end.getTime());
+    }
+    if (user && user !== 'All') {
+      results = results.filter(o => o.user === user);
+    }
+
+    results.sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
+    return NextResponse.json(results);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -18,25 +36,4 @@ export async function POST(request: Request) {
     const body = await request.json();
     const db = await getDb();
 
-    if (!body.content) {
-      return NextResponse.json({ error: 'e-Diary entry narrative/content is required.' }, { status: 400 });
-    }
-
-    const occurrenceId = generateOccurrenceId(db);
-
-    const newOccurrence: Occurrence = {
-      id: occurrenceId,
-      user: body.username || 'Controller',
-      dateTime: body.dateTime || new Date().toISOString(),
-      topic: body.topic || 'General Notice',
-      content: body.content
-    };
-
-    db.occurrences.push(newOccurrence);
-    await saveDb(db);
-
-    return NextResponse.json(newOccurrence, { status: 201 });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-}
+    if (!body.co

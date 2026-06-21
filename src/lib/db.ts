@@ -717,20 +717,4 @@ export function generateOccurrenceId(db: DbSchema): string {
 }
 
 export function generateFaultId(db: DbSchema): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  const prefix = `SEN/FR/${year}${month}${day}/`;
-
-  const todayFaults = (db.faults || []).filter(f => f.id.startsWith(prefix));
-  let nextSeq = 1;
-  if (todayFaults.length > 0) {
-    const sequences = todayFaults.map(f => {
-      const parts = f.id.split('/');
-      return parseInt(parts[parts.length - 1], 10);
-    }).filter(num => !isNaN(num));
-    if (sequences.length > 0) nextSeq = Math.max(...sequences) + 1;
-  }
-  return `${prefix}${String(nextSeq).padStart(3, '0')}`;
-}
+  const now = ne

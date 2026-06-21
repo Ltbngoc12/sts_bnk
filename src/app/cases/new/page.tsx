@@ -127,10 +127,11 @@ export default function NewCasePage() {
       });
 
       if (!caseRes.ok) {
-        throw new Error('Failed to create Case container.');
+        const errBody = await caseRes.json().catch(() => ({}));
+        throw new Error(errBody.error || `Failed to create Case container. (HTTP ${caseRes.status})`);
       }
 
-      const newCase = await caseRes.ok ? await caseRes.json() : null;
+      const newCase = await caseRes.json();
       if (!newCase) {
         throw new Error('Invalid case response.');
       }
@@ -599,10 +600,4 @@ export default function NewCasePage() {
             </button>
             <button type="submit" className="btn btn-primary" disabled={submitting}>
               {submitting ? 'Creating Case...' : 'CREATE CASE'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
+      

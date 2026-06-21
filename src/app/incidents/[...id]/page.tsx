@@ -1,21 +1,22 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { 
-  Incident, 
-  Case, 
-  PersonalInjury, 
-  PersonInvolved, 
-  Task, 
-  Fault, 
-  BroadcastRecord, 
-  Occurrence 
+import {
+  Incident,
+  Case,
+  PersonalInjury,
+  PersonInvolved,
+  Task,
+  Fault,
+  BroadcastRecord,
+  Occurrence
 } from '@/lib/db';
 import { useRole } from '@/context/RoleContext';
 import { getIncidentTaxonomy, getFaultTaxonomy } from '@/lib/taxonomy';
 import MultiResponderSelect from '@/components/MultiResponderSelect';
+import { useNotifications } from '@/context/NotificationContext';
 
 interface HydratedIncident extends Incident {
   relatedTasks?: Task[];
@@ -148,6 +149,10 @@ export default function IncidentDetailsPage() {
   const [elapsedMinutes, setElapsedMinutes] = useState(0);
   const [elapsedDays, setElapsedDays] = useState(0);
 
+  // Notification system + one-shot guards for crisis reminder
+  const { addNotification } = useNotifications();
+  const crisisReminderFiredRef = useRef(false);
+
   // Core Particulars Edit Form State
   const [isEditingCore, setIsEditingCore] = useState(false);
   const [editTitle, setEditTitle] = useState('');
@@ -264,18 +269,48 @@ export default function IncidentDetailsPage() {
     if (incidentId) fetchIncidentData();
   }, [incidentId, fetchIncidentData]);
 
-  // Track elapsed time since incident occurred
+  // Track elapsed time since incident occurred + fire 45-min crisis reminder once
   useEffect(() => {
     if (!incident) return;
+    // Reset the one-shot guard whenever a different incident is loaded
+    crisisReminderFiredRef.current = false;
+
     const calculateTime = () => {
       const occurrenceTime = new Date(incident.dateTime).getTime();
       const diffMs = Date.now() - occurrenceTime;
-      setElapsedMinutes(Math.floor(diffMs / (60 * 1000)));
-      setElapsedDays(Math.floor(diffMs / (24 * 60 * 60 * 1000)));
+      const mins = Math.floor(diffMs / (60 * 1000));
+      const days = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+      setElapsedMinutes(mins);
+      setElapsedDays(days);
+
+      // FRD §6.4: fire notification once when 45-min threshold is crossed for live incidents
+      if (
+        mins >= 45 &&
+        !crisisReminderFiredRef.current &&
+        incident.status !== 'Closed' &&
+        incident.status !== 'Pending Endorsement'
+      ) {
+        crisisReminderFiredRef.current = true;
+        addNotification({
+          title: '⏱ Crisis Level Review Required',
+          message: `Incident ${incident.id} has been active for ${mins} min. Review and confirm crisis level (currently Level ${incident.crisisLevel}).`,
+          role: 'Controller',
+          type: 'incident',
+          link: `/incidents/${incident.id}`,
+        });
+        addNotification({
+          title: '⏱ Crisis Level Review Required',
+          message: `Incident ${incident.id} has been active for ${mins} min. Review and confirm crisis level (currently Level ${incident.crisisLevel}).`,
+          role: 'Duty Officer',
+          type: 'incident',
+          link: `/incidents/${incident.id}`,
+        });
+      }
     };
     calculateTime();
     const timer = setInterval(calculateTime, 15000); // Update every 15s
     return () => clearInterval(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [incident]);
 
   // Action POST handlers
@@ -1392,11 +1427,34 @@ export default function IncidentDetailsPage() {
         </div>
       )}
       {showCrisisReviewReminder && (
-        <div className="alert-banner info-banner glass" style={{ marginBottom: '10px' }}>
-          <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+        <div
+          className="alert-banner glass"
+          style={{
+            marginBottom: '10px',
+            background: 'rgba(239,68,68,0.10)',
+            border: '1.5px solid rgba(239,68,68,0.40)',
+            animation: 'crisisPulse 2s ease-in-out infinite',
+            color: '#FCA5A5',
+          }}
+        >
+          <style>{`
+            @keyframes crisisPulse {
+              0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.20); }
+              50%       { box-shadow: 0 0 0 6px rgba(239,68,68,0); }
+            }
+          `}</style>
+          <svg width="18" height="18" fill="none" stroke="#EF4444" strokeWidth="2.2" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10" />
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3" />
           </svg>
-          <span><strong>Crisis Review Reminder:</strong> Review crisis level (Level {incident.crisisLevel}) as 45 minutes have elapsed since logging ({elapsedMinutes} mins elapsed).</span>
+          <span>
+            <strong style={{ color: '#EF4444' }}>⏱ Crisis Level Review Required</strong>
+            {' — '}
+            {elapsedMinutes} min elapsed since incident was logged. Please review and confirm crisis level
+            {' '}
+            <span style={{ fontWeight: 700, color: '#EF4444' }}>Level {incident.crisisLevel}</span>.
+            {' '}This reminder does not escalate the level automatically.
+          </span>
         </div>
       )}
       {incident.mediaInvolvement.mediaAtScene && (
@@ -3080,111 +3138,4 @@ export default function IncidentDetailsPage() {
                       </div>
                       <span className={s.status === 'Closed' ? 'badge badge-closed' : 'badge badge-live'} style={{ scale: '0.9', transformOrigin: 'right center' }}>{s.status}</span>
                     </div>
-                    <div style={{ fontWeight: 600, fontSize: 13 }}>{s.title}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-                      Reporter: {s.reporterName}
-                      {s.dateTime && <span style={{ marginLeft: 10 }}>{new Date(s.dateTime).toLocaleString('en-SG', { dateStyle: 'short', timeStyle: 'short' })}</span>}
-                    </div>
-                    {s.summary && <div style={{ fontSize: 12, color: 'var(--text-sub)', marginTop: 6, fontStyle: 'italic', borderTop: '1px dashed var(--border-color)', paddingTop: 6 }}>{s.summary}</div>}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    )}
-      </div>
-
-      {/* Controller Confirm Completion Modal */}
-      {showCompleteModal && (
-        <div className="modal-overlay">
-          <div className="modal-box glass">
-            <h2 className="modal-title">Confirm Completion</h2>
-            <div className="form-group">
-              <p style={{ fontSize: '13px', color: 'var(--text-sub)', margin: '8px 0' }}>
-                Confirm that all Responder inputs have been reviewed and the Incident record is complete. Status will change to <strong>Live (Completed)</strong>.
-              </p>
-            </div>
-            <div className="modal-actions">
-              <button className="btn btn-secondary btn-sm" onClick={() => setShowCompleteModal(false)}>Cancel</button>
-              <button className="btn btn-success btn-sm" onClick={handleComplete} disabled={saving}>Confirm</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Return Incident to Controller Modal */}
-      {showReturnModal && (
-        <div className="modal-overlay">
-          <div className="modal-box glass">
-            <h2 className="modal-title">Return Incident to Controller</h2>
-            <div className="form-group" style={{ marginTop: '12px' }}>
-              <label style={{ fontSize: '13px', fontWeight: '600', display: 'block', marginBottom: '6px' }}>Completion Remarks *</label>
-              <textarea
-                className="form-control"
-                rows={4}
-                value={modalRemarks}
-                onChange={(e) => setModalRemarks(e.target.value)}
-                placeholder="Specify the revision required by the Controller..."
-                style={{ width: '100%', padding: '8px', fontSize: '13px' }}
-                required
-              />
-            </div>
-            <div className="modal-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
-              <button className="btn btn-secondary btn-sm" onClick={() => setShowReturnModal(false)}>Cancel</button>
-              <button 
-                className="btn btn-danger btn-sm" 
-                onClick={async () => {
-                  if (!modalRemarks.trim()) return;
-                  const ok = await performAction('return', { returnRemarks: modalRemarks.trim() });
-                  if (ok) {
-                    setShowReturnModal(false);
-                  }
-                }}
-                disabled={saving || !modalRemarks.trim()}
-              >
-                Return to Controller
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Approve Incident Closure Modal */}
-      {showApproveModal && (
-        <div className="modal-overlay">
-          <div className="modal-box glass">
-            <h2 className="modal-title">Approve Incident Closure</h2>
-            <div className="form-group" style={{ marginTop: '12px' }}>
-              <label style={{ fontSize: '13px', fontWeight: '600', display: 'block', marginBottom: '6px' }}>Completion Remarks (Optional)</label>
-              <textarea
-                className="form-control"
-                rows={4}
-                value={modalRemarks}
-                onChange={(e) => setModalRemarks(e.target.value)}
-                placeholder="Enter approval notes or remarks..."
-                style={{ width: '100%', padding: '8px', fontSize: '13px' }}
-              />
-            </div>
-            <div className="modal-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
-              <button className="btn btn-secondary btn-sm" onClick={() => setShowApproveModal(false)}>Cancel</button>
-              <button 
-                className="btn btn-success btn-sm" 
-                onClick={async () => {
-                  const ok = await performAction('close', { closureRemarks: modalRemarks.trim() });
-                  if (ok) {
-                    setShowApproveModal(false);
-                  }
-                }}
-                disabled={saving}
-              >
-                Approve & Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+                    <div style={{ fontWeight: 600,
