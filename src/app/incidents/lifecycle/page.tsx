@@ -862,4 +862,34 @@ export default function IncidentLifecyclePage() {
 
                 <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
                   <div className="section-label">Action Triggers</div>
-                  <ul style={{ paddingLeft: '14px', listS
+                  <ul style={{ paddingLeft: '14px', listStyleType: 'disc', fontSize: '11.5px', color: 'var(--text-sub)', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    {activeNodeDetails.actionTriggers.map((trig, idx) => (
+                      <li key={idx}>{trig}</li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
+                  <div className="section-label">Action Panel Representation</div>
+                  <div style={{ padding: '8px 10px', background: 'var(--bg-inset)', borderRadius: '6px', border: '1px solid var(--border-color)', fontSize: '11.5px', color: 'var(--text-sub)', fontWeight: '500' }}>
+                    {activeNodeDetails.actionPanelState}
+                  </div>
+                </div>
+
+                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
+                  <div className="section-label">Operational Impacts</div>
+                  <ul style={{ paddingLeft: '14px', listStyleType: 'disc', fontSize: '11.5px', color: 'var(--text-sub)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {activeNodeDetails.operationalImpacts.map((imp, idx) => (
+                      <li key={idx}>{imp}</li>
+                    ))}
+                  </ul>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+      </div>
+    </>
+  );
+}

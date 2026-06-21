@@ -226,4 +226,242 @@ export default function OccurrencesPage() {
           {loading ? (
             <div className="occ-loading glass">Loading diary entries…</div>
           ) : filtered.length === 0 ? (
-            <div className="occ-empty glass">No entries found matc
+            <div className="occ-empty glass">No entries found matching your filters.</div>
+          ) : (
+            <div className="occ-entries-timeline">
+              {filtered.map(o => (
+                <div className="occ-card glass" key={o.id}>
+                  {/* Header row */}
+                  <div className="occ-card-header">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span className="occ-id">{o.id}</span>
+                      {o.caseId && (
+                        <Link href={`/cases/${o.caseId}`} style={{ textDecoration: 'none' }}>
+                          <span className="badge badge-ack" style={{ fontSize: 10, padding: '1px 6px', cursor: 'pointer' }}>
+                            Case: {o.caseId}
+                          </span>
+                        </Link>
+                      )}
+                      {o.amendments && o.amendments.length > 0 && (
+                        <span
+                          className="badge"
+                          style={{ fontSize: 10, padding: '1px 6px', background: 'rgba(245,158,11,0.12)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.2)', cursor: 'pointer' }}
+                          onClick={() => setViewingAmendments(o)}
+                          title="View amendment history"
+                        >
+                          ✏ {o.amendments.length} amendment{o.amendments.length > 1 ? 's' : ''}
+                        </span>
+                      )}
+                    </div>
+                    <span className="occ-time">
+                      {new Date(o.dateTime).toLocaleDateString('en-SG', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      {' · '}
+                      {new Date(o.dateTime).toLocaleTimeString('en-SG', { hour: '2-digit', minute: '2-digit', hour12: false })}
+                    </span>
+                  </div>
+
+                  <h2 className="occ-topic">{o.topic}</h2>
+                  <p className="occ-content">{o.content}</p>
+
+                  <div className="occ-card-footer">
+                    <span>Logged by: <strong>{o.user}</strong></span>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      {canEdit && (
+                        <>
+                          {/* Edit / Amend */}
+                          <button
+                            className="btn btn-secondary"
+                            style={{ fontSize: 11, padding: '3px 10px' }}
+                            onClick={() => { setEditingEntry(o); setEditContent(o.content); }}
+                          >
+                            ✏ Amend
+                          </button>
+                          {/* Escalate to Incident */}
+                          <button
+                            className="btn"
+                            style={{ fontSize: 11, padding: '3px 10px', background: 'rgba(239,68,68,0.12)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.25)' }}
+                            onClick={() => setEscalatingEntry(o)}
+                          >
+                            🔺 Escalate to Incident
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Create Modal ───────────────────────────────────────────────────────── */}
+      {showCreateForm && (
+        <div className="modal-backdrop">
+          <div className="create-case-modal glass" style={{ maxWidth: 560 }}>
+            <div className="modal-header">
+              <h2>NEW E-DIARY ENTRY</h2>
+              <button className="close-btn" onClick={() => setShowCreateForm(false)}>✕</button>
+            </div>
+            <form onSubmit={handleCreate} className="modal-form">
+              <div className="modal-scroll-area">
+
+                <div className="form-group">
+                  <label>Topic / Subject *</label>
+                  <select value={topic} onChange={e => setTopic(e.target.value)} required className="form-control select-dark">
+                    <option value="">— Select topic —</option>
+                    {TOPICS.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+
+                {topic === 'Others' && (
+                  <div className="form-group">
+                    <label>Custom Topic *</label>
+                    <input type="text" placeholder="e.g. Unusual weather advisory"
+                      value={customTopic} onChange={e => setCustomTopic(e.target.value)}
+                      required className="form-control" />
+                  </div>
+                )}
+
+                <div className="form-group">
+                  <label>Date &amp; Time of Occurrence</label>
+                  <input type="datetime-local" value={dateTime}
+                    onChange={e => setDateTime(e.target.value)} className="form-control" />
+                  <p className="sub-desc">Defaults to now. Backdating is permitted.</p>
+                </div>
+
+                <div className="form-group">
+                  <label>Link to Existing Case ID <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
+                  <input type="text" placeholder="e.g. SEN/CI/20260621/001 — leave blank to auto-create"
+                    value={caseIdInput} onChange={e => setCaseIdInput(e.target.value)} className="form-control" />
+                  <p className="sub-desc">If left blank, a Case will be auto-created and linked to this entry.</p>
+                </div>
+
+                <div className="form-group">
+                  <label>Narrative *</label>
+                  <textarea placeholder="Describe the occurrence, interaction, or advisory…"
+                    value={content} onChange={e => setContent(e.target.value)}
+                    required className="form-control" rows={5} />
+                </div>
+
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowCreateForm(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={submitting}>
+                  {submitting ? 'Submitting…' : 'SUBMIT ENTRY'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Amend Modal ────────────────────────────────────────────────────────── */}
+      {editingEntry && (
+        <div className="modal-backdrop">
+          <div className="create-case-modal glass" style={{ maxWidth: 520 }}>
+            <div className="modal-header">
+              <h2>AMEND ENTRY · {editingEntry.id}</h2>
+              <button className="close-btn" onClick={() => { setEditingEntry(null); setEditContent(''); }}>✕</button>
+            </div>
+            <form onSubmit={handleAmend} className="modal-form">
+              <div className="modal-scroll-area">
+                <div style={{ padding: '10px 12px', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 6, fontSize: 12, color: '#F59E0B', marginBottom: 16 }}>
+                  ⚠ The original text will be preserved in the amendment history. All amendments are timestamped and attributed.
+                </div>
+                <div className="form-group">
+                  <label>Original Text</label>
+                  <div style={{ padding: '8px 12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                    {editingEntry.content}
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Amended Text *</label>
+                  <textarea value={editContent} onChange={e => setEditContent(e.target.value)}
+                    required className="form-control" rows={5} />
+                </div>
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="btn btn-secondary" onClick={() => { setEditingEntry(null); setEditContent(''); }}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={saving}>
+                  {saving ? 'Saving…' : 'SAVE AMENDMENT'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Amendment History Modal ─────────────────────────────────────────────── */}
+      {viewingAmendments && (
+        <div className="modal-backdrop">
+          <div className="create-case-modal glass" style={{ maxWidth: 520 }}>
+            <div className="modal-header">
+              <h2>AMENDMENT HISTORY · {viewingAmendments.id}</h2>
+              <button className="close-btn" onClick={() => setViewingAmendments(null)}>✕</button>
+            </div>
+            <div className="modal-form">
+              <div className="modal-scroll-area">
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
+                  {viewingAmendments.amendments?.length || 0} amendment(s) recorded. Showing original text before each amendment.
+                </p>
+                {(viewingAmendments.amendments || []).map((am, idx) => (
+                  <div key={idx} style={{ marginBottom: 14, padding: '10px 12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6 }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>
+                      Amendment #{idx + 1} · {new Date(am.timestamp).toLocaleString('en-SG')} · by <strong>{am.amendedBy}</strong>
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--text-sub)', fontStyle: 'italic' }}>
+                      Original: "{am.originalText}"
+                    </div>
+                  </div>
+                ))}
+                <div style={{ marginTop: 12, padding: '10px 12px', background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)', borderRadius: 6 }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Current text:</div>
+                  <div style={{ fontSize: 13, color: 'var(--text-main)' }}>{viewingAmendments.content}</div>
+                </div>
+              </div>
+              <div className="modal-actions">
+                <button className="btn btn-secondary" onClick={() => setViewingAmendments(null)}>Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Escalate Confirm Modal ──────────────────────────────────────────────── */}
+      {escalatingEntry && (
+        <div className="modal-backdrop">
+          <div className="create-case-modal glass" style={{ maxWidth: 460 }}>
+            <div className="modal-header">
+              <h2>ESCALATE TO INCIDENT</h2>
+              <button className="close-btn" onClick={() => setEscalatingEntry(null)}>✕</button>
+            </div>
+            <div className="modal-form">
+              <div className="modal-scroll-area">
+                <p style={{ fontSize: 13, color: 'var(--text-sub)', lineHeight: 1.7 }}>
+                  You are about to create a new <strong>Incident</strong> within the same Case as this e-Diary entry.
+                </p>
+                <div style={{ margin: '12px 0', padding: '10px 14px', background: 'rgba(255,255,255,0.04)', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)' }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>e-Diary Entry</div>
+                  <div style={{ fontWeight: 600, fontSize: 13 }}>{escalatingEntry.id} · {escalatingEntry.topic}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                    Case: {escalatingEntry.caseId || 'auto-assign'}
+                  </div>
+                </div>
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                  The e-Diary entry will be <strong>retained</strong> as a journal record. The new Incident will be linked to the same Case.
+                </p>
+              </div>
+              <div className="modal-actions">
+                <button className="btn btn-secondary" onClick={() => setEscalatingEntry(null)}>Cancel</button>
+                <button className="btn btn-primary" onClick={handleEscalate} style={{ background: '#EF4444', borderColor: '#EF4444' }}>
+                  🔺 CREATE INCIDENT
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}

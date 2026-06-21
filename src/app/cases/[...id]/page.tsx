@@ -815,4 +815,179 @@ export default function CaseDetailsPage() {
               <>
                 <div className="modal-title">✓ Fault Saved as Draft</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '4px 0 16px' }}>
-           
+                  {faultSubmitResult.faultId && (
+                    <div style={{ fontSize: 13 }}>Fault ID: <code style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-primary)' }}>{faultSubmitResult.faultId}</code></div>
+                  )}
+                  <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>Status: Created. Use <strong>Submit to CMMS</strong> in the fault list or fault detail page to send to IFM.</div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="modal-title">Log Infrastructure Fault — {caseId}</div>
+                <form onSubmit={handleRaiseFault}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <div className="form-group">
+                      <label>Fault Type *</label>
+                      <select
+                        className="form-control select-dark"
+                        required
+                        value={faultFormType}
+                        onChange={e => { setFaultFormType(e.target.value); setFaultFormSubType(''); }}
+                      >
+                        <option value="">-- Select Type --</option>
+                        {Object.keys(faultTaxonomy).sort().map(t => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label>Fault Sub-type *</label>
+                      <select
+                        className="form-control select-dark"
+                        required
+                        value={faultFormSubType}
+                        onChange={e => setFaultFormSubType(e.target.value)}
+                        disabled={!faultFormType}
+                      >
+                        <option value="">-- Select Sub-type --</option>
+                        {faultFormType && faultTaxonomy[faultFormType]?.map(st => (
+                          <option key={st} value={st}>{st}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="form-group" style={{ marginTop: 10 }}>
+                    <label>Location (Common Name)</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder={caseData?.incident?.location?.commonName || 'e.g. Siloso Beach Station Carpark Entrance'}
+                      value={faultFormLocation}
+                      onChange={e => setFaultFormLocation(e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group" style={{ marginTop: 10 }}>
+                    <label>Fault Description *</label>
+                    <textarea
+                      className="form-control"
+                      rows={3}
+                      required
+                      placeholder="Describe the defect and its impact..."
+                      value={faultFormDesc}
+                      onChange={e => setFaultFormDesc(e.target.value)}
+                    />
+                  </div>
+                  <div className="modal-actions">
+                    <button type="button" className="btn btn-secondary" onClick={() => { setShowFaultModal(false); setFaultFormType(''); setFaultFormSubType(''); setFaultFormLocation(''); setFaultFormDesc(''); }}>Cancel</button>
+                    <button type="submit" className="btn btn-primary" disabled={faultSubmitting || !faultFormType || !faultFormSubType}>
+                      {faultSubmitting ? 'Saving...' : 'Save Fault'}
+                    </button>
+                  </div>
+                </form>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Log e-Diary Occurrence Modal */}
+      {showEdiaryModal && (
+        <div className="modal-overlay">
+          <div className="modal-box" style={{ maxWidth: 500 }}>
+            <div className="modal-title">Write Occurrence Diary Entry</div>
+            <form onSubmit={handleCreateEDiary}>
+              <div className="form-group">
+                <label>Occurrence Topic/Subject *</label>
+                <select
+                  value={ediaryTopic}
+                  onChange={e => setEdiaryTopic(e.target.value)}
+                  required
+                  className="form-control select-dark"
+                >
+                  <option value="">-- Select Topic --</option>
+                  <option value="VIP Visit Advisory">VIP Visit Advisory</option>
+                  <option value="Routine Siren Testing">Routine Siren Testing</option>
+                  <option value="Ranger Shift Handover">Ranger Shift Handover</option>
+                  <option value="General Public Interaction">General Public Interaction</option>
+                  <option value="Coordinated Drill/Exercise">Coordinated Drill/Exercise</option>
+                  <option value="Lost and Found Report">Lost and Found Report</option>
+                  <option value="Contractor Access Granted">Contractor Access Granted</option>
+                  <option value="Others">Others</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>Narrative Log Details *</label>
+                <textarea
+                  placeholder="Describe the check or interaction details..."
+                  value={ediaryContent}
+                  onChange={e => setEdiaryContent(e.target.value)}
+                  required
+                  className="form-control"
+                  rows={4}
+                />
+              </div>
+
+              <div className="modal-actions">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowEdiaryModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary">Submit Diary Log</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      <style jsx>{`
+        /* ── Case detail layout ───────────────────────────────────────── */
+        .case-content-grid {
+          display: grid;
+          grid-template-columns: 1fr 300px;
+          gap: 16px;
+          align-items: start;
+        }
+        .case-main-col { display: flex; flex-direction: column; gap: 14px; }
+        .case-side-col { display: flex; flex-direction: column; gap: 12px; }
+
+        /* ── Component Cards grid ────────────────────────────────────── */
+        .component-card-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 16px;
+        }
+        .comp-card {
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          padding: 16px 20px;
+          min-height: 250px;
+        }
+        .comp-card-body {
+          flex: 1;
+          margin-top: 12px;
+          margin-bottom: 14px;
+        }
+
+        /* ── Empty component state ────────────────────────────────────── */
+        .empty-comp-state {
+          padding: 20px;
+          text-align: center;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+        }
+
+        /* ── Side info rows ──────────────────────────────────────────── */
+        .cd-info-row {
+          display: flex; justify-content: space-between; align-items: center;
+          font-size: 12.5px; padding: 6px 0;
+          border-bottom: 1px solid var(--border-color);
+        }
+        .cd-info-row:last-child { border-bottom: none; }
+        .cd-info-label { color: var(--text-muted); font-weight: 500; }
+        .cd-info-value { text-align: right; color: var(--text-main); font-weight: 500; }
+      `}</style>
+    </>
+  );
+}

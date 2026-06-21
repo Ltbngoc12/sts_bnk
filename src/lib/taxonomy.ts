@@ -57,4 +57,28 @@ export function getFaultTaxonomy(): Record<string, string[]> {
   return mapping;
 }
 
-export function getIncidentTaxonomy(): Record<str
+export function getIncidentTaxonomy(): Record<string, string[]> {
+  if (typeof window === 'undefined') {
+    // Return default mapping if server-side rendered
+    const mapping: Record<string, string[]> = {};
+    DEFAULT_REFERENCE_DATA
+      .filter(item => item.category === 'Incident' && item.status === 'Active')
+      .forEach(item => {
+        mapping[item.name] = item.subTypes || [];
+      });
+    return mapping;
+  }
+
+  const stored = localStorage.getItem('admin_reference_data');
+  const items: TaxonomyItem[] = stored ? JSON.parse(stored) : [];
+  
+  // Filter for Active Incident types
+  const activeIncidentItems = (items.length > 0 ? items : DEFAULT_REFERENCE_DATA)
+    .filter(item => item.category === 'Incident' && item.status === 'Active');
+
+  const mapping: Record<string, string[]> = {};
+  activeIncidentItems.forEach(item => {
+    mapping[item.name] = item.subTypes || [];
+  });
+  return mapping;
+}

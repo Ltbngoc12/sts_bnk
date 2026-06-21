@@ -600,4 +600,10 @@ export default function NewCasePage() {
             </button>
             <button type="submit" className="btn btn-primary" disabled={submitting}>
               {submitting ? 'Creating Case...' : 'CREATE CASE'}
-      
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}

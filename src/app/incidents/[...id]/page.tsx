@@ -3138,4 +3138,111 @@ export default function IncidentDetailsPage() {
                       </div>
                       <span className={s.status === 'Closed' ? 'badge badge-closed' : 'badge badge-live'} style={{ scale: '0.9', transformOrigin: 'right center' }}>{s.status}</span>
                     </div>
-                    <div style={{ fontWeight: 600,
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{s.title}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                      Reporter: {s.reporterName}
+                      {s.dateTime && <span style={{ marginLeft: 10 }}>{new Date(s.dateTime).toLocaleString('en-SG', { dateStyle: 'short', timeStyle: 'short' })}</span>}
+                    </div>
+                    {s.summary && <div style={{ fontSize: 12, color: 'var(--text-sub)', marginTop: 6, fontStyle: 'italic', borderTop: '1px dashed var(--border-color)', paddingTop: 6 }}>{s.summary}</div>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )}
+      </div>
+
+      {/* Controller Confirm Completion Modal */}
+      {showCompleteModal && (
+        <div className="modal-overlay">
+          <div className="modal-box glass">
+            <h2 className="modal-title">Confirm Completion</h2>
+            <div className="form-group">
+              <p style={{ fontSize: '13px', color: 'var(--text-sub)', margin: '8px 0' }}>
+                Confirm that all Responder inputs have been reviewed and the Incident record is complete. Status will change to <strong>Live (Completed)</strong>.
+              </p>
+            </div>
+            <div className="modal-actions">
+              <button className="btn btn-secondary btn-sm" onClick={() => setShowCompleteModal(false)}>Cancel</button>
+              <button className="btn btn-success btn-sm" onClick={handleComplete} disabled={saving}>Confirm</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Return Incident to Controller Modal */}
+      {showReturnModal && (
+        <div className="modal-overlay">
+          <div className="modal-box glass">
+            <h2 className="modal-title">Return Incident to Controller</h2>
+            <div className="form-group" style={{ marginTop: '12px' }}>
+              <label style={{ fontSize: '13px', fontWeight: '600', display: 'block', marginBottom: '6px' }}>Completion Remarks *</label>
+              <textarea
+                className="form-control"
+                rows={4}
+                value={modalRemarks}
+                onChange={(e) => setModalRemarks(e.target.value)}
+                placeholder="Specify the revision required by the Controller..."
+                style={{ width: '100%', padding: '8px', fontSize: '13px' }}
+                required
+              />
+            </div>
+            <div className="modal-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
+              <button className="btn btn-secondary btn-sm" onClick={() => setShowReturnModal(false)}>Cancel</button>
+              <button 
+                className="btn btn-danger btn-sm" 
+                onClick={async () => {
+                  if (!modalRemarks.trim()) return;
+                  const ok = await performAction('return', { returnRemarks: modalRemarks.trim() });
+                  if (ok) {
+                    setShowReturnModal(false);
+                  }
+                }}
+                disabled={saving || !modalRemarks.trim()}
+              >
+                Return to Controller
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Approve Incident Closure Modal */}
+      {showApproveModal && (
+        <div className="modal-overlay">
+          <div className="modal-box glass">
+            <h2 className="modal-title">Approve Incident Closure</h2>
+            <div className="form-group" style={{ marginTop: '12px' }}>
+              <label style={{ fontSize: '13px', fontWeight: '600', display: 'block', marginBottom: '6px' }}>Completion Remarks (Optional)</label>
+              <textarea
+                className="form-control"
+                rows={4}
+                value={modalRemarks}
+                onChange={(e) => setModalRemarks(e.target.value)}
+                placeholder="Enter approval notes or remarks..."
+                style={{ width: '100%', padding: '8px', fontSize: '13px' }}
+              />
+            </div>
+            <div className="modal-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
+              <button className="btn btn-secondary btn-sm" onClick={() => setShowApproveModal(false)}>Cancel</button>
+              <button 
+                className="btn btn-success btn-sm" 
+                onClick={async () => {
+                  const ok = await performAction('close', { closureRemarks: modalRemarks.trim() });
+                  if (ok) {
+                    setShowApproveModal(false);
+                  }
+                }}
+                disabled={saving}
+              >
+                Approve & Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

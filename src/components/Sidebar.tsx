@@ -484,4 +484,34 @@ export const Sidebar: React.FC = () => {
           display: flex; flex-direction: column; gap: 5px;
         }
 
-        .toggle-lab
+        .toggle-label {
+          display: flex; align-items: center; justify-content: space-between;
+          font-size: 11px; color: rgba(255,255,255,0.55); cursor: pointer;
+        }
+
+        .toggle-switch {
+          width: 32px; height: 18px; border-radius: 9px;
+          background: rgba(255,255,255,0.15); border: none;
+          cursor: pointer; position: relative;
+          transition: background 0.2s;
+          padding: 0; flex-shrink: 0;
+        }
+        .toggle-switch.on { background: #16A34A; }
+
+        .toggle-thumb {
+          position: absolute; top: 2px; left: 2px;
+          width: 14px; height: 14px; border-radius: 50%;
+          background: #fff;
+          transition: transform 0.2s;
+          display: block;
+        }
+        .toggle-switch.on .toggle-thumb { transform: translateX(14px); }
+
+        .elevation-badge {
+          font-size: 9.5px; font-weight: 700; letter-spacing: 0.06em;
+          color: #16A34A; text-transform: uppercase;
+        }
+      `}</style>
+    </div>
+  );
+};
