@@ -143,7 +143,7 @@ export default function CaseLogPage() {
           <h1>CASE DATA LOG</h1>
           <p>Master index of all operational cases — Incidents, Tasks, e-Diary occurrences, and Faults</p>
         </div>
-        {(role === 'Controller' || role === 'Duty Officer' || role === 'Duty Manager' || role === 'System Administrator' || role === 'Current Ops Administrator') && (
+        {(['Controller', 'Duty Officer', 'Duty Manager', 'System Administrator', 'Current Ops Administrator'].includes(role)) && (
           <button
             type="button"
             className="btn btn-primary"

@@ -124,7 +124,7 @@ export default function FaultsPage() {
           <p>Infrastructure defects submitted to IFM CMMS &bull; CMS captures entry point and stores Fault ID reference</p>
         </div>
         {isController && (
-          <button className="btn btn-primary" onClick={() => { setShowCreateModal(true); setSubmitResult(null); }}>
+          <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: 16, height: 16 }}>
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
             </svg>
