@@ -7,7 +7,7 @@ import { Occurrence } from '@/lib/db';
 import { useRole } from '@/context/RoleContext';
 
 // Roles allowed to access e-Diary per FRD §8.3
-const ALLOWED_ROLES = ['Controller', 'Duty Officer', 'Duty Manager', 'System Administrator'];
+const ALLOWED_ROLES = ['Controller', 'Duty Officer', 'Duty Manager', 'System Administrator', 'Current Ops Administrator'];
 
 // Predefined occurrence topics
 const TOPICS = [
@@ -23,9 +23,29 @@ const TOPICS = [
   'Others',
 ];
 
+// TEMPORARY: Show "Upcoming" placeholder — remove this block when ready to demo
+const SHOW_UPCOMING = true;
+
+function UpcomingPlaceholder({ title }: { title: string }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: '16px', color: 'var(--text-muted)' }}>
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-faint)' }}>
+        <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+      </svg>
+      <div style={{ textAlign: 'center' }}>
+        <p style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>{title}</p>
+        <p style={{ fontSize: '12px', color: 'var(--text-faint)' }}>This module is currently under review and will be available soon.</p>
+      </div>
+      <span style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', padding: '4px 12px', borderRadius: '99px', border: '1px solid var(--border-color)', color: 'var(--text-faint)', background: 'var(--bg-inset)' }}>Upcoming</span>
+    </div>
+  );
+}
+
 export default function OccurrencesPage() {
   const { role, username } = useRole();
   const router = useRouter();
+
+  if (SHOW_UPCOMING) return <UpcomingPlaceholder title="e-Diary" />;
 
   const [occurrences, setOccurrences] = useState<Occurrence[]>([]);
   const [loading, setLoading] = useState(true);
@@ -81,7 +101,7 @@ export default function OccurrencesPage() {
       <div className="glass" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
         <div style={{ fontSize: '32px', marginBottom: '12px' }}>🔒</div>
         <div style={{ fontWeight: 700, fontSize: '15px', marginBottom: '8px' }}>Access Restricted</div>
-        <div style={{ fontSize: '13px' }}>The e-Diary module is accessible to Controllers, Duty Officers, Duty Managers, and System Administrators only.</div>
+        <div style={{ fontSize: '13px' }}>The e-Diary module is accessible to Controllers, Duty Officers, Duty Managers, Current Ops Administrators, and System Administrators only.</div>
       </div>
     );
   }

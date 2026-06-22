@@ -5,8 +5,28 @@ import Link from 'next/link';
 import { Task, Case } from '@/lib/db';
 import { useRole } from '@/context/RoleContext';
 
+// TEMPORARY: Show "Upcoming" placeholder — remove this block when ready to demo
+const SHOW_UPCOMING = true;
+
+function UpcomingPlaceholder({ title }: { title: string }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: '16px', color: 'var(--text-muted)' }}>
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-faint)' }}>
+        <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+      </svg>
+      <div style={{ textAlign: 'center' }}>
+        <p style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>{title}</p>
+        <p style={{ fontSize: '12px', color: 'var(--text-faint)' }}>This module is currently under review and will be available soon.</p>
+      </div>
+      <span style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', padding: '4px 12px', borderRadius: '99px', border: '1px solid var(--border-color)', color: 'var(--text-faint)', background: 'var(--bg-inset)' }}>Upcoming</span>
+    </div>
+  );
+}
+
 export default function TasksPage() {
   const { role, username } = useRole();
+
+  if (SHOW_UPCOMING) return <UpcomingPlaceholder title="Task Management Board" />;
   const [tasks, setTasks] = useState<Task[]>([]);
   const [cases, setCases] = useState<Case[]>([]);
   const [loading, setLoading] = useState(true);
@@ -168,7 +188,7 @@ export default function TasksPage() {
   };
 
   // Check role-based permission
-  const isController = role === 'Controller' || role === 'Duty Manager' || role === 'Duty Officer' || role === 'System Administrator';
+  const isController = role === 'Controller' || role === 'Duty Manager' || role === 'Duty Officer' || role === 'System Administrator' || role === 'Current Ops Administrator';
   const isRanger = role === 'Responder (Ranger)';
 
   return (

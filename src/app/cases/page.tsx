@@ -44,6 +44,7 @@ export default function CaseLogPage() {
 
   // Advanced Filters toggle
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showLinkedDropdown, setShowLinkedDropdown] = useState(false);
 
   // Global stats metadata
   const [stats, setStats] = useState({ total: 0, active: 0, triage: 0, closed: 0 });
@@ -123,6 +124,7 @@ export default function CaseLogPage() {
     setHasTasks(false);
     setHasFaults(false);
     setHasEDiary(false);
+    setShowLinkedDropdown(false);
     setPage(1);
   };
 
@@ -138,53 +140,48 @@ export default function CaseLogPage() {
       {/* Page header */}
       <div className="page-header glass">
         <div className="page-header-left">
-          <h1>Case Registry Log</h1>
+          <h1>CASE DATA LOG</h1>
           <p>Master index of all operational cases — Incidents, Tasks, e-Diary occurrences, and Faults</p>
         </div>
-        <div className="page-header-stats">
-          <div className="stat-chip">
-            <span className="stat-val">{stats.total}</span>
-            <span className="stat-lbl">Total</span>
-          </div>
-          <div className="stat-chip stat-chip-active">
-            <span className="stat-val">{stats.active}</span>
-            <span className="stat-lbl">Active</span>
-          </div>
-          <div className="stat-chip stat-chip-warn">
-            <span className="stat-val">{stats.triage}</span>
-            <span className="stat-lbl">Triage</span>
-          </div>
-          <div className="stat-chip stat-chip-muted">
-            <span className="stat-val">{stats.closed}</span>
-            <span className="stat-lbl">Closed</span>
-          </div>
-        </div>
+        {(role === 'Controller' || role === 'Duty Officer' || role === 'Duty Manager' || role === 'System Administrator' || role === 'Current Ops Administrator') && (
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={handleCreateCase}
+            style={{ fontSize: '13px', height: '38px', padding: '0 16px', textTransform: 'uppercase', letterSpacing: '0.04em' }}
+          >
+            + Create Case
+          </button>
+        )}
       </div>
 
-      {/* Filter bar */}
-      <div className="filter-bar glass" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '10px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-          <div className="filter-search" style={{ flex: '1', minWidth: '280px' }}>
-            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{ color: 'var(--text-faint)', flexShrink: 0 }}>
-              <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
-            </svg>
+      {/* Filter panel */}
+      <div className="glass" style={{ padding: '20px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+        {/* Main row */}
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+
+          {/* Search */}
+          <div style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.04em' }}>Search Registry:</label>
             <input
               type="text"
-              placeholder="Search Case ID or title…"
+              placeholder="Search by Case ID or title…"
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="filter-search-input"
-              id="case-search"
+              className="form-control"
+              style={{ width: '100%' }}
             />
           </div>
-          <div className="filter-selects" style={{ marginLeft: '0' }}>
-            <label htmlFor="status-filter" className="filter-label">Status:</label>
+
+          {/* Status */}
+          <div style={{ flex: '0 1 180px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.04em' }}>Status:</label>
             <select
-              id="status-filter"
               value={filterStatus}
               onChange={e => { setFilterStatus(e.target.value); setPage(1); }}
-              className="form-control"
-              style={{ width: '160px', height: '36px', fontSize: '13px', padding: '0 10px' }}
+              className="form-control select-dark"
+              style={{ width: '100%' }}
             >
               <option value="All">All Statuses</option>
               <option value="Pending Triage">Pending Triage</option>
@@ -193,91 +190,104 @@ export default function CaseLogPage() {
               <option value="Closed">Closed</option>
             </select>
           </div>
-          <button 
-            type="button" 
-            className="btn btn-secondary" 
-            onClick={() => setShowAdvanced(!showAdvanced)}
-            style={{ fontSize: '12px', height: '36px', display: 'flex', alignItems: 'center', gap: '4px' }}
-          >
-            {showAdvanced ? 'Hide Filters' : 'Advanced Filters'}
-          </button>
-          <button 
-            type="button" 
-            className="btn btn-secondary" 
-            onClick={handleResetFilters}
-            style={{ fontSize: '12px', height: '36px' }}
-          >
-            Reset
-          </button>
-          
-          {(role === 'Controller' || role === 'Duty Officer' || role === 'Duty Manager' || role === 'System Administrator') && (
-            <button 
-              type="button" 
-              className="btn btn-primary"
-              onClick={handleCreateCase}
-              style={{ fontSize: '12px', height: '36px', marginLeft: 'auto' }}
+
+          {/* Action buttons */}
+          <div style={{ display: 'flex', gap: '10px', height: '36px', alignItems: 'center' }}>
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="btn btn-secondary"
+              style={{ padding: '0 14px', fontSize: '12px', height: '100%', display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}
             >
-              + Create Case
+              ⚙️ {showAdvanced ? 'Hide Options' : 'More Options'}
             </button>
-          )}
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              className="btn btn-secondary"
+              style={{ padding: '0 10px', fontSize: '12px', height: '100%', border: 'none', background: 'transparent', textDecoration: 'underline', whiteSpace: 'nowrap' }}
+            >
+              Clear
+            </button>
+          </div>
         </div>
 
-        {/* Advanced Filters Panel */}
+        {/* Collapsible advanced filters */}
         {showAdvanced && (
-          <div className="advanced-filters-panel" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px', marginTop: '4px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-              <div>
-                <label className="filter-label" style={{ display: 'block', marginBottom: '4px' }}>Start Date</label>
-                <input 
-                  type="date" 
-                  value={startDate} 
-                  onChange={e => { setStartDate(e.target.value); setPage(1); }}
-                  className="form-control" 
-                  style={{ width: '100%', height: '36px' }}
-                />
-              </div>
-              <div>
-                <label className="filter-label" style={{ display: 'block', marginBottom: '4px' }}>End Date</label>
-                <input 
-                  type="date" 
-                  value={endDate} 
-                  onChange={e => { setEndDate(e.target.value); setPage(1); }}
-                  className="form-control" 
-                  style={{ width: '100%', height: '36px' }}
-                />
-              </div>
-              <div>
-                <label className="filter-label" style={{ display: 'block', marginBottom: '4px' }}>Created By</label>
-                <input 
-                  type="text" 
-                  placeholder="Creator name..." 
-                  value={createdBy} 
-                  onChange={e => { setCreatedBy(e.target.value); setPage(1); }}
-                  className="form-control" 
-                  style={{ width: '100%', height: '36px', padding: '0 10px', fontSize: '13px' }}
-                />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '6px' }}>
-                <span className="filter-label" style={{ display: 'block', marginBottom: '2px' }}>Contains Linked Records:</span>
-                <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={hasIncident} onChange={e => { setHasIncident(e.target.checked); setPage(1); }} />
-                    Incident
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={hasTasks} onChange={e => { setHasTasks(e.target.checked); setPage(1); }} />
-                    Tasks
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={hasFaults} onChange={e => { setHasFaults(e.target.checked); setPage(1); }} />
-                    Faults
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={hasEDiary} onChange={e => { setHasEDiary(e.target.checked); setPage(1); }} />
-                    e-Diary
-                  </label>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Date From:</label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={e => { setStartDate(e.target.value); setPage(1); }}
+                className="form-control"
+                style={{ width: '100%' }}
+              />
+            </div>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Date To:</label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={e => { setEndDate(e.target.value); setPage(1); }}
+                className="form-control"
+                style={{ width: '100%' }}
+              />
+            </div>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Created By:</label>
+              <input
+                type="text"
+                placeholder="Creator name..."
+                value={createdBy}
+                onChange={e => { setCreatedBy(e.target.value); setPage(1); }}
+                className="form-control"
+                style={{ width: '100%' }}
+              />
+            </div>
+            <div className="form-group" style={{ margin: 0, position: 'relative' }}>
+              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Linked Records:</label>
+              {/* Trigger button */}
+              <button
+                type="button"
+                onClick={() => setShowLinkedDropdown(v => !v)}
+                className="form-control"
+                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', textAlign: 'left', background: 'var(--bg-inset)' }}
+              >
+                <span style={{ fontSize: '13px', color: [hasIncident, hasTasks, hasFaults, hasEDiary].some(Boolean) ? 'var(--text-main)' : 'var(--text-faint)' }}>
+                  {[hasIncident && 'Incident', hasTasks && 'Tasks', hasFaults && 'Faults', hasEDiary && 'e-Diary'].filter(Boolean).join(', ') || 'All Types'}
+                </span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0, transform: showLinkedDropdown ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </button>
+              {/* Dropdown panel */}
+              {showLinkedDropdown && (
+                <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 50, minWidth: '160px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', padding: '6px 0' }}>
+                  {[
+                    { label: 'Incident', checked: hasIncident, set: setHasIncident },
+                    { label: 'Tasks',    checked: hasTasks,    set: setHasTasks    },
+                    { label: 'Faults',   checked: hasFaults,   set: setHasFaults   },
+                    { label: 'e-Diary',  checked: hasEDiary,   set: setHasEDiary   },
+                  ].map(({ label, checked, set }) => (
+                    <label
+                      key={label}
+                      style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '7px 14px', fontSize: '13px', color: 'var(--text-main)', cursor: 'pointer' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-inset)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={e => { set(e.target.checked); setPage(1); }}
+                        style={{ accentColor: 'var(--color-accent)', width: '14px', height: '14px' }}
+                      />
+                      {label}
+                    </label>
+                  ))}
                 </div>
-              </div>
+              )}
             </div>
           </div>
         )}
@@ -425,23 +435,7 @@ export default function CaseLogPage() {
         .page-header-left h1 { font-size: 15px; font-weight: 700; }
         .page-header-left p  { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
 
-        .page-header-stats {
-          display: flex; gap: 10px;
-        }
-        .stat-chip {
-          display: flex; flex-direction: column; align-items: center;
-          padding: 6px 14px; border-radius: var(--radius-md);
-          background: var(--bg-inset); border: 1px solid var(--border-color);
-          min-width: 56px;
-        }
-        .stat-chip.stat-chip-active { border-color: var(--color-active-border); background: var(--color-active-bg); }
-        .stat-chip.stat-chip-warn   { border-color: var(--color-high-border);   background: var(--color-high-bg); }
-        .stat-chip.stat-chip-muted  { border-color: var(--border-color); }
-
-        .stat-val { font-family: var(--font-mono); font-size: 18px; font-weight: 600; line-height: 1; color: var(--text-main); }
-        .stat-lbl { font-size: 10px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 2px; }
-
-        .filter-bar {
+.filter-bar {
           padding: 12px 16px;
           display: flex; align-items: center; gap: 16px;
         }

@@ -71,24 +71,31 @@ export default function IncidentsPage() {
   ).sort();
 
   // Helper to match Incident Source dropdown options to database requestedBy values
-  const matchesSource = (incidentSourceFilter: string, requestedBy: string) => {
+  const matchesSource = (incidentSourceFilter: string, incident: any) => {
     if (incidentSourceFilter === 'All') return true;
-    const req = (requestedBy || '').toLowerCase();
+    // Prefer reportingSource (new field), fall back to requestedBy for legacy records
+    const src = ((incident.reportingSource || incident.requestedBy) ?? '').toLowerCase();
     const filter = incidentSourceFilter.toLowerCase();
-    
+
     if (filter === 'public phone') {
-      return req.includes('phone') || req.includes('call-in') || req.includes('guest') || req.includes('public');
+      return src.includes('phone') || src.includes('call-in') || src.includes('public');
     }
     if (filter === 'email') {
-      return req.includes('email');
+      return src.includes('email');
     }
     if (filter === 'ucs') {
-      return req.includes('ucs') || req.includes('controller') || req.includes('system') || req.includes('analytics') || req.includes('va');
+      return src.includes('ucs');
+    }
+    if (filter === 'va') {
+      return src.includes('va');
+    }
+    if (filter === 'state agency') {
+      return src.includes('state agency') || src.includes('state');
     }
     if (filter === 'government agency') {
-      return req.includes('agency') || req.includes('state') || req.includes('scdf') || req.includes('spf') || req.includes('mpa') || req.includes('government');
+      return src.includes('agency') || src.includes('scdf') || src.includes('spf') || src.includes('mpa') || src.includes('government');
     }
-    return req.includes(filter);
+    return src.includes(filter);
   };
 
   // Helper to match tab category or status pre-filters
@@ -160,14 +167,14 @@ export default function IncidentsPage() {
     if (filterType !== 'All' && inc.type !== filterType) return false;
     if (filterSubType !== 'All' && inc.subType !== filterSubType) return false;
     if (filterCrisisLevel !== 'All' && String(inc.crisisLevel) !== filterCrisisLevel) return false;
-    if (!matchesSource(filterSource, inc.requestedBy)) return false;
+    if (!matchesSource(filterSource, inc)) return false;
     if (filterController !== 'All' && inc.createdBy !== filterController) return false;
     if (!matchesDateRange(inc.dateTime)) return false;
 
     return true;
   });
 
-  const isController = role === 'Controller' || role === 'Duty Manager' || role === 'Duty Officer' || role === 'System Administrator';
+  const isController = role === 'Controller' || role === 'Duty Manager' || role === 'Duty Officer' || role === 'System Administrator' || role === 'Current Ops Administrator';
 
   // Helper for Status Badge styling classes
   const getStatusBadgeClass = (status: string) => {
@@ -424,7 +431,7 @@ export default function IncidentsPage() {
       </div>
 
       {/* Metrics Bar */}
-      <div className="metrics-grid mb-6">
+      <div className="metrics-grid mb-6" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
         <div className="metric-card glass total-incidents">
           <div className="metric-info">
             <h3>Total Incidents</h3>
@@ -447,15 +454,6 @@ export default function IncidentsPage() {
             <div className="metric-value text-warning">{pendingReviewCount}</div>
           </div>
           <div className="metric-icon" style={{ fontSize: '20px' }}>📝</div>
-        </div>
-
-        <div className="metric-card glass closed-today">
-          <div className="metric-info">
-            <h3>Closed Today</h3>
-            <div className="metric-value text-muted" style={{ fontSize: '18px', fontWeight: 'bold' }}>TBD</div>
-            <span className="badge badge-closed" style={{ marginTop: '4px', fontSize: '9px', padding: '1px 5px' }}>Not in FRD</span>
-          </div>
-          <div className="metric-icon" style={{ fontSize: '20px' }}>🔒</div>
         </div>
 
       </div>
@@ -576,6 +574,8 @@ export default function IncidentsPage() {
                 <option value="Public Phone">Public Phone</option>
                 <option value="Email">Email</option>
                 <option value="UCS">UCS</option>
+                <option value="VA">VA</option>
+                <option value="State Agency">State Agency</option>
                 <option value="Government Agency">Government Agency</option>
               </select>
             </div>
@@ -635,6 +635,7 @@ export default function IncidentsPage() {
                   <th>Location (Common Name)</th>
                   <th>Assigned Responder</th>
                   <th>Incident Status</th>
+                  <th>Closure Broadcast</th>
                   <th>Date Logged</th>
                 </tr>
               </thead>
@@ -672,6 +673,17 @@ export default function IncidentsPage() {
                           {inc.status}
                         </span>
                       </td>
+                      <td>
+                        {(inc as any).closureBroadcastStatus === 'pending' && (
+                          <span className="badge" style={{ background: 'var(--color-high-bg)', color: 'var(--color-high)', borderColor: 'var(--color-high-border)', fontSize: 10 }}>Pending</span>
+                        )}
+                        {(inc as any).closureBroadcastStatus === 'dispatched' && (
+                          <span className="badge badge-closed" style={{ fontSize: 10 }}>Dispatched</span>
+                        )}
+                        {!(inc as any).closureBroadcastStatus && (
+                          <span style={{ color: 'var(--text-faint)', fontSize: 11 }}>—</span>
+                        )}
+                      </td>
                       <td className="date-cell">
                         {new Date(inc.dateTime).toLocaleDateString('en-US')} {new Date(inc.dateTime).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })}
                       </td>
@@ -681,7 +693,7 @@ export default function IncidentsPage() {
               </tbody>
             </table>
           </div>
-        )}
+           )}
       </div>
     </>
   );

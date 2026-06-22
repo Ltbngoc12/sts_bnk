@@ -14,9 +14,10 @@ import {
   Occurrence
 } from '@/lib/db';
 import { useRole } from '@/context/RoleContext';
-import { getIncidentTaxonomy, getFaultTaxonomy } from '@/lib/taxonomy';
+import { getIncidentTaxonomy } from '@/lib/taxonomy';
 import MultiResponderSelect from '@/components/MultiResponderSelect';
 import { useNotifications } from '@/context/NotificationContext';
+import FaultCreateModal from '@/components/FaultCreateModal';
 
 interface HydratedIncident extends Incident {
   relatedTasks?: Task[];
@@ -78,27 +79,21 @@ export default function IncidentDetailsPage() {
   const [reviewRemarks, setReviewRemarks] = useState('');
 
   // Timeline & Refactoring States
-  const [activeTimelineTab, setActiveTimelineTab] = useState<'log' | 'system' | 'faults' | 'duplicates'>('log');
+  const [activeTimelineTab, setActiveTimelineTab] = useState<'log' | 'system' | 'faults' | 'duplicates'>('log'); // 'faults' = Faults & e-Diary tab
   const [editingLogEventNumber, setEditingLogEventNumber] = useState<number | null>(null);
   const [editingLogText, setEditingLogText] = useState('');
 
+  // Linked e-Diary entries (fetched by caseId)
+  const [linkedEDiaryEntries, setLinkedEDiaryEntries] = useState<any[]>([]);
+
   // Linked Fault Form States
-  const [showRaiseFaultForm, setShowRaiseFaultForm] = useState(false);
-  const [faultType, setFaultType] = useState('');
-  const [faultSubType, setFaultSubType] = useState('');
-  const [faultDescription, setFaultDescription] = useState('');
-  const [faultTaxonomy, setFaultTaxonomy] = useState<Record<string, string[]>>({});
+  const [showRaiseFaultModal, setShowRaiseFaultModal] = useState(false);
 
   // Persons / Injuries Forms
-  const [injName, setInjName] = useState('');
-  const [injAge, setInjAge] = useState('');
-  const [injContact, setInjContact] = useState('');
   const [injHospital, setInjHospital] = useState('');
   const [injU16, setInjU16] = useState(false);
   const [parentName, setParentName] = useState('');
   const [parentTel, setParentTel] = useState('');
-  const [injGender, setInjGender] = useState('Male');
-  const [injAddress, setInjAddress] = useState('');
   const [injMsig, setInjMsig] = useState(false);
   const [injMsigSerial, setInjMsigSerial] = useState('');
 
@@ -110,6 +105,7 @@ export default function IncidentDetailsPage() {
   const [pAge, setPAge] = useState('');
   const [pGender, setPGender] = useState('Male');
   const [pAddress, setPAddress] = useState('');
+  const [pInjured, setPInjured] = useState(false);
   const [pInjuryDetails, setPInjuryDetails] = useState('');
 
   // Vehicles Form State
@@ -139,6 +135,7 @@ export default function IncidentDetailsPage() {
     emergency: false,
     media: false,
     property: false,
+    injuries: false,
     persons: false,
     duplicates: false,
     attachments: false,
@@ -149,9 +146,16 @@ export default function IncidentDetailsPage() {
   const [elapsedMinutes, setElapsedMinutes] = useState(0);
   const [elapsedDays, setElapsedDays] = useState(0);
 
-  // Notification system + one-shot guards for crisis reminder
+  // Notification system + one-shot guards for crisis reminder and ageing alerts
   const { addNotification } = useNotifications();
   const crisisReminderFiredRef = useRef(false);
+  const ageing12FiredRef = useRef(false);
+  const ageing14FiredRef = useRef(false);
+
+  // Auto-save wiring for the summary field (FSD §5.7.1)
+  const [summaryDraft, setSummaryDraft] = useState('');
+  const summaryDirtyRef = useRef(false);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Core Particulars Edit Form State
   const [isEditingCore, setIsEditingCore] = useState(false);
@@ -161,7 +165,8 @@ export default function IncidentDetailsPage() {
   const [editSubType, setEditSubType] = useState('');
   const [editPriority, setEditPriority] = useState('Normal');
   const [editCrisisLevel, setEditCrisisLevel] = useState('4');
-  const [editRequestedBy, setEditRequestedBy] = useState('Public Phone');
+  const [editRequestedBy, setEditRequestedBy] = useState('');
+  const [editReportingSource, setEditReportingSource] = useState('Public Phone');
   const [editReporterName, setEditReporterName] = useState('');
   const [editDateTime, setEditDateTime] = useState('');
 
@@ -182,7 +187,6 @@ export default function IncidentDetailsPage() {
   
   useEffect(() => {
     setTaxonomy(getIncidentTaxonomy());
-    setFaultTaxonomy(getFaultTaxonomy());
   }, []);
 
   const startEditingCore = () => {
@@ -194,6 +198,7 @@ export default function IncidentDetailsPage() {
     setEditPriority(incident.priority);
     setEditCrisisLevel(String(incident.crisisLevel));
     setEditRequestedBy(incident.requestedBy);
+    setEditReportingSource(incident.reportingSource || 'Public Phone');
     setEditReporterName(incident.reporterName);
     
     if (incident.dateTime) {
@@ -251,11 +256,22 @@ export default function IncidentDetailsPage() {
       if (res.ok) {
         const incData: HydratedIncident = await res.json();
         setIncident(incData);
+        // Sync summary draft with loaded data (only if not currently dirty)
+        if (!summaryDirtyRef.current) {
+          setSummaryDraft(incData.summary || '');
+        }
 
         // Fetch parent Case details
         const caseRes = await fetch(`/api/cases/${incData.caseId}`);
         if (caseRes.ok) {
           setParentCase(await caseRes.json());
+        }
+
+        // Fetch linked e-Diary entries for this case (FSD §5.3.1)
+        const ediaryRes = await fetch(`/api/occurrences?caseId=${encodeURIComponent(incData.caseId)}`);
+        if (ediaryRes.ok) {
+          const allEntries: any[] = await ediaryRes.json();
+          setLinkedEDiaryEntries(allEntries);
         }
       }
     } catch (err) {
@@ -269,11 +285,34 @@ export default function IncidentDetailsPage() {
     if (incidentId) fetchIncidentData();
   }, [incidentId, fetchIncidentData]);
 
+  // Auto-save: read interval from admin settings, flush summary when dirty (FSD §5.7.1)
+  useEffect(() => {
+    if (!incident || incident.status === 'Closed') return;
+
+    const stored = typeof window !== 'undefined' ? localStorage.getItem('admin_system_settings') : null;
+    const intervalSec: number = stored ? (JSON.parse(stored).autoSaveInterval ?? 60) : 60;
+
+    if (autoSaveTimerRef.current) clearInterval(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setInterval(async () => {
+      if (summaryDirtyRef.current) {
+        summaryDirtyRef.current = false;
+        await updateFields({ summary: summaryDraft });
+      }
+    }, intervalSec * 1000);
+
+    return () => {
+      if (autoSaveTimerRef.current) clearInterval(autoSaveTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [incident?.id, summaryDraft]);
+
   // Track elapsed time since incident occurred + fire 45-min crisis reminder once
   useEffect(() => {
     if (!incident) return;
-    // Reset the one-shot guard whenever a different incident is loaded
+    // Reset the one-shot guards whenever a different incident is loaded
     crisisReminderFiredRef.current = false;
+    ageing12FiredRef.current = false;
+    ageing14FiredRef.current = false;
 
     const calculateTime = () => {
       const occurrenceTime = new Date(incident.dateTime).getTime();
@@ -283,7 +322,7 @@ export default function IncidentDetailsPage() {
       setElapsedMinutes(mins);
       setElapsedDays(days);
 
-      // FRD §6.4: fire notification once when 45-min threshold is crossed for live incidents
+      // FSD §5.2: fire notification once when 45-min threshold is crossed for live incidents
       if (
         mins >= 45 &&
         !crisisReminderFiredRef.current &&
@@ -301,6 +340,50 @@ export default function IncidentDetailsPage() {
         addNotification({
           title: '⏱ Crisis Level Review Required',
           message: `Incident ${incident.id} has been active for ${mins} min. Review and confirm crisis level (currently Level ${incident.crisisLevel}).`,
+          role: 'Duty Officer',
+          type: 'incident',
+          link: `/incidents/${incident.id}`,
+        });
+      }
+
+      // FSD §5.8: Incident Ageing Alerts — 12-day warning, 14-day escalation
+      const isOpen = !['Closed', 'Pending Endorsement'].includes(incident.status);
+      if (days >= 12 && !ageing12FiredRef.current && isOpen) {
+        ageing12FiredRef.current = true;
+        addNotification({
+          title: '⚠️ Incident Ageing Warning (12 Days)',
+          message: `Incident ${incident.id} has been open for ${days} days. Please review and take closure action.`,
+          role: 'Duty Manager',
+          type: 'incident',
+          link: `/incidents/${incident.id}`,
+        });
+        addNotification({
+          title: '⚠️ Incident Ageing Warning (12 Days)',
+          message: `Incident ${incident.id} has been open for ${days} days. Please review and take closure action.`,
+          role: 'Controller',
+          type: 'incident',
+          link: `/incidents/${incident.id}`,
+        });
+      }
+      if (days >= 14 && !ageing14FiredRef.current && isOpen) {
+        ageing14FiredRef.current = true;
+        addNotification({
+          title: '🚨 Incident Ageing Escalation (14 Days)',
+          message: `Incident ${incident.id} has exceeded 14 days without closure. Immediate escalation required.`,
+          role: 'Duty Manager',
+          type: 'incident',
+          link: `/incidents/${incident.id}`,
+        });
+        addNotification({
+          title: '🚨 Incident Ageing Escalation (14 Days)',
+          message: `Incident ${incident.id} has exceeded 14 days without closure. Immediate escalation required.`,
+          role: 'Controller',
+          type: 'incident',
+          link: `/incidents/${incident.id}`,
+        });
+        addNotification({
+          title: '🚨 Incident Ageing Escalation (14 Days)',
+          message: `Incident ${incident.id} has exceeded 14 days without closure. Immediate escalation required.`,
           role: 'Duty Officer',
           type: 'incident',
           link: `/incidents/${incident.id}`,
@@ -348,41 +431,6 @@ export default function IncidentDetailsPage() {
   const handleDeleteLog = async (eventNumber: number) => {
     if (confirm('Are you sure you want to delete this log entry?')) {
       await performAction('delete-log', { eventNumber });
-    }
-  };
-
-  const handleRaiseFault = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!faultType || !faultSubType || !faultDescription.trim()) return;
-    setSaving(true);
-    try {
-      const res = await fetch('/api/faults', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          faultType,
-          faultSubType,
-          description: faultDescription,
-          location: incident?.location,
-          caseId: parentCase?.id,
-          linkedIncidentId: incident?.id,
-          username,
-        }),
-      });
-      if (res.ok) {
-        setShowRaiseFaultForm(false);
-        setFaultType('');
-        setFaultSubType('');
-        setFaultDescription('');
-        await fetchIncidentData();
-      } else {
-        const err = await res.json();
-        alert(`Failed to raise fault: ${err.error}`);
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -525,7 +573,7 @@ export default function IncidentDetailsPage() {
 
   const isRanger = role === 'Responder (Ranger)';
   const isCtrl = role === 'Controller' || role === 'System Administrator';
-  const isMgr = role === 'Duty Manager' || role === 'Duty Officer' || role === 'System Administrator';
+  const isMgr = role === 'Duty Manager' || role === 'Duty Officer' || role === 'System Administrator' || role === 'Current Ops Administrator';
   const isAdmin = role === 'System Administrator';
   const isClosed = incident.status === 'Closed';
 
@@ -889,13 +937,14 @@ export default function IncidentDetailsPage() {
     return incident.propertyDamage.sdcPropertyDamaged ? 'Damaged' : 'None';
   };
 
+  const getInjuriesBadge = () => {
+    const count = incident.personalInjuries?.length || 0;
+    return count > 0 ? `${count} Injured` : 'None';
+  };
+
   const getPersonsBadge = () => {
-    const inj = incident.personalInjuries?.length || 0;
-    const oth = incident.personsInvolved?.length || 0;
-    if (inj > 0 || oth > 0) {
-      return `${inj} Inj / ${oth} Ppl`;
-    }
-    return 'None';
+    const count = incident.personsInvolved?.length || 0;
+    return count > 0 ? `${count} Persons` : 'None';
   };
 
   const getDuplicatesBadge = () => {
@@ -1488,16 +1537,20 @@ export default function IncidentDetailsPage() {
       <div className="glass" style={{ padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Link href={parentCase ? `/cases/${parentCase.id}` : '/cases'} style={{ color: 'var(--text-faint)', fontSize: 11, textDecoration: 'none', fontWeight: 600 }}>
-              ← BACK TO CASE HUB
+            <Link href="/incidents" style={{ color: 'var(--text-faint)', fontSize: 11, textDecoration: 'none', fontWeight: 600 }}>
+              ← BACK TO INCIDENT LOG
             </Link>
             <span style={{ color: 'var(--text-faint)' }}>&bull;</span>
             <span className="mono-id" style={{ background: 'var(--color-critical-bg)', color: 'var(--color-critical)', borderColor: 'var(--color-critical-border)', fontSize: '11px', padding: '1px 6px' }}>
               Incident: {incident.id}
             </span>
-            <span className="mono-id" style={{ background: 'var(--color-info-bg)', color: 'var(--color-info)', borderColor: 'var(--color-info-border)', fontSize: '11px', padding: '1px 6px' }}>
+            <Link
+              href={`/cases/${incident.caseId}`}
+              className="mono-id"
+              style={{ background: 'var(--color-info-bg)', color: 'var(--color-info)', borderColor: 'var(--color-info-border)', fontSize: '11px', padding: '1px 6px', textDecoration: 'none' }}
+            >
               Case: {incident.caseId}
-            </span>
+            </Link>
           </div>
           <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>{incident.title}</h1>
         </div>
@@ -1706,12 +1759,16 @@ export default function IncidentDetailsPage() {
                 </select>
               </div>
               <div className="form-group" style={{ marginBottom: 0 }}>
-                <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Requested By (Source)</label>
-                <select className="form-control select-dark" value={editRequestedBy} onChange={e => setEditRequestedBy(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }}>
-                  {['Public Phone', 'Email', 'UCS', 'Government Agency'].map(source => (
+                <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Reporting Source</label>
+                <select className="form-control select-dark" value={editReportingSource} onChange={e => setEditReportingSource(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }}>
+                  {['Public Phone', 'Email', 'UCS', 'VA', 'State Agency', 'Government Agency', 'Others'].map(source => (
                     <option key={source} value={source}>{source}</option>
                   ))}
                 </select>
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Requested By</label>
+                <input className="form-control" type="text" value={editRequestedBy} onChange={e => setEditRequestedBy(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
               </div>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Reporter Name</label>
@@ -1734,6 +1791,7 @@ export default function IncidentDetailsPage() {
                     priority: editPriority,
                     crisisLevel: editCrisisLevel,
                     requestedBy: editRequestedBy,
+                    reportingSource: editReportingSource,
                     reporterName: editReporterName,
                     dateTime: isoDateTime
                   });
@@ -1748,8 +1806,9 @@ export default function IncidentDetailsPage() {
               <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Sub-Type</span><span className="cd-info-value"><strong>{incident.subType}</strong></span></div>
               <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Crisis Level</span><span className="cd-info-value"><span className="badge badge-ack" style={{ background: 'var(--color-high-bg)', color: 'var(--color-high)', borderColor: 'var(--color-high-border)', fontSize: '11px', padding: '1px 6px' }}>Level {incident.crisisLevel}</span></span></div>
               <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Priority</span><span className="cd-info-value"><strong>{incident.priority}</strong></span></div>
+              <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Reporting Source</span><span className="cd-info-value">{incident.reportingSource || incident.requestedBy || '—'}</span></div>
+              <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Requested By</span><span className="cd-info-value">{incident.requestedBy || '—'}</span></div>
               <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Reporter Name</span><span className="cd-info-value">{incident.reporterName || 'TBD'}</span></div>
-              <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Requested By</span><span className="cd-info-value">{incident.requestedBy}</span></div>
               <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Created By</span><span className="cd-info-value">{incident.createdBy}</span></div>
               <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Occurred</span><span className="cd-info-value">{new Date(incident.dateTime).toLocaleString('en-SG')}</span></div>
               <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Logged</span><span className="cd-info-value" style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{parentCase ? new Date(parentCase.createdAt).toLocaleString('en-SG') : '—'}</span></div>
@@ -1924,7 +1983,7 @@ export default function IncidentDetailsPage() {
               setEditingLogEventNumber(null);
             }}
           >
-            Linked Faults ({incident.relatedFaults?.length || 0})
+            Linked Records ({(incident.relatedFaults?.length || 0) + linkedEDiaryEntries.length})
           </button>
           <button
             type="button"
@@ -1962,12 +2021,21 @@ export default function IncidentDetailsPage() {
                     <h4 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 8 }}>Incident Summary</h4>
                     {!isClosed ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        <textarea 
-                          className="form-control" 
-                          rows={4} 
-                          value={incident.summary || ''} 
+                        <textarea
+                          className="form-control"
+                          rows={4}
+                          value={summaryDraft}
                           placeholder="Provide a detailed operational summary of the incident..."
-                          onChange={e => updateFields({ summary: e.target.value })} 
+                          onChange={e => {
+                            setSummaryDraft(e.target.value);
+                            summaryDirtyRef.current = true;
+                          }}
+                          onBlur={() => {
+                            if (summaryDirtyRef.current) {
+                              summaryDirtyRef.current = false;
+                              updateFields({ summary: summaryDraft });
+                            }
+                          }}
                           style={{ fontSize: 12.5 }}
                         />
                       </div>
@@ -1997,6 +2065,23 @@ export default function IncidentDetailsPage() {
                       <div className="cd-info-row">
                         <span className="cd-info-label">Closed At</span>
                         <span className="cd-info-value">{incident.closedAt ? new Date(incident.closedAt).toLocaleString('en-SG') : '—'}</span>
+                      </div>
+                      <div className="cd-info-row">
+                        <span className="cd-info-label">Closure Broadcast</span>
+                        <span className="cd-info-value">
+                          {(incident as any).closureBroadcastStatus === 'pending' && (
+                            <span className="badge" style={{ background: 'var(--color-high-bg)', color: 'var(--color-high)', borderColor: 'var(--color-high-border)', fontSize: 10 }}>⏳ Pending Dispatch</span>
+                          )}
+                          {(incident as any).closureBroadcastStatus === 'dispatched' && (
+                            <span className="badge badge-closed" style={{ fontSize: 10 }}>✓ Dispatched</span>
+                          )}
+                          {(incident as any).closureBroadcastStatus === 'not_required' && (
+                            <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>Not required</span>
+                          )}
+                          {!(incident as any).closureBroadcastStatus && (
+                            <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>
+                          )}
+                        </span>
                       </div>
                     </div>
                   )}
@@ -2314,6 +2399,78 @@ export default function IncidentDetailsPage() {
               )}
             </div>
 
+            {/* Accordion: Personal Injuries */}
+            <div className="accordion-item">
+              <div className="accordion-header" onClick={() => toggleSection('injuries')}>
+                <div className="accordion-header-left">
+                  <h3 className="accordion-title">Personal Injuries</h3>
+                  <span className={`accordion-badge ${getInjuriesBadge() !== 'None' ? 'active' : 'none'}`}>
+                    {getInjuriesBadge()}
+                  </span>
+                </div>
+                <span>{openSections.injuries ? '▼' : '▶'}</span>
+              </div>
+              {openSections.injuries && (
+                <div className="accordion-content">
+                  {!isClosed && (
+                    <div style={{ border: '1px dashed var(--border-color)', borderRadius: 6, padding: 10, marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <input className="form-control" placeholder="Clinic or Hospital Attended" value={injHospital} onChange={e => setInjHospital(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <input type="checkbox" id="inj-msig-checkbox" checked={injMsig} onChange={e => setInjMsig(e.target.checked)} />
+                        <label htmlFor="inj-msig-checkbox" style={{ fontSize: 11, cursor: 'pointer', userSelect: 'none' }}>MSIG Form Issued</label>
+                      </div>
+                      {injMsig && (
+                        <input className="form-control" placeholder="MSIG Serial Number" value={injMsigSerial} onChange={e => setInjMsigSerial(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                      )}
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <input type="checkbox" id="inj-u16-checkbox" checked={injU16} onChange={e => setInjU16(e.target.checked)} />
+                        <label htmlFor="inj-u16-checkbox" style={{ fontSize: 11, cursor: 'pointer', userSelect: 'none' }}>Under-16 Indicator</label>
+                      </div>
+                      {injU16 && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 8, background: 'var(--bg-inset)', borderRadius: 5 }}>
+                          <input className="form-control" placeholder="Parent or Guardian Name" value={parentName} onChange={e => setParentName(e.target.value)} style={{ padding: '4px 8px', fontSize: 11 }} />
+                          <input className="form-control" placeholder="Parent or Guardian Contact" value={parentTel} onChange={e => setParentTel(e.target.value)} style={{ padding: '4px 8px', fontSize: 11 }} />
+                        </div>
+                      )}
+                      <button type="button" className="btn btn-primary btn-xs" onClick={() => {
+                        const updated = [...incident.personalInjuries, {
+                          clinicHospitalAttended: injHospital,
+                          msigFormIssued: injMsig,
+                          msigSerialNo: injMsig ? injMsigSerial : '',
+                          under16: injU16,
+                          parentGuardianName: parentName,
+                          parentGuardianContact: parentTel
+                        }];
+                        updateFields({ personalInjuries: updated });
+                        setInjHospital(''); setInjU16(false); setParentName(''); setParentTel(''); setInjMsig(false); setInjMsigSerial('');
+                      }}>Add Injury</button>
+                    </div>
+                  )}
+                  {incident.personalInjuries.length === 0 ? (
+                    <p style={{ fontSize: 11, color: 'var(--text-faint)', fontStyle: 'italic', margin: '4px 0' }}>No injuries recorded.</p>
+                  ) : incident.personalInjuries.map((inj, i) => (
+                    <div key={i} className="inset-panel" style={{ padding: 10, marginBottom: 8, fontSize: 12, position: 'relative' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div style={{ fontWeight: 600 }}>
+                          {inj.clinicHospitalAttended || 'Injury Record'}
+                          {inj.under16 && <span style={{ marginLeft: 6, fontSize: 9, background: 'var(--color-critical-bg)', color: 'var(--color-critical)', padding: '2px 4px', borderRadius: 3, fontWeight: 700 }}>U-16</span>}
+                          {inj.msigFormIssued && <span style={{ marginLeft: 6, fontSize: 9, background: 'var(--color-info-bg)', color: 'var(--color-info)', padding: '2px 4px', borderRadius: 3, fontWeight: 700 }}>MSIG</span>}
+                        </div>
+                        {!isClosed && (
+                          <button type="button" style={{ background: 'transparent', border: 'none', color: 'var(--color-critical)', cursor: 'pointer', fontSize: 13, padding: 0 }} onClick={async () => {
+                            const updated = incident.personalInjuries.filter((_, idx) => idx !== i);
+                            await updateFields({ personalInjuries: updated });
+                          }}>✕</button>
+                        )}
+                      </div>
+                      {inj.msigFormIssued && inj.msigSerialNo && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>MSIG Serial No: {inj.msigSerialNo}</div>}
+                      {inj.under16 && <div style={{ fontSize: 10, color: 'var(--text-faint)', marginTop: 3 }}>Guardian: {inj.parentGuardianName} ({inj.parentGuardianContact})</div>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* Accordion: Persons Involved */}
             <div className="accordion-item">
               <div className="accordion-header" onClick={() => toggleSection('persons')}>
@@ -2326,94 +2483,8 @@ export default function IncidentDetailsPage() {
                 <span>{openSections.persons ? '▼' : '▶'}</span>
               </div>
               {openSections.persons && (
-                <div className="accordion-content" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  {/* Injuries list */}
-                  <div>
-                    <h4 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 8 }}>Personal Injuries Log</h4>
-                    {!isClosed && (
-                      <div style={{ border: '1px dashed var(--border-color)', borderRadius: 6, padding: 10, marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        <input className="form-control" placeholder="Full Name *" value={injName} onChange={e => setInjName(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
-                        <div style={{ display: 'flex', gap: 8 }}>
-                          <input className="form-control" type="number" placeholder="Age" value={injAge} onChange={e => setInjAge(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
-                          <select className="form-control select-dark" value={injGender} onChange={e => setInjGender(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }}>
-                            <option value="Male">Male</option>
-                            <option value="Female">Female</option>
-                            <option value="Other">Other</option>
-                          </select>
-                          <input className="form-control" placeholder="Contact No" value={injContact} onChange={e => setInjContact(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
-                        </div>
-                        <input className="form-control" placeholder="Address" value={injAddress} onChange={e => setInjAddress(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
-                        <input className="form-control" placeholder="Hospital / Clinic Attended" value={injHospital} onChange={e => setInjHospital(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
-                        
-                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                          <input type="checkbox" id="inj-msig-checkbox" checked={injMsig} onChange={e => setInjMsig(e.target.checked)} />
-                          <label htmlFor="inj-msig-checkbox" style={{ fontSize: 11, cursor: 'pointer', userSelect: 'none' }}>MSIG Form Issued</label>
-                        </div>
-                        {injMsig && (
-                          <input className="form-control" placeholder="MSIG Serial Number" value={injMsigSerial} onChange={e => setInjMsigSerial(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
-                        )}
-
-                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                          <input type="checkbox" id="inj-u16-checkbox" checked={injU16} onChange={e => setInjU16(e.target.checked)} />
-                          <label htmlFor="inj-u16-checkbox" style={{ fontSize: 11, cursor: 'pointer', userSelect: 'none' }}>Under 16 years old</label>
-                        </div>
-                        {injU16 && (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 8, background: 'var(--bg-inset)', borderRadius: 5 }}>
-                            <input className="form-control" placeholder="Parent/Guardian Name" value={parentName} onChange={e => setParentName(e.target.value)} style={{ padding: '4px 8px', fontSize: 11 }} />
-                            <input className="form-control" placeholder="Parent/Guardian Contact" value={parentTel} onChange={e => setParentTel(e.target.value)} style={{ padding: '4px 8px', fontSize: 11 }} />
-                          </div>
-                        )}
-                        <button type="button" className="btn btn-primary btn-xs" onClick={() => {
-                          if (!injName) return;
-                          const updated = [...incident.personalInjuries, {
-                            name: injName,
-                            address: injAddress,
-                            age: parseInt(injAge, 10) || 0,
-                            gender: injGender,
-                            contactNumber: injContact,
-                            clinicHospitalAttended: injHospital,
-                            msigFormIssued: injMsig,
-                            msigSerialNo: injMsig ? injMsigSerial : '',
-                            under16: injU16,
-                            parentGuardianName: parentName,
-                            parentGuardianContact: parentTel
-                          }];
-                          updateFields({ personalInjuries: updated });
-                          setInjName(''); setInjAge(''); setInjContact(''); setInjHospital(''); setInjU16(false); setParentName(''); setParentTel(''); setInjGender('Male'); setInjAddress(''); setInjMsig(false); setInjMsigSerial('');
-                        }}>Add Injury</button>
-                      </div>
-                    )}
-                    {incident.personalInjuries.length === 0 ? (
-                      <p style={{ fontSize: 11, color: 'var(--text-faint)', fontStyle: 'italic', margin: '4px 0 12px 0' }}>No injuries recorded.</p>
-                    ) : incident.personalInjuries.map((inj, i) => (
-                      <div key={i} className="inset-panel" style={{ padding: 10, marginBottom: 8, fontSize: 12, position: 'relative' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                          <div style={{ fontWeight: 600 }}>
-                            {inj.name} (Age: {inj.age} &bull; {inj.gender || '—'})
-                            {inj.under16 && <span style={{ marginLeft: 6, fontSize: 9, background: 'var(--color-critical-bg)', color: 'var(--color-critical)', padding: '2px 4px', borderRadius: 3, fontWeight: 700 }}>U-16</span>}
-                            {inj.msigFormIssued && <span style={{ marginLeft: 6, fontSize: 9, background: 'var(--color-info-bg)', color: 'var(--color-info)', padding: '2px 4px', borderRadius: 3, fontWeight: 700 }}>MSIG</span>}
-                          </div>
-                          {!isClosed && (
-                            <button type="button" style={{ background: 'transparent', border: 'none', color: 'var(--color-critical)', cursor: 'pointer', fontSize: 13, padding: 0 }} onClick={async () => {
-                              const updated = incident.personalInjuries.filter((_, idx) => idx !== i);
-                              await updateFields({ personalInjuries: updated });
-                            }}>✕</button>
-                          )}
-                        </div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>Hospital: {inj.clinicHospitalAttended || '—'} &bull; Tel: {inj.contactNumber || '—'}</div>
-                        {inj.address && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Address: {inj.address}</div>}
-                        {inj.msigFormIssued && inj.msigSerialNo && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>MSIG Serial No: {inj.msigSerialNo}</div>}
-                        {inj.under16 && <div style={{ fontSize: 10, color: 'var(--text-faint)', marginTop: 3 }}>Guardian: {inj.parentGuardianName} ({inj.parentGuardianContact})</div>}
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="section-separator" style={{ margin: '8px 0' }} />
-
-                  {/* Other persons */}
-                  <div>
-                    <h4 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 8 }}>Other Persons</h4>
-                    {!isClosed && (
+                <div className="accordion-content">
+                  {!isClosed && (
                       <div style={{ border: '1px dashed var(--border-color)', borderRadius: 6, padding: 10, marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
                         <div style={{ display: 'flex', gap: 8 }}>
                           <select className="form-control select-dark" value={pGuestOrNon} onChange={e => setPGuestOrNon(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }}>
@@ -2438,7 +2509,19 @@ export default function IncidentDetailsPage() {
                         <select className="form-control select-dark" value={pRole} onChange={e => setPRole(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }}>
                           {['Witness','Bystander','Subject','Other'].map(o => <option key={o}>{o}</option>)}
                         </select>
-                        <textarea className="form-control" rows={2} placeholder="Injury details (if any)" value={pInjuryDetails} onChange={e => setPInjuryDetails(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <input
+                            type="checkbox"
+                            id="p-injured"
+                            checked={pInjured}
+                            onChange={e => { setPInjured(e.target.checked); if (!e.target.checked) setPInjuryDetails(''); }}
+                            style={{ width: 14, height: 14, cursor: 'pointer' }}
+                          />
+                          <label htmlFor="p-injured" style={{ margin: 0, fontWeight: 'normal', cursor: 'pointer', fontSize: 12 }}>Injured</label>
+                        </div>
+                        {pInjured && (
+                          <textarea className="form-control" rows={2} placeholder="Describe injury details..." value={pInjuryDetails} onChange={e => setPInjuryDetails(e.target.value)} style={{ padding: '4px 8px', fontSize: 12, marginTop: 4 }} />
+                        )}
                         <button type="button" className="btn btn-primary btn-xs" onClick={() => {
                           if (!pName) return;
                           const updated = [...incident.personsInvolved, {
@@ -2453,7 +2536,7 @@ export default function IncidentDetailsPage() {
                             injuryDetails: pInjuryDetails
                           }];
                           updateFields({ personsInvolved: updated });
-                          setPName(''); setPContact(''); setPRole('Witness'); setPGuestOrNon('Guest'); setPAge(''); setPGender('Male'); setPAddress(''); setPInjuryDetails('');
+                          setPName(''); setPContact(''); setPRole('Witness'); setPGuestOrNon('Guest'); setPAge(''); setPGender('Male'); setPAddress(''); setPInjured(false); setPInjuryDetails('');
                         }}>Add Person</button>
                       </div>
                     )}
@@ -2473,10 +2556,11 @@ export default function IncidentDetailsPage() {
                         <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>Role: {p.roleInvolvement} &bull; Tel: {p.contactNumber || '—'}</div>
                         <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Age: {p.age || '—'} &bull; Gender: {p.gender || '—'}</div>
                         {p.address && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Address: {p.address}</div>}
-                        {p.injuryDetails && <div style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic', marginTop: 4 }}>Injury Details: {p.injuryDetails}</div>}
+                        {p.injuryDetails ? (
+                          <div style={{ fontSize: 11, color: 'var(--color-critical)', fontStyle: 'italic', marginTop: 4 }}>⚠ Injured: {p.injuryDetails}</div>
+                        ) : null}
                       </div>
                     ))}
-                  </div>
                 </div>
               )}
             </div>
@@ -2953,72 +3037,27 @@ export default function IncidentDetailsPage() {
           {!isClosed && (
             <button
               className="btn btn-brand btn-sm"
-              onClick={() => setShowRaiseFaultForm(!showRaiseFaultForm)}
+              onClick={() => setShowRaiseFaultModal(true)}
             >
-              {showRaiseFaultForm ? 'Cancel' : '+ Raise Fault'}
+              + Raise Fault
             </button>
           )}
         </div>
 
-        {showRaiseFaultForm && (
-          <form onSubmit={handleRaiseFault} className="glass" style={{ padding: 16, marginBottom: 20, display: 'flex', flexDirection: 'column', gap: 12, background: 'var(--bg-inset)', border: '1px dashed var(--border-color)' }}>
-            <h3 style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>Raise Linked Infrastructure Fault</h3>
-            <p style={{ fontSize: 11, color: 'var(--text-faint)', margin: 0 }}>
-              Location pre-filled from incident. Fault saved as draft (Created) — submit to IFM CMMS from the fault list or fault detail page.
-            </p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div className="form-group">
-                <label style={{ fontSize: 12 }}>Fault Type *</label>
-                <select
-                  className="form-control select-dark"
-                  required
-                  value={faultType}
-                  onChange={e => { setFaultType(e.target.value); setFaultSubType(''); }}
-                >
-                  <option value="">-- Select Type --</option>
-                  {Object.keys(faultTaxonomy).sort().map(t => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-group">
-                <label style={{ fontSize: 12 }}>Fault Sub-type *</label>
-                <select
-                  className="form-control select-dark"
-                  required
-                  value={faultSubType}
-                  onChange={e => setFaultSubType(e.target.value)}
-                  disabled={!faultType}
-                >
-                  <option value="">-- Select Sub-type --</option>
-                  {faultType && faultTaxonomy[faultType]?.map(st => (
-                    <option key={st} value={st}>{st}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="form-group">
-              <label style={{ fontSize: 12 }}>Fault Description *</label>
-              <textarea
-                className="form-control"
-                rows={3}
-                required
-                value={faultDescription}
-                onChange={e => setFaultDescription(e.target.value)}
-                placeholder="Describe the defect, its impact and location specifics..."
-              />
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', padding: '6px 10px', background: 'var(--bg-surface)', borderRadius: 4, border: '1px solid var(--border-color)' }}>
-              📍 Location: {incident?.location?.commonName || incident?.location?.road || 'From Incident'} &nbsp;|&nbsp;
-              🔗 Linked to: {incident?.id}
-            </div>
-            <button type="submit" className="btn btn-success btn-sm" disabled={saving || !faultType || !faultSubType}>
-              {saving ? 'Saving...' : 'Save Fault Draft'}
-            </button>
-          </form>
-        )}
+        <FaultCreateModal
+          isOpen={showRaiseFaultModal}
+          onClose={() => setShowRaiseFaultModal(false)}
+          onSuccess={() => fetchIncidentData()}
+          linkedIncidentId={incident?.id}
+          linkedCaseId={parentCase?.id}
+          prefillLocation={incident?.location}
+          username={username}
+        />
 
         <div style={{ overflowX: 'auto' }}>
+          <h3 style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>
+            Infrastructure Faults ({incident.relatedFaults?.length || 0})
+          </h3>
           <table className="data-table">
             <thead>
               <tr>
@@ -3065,6 +3104,52 @@ export default function IncidentDetailsPage() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* ── Linked e-Diary Entries (FSD §5.3.1) ── */}
+        <div style={{ marginTop: 28, borderTop: '1px solid var(--border-color)', paddingTop: 20 }}>
+          <h3 style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>
+            Linked e-Diary Entries ({linkedEDiaryEntries.length})
+          </h3>
+          {linkedEDiaryEntries.length === 0 ? (
+            <p style={{ fontSize: 12, color: 'var(--text-faint)', fontStyle: 'italic', margin: 0 }}>
+              No linked e-Diary entries for this case.
+            </p>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Entry ID</th>
+                    <th>Topic</th>
+                    <th>Content</th>
+                    <th>Logged By</th>
+                    <th>Date / Time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {linkedEDiaryEntries.map((entry: any) => (
+                    <tr key={entry.id}>
+                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+                        <Link href={`/occurrences`} style={{ color: 'var(--color-primary)', textDecoration: 'none', fontWeight: 600 }}>
+                          {entry.id}
+                        </Link>
+                      </td>
+                      <td>{entry.topic || '—'}</td>
+                      <td style={{ maxWidth: 320, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {entry.content}
+                      </td>
+                      <td>{entry.user || '—'}</td>
+                      <td style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                        {new Date(entry.dateTime).toLocaleDateString('en-SG')}{' '}
+                        {new Date(entry.dateTime).toLocaleTimeString('en-SG', { hour: '2-digit', minute: '2-digit', hour12: false })}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     )}
