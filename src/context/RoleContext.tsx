@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 
 export type UserRole =
   | 'System Administrator'
+  | 'Current Ops Administrator'
   | 'Duty Manager'
   | 'Duty Officer'
   | 'Controller'
@@ -54,6 +55,9 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
       case 'Responder (Ranger)':
         newUsername = 'Ranger John';
         break;
+      case 'Current Ops Administrator':
+        newUsername = 'Ops Admin Lee';
+        break;
       case 'System Administrator':
         newUsername = 'Admin Root';
         break;
@@ -83,3 +87,4 @@ export const useRole = () => {
   }
   return context;
 };
+

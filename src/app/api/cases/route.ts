@@ -162,19 +162,24 @@ export async function POST(request: Request) {
         }
         
         const incidentId = generateIncidentId(db);
+        const incidentDateTime = incidentData.dateTime || new Date().toISOString();
+        // FSD §5.2: Crisis Level 45-minute reminder fires 45 min from incident dateTime
+        const crisisReminderDue = new Date(new Date(incidentDateTime).getTime() + 45 * 60 * 1000).toISOString();
         const newIncident: Incident = {
           id: incidentId,
           caseId: caseId,
           title: title,
-          dateTime: incidentData.dateTime || new Date().toISOString(),
+          dateTime: incidentDateTime,
           type: incidentData.type || 'Others',
           subType: incidentData.subType || 'Others',
           priority: incidentData.priority || 'Normal',
           crisisLevel: 4,
           reporterName: incidentData.reporterName || 'Unknown',
           requestedBy: incidentData.requestedBy || 'IIOC Controller',
+          reportingSource: incidentData.reportingSource || '',
           createdBy: body.username || 'admin',
           category: incidentData.category || 'Standard Incident',
+          crisisReminderDue,
           status: incidentData.status || 'Live',
           assignedTo: Array.isArray(incidentData.assignedTo)
             ? incidentData.assignedTo

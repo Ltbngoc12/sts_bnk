@@ -86,7 +86,7 @@ export const Sidebar: React.FC = () => {
 
   const roles: UserRole[] = [
     'Controller', 'Duty Manager', 'Duty Officer',
-    'Responder (Ranger)', 'System Administrator', 'Stakeholder'
+    'Current Ops Administrator', 'Responder (Ranger)', 'System Administrator', 'Stakeholder'
   ];
 
   const isActive = (path: string) =>
@@ -515,3 +515,4 @@ export const Sidebar: React.FC = () => {
     </div>
   );
 };
+

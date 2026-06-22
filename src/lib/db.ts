@@ -140,10 +140,11 @@ export interface Incident {
   crisisLevel: number; // 1 to 5 (default 4)
   reporterName: string;
   requestedBy: string;
+  reportingSource?: string; // FSD §5.4.4 — channel of the report (e.g. "Public Phone", "VA", "State Agency")
   createdBy: string;
-  category: string; // "Standard Incident" | "Proactive Incident" | "Backdated Incident" | "Ongoing Incident" | "Operational Record"
-  status: string; // "Live" | "Live (Assigned)" | "Live (Acknowledged)" | "Live (On-Site)" | "Live (Completed)" | "Live (Incomplete)" | "Pending Endorsement" | "Returned" | "Closed"
-  assignedTo: string[]; // Array of responder display names, e.g. ["Ranger John", "Ranger Dave"]
+  category: string; // "Standard Incident" | "Proactive Incident" | "Backdated Incident" | "Ongoing Incident" | "Informational / Exercise Records"
+  status: string; // "Live" | "Live (Assigned)" | "Live (Acknowledged)" | "Live (On-Site)" | "Live (Incomplete)" | "Live (Completed)" | "Pending Endorsement" | "Returned" | "Closed"
+  assignedTo: string[]; // Array of responder display names
   responders?: IncidentResponder[]; // Rich metadata per assignment (assignedBy, assignedAt, status)
   location: Location;
   log: LogEntry[];
@@ -158,10 +159,17 @@ export interface Incident {
   summary: string;
   completionRemarks: string;
   slaveIncidents: SlaveIncident[];
+  linkedEDiaryIds?: string[];         // FSD §5.3.1 — e-Diary entries linked to this incident
+  closureBroadcastStatus?: 'not_required' | 'pending' | 'dispatched'; // FSD §5.3.11
+  closureBroadcastId?: string;        // FSD §5.3.11 — linked Broadcast ID once dispatched
   isFalseAlarm?: boolean;
   isDuplicate?: boolean;
   masterIncidentId?: string;
   version?: number;
+  editingBy?: string;                 // FSD §5.7.2 — concurrent editing lock
+  editingStartedAt?: string;          // FSD §5.7.2
+  crisisReminderDue?: string;         // FSD §5.2 — ISO timestamp when 45-min reminder fires
+  crisisReminderFired?: boolean;      // FSD §5.2 — prevent duplicate reminders
   // Lifecycle timestamps set by action-oriented API handlers
   acknowledgedAt?: string;
   onSiteAt?: string;

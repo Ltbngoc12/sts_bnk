@@ -332,7 +332,7 @@ export default function CaseDetailsPage() {
   const inc = caseData.incident;
   const isRanger = role === 'Responder (Ranger)';
   const isCtrl = role === 'Controller' || role === 'System Administrator';
-  const isMgr = role === 'Duty Manager' || role === 'Duty Officer' || role === 'System Administrator';
+  const isMgr = role === 'Duty Manager' || role === 'Duty Officer' || role === 'System Administrator' || role === 'Current Ops Administrator';
   const isClosed = caseData.status === 'Closed';
 
   return (
@@ -991,3 +991,4 @@ export default function CaseDetailsPage() {
     </>
   );
 }
+

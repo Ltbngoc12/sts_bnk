@@ -39,7 +39,8 @@ export default function NewIncidentPage() {
   const [priority, setPriority] = useState('Normal');
   const [crisisLevel, setCrisisLevel] = useState('4');
   const [reporterName, setReporterName] = useState('');
-  const [requestedBy, setRequestedBy] = useState('Public Phone');
+  const [requestedBy, setRequestedBy] = useState('');
+  const [reportingSource, setReportingSource] = useState('Public Phone');
   const [incidentDateTime, setIncidentDateTime] = useState('');
   const [createdBy, setCreatedBy] = useState(username || 'Controller Steve');
 
@@ -96,10 +97,10 @@ export default function NewIncidentPage() {
   const [vehicles, setVehicles] = useState<{ id: number; sdcVehicle: boolean; model: string; plate: string; driverName: string; driverContact: string; licence: string; address: string; remarks: string }[]>([]);
 
   // 7. Personal Injuries State
-  const [injuries, setInjuries] = useState<{ id: number; name: string; address: string; age: string; gender: string; contact: string; hospital: string; msigIssued: boolean; msigSerial: string; under16: boolean; parentName: string; parentContact: string }[]>([]);
+  const [injuries, setInjuries] = useState<{ id: number; hospital: string; msigIssued: boolean; msigSerial: string; under16: boolean; parentName: string; parentContact: string }[]>([]);
 
   // 8. Persons Involved State
-  const [persons, setPersons] = useState<{ id: number; guestOrNon: string; type: string; name: string; address: string; age: string; gender: string; contact: string; role: string; injuryDetails: string }[]>([]);
+  const [persons, setPersons] = useState<{ id: number; guestOrNon: string; type: string; name: string; address: string; age: string; gender: string; contact: string; role: string; injured: boolean; injuryDetails: string }[]>([]);
 
   // 9. CCTV & Body Worn Camera State
   const [cctvFootages, setCctvFootages] = useState<{ id: number; cameraNo: string; timestamp: string; bookmark: string; bwcNo: string; bwcTimestamp: string }[]>([]);
@@ -172,20 +173,6 @@ export default function NewIncidentPage() {
     setIncSubType('');
   }, [incType]);
 
-  // Handle Age changes inside injury list to auto-toggle Under-16 status
-  const handleInjuryAgeChange = (id: number, ageVal: string) => {
-    setInjuries(prev => prev.map(item => {
-      if (item.id === id) {
-        const isUnder16 = parseInt(ageVal, 10) < 16;
-        return {
-          ...item,
-          age: ageVal,
-          under16: isUnder16
-        };
-      }
-      return item;
-    }));
-  };
 
   // Warning Banners triggers
   const now = new Date();
@@ -283,7 +270,8 @@ export default function NewIncidentPage() {
         priority: priority,
         crisisLevel: parseInt(crisisLevel, 10) || 4,
         reporterName: reporterName || 'Anonymous Guest',
-        requestedBy: requestedBy,
+        requestedBy: requestedBy || '',
+        reportingSource: reportingSource,
         category: category,
         status: category === 'Backdated Incident' ? 'Closed' : 'Live',
         assignedTo: assignedResponders,
@@ -337,11 +325,6 @@ export default function NewIncidentPage() {
           remarks: v.remarks
         })),
         personalInjuries: injuries.map(inj => ({
-          name: inj.name,
-          address: inj.address,
-          age: parseInt(inj.age, 10) || 0,
-          gender: inj.gender,
-          contactNumber: inj.contact,
           clinicHospitalAttended: inj.hospital,
           msigFormIssued: inj.msigIssued,
           msigSerialNo: inj.msigSerial,
@@ -884,23 +867,37 @@ export default function NewIncidentPage() {
                 </div>
 
                 <div className="form-group">
-                  <label>Requested By (Source)</label>
-                  <select value={requestedBy} onChange={(e) => setRequestedBy(e.target.value)} className="form-control select-dark">
+                  <label>Reporting Source</label>
+                  <select value={reportingSource} onChange={(e) => setReportingSource(e.target.value)} className="form-control select-dark">
                     <option value="Public Phone">Public Phone</option>
                     <option value="Email">Email</option>
                     <option value="UCS">UCS</option>
+                    <option value="VA">VA</option>
+                    <option value="State Agency">State Agency</option>
                     <option value="Government Agency">Government Agency</option>
+                    <option value="Others">Others</option>
                   </select>
                 </div>
 
                 <div className="form-group">
+                  <label>Requested By</label>
+                  <input
+                    type="text"
+                    placeholder="Person or team who requested the response"
+                    value={requestedBy}
+                    onChange={e => setRequestedBy(e.target.value)}
+                    className="form-control"
+                  />
+                </div>
+
+                <div className="form-group">
                   <label>Reporter's Name</label>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     placeholder="Enter reporter details if any"
-                    value={reporterName} 
-                    onChange={e => setReporterName(e.target.value)} 
-                    className="form-control" 
+                    value={reporterName}
+                    onChange={e => setReporterName(e.target.value)}
+                    className="form-control"
                   />
                 </div>
 
@@ -1511,73 +1508,6 @@ export default function NewIncidentPage() {
                     </span>
 
                     <div className="form-grid">
-                      <div className="form-group">
-                        <label>Full Name</label>
-                        <input 
-                          type="text" 
-                          placeholder="Jane Doe"
-                          value={inj.name} 
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setInjuries(prev => prev.map(item => item.id === inj.id ? { ...item, name: val } : item));
-                          }} 
-                          className="form-control" 
-                        />
-                      </div>
-
-                      <div className="form-group">
-                        <label>Age</label>
-                        <input 
-                          type="number" 
-                          placeholder="e.g. 15"
-                          value={inj.age} 
-                          onChange={(e) => handleInjuryAgeChange(inj.id, e.target.value)} 
-                          className="form-control" 
-                        />
-                      </div>
-
-                      <div className="form-group">
-                        <label>Gender</label>
-                        <select 
-                          value={inj.gender} 
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setInjuries(prev => prev.map(item => item.id === inj.id ? { ...item, gender: val } : item));
-                          }} 
-                          className="form-control select-dark"
-                        >
-                          <option value="Male">Male</option>
-                          <option value="Female">Female</option>
-                          <option value="Other">Other</option>
-                        </select>
-                      </div>
-
-                      <div className="form-group">
-                        <label>Contact Number</label>
-                        <input 
-                          type="text" 
-                          value={inj.contact} 
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setInjuries(prev => prev.map(item => item.id === inj.id ? { ...item, contact: val } : item));
-                          }} 
-                          className="form-control" 
-                        />
-                      </div>
-
-                      <div className="form-group colspan-2">
-                        <label>Home Address</label>
-                        <input 
-                          type="text" 
-                          value={inj.address} 
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setInjuries(prev => prev.map(item => item.id === inj.id ? { ...item, address: val } : item));
-                          }} 
-                          className="form-control" 
-                        />
-                      </div>
-
                       <div className="form-group colspan-2">
                         <label>Clinic or Hospital Attended</label>
                         <input 
@@ -1593,63 +1523,61 @@ export default function NewIncidentPage() {
                       </div>
 
                       {/* MSIG Insurance block */}
-                      <div className="form-group">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '24px' }}>
-                          <input 
-                            type="checkbox" 
-                            id={`msigIssued-${inj.id}`} 
-                            checked={inj.msigIssued} 
+                      <div className="form-group colspan-2" style={{ borderTop: '1px dashed var(--border-color)', paddingTop: '12px', marginTop: '6px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: inj.msigIssued ? '8px' : 0 }}>
+                          <input
+                            type="checkbox"
+                            id={`msigIssued-${inj.id}`}
+                            checked={inj.msigIssued}
                             onChange={(e) => {
                               const checked = e.target.checked;
-                              setInjuries(prev => prev.map(item => item.id === inj.id ? { ...item, msigIssued: checked } : item));
+                              setInjuries(prev => prev.map(item => item.id === inj.id ? { ...item, msigIssued: checked, msigSerial: checked ? item.msigSerial : '' } : item));
                             }}
                           />
-                          <label htmlFor={`msigIssued-${inj.id}`} style={{ fontWeight: '500', fontSize: '12.5px' }}>
+                          <label htmlFor={`msigIssued-${inj.id}`} style={{ fontWeight: '500', fontSize: '12.5px', cursor: 'pointer', margin: 0 }}>
                             MSIG Form Issued
                           </label>
                         </div>
-                      </div>
-
-                      <div className="form-group">
                         {inj.msigIssued && (
-                          <>
-                            <label>MSIG Serial Number *</label>
-                            <input 
-                              type="text" 
-                              placeholder="e.g. MSIG-90218"
-                              value={inj.msigSerial} 
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setInjuries(prev => prev.map(item => item.id === inj.id ? { ...item, msigSerial: val } : item));
-                              }} 
-                              className="form-control" 
-                              required={inj.msigIssued}
-                            />
-                          </>
+                          <div className="form-grid">
+                            <div className="form-group">
+                              <label>MSIG Serial Number</label>
+                              <input
+                                type="text"
+                                placeholder="e.g. MSIG-90218"
+                                value={inj.msigSerial}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setInjuries(prev => prev.map(item => item.id === inj.id ? { ...item, msigSerial: val } : item));
+                                }}
+                                className="form-control"
+                              />
+                            </div>
+                          </div>
                         )}
                       </div>
 
                       {/* Under-16 conditional fields */}
                       <div className="form-group colspan-2" style={{ borderTop: '1px dashed var(--border-color)', paddingTop: '12px', marginTop: '6px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                          <input 
-                            type="checkbox" 
+                          <input
+                            type="checkbox"
                             id={`under16-${inj.id}`}
-                            checked={inj.under16} 
+                            checked={inj.under16}
                             onChange={(e) => {
                               const checked = e.target.checked;
                               setInjuries(prev => prev.map(item => item.id === inj.id ? { ...item, under16: checked } : item));
                             }}
                           />
-                          <label htmlFor={`under16-${inj.id}`} style={{ fontWeight: '600', fontSize: '12.5px', color: 'var(--text-main)' }}>
-                            Under-16 Consent Required
+                          <label htmlFor={`under16-${inj.id}`} style={{ fontWeight: '600', fontSize: '12.5px', color: 'var(--text-main)', cursor: 'pointer', margin: 0 }}>
+                            Under-16 Indicator
                           </label>
                         </div>
 
                         {inj.under16 && (
                           <div className="form-grid" style={{ background: '#FFFDF5', padding: '12px', borderRadius: '6px', border: '1px solid #E6D8B3' }}>
                             <div className="form-group">
-                              <label>Parent / Guardian Name</label>
+                              <label>Parent or Guardian Name</label>
                               <input 
                                 type="text" 
                                 value={inj.parentName} 
@@ -1661,7 +1589,7 @@ export default function NewIncidentPage() {
                               />
                             </div>
                             <div className="form-group">
-                              <label>Parent / Guardian Contact</label>
+                              <label>Parent or Guardian Contact</label>
                               <input 
                                 type="text" 
                                 value={inj.parentContact} 
@@ -1685,7 +1613,7 @@ export default function NewIncidentPage() {
                 onClick={() => {
                   const maxId = injuries.length > 0 ? Math.max(...injuries.map(item => item.id)) : 0;
                   setInjuries(prev => [...prev, {
-                    id: maxId + 1, name: '', address: '', age: '', gender: 'Male', contact: '', hospital: '', msigIssued: false, msigSerial: '', under16: false, parentName: '', parentContact: ''
+                    id: maxId + 1, hospital: '', msigIssued: false, msigSerial: '', under16: false, parentName: '', parentContact: ''
                   }]);
                 }} 
                 className="btn btn-secondary btn-sm"
@@ -1850,17 +1778,32 @@ export default function NewIncidentPage() {
 
                       <div className="form-group">
                         <label>Injury Details (If injured)</label>
-                        <textarea 
-                          placeholder="Minor scrape / None"
-                          value={p.injuryDetails} 
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setPersons(prev => prev.map(item => item.id === p.id ? { ...item, injuryDetails: val } : item));
-                          }} 
-                          className="form-control" 
-                          rows={2}
-                          style={{ padding: '6px 8px', fontSize: '12.5px', resize: 'vertical', minHeight: '40px', lineHeight: '1.4' }}
-                        />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: p.injured ? 8 : 0 }}>
+                          <input
+                            type="checkbox"
+                            id={`injured-${p.id}`}
+                            checked={p.injured}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setPersons(prev => prev.map(item => item.id === p.id ? { ...item, injured: checked, injuryDetails: checked ? item.injuryDetails : '' } : item));
+                            }}
+                            style={{ width: 16, height: 16, cursor: 'pointer' }}
+                          />
+                          <label htmlFor={`injured-${p.id}`} style={{ margin: 0, fontWeight: 'normal', cursor: 'pointer', fontSize: '12.5px' }}>Injured</label>
+                        </div>
+                        {p.injured && (
+                          <textarea
+                            placeholder="Describe injury details..."
+                            value={p.injuryDetails}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setPersons(prev => prev.map(item => item.id === p.id ? { ...item, injuryDetails: val } : item));
+                            }}
+                            className="form-control"
+                            rows={2}
+                            style={{ padding: '6px 8px', fontSize: '12.5px', resize: 'vertical', minHeight: '40px', lineHeight: '1.4' }}
+                          />
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1872,7 +1815,7 @@ export default function NewIncidentPage() {
                 onClick={() => {
                   const maxId = persons.length > 0 ? Math.max(...persons.map(item => item.id)) : 0;
                   setPersons(prev => [...prev, {
-                    id: maxId + 1, guestOrNon: 'Guest', type: 'Guest', name: '', address: '', age: '', gender: 'Male', contact: '', role: '', injuryDetails: ''
+                    id: maxId + 1, guestOrNon: 'Guest', type: 'Guest', name: '', address: '', age: '', gender: 'Male', contact: '', role: '', injured: false, injuryDetails: ''
                   }]);
                 }} 
                 className="btn btn-secondary btn-sm"

@@ -16,10 +16,12 @@ enum CaseStatus {
 
 enum IncidentStatus {
   LIVE
+  LIVE_ASSIGNED
   LIVE_ACKNOWLEDGED
   LIVE_ON_SITE
+  LIVE_INCOMPLETE
   LIVE_COMPLETED
-  PENDING_REVIEW
+  PENDING_ENDORSEMENT
   RETURNED
   CLOSED
 }
@@ -57,18 +59,19 @@ enum GuestType {
 }
 
 model Case {
-  id          String         @id
-  title       String
-  status      CaseStatus     @default(PENDING_TRIAGE)
-  createdAt   DateTime       @default(now())
-  createdBy   String
-  closedAt    DateTime?
-  closedBy    String?
-  incident    Incident?
-  faults      Fault[]
-  tasks       Task[]
-  eDiaryLogs  EDiaryEntry[]
-  broadcasts  BroadcastLog[]
+  id             String         @id
+  title          String
+  status         CaseStatus     @default(PENDING_TRIAGE)
+  cmmsTicketIds  String[]
+  createdAt      DateTime       @default(now())
+  createdBy      String
+  closedAt       DateTime?
+  closedBy       String?
+  incident       Incident?
+  faults         Fault[]
+  tasks          Task[]
+  eDiaryLogs     EDiaryEntry[]
+  broadcasts     BroadcastLog[]
 
   @@index([createdAt])
   @@map("cases")
@@ -98,12 +101,25 @@ model Incident {
   commonName        String?
   postalCode        String?
   locationTags      String[]
-  summary           String             @db.Text
-  completionRemarks String?            @db.Text
-  version           Int                @default(1)
-  isDuplicate       Boolean            @default(false)
-  masterIncidentId  String?
-  logs              IncidentLog[]
+  reportingSource        String?
+  linkedEDiaryIds        String[]
+  closureBroadcastStatus String?
+  closureBroadcastId     String?
+  isFalseAlarm           Boolean            @default(false)
+  editingBy              String?
+  editingStartedAt       DateTime?
+  crisisReminderDue      DateTime?
+  acknowledgedAt         DateTime?
+  onSiteAt               DateTime?
+  completedAt            DateTime?
+  closedAt               DateTime?
+  closedBy               String?
+  summary                String             @db.Text
+  completionRemarks      String?            @db.Text
+  version                Int                @default(1)
+  isDuplicate            Boolean            @default(false)
+  masterIncidentId       String?
+  logs                   IncidentLog[]
   emergencyServices EmergencyService?
   mediaInvolvement  MediaInvolvement?
   propertyDamage    PropertyDamage?

@@ -7,10 +7,14 @@ export async function GET(request: Request) {
     const dateStart = searchParams.get('dateStart');
     const dateEnd   = searchParams.get('dateEnd');
     const user      = searchParams.get('user');
+    const caseId    = searchParams.get('caseId');
 
     const db = await getDb();
     let results = [...db.occurrences];
 
+    if (caseId) {
+      results = results.filter(o => o.caseId === caseId);
+    }
     if (dateStart) {
       const start = new Date(dateStart).getTime();
       results = results.filter(o => new Date(o.dateTime).getTime() >= start);

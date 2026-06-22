@@ -175,7 +175,7 @@ export default function FaultDetailPage() {
     }
   };
 
-  const isController = ['Controller', 'Duty Manager', 'Duty Officer', 'System Administrator'].includes(role);
+  const isController = ['Controller', 'Duty Manager', 'Duty Officer', 'System Administrator', 'Current Ops Administrator'].includes(role);
 
   // ── Render states ────────────────────────────────────────────────────────────
 
@@ -535,5 +535,5 @@ function buildTimeline(fault: Fault) {
     dotColor: 'var(--color-primary)',
   });
 
-  return entries;
-}
+  return entries;}
+

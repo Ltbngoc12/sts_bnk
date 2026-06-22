@@ -154,6 +154,7 @@ export async function PUT(
     if (body.requestedBy) incident.requestedBy = body.requestedBy;
     if (body.reporterName !== undefined) incident.reporterName = body.reporterName;
     if (body.category) incident.category = body.category;
+    if (body.reportingSource !== undefined) incident.reportingSource = body.reportingSource;
 
     // Location updates
     if (body.location) {
@@ -339,8 +340,9 @@ export async function POST(
       // ── Submit for Duty Manager review ─────────────────────────
       case 'submit-review':
       case 'submit-endorsement': {
-        if (!['Live', 'Returned', 'Live (Incomplete)', 'Live (Completed)'].includes(incident.status)) {
-          return NextResponse.json({ error: `Cannot submit for endorsement from current status "${incident.status}".` }, { status: 409 });
+        // FSD §5.5.3: only allowed from Live (Completed) or Returned
+        if (!['Live (Completed)', 'Returned'].includes(incident.status)) {
+          return NextResponse.json({ error: `Cannot submit for endorsement: incident must be in "Live (Completed)" or "Returned" status (current: "${incident.status}").` }, { status: 409 });
         }
         incident.status = 'Pending Endorsement';
         incident.log.push(makeLogEntry(incident, `Incident submitted for Duty Manager endorsement by ${actor}.`));
@@ -360,11 +362,13 @@ export async function POST(
         if (incident.slaveIncidents) {
           incident.slaveIncidents = incident.slaveIncidents.map((s: any) => ({ ...s, status: 'Closed' }));
         }
+        const closingRole = body.role || 'Duty Manager';
         incident.log.push(makeLogEntry(incident,
-          `Incident approved and closed by ${actor} (Duty Manager).${body.closureRemarks ? ` Closure remarks: ${body.closureRemarks}` : ''} Record is now read-only.`
+          `Incident approved and closed by ${actor} (${closingRole}).${body.closureRemarks ? ` Closure remarks: ${body.closureRemarks}` : ''} Record is now read-only.`
         ));
 
-        // ── Auto-trigger Closure Broadcast (FRD 5.12.1) ───────────
+        // ── Queue Closure Broadcast for Controller review (FSD §5.3.11) ────────
+        // Broadcast is PENDING — not dispatched until Controller reviews and confirms
         if (!db.broadcasts) db.broadcasts = [];
         const broadcastSeq = db.broadcasts.filter(b => b.caseId === caseId).length + 1;
         const broadcastId = `${caseId}-BC${String(broadcastSeq).padStart(3, '0')}`;
@@ -373,7 +377,7 @@ export async function POST(
           caseId,
           incidentId: incident.id,
           type: 'Closure',
-          recipients: ['duty-manager@sentosa.gov.sg', 'operations@sentosa.gov.sg'],
+          recipients: [],
           templateUsed: 'Closure Broadcast Template',
           contentDispatched: [
             'INCIDENT CLOSURE NOTICE',
@@ -386,11 +390,13 @@ export async function POST(
             `Closed By: ${actor}`,
             `Closure Remarks: ${body.closureRemarks || 'N/A'}`,
           ].join('\n'),
-          sentAt: new Date().toISOString(),
+          sentAt: null as any,
           sentBy: actor,
-          status: 'SENT',
-          deliveryAttempts: 1
+          status: 'PENDING',
+          deliveryAttempts: 0
         });
+        incident.closureBroadcastStatus = 'pending';
+        incident.closureBroadcastId = broadcastId;
 
         currentCase.incident = incident;
         db.cases[caseIndex] = currentCase;
@@ -403,10 +409,14 @@ export async function POST(
         if (!['Live (Completed)', 'Pending Endorsement'].includes(incident.status)) {
           return NextResponse.json({ error: `Cannot return: incident status is "${incident.status}"` }, { status: 409 });
         }
+        // FSD §5.5.4: return remarks are mandatory
+        if (!body.returnRemarks || !body.returnRemarks.trim()) {
+          return NextResponse.json({ error: 'Return remarks are required when returning an incident.' }, { status: 400 });
+        }
         incident.status = 'Returned';
-        incident.completionRemarks = body.returnRemarks || '';
+        incident.completionRemarks = body.returnRemarks;
         incident.log.push(makeLogEntry(incident,
-          `Incident returned to Controller by ${actor}${body.returnRemarks ? `. Reason: ${body.returnRemarks}` : '.'}`
+          `Incident returned to Controller by ${actor}. Reason: ${body.returnRemarks}`
         ));
         break;
       }
@@ -425,13 +435,17 @@ export async function POST(
 
       // ── System Administrator Reopens closed incident ───────────
       case 'reopen': {
+        // FSD §5.6.1: only System Administrator may reopen
+        if (body.role !== 'System Administrator') {
+          return NextResponse.json({ error: 'Only a System Administrator can reopen a closed incident.' }, { status: 403 });
+        }
         if (incident.status !== 'Closed') {
           return NextResponse.json({ error: 'Incident is not closed and cannot be reopened.' }, { status: 400 });
         }
         incident.status = 'Live';
         incident.closedAt = undefined;
         incident.closedBy = undefined;
-        if (currentCase.status === 'Closed') {
+        if (currentCase.status === 'Closed' || currentCase.status === 'No Action Required') {
           currentCase.status = 'Active';
           currentCase.closedAt = null;
           currentCase.closedBy = null;
@@ -457,11 +471,10 @@ export async function POST(
         incident.log.push(makeLogEntry(incident,
           `Incident marked as FALSE ALARM and closed by ${actor}. Previous status: "${prevStatus}". Record retained for audit purposes.`
         ));
+        // FSD §4.3.2: False alarm with no outstanding tasks → Case = No Action Required (not Closed)
         const activeTasks = db.tasks.filter(t => t.caseId === caseId && t.status !== 'Closed');
         if (activeTasks.length === 0) {
-          currentCase.status = 'Closed';
-          currentCase.closedAt = new Date().toISOString();
-          currentCase.closedBy = actor;
+          currentCase.status = 'No Action Required';
         }
         break;
       }
@@ -598,8 +611,9 @@ export async function POST(
         if (body.personalInjuries) incident.personalInjuries = body.personalInjuries;
         if (body.personsInvolved) incident.personsInvolved = body.personsInvolved;
         if (body.cctvBwc) incident.cctvBwc = body.cctvBwc;
-        if (body.summary) incident.summary = body.summary;
+        if (body.summary !== undefined) incident.summary = body.summary;
         if (body.category) incident.category = body.category;
+        if (body.reportingSource !== undefined) incident.reportingSource = body.reportingSource;
         incident.log.push(makeLogEntry(incident, `Ancillary fields updated by ${actor}.`));
         break;
       }
