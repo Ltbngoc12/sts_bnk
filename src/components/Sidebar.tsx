@@ -110,12 +110,14 @@ export const Sidebar: React.FC = () => {
 
       {/* Brand */}
       <div className="brand-area">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/icon.png" alt="SDC" className="brand-icon" />
-        <div className="brand-text">
-          <div className="brand-name">SDC IIOC</div>
-          <div className="brand-sub">Case Management System</div>
-        </div>
+        {isCollapsed ? (
+          <img src="/icon.png" alt="Sentosa" className="brand-icon" />
+        ) : (
+          <div className="brand-text">
+            <img src="/logo.png" alt="Sentosa" className="brand-logo-img" />
+            <div className="brand-sub">Case Management System</div>
+          </div>
+        )}
       </div>
 
       {/* Nav */}
@@ -329,6 +331,11 @@ export const Sidebar: React.FC = () => {
         }
 
         .brand-text { overflow: hidden; white-space: nowrap; min-width: 0; }
+        .brand-logo-img {
+          height: 48px;
+          object-fit: contain;
+          display: block;
+        }
 
         .brand-name {
           font-size: 12px; font-weight: 700;
@@ -338,8 +345,8 @@ export const Sidebar: React.FC = () => {
         }
 
         .brand-sub {
-          font-size: 9.5px; color: rgba(255,255,255,0.40);
-          margin-top: 2px; letter-spacing: 0.04em;
+          font-size: 11px; color: #ffffff;
+          margin-top: 5px; letter-spacing: 0.04em;
           white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
 

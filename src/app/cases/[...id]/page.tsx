@@ -397,10 +397,10 @@ export default function CaseDetailsPage() {
           </p>
         </div>
 
-        {/* Case Actions — closure is system-managed; only manual activation is permitted */}
+        {/* Case Actions — closure is system-managed; manual status update to No Action Required is permitted for controller */}
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
           {isCtrl && caseData.status === 'Pending Triage' && (
-            <button className="btn btn-success btn-sm" onClick={() => caseUpdate({ status: 'Active' })}>Activate Case</button>
+            <button className="btn btn-warning btn-sm" onClick={() => caseUpdate({ status: 'No Action Required' })}>No Action Required</button>
           )}
         </div>
       </div>

@@ -32,7 +32,7 @@ const DEFAULT_TEMPLATES: BroadcastTemplate[] = [
     category: 'Incident Broadcast',
     name: 'Standard Incident Notification',
     subject: '[ALERT] SDC Operational Alert: {incident_title}',
-    body: 'Incident ID: {incident_id}\nClassification: {incident_type}\nLocation: {location}\nTime Logged: {time}\nSeverity Level: {crisis_level}\nStatus: {status}\n\nDescription: {summary}\n\nThis is an automated dispatch from SDC IIOC. Responders have been deployed.'
+    body: 'Incident ID: {incident_id}\nClassification: {incident_type}\nLocation: {location}\nTime Logged: {time}\nSeverity Level: {crisis_level}\nStatus: {status}\n\nDescription: {summary}\n\nThis is an automated dispatch from Sentosa. Responders have been deployed.'
   },
   {
     id: 'tpl-2',
@@ -45,8 +45,8 @@ const DEFAULT_TEMPLATES: BroadcastTemplate[] = [
     id: 'tpl-3',
     category: 'End-of-Day Interim Broadcast',
     name: 'End-of-Day Operational Summary',
-    subject: '[SUMMARY] SDC IIOC End-of-Day Interim Broadcast - {time}',
-    body: 'SDC IIOC Daily Briefing Summary:\nDate: {time}\n\nToday\'s Operations Overview:\n- Total Active Cases: {total_incidents}\n- Unclosed Safety/Security Events: {open_incidents}\n- Closed Logs: {closed_incidents}\n- CMMS Fault Tickets Raised: {active_tasks}\n\nThis interim broadcast summary was audited and dispatched by the Duty Manager on duty.'
+    subject: '[SUMMARY] Sentosa End-of-Day Interim Broadcast - {time}',
+    body: 'Sentosa Daily Briefing Summary:\nDate: {time}\n\nToday\'s Operations Overview:\n- Total Active Cases: {total_incidents}\n- Unclosed Safety/Security Events: {open_incidents}\n- Closed Logs: {closed_incidents}\n- CMMS Fault Tickets Raised: {active_tasks}\n\nThis interim broadcast summary was audited and dispatched by the Duty Manager on duty.'
   }
 ];
 

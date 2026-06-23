@@ -25,6 +25,10 @@ export default function IncidentsPage() {
   const [filterDateStart, setFilterDateStart] = useState<string>('');
   const [filterDateEnd, setFilterDateEnd] = useState<string>('');
 
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const itemsPerPage = 10;
+
   const fetchCases = async () => {
     try {
       const res = await fetch('/api/cases');
@@ -44,6 +48,10 @@ export default function IncidentsPage() {
     fetchCases();
     setTaxonomy(getIncidentTaxonomy());
   }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterStatus, filterType, filterSubType, filterCrisisLevel, filterSource, filterController, filterDateStart, filterDateEnd, activeTab]);
 
   // Reset Filters
   const resetFilters = () => {
@@ -173,6 +181,11 @@ export default function IncidentsPage() {
 
     return true;
   });
+
+  // Pagination Calculations
+  const totalPages = Math.ceil(filteredIncidents.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedIncidents = filteredIncidents.slice(startIndex, startIndex + itemsPerPage);
 
   const isController = role === 'Controller' || role === 'Duty Manager' || role === 'Duty Officer' || role === 'System Administrator' || role === 'Current Ops Administrator';
 
@@ -629,26 +642,29 @@ export default function IncidentsPage() {
               <thead>
                 <tr>
                   <th>Case ID</th>
+                  <th>Incident ID</th>
                   <th>Incident Title</th>
-                  <th>Classification</th>
+                  <th>Type</th>
+                  <th>Subtype</th>
                   <th>Priority</th>
                   <th>Location (Common Name)</th>
                   <th>Assigned Responder</th>
                   <th>Incident Status</th>
-                  <th>Closure Broadcast</th>
                   <th>Date Logged</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredIncidents.map((c) => {
+                {paginatedIncidents.map((c) => {
                   const inc = c.incident!;
                   return (
                     <tr key={c.id} onClick={() => {
                       window.location.href = `/incidents/${inc.id}`;
                     }}>
                       <td className="case-id-cell">{c.id}</td>
+                      <td className="case-id-cell" style={{ fontFamily: 'monospace' }}>{inc.id}</td>
                       <td className="case-title-cell">{c.title}</td>
-                      <td>{inc.type} - {inc.subType}</td>
+                      <td>{inc.type}</td>
+                      <td>{inc.subType}</td>
                       <td>
                         <span className={`badge ${
                           inc.priority === 'High' ? 'badge-live' : 'badge-closed'
@@ -673,17 +689,6 @@ export default function IncidentsPage() {
                           {inc.status}
                         </span>
                       </td>
-                      <td>
-                        {(inc as any).closureBroadcastStatus === 'pending' && (
-                          <span className="badge" style={{ background: 'var(--color-high-bg)', color: 'var(--color-high)', borderColor: 'var(--color-high-border)', fontSize: 10 }}>Pending</span>
-                        )}
-                        {(inc as any).closureBroadcastStatus === 'dispatched' && (
-                          <span className="badge badge-closed" style={{ fontSize: 10 }}>Dispatched</span>
-                        )}
-                        {!(inc as any).closureBroadcastStatus && (
-                          <span style={{ color: 'var(--text-faint)', fontSize: 11 }}>—</span>
-                        )}
-                      </td>
                       <td className="date-cell">
                         {new Date(inc.dateTime).toLocaleDateString('en-US')} {new Date(inc.dateTime).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })}
                       </td>
@@ -692,6 +697,54 @@ export default function IncidentsPage() {
                 })}
               </tbody>
             </table>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                  Showing <strong>{startIndex + 1}</strong> to <strong>{Math.min(startIndex + itemsPerPage, filteredIncidents.length)}</strong> of <strong>{filteredIncidents.length}</strong> incidents
+                </div>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="btn btn-secondary btn-xs"
+                    style={{ padding: '6px 12px', fontSize: '11px', borderRadius: '6px', opacity: currentPage === 1 ? 0.5 : 1, cursor: currentPage === 1 ? 'default' : 'pointer' }}
+                  >
+                    Previous
+                  </button>
+                  
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => {
+                    const isCurrent = p === currentPage;
+                    return (
+                      <button
+                        key={p}
+                        onClick={() => setCurrentPage(p)}
+                        className={`btn ${isCurrent ? 'btn-primary' : 'btn-secondary'} btn-xs`}
+                        style={{
+                          padding: '6px 10px',
+                          fontSize: '11px',
+                          borderRadius: '6px',
+                          fontWeight: isCurrent ? 'bold' : 'normal',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {p}
+                      </button>
+                    );
+                  })}
+
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className="btn btn-secondary btn-xs"
+                    style={{ padding: '6px 12px', fontSize: '11px', borderRadius: '6px', opacity: currentPage === totalPages ? 0.5 : 1, cursor: currentPage === totalPages ? 'default' : 'pointer' }}
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
            )}
       </div>

@@ -73,7 +73,6 @@ export default function IncidentDetailsPage() {
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [modalRemarks, setModalRemarks] = useState('');
-  const [assigneeInput, setAssigneeInput] = useState('');
   const [assignmentError, setAssignmentError] = useState('');
   const [pendingResponders, setPendingResponders] = useState<string[] | null>(null);
   const [reviewRemarks, setReviewRemarks] = useState('');
@@ -157,8 +156,8 @@ export default function IncidentDetailsPage() {
   const summaryDirtyRef = useRef(false);
   const autoSaveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Core Particulars Edit Form State
-  const [isEditingCore, setIsEditingCore] = useState(false);
+  // Unified Edit Info State
+  const [isEditingInfo, setIsEditingInfo] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editCategory, setEditCategory] = useState('Standard Incident');
   const [editType, setEditType] = useState('');
@@ -171,7 +170,6 @@ export default function IncidentDetailsPage() {
   const [editDateTime, setEditDateTime] = useState('');
 
   // Location Info Edit Form State
-  const [isEditingLocation, setIsEditingLocation] = useState(false);
   const [editRoad, setEditRoad] = useState('');
   const [editBuilding, setEditBuilding] = useState('');
   const [editLevelSpace, setEditLevelSpace] = useState('');
@@ -189,7 +187,7 @@ export default function IncidentDetailsPage() {
     setTaxonomy(getIncidentTaxonomy());
   }, []);
 
-  const startEditingCore = () => {
+  const handleStartEditingAll = () => {
     if (!incident) return;
     setEditTitle(incident.title);
     setEditCategory(incident.category || 'Standard Incident');
@@ -210,21 +208,118 @@ export default function IncidentDetailsPage() {
       setEditDateTime('');
     }
     
-    setIsEditingCore(true);
+    if (incident.location) {
+      setEditRoad(incident.location.road || '');
+      setEditBuilding(incident.location.building || '');
+      setEditLevelSpace(incident.location.levelSpace || '');
+      setEditNearAt(incident.location.nearAt || '');
+      setEditCommonName(incident.location.commonName || '');
+      setEditPostalCode(incident.location.postalCode || '000000');
+      setEditTagsStr((incident.location.tags || []).join(', '));
+      setEditLat(incident.location.lat);
+      setEditLng(incident.location.lng);
+    }
+
+    setPendingResponders(Array.isArray(incident.assignedTo) ? incident.assignedTo : []);
+    setIsEditingInfo(true);
   };
 
-  const startEditingLocation = () => {
-    if (!incident || !incident.location) return;
-    setEditRoad(incident.location.road || '');
-    setEditBuilding(incident.location.building || '');
-    setEditLevelSpace(incident.location.levelSpace || '');
-    setEditNearAt(incident.location.nearAt || '');
-    setEditCommonName(incident.location.commonName || '');
-    setEditPostalCode(incident.location.postalCode || '000000');
-    setEditTagsStr((incident.location.tags || []).join(', '));
-    setEditLat(incident.location.lat);
-    setEditLng(incident.location.lng);
-    setIsEditingLocation(true);
+  const handleCancelAll = () => {
+    setPendingResponders(null);
+    setAssignmentError('');
+    setIsEditingInfo(false);
+  };
+
+  const handleSaveAll = async () => {
+    if (!incident) return;
+    if (!editTitle.trim()) { alert('Title is required.'); return; }
+    if (!editType) { alert('Type is required.'); return; }
+    if (!editSubType) { alert('Sub-type is required.'); return; }
+    
+    setSaving(true);
+    setAssignmentError('');
+    try {
+      const isoDateTime = editDateTime ? new Date(editDateTime).toISOString() : new Date().toISOString();
+      const tags = editTagsStr.split(',').map(t => t.trim()).filter(Boolean);
+      
+      const updatePayload = {
+        title: editTitle,
+        type: editType,
+        subType: editSubType,
+        priority: editPriority,
+        crisisLevel: Number(editCrisisLevel),
+        requestedBy: editRequestedBy,
+        reportingSource: editReportingSource,
+        reporterName: editReporterName,
+        dateTime: isoDateTime,
+        location: {
+          road: editRoad,
+          building: editBuilding,
+          levelSpace: editLevelSpace,
+          nearAt: editNearAt,
+          commonName: editCommonName,
+          postalCode: editPostalCode,
+          tags,
+          lat: editLat,
+          lng: editLng
+        }
+      };
+
+      const updateRes = await fetch(`/api/incidents/${incidentId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...updatePayload, username }),
+      });
+      if (!updateRes.ok) {
+        const err = await updateRes.json();
+        alert(`Failed to save details: ${err.error}`);
+        setSaving(false);
+        return;
+      }
+
+      const currentList = Array.isArray(incident.assignedTo) ? incident.assignedTo : [];
+      const pending = pendingResponders ?? currentList;
+      const toAdd = pending.filter(r => !currentList.includes(r));
+      const toRemove = currentList.filter(r => !pending.includes(r));
+
+      if (toAdd.length > 0 || toRemove.length > 0) {
+        for (const name of toAdd) {
+          const res = await fetch(`/api/incidents/${incidentId}/assign`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ addResponder: name, username, role }),
+          });
+          if (!res.ok) {
+            const err = await res.json();
+            setAssignmentError(err.error || 'Failed to add responder.');
+            setSaving(false);
+            return;
+          }
+        }
+        for (const name of toRemove) {
+          const res = await fetch(`/api/incidents/${incidentId}/assign`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ removeResponder: name, username, role }),
+          });
+          if (!res.ok) {
+            const err = await res.json();
+            setAssignmentError(err.error || 'Failed to remove responder.');
+            setSaving(false);
+            return;
+          }
+        }
+      }
+
+      setPendingResponders(null);
+      await fetchIncidentData();
+      setIsEditingInfo(false);
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Error occurred while saving.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const toggleSection = (section: string) => {
@@ -490,49 +585,7 @@ export default function IncidentDetailsPage() {
     setPendingResponders(updatedList);
   };
 
-  const handleAssignResponders = async () => {
-    if (!incident) return;
-    const currentList = Array.isArray(incident.assignedTo) ? incident.assignedTo : [];
-    const pending = pendingResponders ?? currentList;
-    const toAdd = pending.filter(r => !currentList.includes(r));
-    const toRemove = currentList.filter(r => !pending.includes(r));
-    if (toAdd.length === 0 && toRemove.length === 0) return;
-
-    setAssignmentError('');
-    setSaving(true);
-    try {
-      for (const name of toAdd) {
-        const res = await fetch(`/api/incidents/${incidentId}/assign`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ addResponder: name, username, role }),
-        });
-        if (!res.ok) {
-          const err = await res.json();
-          setAssignmentError(err.error || 'Failed to add responder.');
-          return;
-        }
-      }
-      for (const name of toRemove) {
-        const res = await fetch(`/api/incidents/${incidentId}/assign`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ removeResponder: name, username, role }),
-        });
-        if (!res.ok) {
-          const err = await res.json();
-          setAssignmentError(err.error || 'Failed to remove responder.');
-          return;
-        }
-      }
-      setPendingResponders(null);
-      await fetchIncidentData();
-    } catch (err: any) {
-      setAssignmentError(err.message || 'Request error occurred.');
-    } finally {
-      setSaving(false);
-    }
-  };
+  // Removed handleAssignResponders in favor of unified handleSaveAll
 
   const handleComplete = async () => {
     const ok = await performAction('complete');
@@ -576,6 +629,7 @@ export default function IncidentDetailsPage() {
   const isMgr = role === 'Duty Manager' || role === 'Duty Officer' || role === 'System Administrator' || role === 'Current Ops Administrator';
   const isAdmin = role === 'System Administrator';
   const isClosed = incident.status === 'Closed';
+  const isLocked = isClosed || incident.status === 'Live (Completed)';
 
   // Warnings / Reminder Triggers
   const showCrisisReviewReminder = elapsedMinutes >= 45 && incident.status !== 'Closed';
@@ -965,7 +1019,7 @@ export default function IncidentDetailsPage() {
         /* Section A: Unified Info Panel */
         .incident-info-panel {
           display: grid;
-          grid-template-columns: 1.2fr 1.2fr 2fr;
+          grid-template-columns: 1fr 1fr 1fr;
           gap: 20px;
           padding: 16px 20px;
           margin-bottom: 20px;
@@ -1590,21 +1644,13 @@ export default function IncidentDetailsPage() {
           {/* Controller/Admin Actions */}
           {isCtrl && !isClosed && (
             <>
-              {['Live', 'Live (Assigned)', 'Live (Acknowledged)'].includes(incident.status) && (
-                <button
-                  className="btn btn-info btn-sm"
-                  onClick={handleAssignResponders}
-                  disabled={saving || pendingResponders === null || JSON.stringify(pendingResponders) === JSON.stringify(Array.isArray(incident.assignedTo) ? incident.assignedTo : [])}
-                >
-                  {incident.status === 'Live' ? 'Assign Responder' : 'Reassign Responder'}
-                </button>
-              )}
+              {/* Reassign button moved to Assigned Responders section below */}
               {incident.status === 'Live (Acknowledged)' && (
                 <button className="btn btn-primary btn-sm" onClick={() => performAction('on-site')} disabled={saving}>
                   Update to On-site
                 </button>
               )}
-              {['Live (On-Site)', 'Live (Incomplete)'].includes(incident.status) && (
+              {incident.status === 'Live (Completed)' && (
                 <button
                   className="btn btn-warning btn-sm"
                   onClick={async () => {
@@ -1705,15 +1751,25 @@ export default function IncidentDetailsPage() {
 
       {/* Section A: Unified Info Panel (Top Grid) */}
       <div className="glass incident-info-panel" style={{ marginTop: 20 }}>
+        {/* Header spanning all columns */}
+        <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px dashed var(--border-color)', paddingBottom: '10px', marginBottom: '10px' }}>
+          <h2 style={{ fontSize: '13px', fontWeight: 700, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>Incident Particulars, Location & Responders</h2>
+          {isCtrl && !isLocked && (
+            isEditingInfo ? (
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn btn-success btn-xs" onClick={handleSaveAll} disabled={saving} style={{ padding: '3px 12px', fontSize: 11 }}>Save Changes</button>
+                <button className="btn btn-secondary btn-xs" onClick={handleCancelAll} disabled={saving} style={{ padding: '3px 12px', fontSize: 11 }}>Cancel</button>
+              </div>
+            ) : (
+              <button className="btn btn-secondary btn-xs" onClick={handleStartEditingAll} style={{ padding: '3px 12px', fontSize: 11 }}>✏️ Edit Incident Details</button>
+            )
+          )}
+        </div>
+
         {/* Core Particulars */}
         <div className="info-panel-col">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, borderBottom: '1px dashed var(--border-color)', paddingBottom: 4 }}>
-            <div className="info-panel-title" style={{ borderBottom: 'none', marginBottom: 0, paddingBottom: 0 }}>Core Particulars</div>
-            {!isClosed && !isEditingCore && (
-              <button className="btn btn-secondary btn-xs" onClick={startEditingCore} style={{ padding: '2px 8px', fontSize: 11 }}>✏️ Edit</button>
-            )}
-          </div>
-          {isEditingCore ? (
+          <div className="info-panel-title">General Information</div>
+          {isEditingInfo ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '4px 0' }}>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Incident Title *</label>
@@ -1778,27 +1834,6 @@ export default function IncidentDetailsPage() {
                 <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Date & Time of Occurrence *</label>
                 <input className="form-control" type="datetime-local" value={editDateTime} onChange={e => setEditDateTime(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
               </div>
-              <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-                <button className="btn btn-brand btn-xs" style={{ flex: 1 }} onClick={async () => {
-                  if (!editTitle.trim()) { alert('Title is required.'); return; }
-                  if (!editType) { alert('Type is required.'); return; }
-                  if (!editSubType) { alert('Sub-type is required.'); return; }
-                  const isoDateTime = editDateTime ? new Date(editDateTime).toISOString() : new Date().toISOString();
-                  await updateFields({
-                    title: editTitle,
-                    type: editType,
-                    subType: editSubType,
-                    priority: editPriority,
-                    crisisLevel: editCrisisLevel,
-                    requestedBy: editRequestedBy,
-                    reportingSource: editReportingSource,
-                    reporterName: editReporterName,
-                    dateTime: isoDateTime
-                  });
-                  setIsEditingCore(false);
-                }}>Save</button>
-                <button className="btn btn-secondary btn-xs" style={{ flex: 1 }} onClick={() => setIsEditingCore(false)}>Cancel</button>
-              </div>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
@@ -1818,13 +1853,8 @@ export default function IncidentDetailsPage() {
 
         {/* Location Info */}
         <div className="info-panel-col">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, borderBottom: '1px dashed var(--border-color)', paddingBottom: 4 }}>
-            <div className="info-panel-title" style={{ borderBottom: 'none', marginBottom: 0, paddingBottom: 0 }}>Location Details</div>
-            {!isClosed && !isEditingLocation && (
-              <button className="btn btn-secondary btn-xs" onClick={startEditingLocation} style={{ padding: '2px 8px', fontSize: 11 }}>✏️ Edit</button>
-            )}
-          </div>
-          {isEditingLocation ? (
+          <div className="info-panel-title">Location</div>
+          {isEditingInfo ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '4px 0' }}>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Common Name</label>
@@ -1854,26 +1884,6 @@ export default function IncidentDetailsPage() {
                 <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Location Tags (Comma separated)</label>
                 <input className="form-control" type="text" value={editTagsStr} onChange={e => setEditTagsStr(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} placeholder="e.g. Siloso, Beachfront" />
               </div>
-              <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-                <button className="btn btn-brand btn-xs" style={{ flex: 1 }} onClick={async () => {
-                  const tags = editTagsStr.split(',').map(t => t.trim()).filter(Boolean);
-                  await updateFields({
-                    location: {
-                      road: editRoad,
-                      building: editBuilding,
-                      levelSpace: editLevelSpace,
-                      nearAt: editNearAt,
-                      commonName: editCommonName,
-                      postalCode: editPostalCode,
-                      tags,
-                      lat: editLat,
-                      lng: editLng
-                    }
-                  });
-                  setIsEditingLocation(false);
-                }}>Save</button>
-                <button className="btn btn-secondary btn-xs" style={{ flex: 1 }} onClick={() => setIsEditingLocation(false)}>Cancel</button>
-              </div>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
@@ -1902,7 +1912,7 @@ export default function IncidentDetailsPage() {
 
         {/* Assigned Responders */}
         <div className="info-panel-col assigned-responders-section">
-          <div className="info-panel-title">Assigned Responders</div>
+          <div className="info-panel-title">Responder Assignment</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
               {Array.isArray(incident.assignedTo) && incident.assignedTo.length > 0 ? (
@@ -1927,7 +1937,7 @@ export default function IncidentDetailsPage() {
             </div>
 
             {/* Inline Dispatcher Controls */}
-            {isCtrl && !isClosed && (
+            {isCtrl && !isLocked && isEditingInfo && (
               <div style={{ marginTop: 8 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                   <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)' }}>RE-ASSIGN RESPONDERS</label>
@@ -2006,156 +2016,91 @@ export default function IncidentDetailsPage() {
             
             {/* Accordion: Summary & Closure */}
             <div className="accordion-item">
-              <div className="accordion-header" onClick={() => toggleSection('summaryClosure')}>
+              <div className="accordion-header" style={{ cursor: 'default' }}>
                 <div className="accordion-header-left">
                   <h3 className="accordion-title">Summary & Closure</h3>
                   <span className={`accordion-badge ${incident.summary ? 'active' : 'none'}`}>
                     {incident.summary ? 'Ready' : 'Pending'}
                   </span>
                 </div>
-                <span>{openSections.summaryClosure ? '▼' : '▶'}</span>
               </div>
-              {openSections.summaryClosure && (
-                <div className="accordion-content" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  <div>
-                    <h4 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 8 }}>Incident Summary</h4>
-                    {!isClosed ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        <textarea
-                          className="form-control"
-                          rows={4}
-                          value={summaryDraft}
-                          placeholder="Provide a detailed operational summary of the incident..."
-                          onChange={e => {
-                            setSummaryDraft(e.target.value);
-                            summaryDirtyRef.current = true;
-                          }}
-                          onBlur={() => {
-                            if (summaryDirtyRef.current) {
-                              summaryDirtyRef.current = false;
-                              updateFields({ summary: summaryDraft });
-                            }
-                          }}
-                          style={{ fontSize: 12.5 }}
-                        />
-                      </div>
-                    ) : (
-                      <div className="inset-panel" style={{ padding: 12, fontSize: 12.5, whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
-                        {incident.summary || <span style={{ fontStyle: 'italic', color: 'var(--text-faint)' }}>No summary recorded.</span>}
-                      </div>
-                    )}
-                  </div>
-                  
-                  {incident.completionRemarks && (
-                    <div>
-                      <h4 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 6 }}>Completion Remarks</h4>
-                      <div className="inset-panel" style={{ padding: 10, fontSize: 12, fontStyle: 'italic', background: 'var(--bg-inset)' }}>
-                        {incident.completionRemarks}
-                      </div>
+              <div className="accordion-content" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div>
+                  <h4 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 8 }}>Incident Summary</h4>
+                  {!isLocked ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <textarea
+                        className="form-control"
+                        rows={4}
+                        value={summaryDraft}
+                        placeholder="Provide a detailed operational summary of the incident..."
+                        onChange={e => {
+                          setSummaryDraft(e.target.value);
+                          summaryDirtyRef.current = true;
+                        }}
+                        onBlur={() => {
+                          if (summaryDirtyRef.current) {
+                            summaryDirtyRef.current = false;
+                            updateFields({ summary: summaryDraft });
+                          }
+                        }}
+                        style={{ fontSize: 12.5 }}
+                      />
                     </div>
-                  )}
-
-                  {isClosed && (
-                    <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      <h4 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 4 }}>Closure Metadata</h4>
-                      <div className="cd-info-row">
-                        <span className="cd-info-label">Closed By</span>
-                        <span className="cd-info-value">{incident.closedBy || 'System/Duty Manager'}</span>
-                      </div>
-                      <div className="cd-info-row">
-                        <span className="cd-info-label">Closed At</span>
-                        <span className="cd-info-value">{incident.closedAt ? new Date(incident.closedAt).toLocaleString('en-SG') : '—'}</span>
-                      </div>
-                      <div className="cd-info-row">
-                        <span className="cd-info-label">Closure Broadcast</span>
-                        <span className="cd-info-value">
-                          {(incident as any).closureBroadcastStatus === 'pending' && (
-                            <span className="badge" style={{ background: 'var(--color-high-bg)', color: 'var(--color-high)', borderColor: 'var(--color-high-border)', fontSize: 10 }}>⏳ Pending Dispatch</span>
-                          )}
-                          {(incident as any).closureBroadcastStatus === 'dispatched' && (
-                            <span className="badge badge-closed" style={{ fontSize: 10 }}>✓ Dispatched</span>
-                          )}
-                          {(incident as any).closureBroadcastStatus === 'not_required' && (
-                            <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>Not required</span>
-                          )}
-                          {!(incident as any).closureBroadcastStatus && (
-                            <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>
-                          )}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Accordion: CCTV */}
-            <div className="accordion-item">
-              <div className="accordion-header" onClick={() => toggleSection('cctv')}>
-                <div className="accordion-header-left">
-                  <h3 className="accordion-title">CCTV & BWC Cameras</h3>
-                  <span className={`accordion-badge ${incident.cctvBwc && incident.cctvBwc.length > 0 ? 'active' : 'none'}`}>
-                    {getCctvBadge()}
-                  </span>
-                </div>
-                <span>{openSections.cctv ? '▼' : '▶'}</span>
-              </div>
-              {openSections.cctv && (
-                <div className="accordion-content">
-                  {!isClosed && (
-                    <div style={{ border: '1px dashed var(--border-color)', borderRadius: 6, padding: 10, marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <input className="form-control" placeholder="CCTV Camera No" value={cctvCameraNo} onChange={e => setCctvCameraNo(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
-                        <input className="form-control" type="time" placeholder="VMS Timestamp" value={cctvVmsTimestamp} onChange={e => setCctvVmsTimestamp(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
-                      </div>
-                      <input className="form-control" placeholder="VMS Bookmark Name" value={cctvBookmark} onChange={e => setCctvBookmark(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <input className="form-control" placeholder="BWC Camera No" value={cctvBwcNo} onChange={e => setCctvBwcNo(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
-                        <input className="form-control" type="time" placeholder="BWC Timestamp" value={cctvBwcTimestamp} onChange={e => setCctvBwcTimestamp(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
-                      </div>
-                      <button type="button" className="btn btn-primary btn-xs" onClick={() => {
-                        const updated = [...(incident.cctvBwc || []), {
-                          cameraNumber: cctvCameraNo,
-                          vmsTimestamp: cctvVmsTimestamp,
-                          vmsBookmark: cctvBookmark,
-                          bwcNumber: cctvBwcNo,
-                          bwcTimestamp: cctvBwcTimestamp
-                        }];
-                        updateFields({ cctvBwc: updated });
-                        setCctvCameraNo(''); setCctvVmsTimestamp(''); setCctvBookmark(''); setCctvBwcNo(''); setCctvBwcTimestamp('');
-                      }}>Add Camera Reference</button>
-                    </div>
-                  )}
-
-                  {incident.cctvBwc && incident.cctvBwc.length > 0 ? (
-                    incident.cctvBwc.map((cam, idx) => (
-                      <div key={idx} style={{ padding: '8px 10px', background: 'var(--bg-inset)', border: '1px solid var(--border-color)', borderRadius: 5, marginBottom: 8, fontSize: 12, position: 'relative' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                          <div style={{ fontWeight: 600 }}>CCTV: {cam.cameraNumber || '—'}</div>
-                          {!isClosed && (
-                            <button type="button" style={{ background: 'transparent', border: 'none', color: 'var(--color-critical)', cursor: 'pointer', fontSize: 13, padding: 0 }} onClick={async () => {
-                              const updated = incident.cctvBwc.filter((_, i) => i !== idx);
-                              await updateFields({ cctvBwc: updated });
-                            }}>✕</button>
-                          )}
-                        </div>
-                        {cam.vmsTimestamp && <div style={{ color: 'var(--text-muted)', marginTop: 2 }}>VMS Time: {cam.vmsTimestamp}</div>}
-                        {cam.vmsBookmark && <div style={{ color: 'var(--text-muted)' }}>Bookmark: {cam.vmsBookmark}</div>}
-                        {cam.bwcNumber && <div style={{ color: 'var(--text-muted)', marginTop: 4 }}>BWC: {cam.bwcNumber} {cam.bwcTimestamp ? `@ ${cam.bwcTimestamp}` : ''}</div>}
-                      </div>
-                    ))
                   ) : (
-                    <p style={{ fontSize: 12, color: 'var(--text-faint)', fontStyle: 'italic', textAlign: 'center', margin: 0 }}>No cameras referenced.</p>
+                    <div className="inset-panel" style={{ padding: 12, fontSize: 12.5, whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
+                      {incident.summary || <span style={{ fontStyle: 'italic', color: 'var(--text-faint)' }}>No summary recorded.</span>}
+                    </div>
                   )}
                 </div>
-              )}
+                
+                {incident.completionRemarks && (
+                  <div>
+                    <h4 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 6 }}>Completion Remarks</h4>
+                    <div className="inset-panel" style={{ padding: 10, fontSize: 12, fontStyle: 'italic', background: 'var(--bg-inset)' }}>
+                      {incident.completionRemarks}
+                    </div>
+                  </div>
+                )}
+
+                {isClosed && (
+                  <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <h4 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 4 }}>Closure Metadata</h4>
+                    <div className="cd-info-row">
+                      <span className="cd-info-label">Closed By</span>
+                      <span className="cd-info-value">{incident.closedBy || 'System/Duty Manager'}</span>
+                    </div>
+                    <div className="cd-info-row">
+                      <span className="cd-info-label">Closed At</span>
+                      <span className="cd-info-value">{incident.closedAt ? new Date(incident.closedAt).toLocaleString('en-SG') : '—'}</span>
+                    </div>
+                    <div className="cd-info-row">
+                      <span className="cd-info-label">Closure Broadcast</span>
+                      <span className="cd-info-value">
+                        {(incident as any).closureBroadcastStatus === 'pending' && (
+                          <span className="badge" style={{ background: 'var(--color-high-bg)', color: 'var(--color-high)', borderColor: 'var(--color-high-border)', fontSize: 10 }}>⏳ Pending Dispatch</span>
+                        )}
+                        {(incident as any).closureBroadcastStatus === 'dispatched' && (
+                          <span className="badge badge-closed" style={{ fontSize: 10 }}>✓ Dispatched</span>
+                        )}
+                        {(incident as any).closureBroadcastStatus === 'not_required' && (
+                          <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>Not required</span>
+                        )}
+                        {!(incident as any).closureBroadcastStatus && (
+                          <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Accordion: Emergency Services */}
             <div className="accordion-item">
               <div className="accordion-header" onClick={() => toggleSection('emergency')}>
                 <div className="accordion-header-left">
-                  <h3 className="accordion-title">Emergency Services</h3>
+                  <h3 className="accordion-title">4. Emergency Services</h3>
                   <span className={`accordion-badge ${getEmergencyBadge() !== 'None' ? 'critical' : 'none'}`}>
                     {getEmergencyBadge()}
                   </span>
@@ -2170,7 +2115,7 @@ export default function IncidentDetailsPage() {
                     <label className="checkbox-row" style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: 8 }}>
                       <input type="checkbox" checked={incident.emergencyServices.policeAtScene}
                         onChange={e => updateFields({ emergencyServices: { ...incident.emergencyServices, policeAtScene: e.target.checked } })}
-                        disabled={isClosed} />
+                        disabled={isLocked} />
                       Police present at scene
                     </label>
                     {incident.emergencyServices.policeAtScene && (
@@ -2179,25 +2124,25 @@ export default function IncidentDetailsPage() {
                           <label>Officer Name & Rank</label>
                           <input className="form-control" type="text" value={incident.emergencyServices.officerNameRank}
                             onChange={e => updateFields({ emergencyServices: { ...incident.emergencyServices, officerNameRank: e.target.value } })}
-                            disabled={isClosed} style={{ padding: '4px 8px', fontSize: 12 }} />
+                            disabled={isLocked} style={{ padding: '4px 8px', fontSize: 12 }} />
                         </div>
                         <div className="form-group" style={{ marginBottom: 0 }}>
                           <label>Police Report ID</label>
                           <input className="form-control" type="text" value={incident.emergencyServices.policeIncidentNo}
                             onChange={e => updateFields({ emergencyServices: { ...incident.emergencyServices, policeIncidentNo: e.target.value } })}
-                            disabled={isClosed} style={{ padding: '4px 8px', fontSize: 12 }} />
+                            disabled={isLocked} style={{ padding: '4px 8px', fontSize: 12 }} />
                         </div>
                         <div className="form-group" style={{ marginBottom: 0 }}>
                           <label>Classification</label>
                           <input className="form-control" type="text" value={incident.emergencyServices.classification || ''}
                             onChange={e => updateFields({ emergencyServices: { ...incident.emergencyServices, classification: e.target.value } })}
-                            disabled={isClosed} style={{ padding: '4px 8px', fontSize: 12 }} />
+                            disabled={isLocked} style={{ padding: '4px 8px', fontSize: 12 }} />
                         </div>
                         <div className="form-group" style={{ marginBottom: 0 }}>
                           <label>Responding Unit</label>
                           <input className="form-control" type="text" value={incident.emergencyServices.respondingUnit || ''}
                             onChange={e => updateFields({ emergencyServices: { ...incident.emergencyServices, respondingUnit: e.target.value } })}
-                            disabled={isClosed} style={{ padding: '4px 8px', fontSize: 12 }} />
+                            disabled={isLocked} style={{ padding: '4px 8px', fontSize: 12 }} />
                         </div>
                       </div>
                     )}
@@ -2210,7 +2155,7 @@ export default function IncidentDetailsPage() {
                       <label>Responder Type</label>
                       <select className="form-control select-dark" value={incident.emergencyServices.ambulanceScdfType}
                         onChange={e => updateFields({ emergencyServices: { ...incident.emergencyServices, ambulanceScdfType: e.target.value } })}
-                        disabled={isClosed} style={{ padding: '4px 8px', fontSize: 12 }}>
+                        disabled={isLocked} style={{ padding: '4px 8px', fontSize: 12 }}>
                         <option value="">None</option>
                         <option value="Ambulance">Ambulance</option>
                         <option value="SCDF">SCDF Fire/Hazmat</option>
@@ -2222,31 +2167,31 @@ export default function IncidentDetailsPage() {
                           <label>Officer Name</label>
                           <input className="form-control" type="text" value={incident.emergencyServices.ambulanceOfficerName}
                             onChange={e => updateFields({ emergencyServices: { ...incident.emergencyServices, ambulanceOfficerName: e.target.value } })}
-                            disabled={isClosed} style={{ padding: '4px 8px', fontSize: 12 }} />
+                            disabled={isLocked} style={{ padding: '4px 8px', fontSize: 12 }} />
                         </div>
                         <div className="form-group" style={{ marginBottom: 0 }}>
                           <label>Call Sign</label>
                           <input className="form-control" type="text" value={incident.emergencyServices.ambulanceCallSign}
                             onChange={e => updateFields({ emergencyServices: { ...incident.emergencyServices, ambulanceCallSign: e.target.value } })}
-                            disabled={isClosed} style={{ padding: '4px 8px', fontSize: 12 }} />
+                            disabled={isLocked} style={{ padding: '4px 8px', fontSize: 12 }} />
                         </div>
                         <div className="form-group" style={{ marginBottom: 0 }}>
                           <label>Responding Unit</label>
                           <input className="form-control" type="text" value={incident.emergencyServices.ambulanceRespondingUnit || ''}
                             onChange={e => updateFields({ emergencyServices: { ...incident.emergencyServices, ambulanceRespondingUnit: e.target.value } })}
-                            disabled={isClosed} style={{ padding: '4px 8px', fontSize: 12 }} />
+                            disabled={isLocked} style={{ padding: '4px 8px', fontSize: 12 }} />
                         </div>
                         <div className="form-group" style={{ marginBottom: 0 }}>
                           <label>Arrival Time</label>
                           <input className="form-control" type="time" value={incident.emergencyServices.ambulanceArrivalTime || ''}
                             onChange={e => updateFields({ emergencyServices: { ...incident.emergencyServices, ambulanceArrivalTime: e.target.value } })}
-                            disabled={isClosed} style={{ padding: '4px 8px', fontSize: 12 }} />
+                            disabled={isLocked} style={{ padding: '4px 8px', fontSize: 12 }} />
                         </div>
                         <div className="form-group" style={{ marginBottom: 0 }}>
                           <label>Hospital Conveyed To</label>
                           <input className="form-control" type="text" value={incident.emergencyServices.hospitalConveyedTo}
                             onChange={e => updateFields({ emergencyServices: { ...incident.emergencyServices, hospitalConveyedTo: e.target.value } })}
-                            disabled={isClosed} style={{ padding: '4px 8px', fontSize: 12 }} />
+                            disabled={isLocked} style={{ padding: '4px 8px', fontSize: 12 }} />
                         </div>
                       </div>
                     )}
@@ -2259,7 +2204,7 @@ export default function IncidentDetailsPage() {
             <div className="accordion-item">
               <div className="accordion-header" onClick={() => toggleSection('media')}>
                 <div className="accordion-header-left">
-                  <h3 className="accordion-title">Media & Press</h3>
+                  <h3 className="accordion-title">5. Media Involvement</h3>
                   <span className={`accordion-badge ${getMediaBadge() !== 'None' ? 'warning' : 'none'}`}>
                     {getMediaBadge()}
                   </span>
@@ -2271,7 +2216,7 @@ export default function IncidentDetailsPage() {
                   <label className="checkbox-row" style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: 12 }}>
                     <input type="checkbox" checked={incident.mediaInvolvement.mediaAtScene}
                       onChange={e => updateFields({ mediaInvolvement: { ...incident.mediaInvolvement, mediaAtScene: e.target.checked } })}
-                      disabled={isClosed} />
+                      disabled={isLocked} />
                     Press/Media present at scene
                   </label>
                   {incident.mediaInvolvement.mediaAtScene && (
@@ -2280,14 +2225,14 @@ export default function IncidentDetailsPage() {
                         <label>Media Outlet Name</label>
                         <input className="form-control" type="text" value={incident.mediaInvolvement.mediaName}
                           onChange={e => updateFields({ mediaInvolvement: { ...incident.mediaInvolvement, mediaName: e.target.value } })}
-                          disabled={isClosed} style={{ padding: '4px 8px', fontSize: 12 }} />
+                          disabled={isLocked} style={{ padding: '4px 8px', fontSize: 12 }} />
                       </div>
                       <div style={{ background: 'var(--color-high-bg)', border: '1px solid var(--color-high-border)', borderRadius: 6, padding: '10px 12px', fontSize: 11, color: 'var(--color-high)' }}>
                         <strong>⚠ COMMUNICATIONS ACTION:</strong> Media presence flags an automatic trigger. Notify SDC Communications team.
                         <label className="checkbox-row" style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
                           <input type="checkbox" checked={incident.mediaInvolvement.commsNotified}
                             onChange={e => updateFields({ mediaInvolvement: { ...incident.mediaInvolvement, commsNotified: e.target.checked } })}
-                            disabled={isClosed} />
+                            disabled={isLocked} />
                           Communications Team Notified
                         </label>
                       </div>
@@ -2301,7 +2246,7 @@ export default function IncidentDetailsPage() {
             <div className="accordion-item">
               <div className="accordion-header" onClick={() => toggleSection('property')}>
                 <div className="accordion-header-left">
-                  <h3 className="accordion-title">Property & Vehicles</h3>
+                  <h3 className="accordion-title">6. Property & Vehicles</h3>
                   <span className={`accordion-badge ${getPropertyBadge() !== 'None' ? 'warning' : 'none'}`}>
                     {getPropertyBadge()}
                   </span>
@@ -2314,7 +2259,7 @@ export default function IncidentDetailsPage() {
                     <label className="checkbox-row" style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: 8 }}>
                       <input type="checkbox" checked={incident.propertyDamage.sdcPropertyDamaged}
                         onChange={e => updateFields({ propertyDamage: { ...incident.propertyDamage, sdcPropertyDamaged: e.target.checked } })}
-                        disabled={isClosed} />
+                        disabled={isLocked} />
                       SDC Property Damaged
                     </label>
                     {incident.propertyDamage.sdcPropertyDamaged && (
@@ -2322,7 +2267,7 @@ export default function IncidentDetailsPage() {
                         <label>Description of Damage</label>
                         <textarea className="form-control" rows={2} value={incident.propertyDamage.description}
                           onChange={e => updateFields({ propertyDamage: { ...incident.propertyDamage, description: e.target.value } })}
-                          disabled={isClosed} style={{ fontSize: 12 }} />
+                          disabled={isLocked} style={{ fontSize: 12 }} />
                       </div>
                     )}
                   </div>
@@ -2332,7 +2277,7 @@ export default function IncidentDetailsPage() {
                       <h4 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', margin: 0 }}>Vehicles Involved</h4>
                     </div>
 
-                    {!isClosed && (
+                    {!isLocked && (
                       <div style={{ border: '1px dashed var(--border-color)', borderRadius: 6, padding: 10, marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
                         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                           <input type="checkbox" id="veh-sdc-checkbox" checked={vehSdc} onChange={e => setVehSdc(e.target.checked)} />
@@ -2378,7 +2323,7 @@ export default function IncidentDetailsPage() {
                               {v.vehicleModel} ({v.vehicleNumber})
                               {v.sdcVehicleInvolved && <span style={{ marginLeft: 6, fontSize: 9, background: 'var(--color-info-bg)', color: 'var(--color-info)', padding: '2px 4px', borderRadius: 3, fontWeight: 700 }}>SDC VEH</span>}
                             </div>
-                            {!isClosed && (
+                            {!isLocked && (
                               <button type="button" style={{ background: 'transparent', border: 'none', color: 'var(--color-critical)', cursor: 'pointer', fontSize: 13, padding: 0 }} onClick={async () => {
                                 const updated = incident.vehiclesInvolved.filter((_, idx) => idx !== i);
                                 await updateFields({ vehiclesInvolved: updated });
@@ -2403,7 +2348,7 @@ export default function IncidentDetailsPage() {
             <div className="accordion-item">
               <div className="accordion-header" onClick={() => toggleSection('injuries')}>
                 <div className="accordion-header-left">
-                  <h3 className="accordion-title">Personal Injuries</h3>
+                  <h3 className="accordion-title">7. Personal Injuries</h3>
                   <span className={`accordion-badge ${getInjuriesBadge() !== 'None' ? 'active' : 'none'}`}>
                     {getInjuriesBadge()}
                   </span>
@@ -2412,7 +2357,7 @@ export default function IncidentDetailsPage() {
               </div>
               {openSections.injuries && (
                 <div className="accordion-content">
-                  {!isClosed && (
+                  {!isLocked && (
                     <div style={{ border: '1px dashed var(--border-color)', borderRadius: 6, padding: 10, marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
                       <input className="form-control" placeholder="Clinic or Hospital Attended" value={injHospital} onChange={e => setInjHospital(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
                       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -2456,7 +2401,7 @@ export default function IncidentDetailsPage() {
                           {inj.under16 && <span style={{ marginLeft: 6, fontSize: 9, background: 'var(--color-critical-bg)', color: 'var(--color-critical)', padding: '2px 4px', borderRadius: 3, fontWeight: 700 }}>U-16</span>}
                           {inj.msigFormIssued && <span style={{ marginLeft: 6, fontSize: 9, background: 'var(--color-info-bg)', color: 'var(--color-info)', padding: '2px 4px', borderRadius: 3, fontWeight: 700 }}>MSIG</span>}
                         </div>
-                        {!isClosed && (
+                        {!isLocked && (
                           <button type="button" style={{ background: 'transparent', border: 'none', color: 'var(--color-critical)', cursor: 'pointer', fontSize: 13, padding: 0 }} onClick={async () => {
                             const updated = incident.personalInjuries.filter((_, idx) => idx !== i);
                             await updateFields({ personalInjuries: updated });
@@ -2475,7 +2420,7 @@ export default function IncidentDetailsPage() {
             <div className="accordion-item">
               <div className="accordion-header" onClick={() => toggleSection('persons')}>
                 <div className="accordion-header-left">
-                  <h3 className="accordion-title">Persons Involved</h3>
+                  <h3 className="accordion-title">8. Persons Involved</h3>
                   <span className={`accordion-badge ${getPersonsBadge() !== 'None' ? 'active' : 'none'}`}>
                     {getPersonsBadge()}
                   </span>
@@ -2484,7 +2429,7 @@ export default function IncidentDetailsPage() {
               </div>
               {openSections.persons && (
                 <div className="accordion-content">
-                  {!isClosed && (
+                  {!isLocked && (
                       <div style={{ border: '1px dashed var(--border-color)', borderRadius: 6, padding: 10, marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
                         <div style={{ display: 'flex', gap: 8 }}>
                           <select className="form-control select-dark" value={pGuestOrNon} onChange={e => setPGuestOrNon(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }}>
@@ -2546,7 +2491,7 @@ export default function IncidentDetailsPage() {
                       <div key={i} className="inset-panel" style={{ padding: 10, marginBottom: 8, fontSize: 12, position: 'relative' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                           <div style={{ fontWeight: 600 }}>{p.name} ({p.type} &bull; {p.guestOrNonGuest})</div>
-                          {!isClosed && (
+                          {!isLocked && (
                             <button type="button" style={{ background: 'transparent', border: 'none', color: 'var(--color-critical)', cursor: 'pointer', fontSize: 13, padding: 0 }} onClick={async () => {
                               const updated = incident.personsInvolved.filter((_, idx) => idx !== i);
                               await updateFields({ personsInvolved: updated });
@@ -2565,13 +2510,76 @@ export default function IncidentDetailsPage() {
               )}
             </div>
 
+            {/* Accordion: CCTV */}
+            <div className="accordion-item">
+              <div className="accordion-header" onClick={() => toggleSection('cctv')}>
+                <div className="accordion-header-left">
+                  <h3 className="accordion-title">9. CCTV & Body Worn Camera</h3>
+                  <span className={`accordion-badge ${incident.cctvBwc && incident.cctvBwc.length > 0 ? 'active' : 'none'}`}>
+                    {getCctvBadge()}
+                  </span>
+                </div>
+                <span>{openSections.cctv ? '▼' : '▶'}</span>
+              </div>
+              {openSections.cctv && (
+                <div className="accordion-content">
+                  {!isLocked && (
+                    <div style={{ border: '1px dashed var(--border-color)', borderRadius: 6, padding: 10, marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <input className="form-control" placeholder="CCTV Camera No" value={cctvCameraNo} onChange={e => setCctvCameraNo(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                        <input className="form-control" type="time" placeholder="VMS Timestamp" value={cctvVmsTimestamp} onChange={e => setCctvVmsTimestamp(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                      </div>
+                      <input className="form-control" placeholder="VMS Bookmark Name" value={cctvBookmark} onChange={e => setCctvBookmark(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <input className="form-control" placeholder="BWC Camera No" value={cctvBwcNo} onChange={e => setCctvBwcNo(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                        <input className="form-control" type="time" placeholder="BWC Timestamp" value={cctvBwcTimestamp} onChange={e => setCctvBwcTimestamp(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                      </div>
+                      <button type="button" className="btn btn-primary btn-xs" onClick={() => {
+                        const updated = [...(incident.cctvBwc || []), {
+                          cameraNumber: cctvCameraNo,
+                          vmsTimestamp: cctvVmsTimestamp,
+                          vmsBookmark: cctvBookmark,
+                          bwcNumber: cctvBwcNo,
+                          bwcTimestamp: cctvBwcTimestamp
+                        }];
+                        updateFields({ cctvBwc: updated });
+                        setCctvCameraNo(''); setCctvVmsTimestamp(''); setCctvBookmark(''); setCctvBwcNo(''); setCctvBwcTimestamp('');
+                      }}>Add Camera Reference</button>
+                    </div>
+                  )}
+
+                  {incident.cctvBwc && incident.cctvBwc.length > 0 ? (
+                    incident.cctvBwc.map((cam, idx) => (
+                      <div key={idx} style={{ padding: '8px 10px', background: 'var(--bg-inset)', border: '1px solid var(--border-color)', borderRadius: 5, marginBottom: 8, fontSize: 12, position: 'relative' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div style={{ fontWeight: 600 }}>CCTV: {cam.cameraNumber || '—'}</div>
+                          {!isLocked && (
+                            <button type="button" style={{ background: 'transparent', border: 'none', color: 'var(--color-critical)', cursor: 'pointer', fontSize: 13, padding: 0 }} onClick={async () => {
+                              const updated = incident.cctvBwc.filter((_, i) => i !== idx);
+                              await updateFields({ cctvBwc: updated });
+                            }}>✕</button>
+                          )}
+                        </div>
+                        {cam.vmsTimestamp && <div style={{ color: 'var(--text-muted)', marginTop: 2 }}>VMS Time: {cam.vmsTimestamp}</div>}
+                        {cam.vmsBookmark && <div style={{ color: 'var(--text-muted)' }}>Bookmark: {cam.vmsBookmark}</div>}
+                        {cam.bwcNumber && <div style={{ color: 'var(--text-muted)', marginTop: 4 }}>BWC: {cam.bwcNumber} {cam.bwcTimestamp ? `@ ${cam.bwcTimestamp}` : ''}</div>}
+                      </div>
+                    ))
+                  ) : (
+                    <p style={{ fontSize: 12, color: 'var(--text-faint)', fontStyle: 'italic', textAlign: 'center', margin: 0 }}>No cameras referenced.</p>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Duplicate Accordion removed (promoted to Tab 4) */}
+
 
             {/* Accordion: Attachments */}
             <div className="accordion-item">
               <div className="accordion-header" onClick={() => toggleSection('attachments')}>
                 <div className="accordion-header-left">
-                  <h3 className="accordion-title">Attachments</h3>
+                  <h3 className="accordion-title">10. Attachments</h3>
                   <span className={`accordion-badge ${(incident.attachments && incident.attachments.length > 0) ? 'active' : 'none'}`}>
                     {incident.attachments && incident.attachments.length > 0 ? `${incident.attachments.length} files` : 'None'}
                   </span>
@@ -2580,7 +2588,7 @@ export default function IncidentDetailsPage() {
               </div>
               {openSections.attachments && (
                 <div className="accordion-content">
-                  {!isClosed && (
+                  {!isLocked && (
                     <div 
                       className="mock-dropzone"
                       onClick={startMockUpload}
@@ -2614,7 +2622,7 @@ export default function IncidentDetailsPage() {
                                 {(f.fileSize / (1024 * 1024)).toFixed(2)} MB &bull; Uploaded by {f.uploadedBy}
                               </span>
                             </div>
-                            {!isClosed && (
+                            {!isLocked && (
                               <button type="button" onClick={(e) => { e.stopPropagation(); deleteAttachment(f.id); }} style={{ border: 'none', background: 'transparent', color: 'var(--color-critical)', cursor: 'pointer', fontWeight: 'bold', fontSize: 12 }}>✕</button>
                             )}
                           </li>
@@ -2641,7 +2649,7 @@ export default function IncidentDetailsPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           
           {/* Streamlined Log Composer */}
-          {!isClosed && (
+          {!isLocked && (
             <div className="glass composer-card">
               <h3 className="accordion-title" style={{ marginBottom: 12 }}>Log Operational Update</h3>
               
@@ -2796,7 +2804,7 @@ export default function IncidentDetailsPage() {
           {/* Timeline Feed Panel — Operational logs only (System Activity is in its own top-level tab) */}
           <div className="glass timeline-feed-card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <h2 className="panel-title" style={{ margin: 0 }}>Operational Activity Log</h2>
+              <h2 className="panel-title" style={{ margin: 0 }}>Incident Log</h2>
             </div>
 
             <div className="timeline-container">
@@ -3034,7 +3042,7 @@ export default function IncidentDetailsPage() {
       <div className="glass console-card" style={{ padding: 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, borderBottom: '1px solid var(--border-color)', paddingBottom: 10 }}>
           <h2 className="panel-title" style={{ margin: 0 }}>Linked Faults</h2>
-          {!isClosed && (
+          {!isLocked && (
             <button
               className="btn btn-brand btn-sm"
               onClick={() => setShowRaiseFaultModal(true)}
@@ -3173,7 +3181,7 @@ export default function IncidentDetailsPage() {
                   </Link>.
                 </p>
               </div>
-            ) : isCtrl && !isClosed ? (
+            ) : isCtrl && !isLocked ? (
               <form onSubmit={handleMarkAsDuplicate} style={{ display: 'flex', flexDirection: 'column', gap: 10, background: 'var(--bg-inset)', border: '1px solid var(--border-color)', padding: 16, borderRadius: 'var(--radius-md)' }}>
                 <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0 }}>
                   If this incident is a duplicate of an earlier report, enter the <strong>original</strong> Incident ID below. <strong>This record will be closed</strong> and linked to the master.

@@ -568,7 +568,7 @@ export const mockIncidents: Incident[] = [
       lng: 103.8228
     },
     log: [
-      { eventNumber: 1, date: "2026-06-12", time: "14:30:00", description: "MPA alerted SDC IIOC to localized fuel spill drifting towards Palawan. Ranger Sarah dispatched to verify. SDC environmental taskforce mobilized." },
+      { eventNumber: 1, date: "2026-06-12", time: "14:30:00", description: "MPA alerted Sentosa to localized fuel spill drifting towards Palawan. Ranger Sarah dispatched to verify. SDC environmental taskforce mobilized." },
       { eventNumber: 2, date: "2026-06-12", time: "17:30:00", description: "Containment booms deployed. Oil sheen dissipated. Closed." }
     ],
     ...defaultSubStructures,

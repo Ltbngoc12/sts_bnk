@@ -64,21 +64,14 @@ export async function PUT(
       const currentStatus = existingCase.status;
       const targetStatus = body.status;
 
-      // Only allow: Pending Triage → Active, No Action Required → Active (admin reactivation)
+      // Only allow: Pending Triage → No Action Required
       const allowed =
-        (currentStatus === 'Pending Triage' && targetStatus === 'Active') ||
-        (currentStatus === 'No Action Required' && targetStatus === 'Active');
+        (currentStatus === 'Pending Triage' && targetStatus === 'No Action Required');
 
       if (!allowed) {
         return NextResponse.json({
           error: `Manual status change from "${currentStatus}" to "${targetStatus}" is not permitted. Case closure is managed automatically by the system.`
         }, { status: 400 });
-      }
-
-      // Reactivation — clear closure metadata
-      if (targetStatus === 'Active') {
-        existingCase.closedAt = null;
-        existingCase.closedBy = null;
       }
 
       existingCase.status = targetStatus;
@@ -145,7 +138,7 @@ export async function PUT(
       };
       existingCase.incident = newIncident;
       // Escalates status to Active on child creation
-      if (existingCase.status === 'Pending Triage') {
+      if (existingCase.status === 'Pending Triage' || existingCase.status === 'No Action Required') {
         existingCase.status = 'Active';
       }
     }
@@ -154,7 +147,7 @@ export async function PUT(
     if (body.cmmsTicketId) {
       if (!existingCase.cmmsTickets.includes(body.cmmsTicketId)) {
         existingCase.cmmsTickets.push(body.cmmsTicketId);
-        if (existingCase.status === 'Pending Triage') {
+        if (existingCase.status === 'Pending Triage' || existingCase.status === 'No Action Required') {
           existingCase.status = 'Active';
         }
       }

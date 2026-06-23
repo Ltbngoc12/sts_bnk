@@ -226,34 +226,17 @@ export default function NewCasePage() {
               />
             </div>
 
-            <div className="form-group">
-              <label>Initial Case Status</label>
-              <select 
-                value={caseStatus} 
-                onChange={(e) => setCaseStatus(e.target.value)} 
-                disabled={componentType === 'incident' || componentType === 'fault'}
-                className="form-control select-dark"
-              >
-                <option value="Pending Triage">Pending Triage</option>
-                <option value="Active">Active</option>
-                <option value="No Action Required">No Action Required</option>
-              </select>
-              {(componentType === 'incident' || componentType === 'fault') && (
-                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                  * Case status is escalated to Active when linking an incident or fault.
-                </p>
-              )}
-            </div>
-
-            <div className="form-group">
+            <div className="form-group colspan-2">
               <label>Link Component on Creation</label>
               <select
                 value={componentType}
                 onChange={(e) => {
                   const val = e.target.value;
                   setComponentType(val);
-                  if (val === 'incident' || val === 'fault') {
+                  if (val === 'incident' || val === 'fault' || val === 'task') {
                     setCaseStatus('Active');
+                  } else {
+                    setCaseStatus('Pending Triage');
                   }
                 }}
                 className="form-control select-dark"

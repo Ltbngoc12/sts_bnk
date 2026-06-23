@@ -423,7 +423,7 @@ export async function POST(
 
       // ── Controller/DM returns to Responder for further action ──
       case 'return-to-responder': {
-        if (!['Live (On-Site)', 'Live (Completed)', 'Pending Endorsement', 'Returned'].includes(incident.status)) {
+        if (!['Live (Completed)', 'Pending Endorsement', 'Returned'].includes(incident.status)) {
           return NextResponse.json({ error: `Cannot return to responder: incident status is "${incident.status}"` }, { status: 409 });
         }
         incident.status = 'Live (Incomplete)';
