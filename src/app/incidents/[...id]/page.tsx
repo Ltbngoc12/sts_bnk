@@ -72,6 +72,8 @@ export default function IncidentDetailsPage() {
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [showApproveModal, setShowApproveModal] = useState(false);
+  const [showReturnToResponderModal, setShowReturnToResponderModal] = useState(false);
+  const [returnToResponderRemarks, setReturnToResponderRemarks] = useState('');
   const [modalRemarks, setModalRemarks] = useState('');
   const [assignmentError, setAssignmentError] = useState('');
   const [pendingResponders, setPendingResponders] = useState<string[] | null>(null);
@@ -629,7 +631,7 @@ export default function IncidentDetailsPage() {
   const isMgr = role === 'Duty Manager' || role === 'Duty Officer' || role === 'System Administrator' || role === 'Current Ops Administrator';
   const isAdmin = role === 'System Administrator';
   const isClosed = incident.status === 'Closed';
-  const isLocked = isClosed || incident.status === 'Live (Completed)';
+  const isLocked = isClosed || incident.status === 'Live (Completed)' || (incident.status === 'Pending Endorsement' && !isMgr);
 
   // Warnings / Reminder Triggers
   const showCrisisReviewReminder = elapsedMinutes >= 45 && incident.status !== 'Closed';
@@ -1650,35 +1652,34 @@ export default function IncidentDetailsPage() {
                   Update to On-site
                 </button>
               )}
-              {incident.status === 'Live (Completed)' && (
-                <button
-                  className="btn btn-warning btn-sm"
-                  onClick={async () => {
-                    const r = prompt('Reason for returning to responder:');
-                    if (r !== null) await performAction('return-to-responder', { returnRemarks: r });
-                  }}
-                  disabled={saving}
-                >
-                  Return to Responder
-                </button>
+              {incident.status === 'Live (On-Site)' && (
+                <>
+                  <button
+                    className="btn btn-warning btn-sm"
+                    onClick={() => { setReturnToResponderRemarks(''); setShowReturnToResponderModal(true); }}
+                    disabled={saving}
+                  >
+                    Return to Responder
+                  </button>
+                  <button className="btn btn-success btn-sm" onClick={() => setShowCompleteModal(true)} disabled={saving}>
+                    Confirm Completion
+                  </button>
+                </>
               )}
-              {['Live (On-Site)', 'Live (Incomplete)'].includes(incident.status) && (
+              {incident.status === 'Live (Incomplete)' && (
                 <button className="btn btn-success btn-sm" onClick={() => setShowCompleteModal(true)} disabled={saving}>
                   Confirm Completion
                 </button>
               )}
               {['Live (Completed)', 'Returned'].includes(incident.status) && (
                 <button className="btn btn-primary btn-sm" onClick={() => performAction('submit-endorsement')} disabled={saving}>
-                  Submit for Closure
+                  Submit for Endorsement
                 </button>
               )}
               {incident.status === 'Returned' && (
                 <button
                   className="btn btn-warning btn-sm"
-                  onClick={async () => {
-                    const r = prompt('Reason for returning to responder:');
-                    if (r !== null) await performAction('return-to-responder', { returnRemarks: r });
-                  }}
+                  onClick={() => { setReturnToResponderRemarks(''); setShowReturnToResponderModal(true); }}
                   disabled={saving}
                 >
                   Return to Responder
@@ -3246,6 +3247,41 @@ export default function IncidentDetailsPage() {
       </div>
     )}
       </div>
+
+      {/* Return to Responder Modal */}
+      {showReturnToResponderModal && (
+        <div className="modal-overlay">
+          <div className="modal-box glass">
+            <h2 className="modal-title">Return to Responder</h2>
+            <div className="form-group" style={{ marginTop: '12px' }}>
+              <label style={{ fontSize: '13px', fontWeight: '600', display: 'block', marginBottom: '6px' }}>Reason for Return *</label>
+              <textarea
+                className="form-control"
+                rows={4}
+                value={returnToResponderRemarks}
+                onChange={(e) => setReturnToResponderRemarks(e.target.value)}
+                placeholder="Specify what the Responder needs to address..."
+                style={{ width: '100%', padding: '8px', fontSize: '13px' }}
+                autoFocus
+              />
+            </div>
+            <div className="modal-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
+              <button className="btn btn-secondary btn-sm" onClick={() => setShowReturnToResponderModal(false)}>Cancel</button>
+              <button
+                className="btn btn-warning btn-sm"
+                onClick={async () => {
+                  if (!returnToResponderRemarks.trim()) return;
+                  const ok = await performAction('return-to-responder', { returnRemarks: returnToResponderRemarks.trim() });
+                  if (ok) setShowReturnToResponderModal(false);
+                }}
+                disabled={saving || !returnToResponderRemarks.trim()}
+              >
+                Return to Responder
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Controller Confirm Completion Modal */}
       {showCompleteModal && (
