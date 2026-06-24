@@ -306,7 +306,7 @@ export const Sidebar: React.FC = () => {
           display: flex; flex-direction: column;
           z-index: 100;
           transition: width 0.25s ease;
-          overflow: hidden;
+          overflow: visible;
         }
 
         .collapse-btn {
@@ -328,6 +328,8 @@ export const Sidebar: React.FC = () => {
           border-bottom: 1px solid var(--sidebar-divider);
           flex-shrink: 0;
           overflow: hidden;
+          width: var(--sidebar-width);
+          transition: width 0.25s ease;
         }
 
         .brand-icon {
@@ -361,6 +363,8 @@ export const Sidebar: React.FC = () => {
           padding: 8px 8px 12px;
           scrollbar-width: thin;
           scrollbar-color: rgba(0,0,0,0.1) transparent;
+          width: var(--sidebar-width);
+          transition: width 0.25s ease;
         }
 
         .nav-group { margin-bottom: 6px; }

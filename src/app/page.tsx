@@ -111,7 +111,7 @@ export default function DashboardPage() {
       {/* Header bar */}
       <div className="dashboard-header-bar glass">
         <div className="header-title-sec">
-          <h1>OPERATIONAL DASHBOARD</h1>
+          <h1>OPERATIONAL DASHBOARD <span style={{display:'inline-flex',alignItems:'center',gap:'6px',fontSize:'0.55em',fontWeight:600,letterSpacing:'0.08em',background:'#fff7ed',color:'#ea580c',border:'1.5px solid #fdba74',borderRadius:'6px',padding:'3px 10px',verticalAlign:'middle',marginLeft:'8px'}}><span style={{width:'7px',height:'7px',borderRadius:'50%',background:'#ea580c',display:'inline-block',animation:'pulse 1.5s infinite'}}/>IN PROCESS</span></h1>
           <p>Island Integrated Operations Centre (IIOC) &bull; Live Feed</p>
         </div>
         <div className="header-status-sec">
