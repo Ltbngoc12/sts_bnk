@@ -427,7 +427,7 @@ export default function FaultDetailPage() {
                 </>
               ) : (
                 <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                  Linked Incident: <span className="mono-id" style={{ fontSize: 11 }}>{fault.linkedIncidentId}</span>
+                  Linked Incident: <span className="mono-id" style={{ fontSize: 11, color: 'var(--color-critical)', background: 'var(--color-critical-bg)', borderColor: 'var(--color-critical-border)' }}>{fault.linkedIncidentId}</span>
                   <p style={{ fontSize: 12, color: 'var(--text-faint)', marginTop: 4 }}>Incident data unavailable.</p>
                 </div>
               )}

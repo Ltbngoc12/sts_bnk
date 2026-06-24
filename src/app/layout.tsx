@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   title: "Sentosa ISS Case Management System",
   description: "Functional Case Management System (CMS) for Sentosa Development Corporation (SDC)",
   icons: {
-    icon: "/icon.png",
+    icon: "/logo.svg",
   },
 };
 

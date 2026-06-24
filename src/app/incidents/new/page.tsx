@@ -535,7 +535,7 @@ export default function NewIncidentPage() {
         .accordion-title {
           font-size: 14px;
           font-weight: 600;
-          color: var(--text-main);
+          color: var(--color-primary-dark);
         }
         .accordion-header-right {
           display: flex;
@@ -630,7 +630,7 @@ export default function NewIncidentPage() {
           border: 1px solid var(--border-color);
           border-radius: var(--radius-lg);
           padding: 18px;
-          box-shadow: 0 4px 16px rgba(44, 26, 14, 0.05);
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
         }
         .navigator-title {
           font-size: 13px;
@@ -692,9 +692,9 @@ export default function NewIncidentPage() {
           top: '12px', 
           zIndex: 1000, 
           marginBottom: '20px',
-          background: 'rgba(253, 252, 248, 0.96)',
+          background: 'rgba(255, 255, 255, 0.96)',
           backdropFilter: 'blur(8px)',
-          boxShadow: '0 4px 20px rgba(44, 26, 14, 0.12)',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.06)',
         }}
       >
         <div className="title-section">
@@ -705,7 +705,7 @@ export default function NewIncidentPage() {
           <Link href="/incidents" className="btn btn-secondary btn-sm" style={{ display: 'inline-flex', alignItems: 'center', height: '32px' }}>
             Cancel
           </Link>
-          <button type="submit" form="new-incident-form" className="btn btn-primary" style={{ background: 'var(--color-primary)', borderColor: 'var(--color-primary)', color: '#FFF', padding: '8px 18px', fontSize: '13px', height: '38px' }}>
+          <button type="submit" form="new-incident-form" className="btn btn-info" style={{ color: '#FFF', padding: '8px 18px', fontSize: '13px', height: '38px' }}>
             Log Incident
           </button>
         </div>

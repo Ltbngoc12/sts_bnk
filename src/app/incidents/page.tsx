@@ -6,6 +6,141 @@ import { Case, Incident } from '@/lib/db';
 import { useRole } from '@/context/RoleContext';
 import { getIncidentTaxonomy } from '@/lib/taxonomy';
 
+function CrisisIcon({ level }: { level: string | number }) {
+  const lvl = String(level);
+  if (lvl === '1') {
+    return (
+      <span style={{ color: '#EF4444', marginRight: '6px', display: 'inline-flex', alignSelf: 'center' }} title="Crisis Level 1 (Severe)">
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="17 11 12 6 7 11" />
+          <polyline points="17 18 12 13 7 18" />
+        </svg>
+      </span>
+    );
+  }
+  if (lvl === '2') {
+    return (
+      <span style={{ color: '#F97316', marginRight: '6px', display: 'inline-flex', alignSelf: 'center' }} title="Crisis Level 2 (High)">
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="17 11 12 6 7 11" />
+          <polyline points="17 18 12 13 7 18" />
+        </svg>
+      </span>
+    );
+  }
+  if (lvl === '3') {
+    return (
+      <span style={{ color: '#CA8A04', marginRight: '6px', display: 'inline-flex', alignSelf: 'center' }} title="Crisis Level 3 (Medium)">
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="5" y1="9" x2="19" y2="9" />
+          <line x1="5" y1="15" x2="19" y2="15" />
+        </svg>
+      </span>
+    );
+  }
+  if (lvl === '4') {
+    return (
+      <span style={{ color: '#F97316', marginRight: '6px', display: 'inline-flex', alignSelf: 'center', opacity: 0.6 }} title="Crisis Level 4 (Default)">
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="17 11 12 6 7 11" />
+          <polyline points="17 18 12 13 7 18" />
+        </svg>
+      </span>
+    );
+  }
+  return (
+    <span style={{ color: '#9CA3AF', marginRight: '6px', display: 'inline-flex', alignSelf: 'center' }} title={`Crisis Level ${lvl}`}>
+      <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="17 11 12 6 7 11" />
+        <polyline points="17 18 12 13 7 18" />
+      </svg>
+    </span>
+  );
+}
+
+function RespondersAvatars({ names }: { names: string | string[] }) {
+  const list = Array.isArray(names) ? names : [names].filter(Boolean);
+  if (list.length === 0) {
+    return <span style={{ color: 'var(--text-faint)' }}>—</span>;
+  }
+
+  const getAvatarColor = (name: string) => {
+    const charCode = name.charCodeAt(0) || 65;
+    const colors = [
+      '#10B981', // Teal/green
+      '#3B82F6', // Blue
+      '#EC4899', // Pink
+      '#8B5CF6', // Purple
+      '#F97316', // Orange
+      '#0D9488', // Dark teal
+      '#6366F1', // Indigo
+    ];
+    return colors[charCode % colors.length];
+  };
+
+  if (list.length === 1) {
+    const name = list[0];
+    const letter = name.trim().charAt(0).toUpperCase();
+    const color = getAvatarColor(name);
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <span style={{
+          width: '20px',
+          height: '20px',
+          borderRadius: '50%',
+          background: color,
+          color: '#FFF',
+          fontSize: '10px',
+          fontWeight: 700,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          border: '1.5px solid #FFF',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.08)'
+        }}>
+          {letter}
+        </span>
+        <span style={{ fontSize: '13px', color: 'var(--text-main)' }}>{name}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center' }}>
+      <div style={{ display: 'flex', marginRight: '6px' }}>
+        {list.map((name, idx) => {
+          const letter = name.trim().charAt(0).toUpperCase();
+          const color = getAvatarColor(name);
+          return (
+            <span
+              key={idx}
+              title={name}
+              style={{
+                width: '20px',
+                height: '20px',
+                borderRadius: '50%',
+                background: color,
+                color: '#FFF',
+                fontSize: '10px',
+                fontWeight: 700,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: '1.5px solid #FFF',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
+                marginLeft: idx > 0 ? '-6px' : '0',
+                zIndex: 10 - idx
+              }}
+            >
+              {letter}
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function IncidentsPage() {
   const { role } = useRole();
   const [cases, setCases] = useState<Case[]>([]);
@@ -24,6 +159,7 @@ export default function IncidentsPage() {
   const [filterController, setFilterController] = useState<string>('All');
   const [filterDateStart, setFilterDateStart] = useState<string>('');
   const [filterDateEnd, setFilterDateEnd] = useState<string>('');
+  const [filterSite, setFilterSite] = useState<string>('All');
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -51,7 +187,7 @@ export default function IncidentsPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, filterStatus, filterType, filterSubType, filterCrisisLevel, filterSource, filterController, filterDateStart, filterDateEnd, activeTab]);
+  }, [searchTerm, filterStatus, filterType, filterSubType, filterCrisisLevel, filterSource, filterController, filterDateStart, filterDateEnd, activeTab, filterSite]);
 
   // Reset Filters
   const resetFilters = () => {
@@ -64,6 +200,8 @@ export default function IncidentsPage() {
     setFilterController('All');
     setFilterDateStart('');
     setFilterDateEnd('');
+    setFilterSite('All');
+    setActiveTab('All');
   };
 
   // Filter only cases containing incidents
@@ -74,6 +212,15 @@ export default function IncidentsPage() {
     new Set(
       incidentCases
         .map(c => c.incident?.createdBy)
+        .filter((val): val is string => !!val)
+    )
+  ).sort();
+
+  // Dynamic list of sites from location data
+  const uniqueSites = Array.from(
+    new Set(
+      incidentCases
+        .map(c => c.incident?.location.commonName || c.incident?.location.road)
         .filter((val): val is string => !!val)
     )
   ).sort();
@@ -156,10 +303,8 @@ export default function IncidentsPage() {
 
 
   // Apply all filter rules to line items
-  const filteredIncidents = incidentCases.filter(c => {
+  const matchingIncidentsWithoutTab = incidentCases.filter(c => {
     const inc = c.incident!;
-    
-    if (!matchesTab(activeTab, inc)) return false;
     
     const matchesSearch = 
       c.id.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -178,7 +323,21 @@ export default function IncidentsPage() {
     if (!matchesSource(filterSource, inc)) return false;
     if (filterController !== 'All' && inc.createdBy !== filterController) return false;
     if (!matchesDateRange(inc.dateTime)) return false;
+    
+    if (filterSite !== 'All') {
+      const siteName = inc.location.commonName || inc.location.road || '';
+      if (siteName !== filterSite) return false;
+    }
 
+    return true;
+  });
+
+  const allReportsCount = matchingIncidentsWithoutTab.length;
+  const pendingReportsCount = matchingIncidentsWithoutTab.filter(c => c.incident?.status === 'Pending Endorsement').length;
+
+  const filteredIncidents = matchingIncidentsWithoutTab.filter(c => {
+    const inc = c.incident!;
+    if (!matchesTab(activeTab, inc)) return false;
     return true;
   });
 
@@ -198,8 +357,10 @@ export default function IncidentsPage() {
       case 'Live (Assigned)':
         return 'badge-assigned';
       case 'Live (Acknowledged)':
-      case 'Live (Incomplete)':
         return 'badge-ack';
+      case 'Live (Incomplete)':
+      case 'Incomplete':
+        return 'badge-incomplete';
       case 'Live (On-Site)':
         return 'badge-onsite';
       case 'Live (Completed)':
@@ -433,7 +594,7 @@ export default function IncidentsPage() {
           </Link>
 
           {isController && (
-            <Link href="/incidents/new" className="btn btn-primary">
+            <Link href="/incidents/new" className="btn btn-info">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '18px', height: '18px' }}>
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
               </svg>
@@ -472,71 +633,133 @@ export default function IncidentsPage() {
       </div>
 
       {/* Advanced Filter Panel */}
-      <div className="glass" style={{ padding: '20px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div className="glass" style={{ padding: '20px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '16px', background: 'var(--bg-card)' }}>
         
         {/* Main Filters Row (Search, Type, Status, Actions) */}
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
           
-          {/* Search bar */}
-          <div style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.04em' }}>Search Registry:</label>
-            <input 
-              type="text" 
-              placeholder="Search by Case ID, Title, or Responder..." 
-              value={searchTerm} 
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="form-control"
-              style={{ width: '100%' }}
-            />
+          {/* Left Side: Tabs */}
+          <div style={{ display: 'flex', gap: '4px' }}>
+            <button
+              onClick={() => { setActiveTab('All'); setCurrentPage(1); }}
+              className={`tab-btn ${activeTab === 'All' ? 'active' : ''}`}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                borderBottom: activeTab === 'All' ? '2px solid var(--color-primary)' : '2px solid transparent',
+                color: activeTab === 'All' ? 'var(--color-primary)' : 'var(--text-muted)',
+                padding: '8px 16px',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              All Reports
+              <span style={{
+                fontSize: '11px',
+                fontWeight: 700,
+                background: activeTab === 'All' ? 'var(--color-primary-bg)' : 'var(--bg-inset)',
+                color: activeTab === 'All' ? 'var(--color-primary)' : 'var(--text-muted)',
+                padding: '2px 8px',
+                borderRadius: '10px',
+                minWidth: '20px',
+                textAlign: 'center'
+              }}>
+                {allReportsCount}
+              </span>
+            </button>
+            <button
+              onClick={() => { setActiveTab('Pending Endorsement'); setCurrentPage(1); }}
+              className={`tab-btn ${activeTab === 'Pending Endorsement' ? 'active' : ''}`}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                borderBottom: activeTab === 'Pending Endorsement' ? '2px solid var(--color-primary)' : '2px solid transparent',
+                color: activeTab === 'Pending Endorsement' ? 'var(--color-primary)' : 'var(--text-muted)',
+                padding: '8px 16px',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              My Pending Reports
+              <span style={{
+                fontSize: '11px',
+                fontWeight: 700,
+                background: activeTab === 'Pending Endorsement' ? 'var(--color-primary-bg)' : 'var(--bg-inset)',
+                color: activeTab === 'Pending Endorsement' ? 'var(--color-primary)' : 'var(--text-muted)',
+                padding: '2px 8px',
+                borderRadius: '10px',
+                minWidth: '20px',
+                textAlign: 'center'
+              }}>
+                {pendingReportsCount}
+              </span>
+            </button>
           </div>
 
-          {/* Type dropdown */}
-          <div style={{ flex: '0 1 180px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.04em' }}>Incident Type:</label>
-            <select value={filterType} onChange={(e) => { setFilterType(e.target.value); setFilterSubType('All'); }} className="form-control select-dark" style={{ width: '100%' }}>
-              <option value="All">All Types</option>
-              {Object.keys(taxonomy).sort().map(t => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
-          </div>
+          {/* Right Side: Search & Filter toggle */}
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', flexGrow: 1, justifyContent: 'flex-end' }}>
+            
+            {/* Search Input with Magnifying Glass SVG */}
+            <div style={{ position: 'relative', width: '100%', maxWidth: '300px' }}>
+              <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-faint)', display: 'flex', alignItems: 'center' }}>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+              </span>
+              <input 
+                type="text" 
+                placeholder="Search form no., title, site, name..." 
+                value={searchTerm} 
+                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                className="form-control"
+                style={{ width: '100%', paddingLeft: '36px', height: '36px', fontSize: '13px' }}
+              />
+            </div>
 
-          {/* Status dropdown */}
-          <div style={{ flex: '0 1 180px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.04em' }}>Status:</label>
-            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="form-control select-dark" style={{ width: '100%' }}>
-              <option value="All">All Statuses</option>
-              <option value="Live">Live</option>
-              <option value="Live (Assigned)">Live (Assigned)</option>
-              <option value="Live (Acknowledged)">Live (Acknowledged)</option>
-              <option value="Live (On-Site)">Live (On-Site)</option>
-              <option value="Live (Completed)">Live (Completed)</option>
-              <option value="Live (Incomplete)">Live (Incomplete)</option>
-              <option value="Pending Endorsement">Pending Endorsement</option>
-              <option value="Returned">Returned</option>
-              <option value="Closed">Closed</option>
-            </select>
-          </div>
-
-          {/* Action buttons */}
-          <div style={{ display: 'flex', gap: '10px', height: '36px', alignItems: 'center' }}>
+            {/* Filters toggle button with Funnel SVG */}
             <button 
               onClick={() => setShowAdvancedFilters(!showAdvancedFilters)} 
-              className="btn btn-secondary"
-              style={{ padding: '0 14px', fontSize: '12px', height: '100%', display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}
+              className={`btn ${showAdvancedFilters ? 'btn-info' : 'btn-secondary'}`}
+              style={{ 
+                padding: '0 14px', 
+                fontSize: '12.5px', 
+                height: '36px', 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px', 
+                whiteSpace: 'nowrap',
+                fontWeight: 600,
+                borderRadius: 'var(--radius-md)'
+              }}
             >
-              ⚙️ {showAdvancedFilters ? 'Hide Options' : 'More Options'}
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+              </svg>
+              Filters
             </button>
-            
-            <button 
-              onClick={resetFilters} 
-              className="btn btn-secondary"
-              style={{ padding: '0 10px', fontSize: '12px', height: '100%', border: 'none', background: 'transparent', textDecoration: 'underline', whiteSpace: 'nowrap' }}
-            >
-              Clear
-            </button>
-          </div>
 
+            {/* Clear Button */}
+            {(searchTerm || filterStatus !== 'All' || filterType !== 'All' || filterSubType !== 'All' || filterCrisisLevel !== 'All' || filterSource !== 'All' || filterController !== 'All' || filterDateStart || filterDateEnd || filterSite !== 'All' || activeTab !== 'All') && (
+              <button 
+                onClick={resetFilters} 
+                className="btn btn-secondary"
+                style={{ padding: '0 10px', fontSize: '12.5px', height: '36px', border: 'none', background: 'transparent', textDecoration: 'underline', whiteSpace: 'nowrap' }}
+              >
+                Clear
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Collapsible Advanced Filters Row */}
@@ -545,19 +768,58 @@ export default function IncidentsPage() {
             style={{ 
               display: 'grid', 
               gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', 
-              gap: '12px', 
-              paddingTop: '16px', 
-              borderTop: '1px solid var(--border-color)' 
+              gap: '16px', 
+              paddingTop: '4px'
             }}
           >
+            {/* Site dropdown */}
+            <div className="form-group" style={{ margin: 0 }}>
+              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Site:</label>
+              <select value={filterSite} onChange={(e) => { setFilterSite(e.target.value); setCurrentPage(1); }} className="form-control select-dark" style={{ width: '100%' }}>
+                <option value="All">All Sites</option>
+                {uniqueSites.map(site => (
+                  <option key={site} value={site}>{site}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Status dropdown */}
+            <div className="form-group" style={{ margin: 0 }}>
+              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Status:</label>
+              <select value={filterStatus} onChange={(e) => { setFilterStatus(e.target.value); setCurrentPage(1); }} className="form-control select-dark" style={{ width: '100%' }}>
+                <option value="All">All Statuses</option>
+                <option value="Live">Live</option>
+                <option value="Live (Assigned)">Live (Assigned)</option>
+                <option value="Live (Acknowledged)">Live (Acknowledged)</option>
+                <option value="Live (On-Site)">Live (On-Site)</option>
+                <option value="Live (Completed)">Live (Completed)</option>
+                <option value="Live (Incomplete)">Live (Incomplete)</option>
+                <option value="Pending Endorsement">Pending Endorsement</option>
+                <option value="Returned">Returned</option>
+                <option value="Closed">Closed</option>
+              </select>
+            </div>
+
+            {/* Category dropdown */}
+            <div className="form-group" style={{ margin: 0 }}>
+              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Category:</label>
+              <select value={filterType} onChange={(e) => { setFilterType(e.target.value); setFilterSubType('All'); setCurrentPage(1); }} className="form-control select-dark" style={{ width: '100%' }}>
+                <option value="All">All Categories</option>
+                {Object.keys(taxonomy).sort().map(t => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
+
             {/* Sub-type dropdown */}
             <div className="form-group" style={{ margin: 0 }}>
-              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Incident Sub-Type:</label>
+              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Sub-Type:</label>
               <select 
                 value={filterSubType} 
-                onChange={(e) => setFilterSubType(e.target.value)} 
+                onChange={(e) => { setFilterSubType(e.target.value); setCurrentPage(1); }} 
                 className="form-control select-dark"
                 disabled={filterType === 'All'}
+                style={{ width: '100%' }}
               >
                 <option value="All">All Sub-types</option>
                 {filterType !== 'All' && taxonomy[filterType]?.sort().map(st => (
@@ -566,10 +828,10 @@ export default function IncidentsPage() {
               </select>
             </div>
 
-            {/* Crisis Level dropdown */}
+            {/* Crisis Level (Severity) dropdown */}
             <div className="form-group" style={{ margin: 0 }}>
-              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Crisis Level:</label>
-              <select value={filterCrisisLevel} onChange={(e) => setFilterCrisisLevel(e.target.value)} className="form-control select-dark">
+              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Severity:</label>
+              <select value={filterCrisisLevel} onChange={(e) => { setFilterCrisisLevel(e.target.value); setCurrentPage(1); }} className="form-control select-dark" style={{ width: '100%' }}>
                 <option value="All">All Levels</option>
                 <option value="1">Level 1 (Crisis)</option>
                 <option value="2">Level 2</option>
@@ -581,8 +843,8 @@ export default function IncidentsPage() {
 
             {/* Source dropdown */}
             <div className="form-group" style={{ margin: 0 }}>
-              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Incident Source:</label>
-              <select value={filterSource} onChange={(e) => setFilterSource(e.target.value)} className="form-control select-dark">
+              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Submitted By:</label>
+              <select value={filterSource} onChange={(e) => { setFilterSource(e.target.value); setCurrentPage(1); }} className="form-control select-dark" style={{ width: '100%' }}>
                 <option value="All">All Sources</option>
                 <option value="Public Phone">Public Phone</option>
                 <option value="Email">Email</option>
@@ -595,8 +857,8 @@ export default function IncidentsPage() {
 
             {/* Controller dropdown */}
             <div className="form-group" style={{ margin: 0 }}>
-              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Controller:</label>
-              <select value={filterController} onChange={(e) => setFilterController(e.target.value)} className="form-control select-dark">
+              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Controller:</label>
+              <select value={filterController} onChange={(e) => { setFilterController(e.target.value); setCurrentPage(1); }} className="form-control select-dark" style={{ width: '100%' }}>
                 <option value="All">All Controllers</option>
                 {uniqueControllers.map(c => (
                   <option key={c} value={c}>{c}</option>
@@ -606,25 +868,28 @@ export default function IncidentsPage() {
 
             {/* Date Picker Start */}
             <div className="form-group" style={{ margin: 0 }}>
-              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Date From:</label>
+              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Date From:</label>
               <input 
                 type="date" 
                 value={filterDateStart} 
-                onChange={(e) => setFilterDateStart(e.target.value)} 
+                onChange={(e) => { setFilterDateStart(e.target.value); setCurrentPage(1); }} 
                 className="form-control" 
+                style={{ width: '100%', height: '36px' }}
               />
             </div>
 
             {/* Date Picker End */}
             <div className="form-group" style={{ margin: 0 }}>
-              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Date To:</label>
+              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Date To:</label>
               <input 
                 type="date" 
                 value={filterDateEnd} 
-                onChange={(e) => setFilterDateEnd(e.target.value)} 
+                onChange={(e) => { setFilterDateEnd(e.target.value); setCurrentPage(1); }} 
                 className="form-control" 
+                style={{ width: '100%', height: '36px' }}
               />
             </div>
+
           </div>
         )}
       </div>
@@ -660,9 +925,19 @@ export default function IncidentsPage() {
                     <tr key={c.id} onClick={() => {
                       window.location.href = `/incidents/${inc.id}`;
                     }}>
-                      <td className="case-id-cell">{c.id}</td>
-                      <td className="case-id-cell" style={{ fontFamily: 'monospace' }}>{inc.id}</td>
-                      <td className="case-title-cell">{c.title}</td>
+                      <td>
+                        <span className="mono-id">
+                          <Link href={`/cases/${c.id}`} style={{ textDecoration: 'none', color: 'inherit' }} onClick={(e) => e.stopPropagation()}>
+                            {c.id}
+                          </Link>
+                        </span>
+                      </td>
+                      <td>
+                        <span className="mono-id" style={{ color: 'var(--color-critical)', background: 'var(--color-critical-bg)', borderColor: 'var(--color-critical-border)' }}>
+                          {inc.id}
+                        </span>
+                      </td>
+                      <td className="case-title-cell" style={{ fontWeight: 500 }}>{c.title}</td>
                       <td>{inc.type}</td>
                       <td>{inc.subType}</td>
                       <td>
@@ -674,15 +949,7 @@ export default function IncidentsPage() {
                       </td>
                       <td>{inc.location.commonName || inc.location.road}</td>
                       <td>
-                        {Array.isArray(inc.assignedTo) ? (
-                          inc.assignedTo.length > 0 ? (
-                            inc.assignedTo.join(', ')
-                          ) : (
-                            <span style={{ color: 'var(--text-faint)' }}>Unassigned</span>
-                          )
-                        ) : (
-                          inc.assignedTo || <span style={{ color: 'var(--text-faint)' }}>Unassigned</span>
-                        )}
+                        <RespondersAvatars names={inc.assignedTo} />
                       </td>
                       <td>
                         <span className={`badge ${getStatusBadgeClass(inc.status)}`}>

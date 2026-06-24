@@ -1,69 +1,69 @@
-/* JetBrains Mono from Google Fonts — Aptos loads from system (Windows 11 / Microsoft 365) */
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
+/* Inter and JetBrains Mono from Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
   /* ─── Design System Color Tokens ──────────────────────────────── */
-  /* Spec: Primary #FF8200 | Secondary #008C95 | Tertiary #4A148C | Neutral #F4F1EA */
+  /* Spec: Primary #FF8200 | Secondary #008C95 | Tertiary #4A148C | Neutral Light Theme */
 
-  --bg-base:    #F4F1EA; /* Neutral warm background */
-  --bg-card:    #FDFCF8; /* Warm white card surface */
-  --bg-sidebar: #0F1117;
-  --bg-header:  #FDFCF8;
-  --bg-inset:   #EEEADE; /* Slightly darker neutral for inset panels */
-  --bg-hover:   #E8E3D8; /* Hover tint on neutral base */
+  --bg-base:    #F3F4F6; /* Modern off-white / light grey background */
+  --bg-card:    #FFFFFF; /* White card surface */
+  --bg-sidebar: #FFFFFF; /* White sidebar */
+  --bg-header:  #FFFFFF;
+  --bg-inset:   #F9FAFB; /* Lightest grey for inset panels */
+  --bg-hover:   #F3F4F6; /* Hover tint on neutral base */
 
   /* Status / Severity Colors (high-contrast, status-driven) */
-  --color-critical:       #DC2626; /* Level 1-2: Live / Emergency */
-  --color-critical-bg:    rgba(220, 38, 38, 0.08);
-  --color-critical-border:rgba(220, 38, 38, 0.20);
+  --color-critical:       #EF4444; /* Red: Level 1-2 / Live / Emergency */
+  --color-critical-bg:    #FEF2F2;
+  --color-critical-border:#FCA5A5;
 
-  --color-high:           #EA580C; /* Level 3-4: Acknowledged / Warning */
-  --color-high-bg:        rgba(234, 88, 12, 0.08);
-  --color-high-border:    rgba(234, 88, 12, 0.20);
+  --color-high:           #F97316; /* Orange: Level 3-4 / Acknowledged / Warning */
+  --color-high-bg:        #FFF7ED;
+  --color-high-border:    #FED7AA;
 
-  /* Secondary brand color: Teal #008C95 — On-Site / In Progress */
-  --color-active:         #008C95;
-  --color-active-bg:      rgba(0, 140, 149, 0.08);
-  --color-active-border:  rgba(0, 140, 149, 0.20);
+  /* Secondary brand color: Teal — On-Site / In Progress */
+  --color-active:         #10B981;
+  --color-active-bg:      #ECFDF5;
+  --color-active-border:  #A7F3D0;
 
-  /* Tertiary brand color: Purple #4A148C — Pending Review */
-  --color-review:         #4A148C;
-  --color-review-bg:      rgba(74, 20, 140, 0.08);
-  --color-review-border:  rgba(74, 20, 140, 0.20);
+  /* Tertiary brand color: Purple/Teal - Review */
+  --color-review:         #0D9488;
+  --color-review-bg:      #F0FDFA;
+  --color-review-border:  #99F6E4;
 
   --color-closed:         #6B7280; /* Closed / Read-only / Grey */
-  --color-closed-bg:      rgba(107, 114, 128, 0.08);
-  --color-closed-border:  rgba(107, 114, 128, 0.20);
+  --color-closed-bg:      #F3F4F6;
+  --color-closed-border:  #E5E7EB;
 
-  --color-info:           #2563EB; /* Info/CMMS/System IDs */
-  --color-info-bg:        rgba(37, 99, 235, 0.08);
-  --color-info-border:    rgba(37, 99, 235, 0.20);
+  --color-info:           #3B82F6; /* Info/CMMS/System IDs - Blue */
+  --color-info-bg:        #EFF6FF;
+  --color-info-border:    #BFDBFE;
 
   /* Primary brand color: Orange #FF8200 — Key CTAs and active states */
   --color-primary:        #FF8200;
-  --color-primary-hover:  #D97006;
+  --color-primary-hover:  #E07200;
   --color-primary-dark:   #6D3500;
-  --color-primary-bg:     rgba(255, 130, 0, 0.08);
-  --color-primary-border: rgba(255, 130, 0, 0.25);
+  --color-primary-bg:     #FFF7ED;
+  --color-primary-border: #FFEDD5;
 
   /* Typography */
-  --text-main:    #2C1A0E; /* Warm dark brown for body text on warm bg */
-  --text-sub:     #4A3728;
-  --text-muted:   #7A6555;
-  --text-faint:   #A89080;
+  --text-main:    #1F2937; /* Dark charcoal/grey for body text */
+  --text-sub:     #4B5563; /* Medium grey */
+  --text-muted:   #6B7280; /* Muted grey */
+  --text-faint:   #9CA3AF;
   --text-inverse: #FFFFFF;
 
-  /* Borders — warm toned to match neutral background */
-  --border-color:       #D9D0C4;
-  --border-color-hover: #C5BAB0;
+  /* Borders */
+  --border-color:       #E5E7EB;
+  --border-color-hover: #D1D5DB;
   --border-focus:       #FF8200; /* Focus ring uses primary brand color */
 
-  /* Sidebar (dark) */
-  --sidebar-text:       rgba(255,255,255,0.70);
-  --sidebar-text-hover: rgba(255,255,255,0.95);
-  --sidebar-active-bg:  rgba(255, 130, 0, 0.15); /* Tinted with primary brand */
-  --sidebar-active-border: rgba(255, 130, 0, 0.30);
-  --sidebar-divider:    rgba(255,255,255,0.08);
+  /* Sidebar (light) */
+  --sidebar-text:       #4B5563;
+  --sidebar-text-hover: #111827;
+  --sidebar-active-bg:  #FFF7ED;
+  --sidebar-active-border: #FFEDD5;
+  --sidebar-divider:    #E5E7EB;
 
   /* Layout */
   --sidebar-width: 232px;
@@ -71,13 +71,12 @@
   --radius-md:  8px;
   --radius-lg:  12px;
 
-  /* ─── Typography Stacks (24K Design System) ───────────────────── */
-  /* Aptos: system font on Windows 11 / Microsoft 365, falls back to system-ui */
-  --font-headline: 'Aptos', 'Calibri', system-ui, -apple-system, sans-serif;
-  --font-body:     'Aptos', 'Calibri', system-ui, -apple-system, sans-serif;
+  /* ─── Typography Stacks ───────────────────────────────────────── */
+  --font-headline: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-body:     'Inter', system-ui, -apple-system, sans-serif;
   --font-mono:     'JetBrains Mono', 'Menlo', monospace;
 
-  /* ─── Spacing Scale (24K Design System — space tokens) ────────── */
+  /* ─── Spacing Scale ───────────────────────────────────────────── */
   --space-2xs: 4px;
   --space-xs:  6px;
   --space-s:   8px;
@@ -90,8 +89,7 @@
   --space-5xl: 48px;
   --space-6xl: 64px;
 
-  /* ─── Figma Token Aliases (24K naming convention) ─────────────── */
-  /* These alias existing tokens so new code can use Figma names */
+  /* ─── Figma Token Aliases ─────────────────────────────────────── */
   --background-primary:  var(--bg-card);
   --background-surface:  var(--bg-base);
   --background-inset:    var(--bg-inset);
@@ -456,13 +454,14 @@ h3 { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform
 }
 
 .badge-live      { background: var(--color-critical-bg); color: var(--color-critical); border-color: var(--color-critical-border); }
-.badge-assigned  { background: rgba(217, 119, 6, 0.10);   color: #D97706;               border-color: rgba(217, 119, 6, 0.25); }
+.badge-assigned  { background: var(--color-high-bg);     color: var(--color-high);     border-color: var(--color-high-border); }
 .badge-ack       { background: var(--color-high-bg);     color: var(--color-high);     border-color: var(--color-high-border); }
 .badge-onsite    { background: var(--color-active-bg);   color: var(--color-active);   border-color: var(--color-active-border); }
-.badge-completed { background: var(--color-active-bg);   color: var(--color-active);   border-color: var(--color-active-border); }
+.badge-completed { background: var(--color-info-bg);     color: var(--color-info);     border-color: var(--color-info-border); }
 .badge-review    { background: var(--color-review-bg);   color: var(--color-review);   border-color: var(--color-review-border); }
 .badge-closed    { background: var(--color-closed-bg);   color: var(--color-closed);   border-color: var(--color-closed-border); }
 .badge-info      { background: var(--color-info-bg);     color: var(--color-info);     border-color: var(--color-info-border); }
+.badge-incomplete{ background: #F3E8FF;                  color: #7C3AED;               border-color: #D8B4FE; }
 
 /* ─── Buttons ────────────────────────────────────────────────────── */
 .btn {
@@ -547,8 +546,8 @@ textarea.form-control { resize: vertical; min-height: 72px; line-height: 1.5; }
 }
 
 .custom-table th {
-  background: var(--bg-inset);
-  padding: 10px 14px;
+  background: transparent;
+  padding: 12px 16px;
   color: var(--text-muted);
   font-size: 11px; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.06em;
@@ -557,7 +556,7 @@ textarea.form-control { resize: vertical; min-height: 72px; line-height: 1.5; }
 }
 
 .custom-table td {
-  padding: 12px 14px;
+  padding: 14px 16px;
   border-bottom: 1px solid var(--border-color);
   color: var(--text-main);
   vertical-align: middle;
@@ -565,7 +564,7 @@ textarea.form-control { resize: vertical; min-height: 72px; line-height: 1.5; }
 
 .custom-table tr:last-child td { border-bottom: none; }
 .custom-table tbody tr { transition: background 0.12s ease; }
-.custom-table tbody tr:hover { background: var(--bg-hover); cursor: pointer; }
+.custom-table tbody tr:hover { background: var(--bg-inset); cursor: pointer; }
 
 /* ─── Timeline / Incident Log ────────────────────────────────────── */
 .timeline {

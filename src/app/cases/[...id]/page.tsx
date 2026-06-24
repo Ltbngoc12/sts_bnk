@@ -424,7 +424,7 @@ export default function CaseDetailsPage() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)' }}>{inc.title}</div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px', fontSize: '12px', color: 'var(--text-muted)' }}>
-                      <div><strong>Incident ID:</strong> <span className="mono-id" style={{ fontSize: '10px', padding: '1px 5px' }}>{inc.id}</span></div>
+                      <div><strong>Incident ID:</strong> <span className="mono-id" style={{ fontSize: '10px', padding: '1px 5px', color: 'var(--color-critical)', background: 'var(--color-critical-bg)', borderColor: 'var(--color-critical-border)' }}>{inc.id}</span></div>
                       <div><strong>Priority:</strong> {inc.priority}</div>
                       <div><strong>Classification:</strong> {inc.type} &bull; {inc.subType}</div>
                       <div><strong>Location:</strong> {inc.location.commonName || inc.location.road || 'TBD'}</div>

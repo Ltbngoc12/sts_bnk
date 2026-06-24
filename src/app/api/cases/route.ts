@@ -34,12 +34,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 2. Status Filter
-    if (statuses.length > 0) {
-      cases = cases.filter(c => statuses.includes(c.status));
-    }
-
-    // 3. Date Range Filter
+    // 2. Date Range Filter
     if (startDate) {
       const start = new Date(startDate).getTime();
       cases = cases.filter(c => new Date(c.createdAt).getTime() >= start);
@@ -49,12 +44,12 @@ export async function GET(request: NextRequest) {
       cases = cases.filter(c => new Date(c.createdAt).getTime() <= end);
     }
 
-    // 4. Creator Filter
+    // 3. Creator Filter
     if (createdBy) {
       cases = cases.filter(c => c.createdBy.toLowerCase() === createdBy.toLowerCase());
     }
 
-    // 5. Linked Record Filters
+    // 4. Linked Record Filters
     if (hasIncident) {
       cases = cases.filter(c => c.incident !== null);
     }
@@ -66,6 +61,15 @@ export async function GET(request: NextRequest) {
     }
     if (hasEDiary) {
       cases = cases.filter(c => db.occurrences.some(o => o.caseId === c.id));
+    }
+
+    // Calculate dynamic stats before status filter is applied
+    const allCount = cases.length;
+    const activeCount = cases.filter(c => c.status !== 'Closed').length;
+
+    // 5. Status Filter
+    if (statuses.length > 0) {
+      cases = cases.filter(c => statuses.includes(c.status));
     }
 
     // 6. Sorting
@@ -109,10 +113,10 @@ export async function GET(request: NextRequest) {
         totalPages: Math.ceil(totalItems / limit)
       },
       stats: {
-        total: db.cases.length,
-        active: db.cases.filter(c => c.status === 'Active').length,
-        triage: db.cases.filter(c => c.status === 'Pending Triage').length,
-        closed: db.cases.filter(c => c.status === 'Closed').length
+        total: allCount,
+        active: activeCount,
+        triage: cases.filter(c => c.status === 'Pending Triage').length,
+        closed: cases.filter(c => c.status === 'Closed').length
       }
     });
   } catch (error: any) {

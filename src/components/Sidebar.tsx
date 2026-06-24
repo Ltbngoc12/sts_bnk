@@ -111,12 +111,15 @@ export const Sidebar: React.FC = () => {
       {/* Brand */}
       <div className="brand-area">
         {isCollapsed ? (
-          <img src="/icon.png" alt="Sentosa" className="brand-icon" />
+          <img src="/logo.svg" alt="Sentosa" className="brand-icon" />
         ) : (
-          <div className="brand-text">
-            <img src="/logo.png" alt="Sentosa" className="brand-logo-img" />
-            <div className="brand-sub">Case Management System</div>
-          </div>
+          <>
+            <img src="/logo.svg" alt="Sentosa" className="brand-logo-img" />
+            <div className="brand-text">
+              <div className="brand-name" style={{ fontSize: '15px', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'none' }}>Sentosa</div>
+              <div className="brand-sub">Case Management System</div>
+            </div>
+          </>
         )}
       </div>
 
@@ -150,13 +153,14 @@ export const Sidebar: React.FC = () => {
                 style={{
                   width: '100%',
                   background: 'none',
-                  textAlign: 'left',
+                  textAlign: isCollapsed ? 'center' : 'left',
                   border: 'none',
                   display: 'flex',
+                  flexDirection: isCollapsed ? 'column' : 'row',
                   alignItems: 'center',
-                  gap: '9px',
+                  gap: isCollapsed ? '5px' : '9px',
                   cursor: 'pointer',
-                  padding: '8px 8px',
+                  padding: isCollapsed ? '8px 4px' : '8px 8px',
                   borderRadius: '6px',
                   color: 'var(--sidebar-text)',
                   fontSize: '12.5px',
@@ -168,7 +172,9 @@ export const Sidebar: React.FC = () => {
                   d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"
                   d2="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
                 />
-                <span className="nav-label" style={{ flex: 1 }}>System Configuration</span>
+                <span className="nav-label" style={isCollapsed ? { flex: 'none', fontSize: '9px', fontWeight: 500 } : { flex: 1 }}>
+                  {isCollapsed ? 'Settings' : 'System Configuration'}
+                </span>
                 {!isCollapsed && (
                   <svg
                     viewBox="0 0 24 24"
@@ -295,6 +301,7 @@ export const Sidebar: React.FC = () => {
           width: var(--sidebar-width);
           height: 100vh;
           background: var(--bg-sidebar);
+          border-right: 1px solid var(--border-color);
           position: fixed; left: 0; top: 0;
           display: flex; flex-direction: column;
           z-index: 100;
@@ -305,15 +312,15 @@ export const Sidebar: React.FC = () => {
         .collapse-btn {
           position: absolute; top: 48px; right: -12px;
           width: 24px; height: 24px; border-radius: 50%;
-          background: #1F2937; border: 1px solid rgba(255,255,255,0.12);
-          color: rgba(255,255,255,0.5);
+          background: var(--bg-card); border: 1px solid var(--border-color);
+          color: var(--text-muted);
           display: flex; align-items: center; justify-content: center;
           cursor: pointer; z-index: 110;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+          box-shadow: 0 2px 8px rgba(0,0,0,0.06);
           transition: all 0.15s ease;
           padding: 0;
         }
-        .collapse-btn:hover { color: #fff; border-color: rgba(255,255,255,0.3); }
+        .collapse-btn:hover { color: var(--color-primary); border-color: var(--color-primary); }
 
         .brand-area {
           display: flex; align-items: center; gap: 10px;
@@ -326,26 +333,25 @@ export const Sidebar: React.FC = () => {
         .brand-icon {
           width: 28px; height: 28px; flex-shrink: 0;
           object-fit: contain;
-          filter: brightness(10);
           mix-blend-mode: normal;
         }
 
         .brand-text { overflow: hidden; white-space: nowrap; min-width: 0; }
         .brand-logo-img {
-          height: 48px;
+          width: 32px; height: 32px; flex-shrink: 0;
           object-fit: contain;
           display: block;
         }
 
         .brand-name {
           font-size: 12px; font-weight: 700;
-          color: rgba(255,255,255,0.95);
+          color: var(--text-main);
           letter-spacing: 0.08em;
           text-transform: uppercase;
         }
 
         .brand-sub {
-          font-size: 11px; color: #ffffff;
+          font-size: 11px; color: var(--text-muted);
           margin-top: 5px; letter-spacing: 0.04em;
           white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
@@ -354,14 +360,14 @@ export const Sidebar: React.FC = () => {
           flex: 1; overflow-y: auto; overflow-x: hidden;
           padding: 8px 8px 12px;
           scrollbar-width: thin;
-          scrollbar-color: rgba(255,255,255,0.1) transparent;
+          scrollbar-color: rgba(0,0,0,0.1) transparent;
         }
 
         .nav-group { margin-bottom: 6px; }
 
         .nav-group-label {
           font-size: 9.5px; font-weight: 700;
-          color: rgba(255,255,255,0.25);
+          color: var(--text-muted);
           text-transform: uppercase; letter-spacing: 0.10em;
           padding: 10px 8px 4px;
           white-space: nowrap;
@@ -383,13 +389,15 @@ export const Sidebar: React.FC = () => {
 
         :global(.nav-item:hover) {
           color: var(--sidebar-text-hover) !important;
-          background: rgba(255,255,255,0.06);
+          background: var(--bg-hover);
         }
 
         :global(.nav-item.active) {
-          color: #fff !important;
-          background: var(--sidebar-active-bg);
-          border-color: var(--sidebar-active-border);
+          color: var(--color-primary) !important;
+          background: var(--sidebar-active-bg) !important;
+          border-left: 4px solid var(--color-primary) !important;
+          border-radius: 0 6px 6px 0 !important;
+          padding-left: 5px !important;
           font-weight: 600;
         }
 
@@ -403,14 +411,14 @@ export const Sidebar: React.FC = () => {
           position: absolute; left: 100%; top: 50%;
           transform: translateY(-50%) translateX(8px);
           margin-left: 8px;
-          background: var(--bg-sidebar); color: #fff;
+          background: #111827; color: #fff;
           font-size: 12px; font-weight: 500;
           padding: 5px 10px; border-radius: 5px;
           white-space: nowrap;
           opacity: 0; pointer-events: none;
           transition: all 0.15s ease;
           z-index: 200;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         }
 
         :global(.nav-item:hover .nav-tooltip) {
@@ -423,10 +431,47 @@ export const Sidebar: React.FC = () => {
         .collapsed .nav-scroll  { padding: 8px 6px; }
         .collapsed .nav-group-label { display: none; }
 
-        :global(.collapsed .nav-item) {
-          justify-content: center; padding: 9px 0; gap: 0;
+        :global(.collapsed .nav-item:not(.submenu-item)) {
+          flex-direction: column !important;
+          align-items: center !important;
+          justify-content: center !important;
+          padding: 8px 4px !important;
+          gap: 5px !important;
+          border-radius: 8px !important;
+          border: 1px solid transparent !important;
         }
-        :global(.collapsed .nav-label) { display: none; }
+
+        :global(.collapsed .nav-item:not(.submenu-item) .nav-label) {
+          display: block !important;
+          font-size: 9px !important;
+          font-weight: 500 !important;
+          text-align: center !important;
+          white-space: normal !important;
+          line-height: 1.1 !important;
+          flex: none !important;
+        }
+
+        :global(.collapsed .nav-tooltip) {
+          display: none !important;
+        }
+
+        :global(.collapsed .submenu-item) {
+          justify-content: center !important;
+          padding: 6px 0 !important;
+        }
+
+        :global(.collapsed .submenu-item .nav-label) {
+          display: none !important;
+        }
+
+        :global(.collapsed .nav-item:not(.submenu-item).active) {
+          color: var(--color-primary) !important;
+          background: var(--sidebar-active-bg) !important;
+          border: 1px solid var(--color-primary) !important;
+          border-radius: 8px !important;
+          padding-left: 4px !important;
+          border-left: 1px solid var(--color-primary) !important;
+        }
 
         /* Footer */
         .sidebar-footer {
@@ -442,9 +487,9 @@ export const Sidebar: React.FC = () => {
 
         .avatar {
           width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
-          background: rgba(255,255,255,0.12);
-          border: 1px solid rgba(255,255,255,0.15);
-          color: rgba(255,255,255,0.85); font-size: 12px; font-weight: 700;
+          background: #10B981;
+          border: 1px solid rgba(0,0,0,0.05);
+          color: #FFFFFF; font-size: 12px; font-weight: 700;
           display: flex; align-items: center; justify-content: center;
         }
 
@@ -452,12 +497,12 @@ export const Sidebar: React.FC = () => {
 
         .user-name {
           font-size: 12px; font-weight: 600;
-          color: rgba(255,255,255,0.85);
+          color: var(--text-main);
           overflow: hidden; text-overflow: ellipsis;
         }
 
         .user-role-label {
-          font-size: 10.5px; color: rgba(255,255,255,0.40);
+          font-size: 10.5px; color: var(--text-muted);
           margin-top: 1px; overflow: hidden; text-overflow: ellipsis;
         }
 
@@ -470,21 +515,21 @@ export const Sidebar: React.FC = () => {
 
         .switcher-label {
           font-size: 9.5px; font-weight: 700;
-          color: rgba(255,255,255,0.25);
+          color: var(--text-muted);
           text-transform: uppercase; letter-spacing: 0.10em;
         }
 
         .role-select {
-          background: rgba(255,255,255,0.06);
-          border: 1px solid rgba(255,255,255,0.12);
+          background: var(--bg-inset);
+          border: 1px solid var(--border-color);
           border-radius: 5px; padding: 5px 8px;
-          color: rgba(255,255,255,0.75);
+          color: var(--text-main);
           font-family: var(--font-body); font-size: 11.5px;
           outline: none; cursor: pointer; width: 100%;
           transition: border-color 0.15s;
         }
-        .role-select:focus { border-color: rgba(255,255,255,0.3); }
-        .role-select option { background: #1F2937; color: #fff; }
+        .role-select:focus { border-color: var(--color-primary); }
+        .role-select option { background: var(--bg-card); color: var(--text-main); }
 
         /* DO Elevation Toggle */
         .elevation-toggle {
@@ -493,12 +538,12 @@ export const Sidebar: React.FC = () => {
 
         .toggle-label {
           display: flex; align-items: center; justify-content: space-between;
-          font-size: 11px; color: rgba(255,255,255,0.55); cursor: pointer;
+          font-size: 11px; color: var(--text-sub); cursor: pointer;
         }
 
         .toggle-switch {
           width: 32px; height: 18px; border-radius: 9px;
-          background: rgba(255,255,255,0.15); border: none;
+          background: var(--border-color); border: none;
           cursor: pointer; position: relative;
           transition: background 0.2s;
           padding: 0; flex-shrink: 0;

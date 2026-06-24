@@ -15,7 +15,9 @@ import {
 } from '@/lib/db';
 import { useRole } from '@/context/RoleContext';
 import { getIncidentTaxonomy } from '@/lib/taxonomy';
+import dynamic from 'next/dynamic';
 import MultiResponderSelect from '@/components/MultiResponderSelect';
+const IncidentMap = dynamic(() => import('@/components/IncidentMap'), { ssr: false });
 import { useNotifications } from '@/context/NotificationContext';
 import FaultCreateModal from '@/components/FaultCreateModal';
 
@@ -1153,9 +1155,11 @@ export default function IncidentDetailsPage() {
           margin: 0;
           font-size: 11.5px;
           font-weight: 700;
-          color: var(--text-main);
+          color: var(--color-primary-dark);
           text-transform: uppercase;
           letter-spacing: 0.05em;
+          border-left: 3px solid var(--color-primary);
+          padding-left: 8px;
         }
         .accordion-badge {
           padding: 2px 7px;
@@ -1754,7 +1758,7 @@ export default function IncidentDetailsPage() {
       <div className="glass incident-info-panel" style={{ marginTop: 20 }}>
         {/* Header spanning all columns */}
         <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px dashed var(--border-color)', paddingBottom: '10px', marginBottom: '10px' }}>
-          <h2 style={{ fontSize: '13px', fontWeight: 700, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>Incident Particulars, Location & Responders</h2>
+          <h2 style={{ fontSize: '13px', fontWeight: 700, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-primary-dark)', borderLeft: '3px solid var(--color-primary)', paddingLeft: '8px' }}>Incident Particulars, Location & Responders</h2>
           {isCtrl && !isLocked && (
             isEditingInfo ? (
               <div style={{ display: 'flex', gap: 8 }}>
@@ -1852,111 +1856,135 @@ export default function IncidentDetailsPage() {
           )}
         </div>
 
-        {/* Location Info */}
-        <div className="info-panel-col">
-          <div className="info-panel-title">Location</div>
-          {isEditingInfo ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '4px 0' }}>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Common Name</label>
-                <input className="form-control" type="text" value={editCommonName} onChange={e => setEditCommonName(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+        {/* Column 2: Location Info & Responder Assignment (stacked) */}
+        <div className="info-panel-col" style={{ gap: '20px' }}>
+          {/* Location Info */}
+          <div>
+            <div className="info-panel-title">Location</div>
+            {isEditingInfo ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '4px 0' }}>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Common Name</label>
+                  <input className="form-control" type="text" value={editCommonName} onChange={e => setEditCommonName(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Road</label>
+                  <input className="form-control" type="text" value={editRoad} onChange={e => setEditRoad(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Building</label>
+                  <input className="form-control" type="text" value={editBuilding} onChange={e => setEditBuilding(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Level & Space</label>
+                  <input className="form-control" type="text" value={editLevelSpace} onChange={e => setEditLevelSpace(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Beside / Near To / At</label>
+                  <input className="form-control" type="text" value={editNearAt} onChange={e => setEditNearAt(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Postal Code</label>
+                  <input className="form-control" type="text" value={editPostalCode} onChange={e => setEditPostalCode(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Location Tags (Comma separated)</label>
+                  <input className="form-control" type="text" value={editTagsStr} onChange={e => setEditTagsStr(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} placeholder="e.g. Siloso, Beachfront" />
+                </div>
               </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Road</label>
-                <input className="form-control" type="text" value={editRoad} onChange={e => setEditRoad(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
-              </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Building</label>
-                <input className="form-control" type="text" value={editBuilding} onChange={e => setEditBuilding(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
-              </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Level & Space</label>
-                <input className="form-control" type="text" value={editLevelSpace} onChange={e => setEditLevelSpace(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
-              </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Beside / Near To / At</label>
-                <input className="form-control" type="text" value={editNearAt} onChange={e => setEditNearAt(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
-              </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Postal Code</label>
-                <input className="form-control" type="text" value={editPostalCode} onChange={e => setEditPostalCode(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
-              </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Location Tags (Comma separated)</label>
-                <input className="form-control" type="text" value={editTagsStr} onChange={e => setEditTagsStr(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} placeholder="e.g. Siloso, Beachfront" />
-              </div>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
-              <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Common Name</span><span className="cd-info-value"><strong>{incident.location.commonName || '—'}</strong></span></div>
-              <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Road</span><span className="cd-info-value">{incident.location.road || '—'}</span></div>
-              <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Building</span><span className="cd-info-value">{incident.location.building || '—'}</span></div>
-              <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Level & Space</span><span className="cd-info-value">{incident.location.levelSpace || '—'}</span></div>
-              <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Beside/Near/At</span><span className="cd-info-value">{incident.location.nearAt || '—'}</span></div>
-              <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Postal Code</span><span className="cd-info-value">{incident.location.postalCode}</span></div>
-              <div className="cd-info-row" style={{ height: 'auto', minHeight: '34px', padding: '4px 0' }}>
-                <span className="cd-info-label">Location Tags</span>
-                <span className="cd-info-value" style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end', marginTop: 4, marginBottom: 4 }}>
-                  {incident.location.tags && incident.location.tags.length > 0 ? (
-                    incident.location.tags.map((t, idx) => (
-                      <span key={idx} style={{ background: '#F4F1EA', color: '#2B1F1D', border: '1px solid #E6DFD5', borderRadius: '4px', padding: '1px 6px', fontSize: '10.5px', fontWeight: '500' }}>{t}</span>
-                    ))
-                  ) : (
-                    <span style={{ color: 'var(--text-faint)' }}>None</span>
-                  )}
-                </span>
-              </div>
-              <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Coordinates</span><span className="cd-info-value" style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>{incident.location.lat.toFixed(5)}, {incident.location.lng.toFixed(5)}</span></div>
-            </div>
-          )}
-        </div>
-
-        {/* Assigned Responders */}
-        <div className="info-panel-col assigned-responders-section">
-          <div className="info-panel-title">Responder Assignment</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-              {Array.isArray(incident.assignedTo) && incident.assignedTo.length > 0 ? (
-                incident.assignedTo.map(name => (
-                  <span
-                    key={name}
-                    className="badge badge-ack"
-                    style={{
-                      background: 'rgba(66, 153, 225, 0.15)',
-                      color: 'var(--color-info, #4299e1)',
-                      borderColor: 'rgba(66, 153, 225, 0.3)',
-                      fontSize: '11px',
-                      padding: '1px 6px'
-                    }}
-                  >
-                    {name}
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
+                <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Common Name</span><span className="cd-info-value"><strong>{incident.location.commonName || '—'}</strong></span></div>
+                <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Road</span><span className="cd-info-value">{incident.location.road || '—'}</span></div>
+                <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Building</span><span className="cd-info-value">{incident.location.building || '—'}</span></div>
+                <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Level & Space</span><span className="cd-info-value">{incident.location.levelSpace || '—'}</span></div>
+                <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Beside/Near/At</span><span className="cd-info-value">{incident.location.nearAt || '—'}</span></div>
+                <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Postal Code</span><span className="cd-info-value">{incident.location.postalCode}</span></div>
+                <div className="cd-info-row" style={{ height: 'auto', minHeight: '34px', padding: '4px 0' }}>
+                  <span className="cd-info-label">Location Tags</span>
+                  <span className="cd-info-value" style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end', marginTop: 4, marginBottom: 4 }}>
+                    {incident.location.tags && incident.location.tags.length > 0 ? (
+                      incident.location.tags.map((t, idx) => (
+                        <span key={idx} style={{ background: '#F4F1EA', color: '#2B1F1D', border: '1px solid #E6DFD5', borderRadius: '4px', padding: '1px 6px', fontSize: '10.5px', fontWeight: '500' }}>{t}</span>
+                      ))
+                    ) : (
+                      <span style={{ color: 'var(--text-faint)' }}>None</span>
+                    )}
                   </span>
-                ))
-              ) : (
-                <span style={{ color: 'var(--text-faint)', fontSize: '12px', fontStyle: 'italic' }}>Unassigned</span>
-              )}
-            </div>
+                </div>
+                <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Coordinates</span><span className="cd-info-value" style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>{incident.location.lat.toFixed(5)}, {incident.location.lng.toFixed(5)}</span></div>
+              </div>
+            )}
+          </div>
 
-            {/* Inline Dispatcher Controls */}
-            {isCtrl && !isLocked && isEditingInfo && (
-              <div style={{ marginTop: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                  <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)' }}>RE-ASSIGN RESPONDERS</label>
-                  {pendingResponders !== null && JSON.stringify(pendingResponders) !== JSON.stringify(Array.isArray(incident.assignedTo) ? incident.assignedTo : []) && (
-                    <span style={{ fontSize: 10, color: 'var(--color-warning)', fontWeight: 600 }}>● Unsaved</span>
+          {/* Assigned Responders */}
+          <div className="assigned-responders-section" style={{ marginTop: '12px' }}>
+            <div className="info-panel-title">Responder Assignment</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                {Array.isArray(incident.assignedTo) && incident.assignedTo.length > 0 ? (
+                  incident.assignedTo.map(name => (
+                    <span
+                      key={name}
+                      className="badge badge-ack"
+                      style={{
+                        background: 'rgba(66, 153, 225, 0.15)',
+                        color: 'var(--color-info, #4299e1)',
+                        borderColor: 'rgba(66, 153, 225, 0.3)',
+                        fontSize: '11px',
+                        padding: '1px 6px'
+                      }}
+                    >
+                      {name}
+                    </span>
+                  ))
+                ) : (
+                  <span style={{ color: 'var(--text-faint)', fontSize: '12px', fontStyle: 'italic' }}>Unassigned</span>
+                )}
+              </div>
+
+              {/* Inline Dispatcher Controls */}
+              {isCtrl && !isLocked && isEditingInfo && (
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                    <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)' }}>RE-ASSIGN RESPONDERS</label>
+                    {pendingResponders !== null && JSON.stringify(pendingResponders) !== JSON.stringify(Array.isArray(incident.assignedTo) ? incident.assignedTo : []) && (
+                      <span style={{ fontSize: 10, color: 'var(--color-warning)', fontWeight: 600 }}>● Unsaved</span>
+                    )}
+                  </div>
+                  <MultiResponderSelect
+                    value={pendingResponders ?? (Array.isArray(incident.assignedTo) ? incident.assignedTo : [])}
+                    onChange={handleResponderChange}
+                    disabled={saving}
+                    allowEmpty={false}
+                  />
+                  {assignmentError && (
+                    <div style={{ marginTop: 6, color: 'var(--color-critical)', fontSize: 11 }}>
+                      ⚠️ {assignmentError}
+                    </div>
                   )}
                 </div>
-                <MultiResponderSelect
-                  value={pendingResponders ?? (Array.isArray(incident.assignedTo) ? incident.assignedTo : [])}
-                  onChange={handleResponderChange}
-                  disabled={saving}
-                  allowEmpty={false}
-                />
-                {assignmentError && (
-                  <div style={{ marginTop: 6, color: 'var(--color-critical)', fontSize: 11 }}>
-                    ⚠️ {assignmentError}
-                  </div>
-                )}
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Column 3: Sentosa Map (pins latitude & longitude location) */}
+        <div className="info-panel-col" style={{ minHeight: '260px' }}>
+          <div className="info-panel-title">Incident Map</div>
+          <div style={{ flexGrow: 1, height: '100%', minHeight: '260px' }}>
+            {incident.location.lat && incident.location.lng ? (
+              <IncidentMap
+                lat={incident.location.lat}
+                lng={incident.location.lng}
+                commonName={incident.location.commonName}
+                road={incident.location.road}
+                priority={incident.priority}
+                type={incident.type}
+              />
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', border: '1px solid var(--border-color)', borderRadius: '8px', background: 'var(--bg-inset)', color: 'var(--text-faint)', fontSize: '12px' }}>
+                Coordinates unavailable
               </div>
             )}
           </div>

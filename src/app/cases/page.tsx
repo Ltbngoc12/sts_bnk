@@ -31,6 +31,7 @@ export default function CaseLogPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   // Filter States
+  const [activeTab, setActiveTab] = useState<'All' | 'Active'>('All');
   const [filterStatus, setFilterStatus] = useState('All');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -61,7 +62,7 @@ export default function CaseLogPage() {
   // Fetch Cases when filters, sort, page, or limit changes
   useEffect(() => {
     fetchCases();
-  }, [page, limit, sortBy, sortOrder, filterStatus, startDate, endDate, createdBy, hasIncident, hasTasks, hasFaults, hasEDiary, debouncedSearch]);
+  }, [page, limit, sortBy, sortOrder, filterStatus, startDate, endDate, createdBy, hasIncident, hasTasks, hasFaults, hasEDiary, debouncedSearch, activeTab]);
 
   const fetchCases = async () => {
     setLoading(true);
@@ -73,7 +74,17 @@ export default function CaseLogPage() {
       params.append('sortOrder', sortOrder);
       
       if (debouncedSearch) params.append('search', debouncedSearch);
-      if (filterStatus !== 'All') params.append('status', filterStatus);
+      if (activeTab === 'Active') {
+        if (filterStatus === 'All') {
+          params.append('status', 'Active,Pending Triage,No Action Required');
+        } else {
+          params.append('status', filterStatus);
+        }
+      } else {
+        if (filterStatus !== 'All') {
+          params.append('status', filterStatus);
+        }
+      }
       if (startDate) params.append('startDate', new Date(startDate).toISOString());
       if (endDate) {
         // Include the whole end day
@@ -125,6 +136,7 @@ export default function CaseLogPage() {
     setHasFaults(false);
     setHasEDiary(false);
     setShowLinkedDropdown(false);
+    setActiveTab('All');
     setPage(1);
   };
 
@@ -146,7 +158,7 @@ export default function CaseLogPage() {
         {(['Controller', 'Duty Officer', 'Duty Manager', 'System Administrator', 'Current Ops Administrator'].includes(role)) && (
           <button
             type="button"
-            className="btn btn-primary"
+            className="btn btn-info"
             onClick={handleCreateCase}
             style={{ fontSize: '13px', height: '38px', padding: '0 16px', textTransform: 'uppercase', letterSpacing: '0.04em' }}
           >
@@ -154,106 +166,202 @@ export default function CaseLogPage() {
           </button>
         )}
       </div>
-
       {/* Filter panel */}
-      <div className="glass" style={{ padding: '20px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div className="glass" style={{ padding: '20px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '16px', background: 'var(--bg-card)' }}>
 
-        {/* Main row */}
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-
-          {/* Search */}
-          <div style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.04em' }}>Search Registry:</label>
-            <input
-              type="text"
-              placeholder="Search by Case ID or title…"
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              className="form-control"
-              style={{ width: '100%' }}
-            />
-          </div>
-
-          {/* Status */}
-          <div style={{ flex: '0 1 180px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.04em' }}>Status:</label>
-            <select
-              value={filterStatus}
-              onChange={e => { setFilterStatus(e.target.value); setPage(1); }}
-              className="form-control select-dark"
-              style={{ width: '100%' }}
-            >
-              <option value="All">All Statuses</option>
-              <option value="Pending Triage">Pending Triage</option>
-              <option value="Active">Active</option>
-              <option value="No Action Required">No Action Required</option>
-              <option value="Closed">Closed</option>
-            </select>
-          </div>
-
-          {/* Action buttons */}
-          <div style={{ display: 'flex', gap: '10px', height: '36px', alignItems: 'center' }}>
+        {/* Main Filters Row: Left (Tabs) & Right (Search & Filters button) */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
+          
+          {/* Left Side: Tabs */}
+          <div style={{ display: 'flex', gap: '4px' }}>
             <button
-              type="button"
-              onClick={() => setShowAdvanced(!showAdvanced)}
-              className="btn btn-secondary"
-              style={{ padding: '0 14px', fontSize: '12px', height: '100%', display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}
+              onClick={() => { setActiveTab('All'); setPage(1); }}
+              className={`tab-btn ${activeTab === 'All' ? 'active' : ''}`}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                borderBottom: activeTab === 'All' ? '2px solid var(--color-primary)' : '2px solid transparent',
+                color: activeTab === 'All' ? 'var(--color-primary)' : 'var(--text-muted)',
+                padding: '8px 16px',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'all 0.15s ease'
+              }}
             >
-              ⚙️ {showAdvanced ? 'Hide Options' : 'More Options'}
+              All Cases
+              <span style={{
+                fontSize: '11px',
+                fontWeight: 700,
+                background: activeTab === 'All' ? 'var(--color-primary-bg)' : 'var(--bg-inset)',
+                color: activeTab === 'All' ? 'var(--color-primary)' : 'var(--text-muted)',
+                padding: '2px 8px',
+                borderRadius: '10px',
+                minWidth: '20px',
+                textAlign: 'center'
+              }}>
+                {stats.total}
+              </span>
             </button>
             <button
-              type="button"
-              onClick={handleResetFilters}
-              className="btn btn-secondary"
-              style={{ padding: '0 10px', fontSize: '12px', height: '100%', border: 'none', background: 'transparent', textDecoration: 'underline', whiteSpace: 'nowrap' }}
+              onClick={() => { setActiveTab('Active'); setPage(1); }}
+              className={`tab-btn ${activeTab === 'Active' ? 'active' : ''}`}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                borderBottom: activeTab === 'Active' ? '2px solid var(--color-primary)' : '2px solid transparent',
+                color: activeTab === 'Active' ? 'var(--color-primary)' : 'var(--text-muted)',
+                padding: '8px 16px',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'all 0.15s ease'
+              }}
             >
-              Clear
+              Active Cases
+              <span style={{
+                fontSize: '11px',
+                fontWeight: 700,
+                background: activeTab === 'Active' ? 'var(--color-primary-bg)' : 'var(--bg-inset)',
+                color: activeTab === 'Active' ? 'var(--color-primary)' : 'var(--text-muted)',
+                padding: '2px 8px',
+                borderRadius: '10px',
+                minWidth: '20px',
+                textAlign: 'center'
+              }}>
+                {stats.active}
+              </span>
             </button>
+          </div>
+
+          {/* Right Side: Search & Filter toggle */}
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', flexGrow: 1, justifyContent: 'flex-end' }}>
+            
+            {/* Search Input with Magnifying Glass SVG */}
+            <div style={{ position: 'relative', width: '100%', maxWidth: '300px' }}>
+              <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-faint)', display: 'flex', alignItems: 'center' }}>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+              </span>
+              <input 
+                type="text" 
+                placeholder="Search case ID, title, status..." 
+                value={searchTerm} 
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="form-control"
+                style={{ width: '100%', paddingLeft: '36px', height: '36px', fontSize: '13px' }}
+              />
+            </div>
+
+            {/* Filters toggle button with Funnel SVG */}
+            <button 
+              onClick={() => setShowAdvanced(!showAdvanced)} 
+              className={`btn ${showAdvanced ? 'btn-info' : 'btn-secondary'}`}
+              style={{ 
+                padding: '0 14px', 
+                fontSize: '12.5px', 
+                height: '36px', 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px', 
+                whiteSpace: 'nowrap',
+                fontWeight: 600,
+                borderRadius: 'var(--radius-md)'
+              }}
+            >
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+              </svg>
+              Filters
+            </button>
+
+            {/* Clear Button */}
+            {(searchTerm || filterStatus !== 'All' || startDate || endDate || createdBy || hasIncident || hasTasks || hasFaults || hasEDiary || activeTab !== 'All') && (
+              <button 
+                onClick={handleResetFilters} 
+                className="btn btn-secondary"
+                style={{ padding: '0 10px', fontSize: '12.5px', height: '36px', border: 'none', background: 'transparent', textDecoration: 'underline', whiteSpace: 'nowrap' }}
+              >
+                Clear
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Collapsible advanced filters */}
+        {/* Collapsible Advanced Filters */}
         {showAdvanced && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '16px', paddingTop: '4px' }}>
+            
+            {/* Status */}
             <div className="form-group" style={{ margin: 0 }}>
-              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Date From:</label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={e => { setStartDate(e.target.value); setPage(1); }}
-                className="form-control"
+              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Status:</label>
+              <select
+                value={filterStatus}
+                onChange={e => { setFilterStatus(e.target.value); setPage(1); }}
+                className="form-control select-dark"
                 style={{ width: '100%' }}
-              />
+              >
+                <option value="All">All Statuses</option>
+                <option value="Pending Triage">Pending Triage</option>
+                <option value="Active">Active</option>
+                <option value="No Action Required">No Action Required</option>
+                <option value="Closed">Closed</option>
+              </select>
             </div>
+
+            {/* Created By */}
             <div className="form-group" style={{ margin: 0 }}>
-              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Date To:</label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={e => { setEndDate(e.target.value); setPage(1); }}
-                className="form-control"
-                style={{ width: '100%' }}
-              />
-            </div>
-            <div className="form-group" style={{ margin: 0 }}>
-              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Created By:</label>
+              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Created By:</label>
               <input
                 type="text"
                 placeholder="Creator name..."
                 value={createdBy}
                 onChange={e => { setCreatedBy(e.target.value); setPage(1); }}
                 className="form-control"
-                style={{ width: '100%' }}
+                style={{ width: '100%', height: '36px' }}
               />
             </div>
+
+            {/* Date From */}
+            <div className="form-group" style={{ margin: 0 }}>
+              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Date From:</label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={e => { setStartDate(e.target.value); setPage(1); }}
+                className="form-control"
+                style={{ width: '100%', height: '36px' }}
+              />
+            </div>
+
+            {/* Date To */}
+            <div className="form-group" style={{ margin: 0 }}>
+              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Date To:</label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={e => { setEndDate(e.target.value); setPage(1); }}
+                className="form-control"
+                style={{ width: '100%', height: '36px' }}
+              />
+            </div>
+
+            {/* Linked Records dropdown */}
             <div className="form-group" style={{ margin: 0, position: 'relative' }}>
-              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Linked Records:</label>
-              {/* Trigger button */}
+              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Linked Records:</label>
               <button
                 type="button"
                 onClick={() => setShowLinkedDropdown(v => !v)}
                 className="form-control"
-                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', textAlign: 'left', background: 'var(--bg-inset)' }}
+                style={{ width: '100%', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', textAlign: 'left', background: 'var(--bg-inset)' }}
               >
                 <span style={{ fontSize: '13px', color: [hasIncident, hasTasks, hasFaults, hasEDiary].some(Boolean) ? 'var(--text-main)' : 'var(--text-faint)' }}>
                   {[hasIncident && 'Incident', hasTasks && 'Tasks', hasFaults && 'Faults', hasEDiary && 'e-Diary'].filter(Boolean).join(', ') || 'All Types'}
@@ -262,7 +370,7 @@ export default function CaseLogPage() {
                   <path d="M6 9l6 6 6-6" />
                 </svg>
               </button>
-              {/* Dropdown panel */}
+              
               {showLinkedDropdown && (
                 <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 50, minWidth: '160px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', padding: '6px 0' }}>
                   {[
@@ -289,6 +397,7 @@ export default function CaseLogPage() {
                 </div>
               )}
             </div>
+
           </div>
         )}
       </div>
