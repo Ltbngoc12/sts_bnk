@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(update-config)",
+      "Skill(update-config:*)",
+      "Bash(claude mcp *)",
+      "mcp__figma__whoami",
+      "mcp__figma__get_libraries",
+      "mcp__figma__search_design_system",
+      "mcp__figma__get_variable_defs",
+      "mcp__figma__get_metadata",
+      "mcp__figma__get_design_context",
+      "Bash(grep -o '#[0-9a-fA-F]\\\\{3,8\\\\}')",
+      "PowerShell($filePath = 'C:\\\\Users\\\\huy.duong\\\\.claude\\\\projects\\\\c--Users-huy-duong-OneDrive---BnK-Solutions-JSC-Project-Sentosa-CODE\\\\46f2bcf3-c299-4a86-b04d-3bfdd52fa8da\\\\tool-results\\\\mcp-figma-get_design_context-1781692855515.txt'; $content = Get-Content $filePath -Raw; $json = ConvertFrom-Json $content; $text = $json[0].text; Write-Host \"Content length: $\\($text.Length\\) chars\"; Write-Host \"First 1000 chars:\"; $text.Substring\\(0, [Math]::Min\\(1000, $text.Length\\)\\))",
+      "Bash(git commit -m ' *)",
+      "PowerShell(netstat -ano)",
+      "PowerShell(taskkill /PID 18132 /F)",
+      "Read(//c/Users/huy.duong/OneDrive - BnK Solutions JSC/Project/Sentosa/**)",
+      "Bash(dir \"c:\\\\Users\\\\huy.duong\\\\OneDrive - BnK Solutions JSC\\\\Project\\\\Sentosa\")",
+      "Bash(ls \"c:\\\\Users\\\\huy.duong\\\\OneDrive - BnK Solutions JSC\")",
+      "Read(//c/Users/huy.duong/OneDrive - BnK Solutions JSC/**)",
+      "Bash(find \"c:\\\\Users\\\\huy.duong\" -name \"*FSD*\" -o -name \"*task*management*\" -o -name \"*Task*Management*\" 2>/dev/null | grep -v \"node_modules\" | head -20)",
+      "Read(//c/Users/huy.duong/**)",
+      "PowerShell(taskkill /PID 18180 /F)"
+    ]
+  }
+}
