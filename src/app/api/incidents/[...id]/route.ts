@@ -313,20 +313,21 @@ export async function POST(
         break;
       }
 
-      // ── Responder notifies Controller of completion (log only) ───
+      // ── Responder notifies Controller of completion ───────────────
       case 'notify-complete': {
         if (!['Live (On-Site)', 'Live (Acknowledged)', 'Live', 'Live (Assigned)', 'Live (Incomplete)'].includes(incident.status)) {
           return NextResponse.json({ error: `Cannot notify completion: current status is "${incident.status}"` }, { status: 409 });
         }
+        incident.status = 'Live (Pending Controller Review)';
         incident.log.push(makeLogEntry(incident,
-          `${actor} has notified completion of ground activities and is awaiting Controller review.`
+          `${actor} has notified completion of ground activities. Status changed to Live (Pending Controller Review) — awaiting Controller verification.`
         ));
         break;
       }
 
       // ── Controller locks incident (all responders done) ────────
       case 'complete': {
-        if (!['Live (On-Site)', 'Live (Acknowledged)', 'Live', 'Live (Assigned)', 'Live (Incomplete)'].includes(incident.status)) {
+        if (!['Live (Pending Controller Review)', 'Live (Acknowledged)', 'Live', 'Live (Assigned)', 'Live (Incomplete)'].includes(incident.status)) {
           return NextResponse.json({ error: `Cannot lock incident: current status is "${incident.status}"` }, { status: 409 });
         }
         incident.status = 'Live (Completed)';
@@ -340,9 +341,8 @@ export async function POST(
       // ── Submit for Duty Manager review ─────────────────────────
       case 'submit-review':
       case 'submit-endorsement': {
-        // FSD §5.5.3: only allowed from Live (Completed) or Returned
-        if (!['Live (Completed)', 'Returned'].includes(incident.status)) {
-          return NextResponse.json({ error: `Cannot submit for endorsement: incident must be in "Live (Completed)" or "Returned" status (current: "${incident.status}").` }, { status: 409 });
+        if (!['Live (Pending Controller Review)', 'Live (Completed)', 'Returned'].includes(incident.status)) {
+          return NextResponse.json({ error: `Cannot submit for endorsement: incident must be pending Controller review, completed, or returned (current: "${incident.status}").` }, { status: 409 });
         }
         incident.status = 'Pending Endorsement';
         incident.log.push(makeLogEntry(incident, `Incident submitted for Duty Manager endorsement by ${actor}.`));
@@ -423,7 +423,7 @@ export async function POST(
 
       // ── Controller/DM returns to Responder for further action ──
       case 'return-to-responder': {
-        if (!['Live (On-Site)', 'Live (Incomplete)', 'Pending Endorsement', 'Returned'].includes(incident.status)) {
+        if (!['Live (Pending Controller Review)', 'Live (Incomplete)', 'Pending Endorsement', 'Returned'].includes(incident.status)) {
           return NextResponse.json({ error: `Cannot return to responder: incident status is "${incident.status}"` }, { status: 409 });
         }
         incident.status = 'Live (Incomplete)';

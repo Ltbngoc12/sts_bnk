@@ -462,6 +462,7 @@ h3 { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform
 .badge-closed    { background: var(--color-closed-bg);   color: var(--color-closed);   border-color: var(--color-closed-border); }
 .badge-info      { background: var(--color-info-bg);     color: var(--color-info);     border-color: var(--color-info-border); }
 .badge-incomplete{ background: #F3E8FF;                  color: #7C3AED;               border-color: #D8B4FE; }
+.badge-pending-ctrl { background: #FFF7ED;              color: #C2410C;               border-color: #FED7AA; }
 
 /* ─── Buttons ────────────────────────────────────────────────────── */
 .btn {

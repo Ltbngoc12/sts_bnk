@@ -41,6 +41,8 @@ function incBadgeClass(status: string) {
       return 'badge badge-ack';
     case 'Live (On-Site)':
       return 'badge badge-onsite';
+    case 'Live (Pending Controller Review)':
+      return 'badge badge-pending-ctrl';
     case 'Live (Completed)':
       return 'badge badge-completed';
     case 'Pending Endorsement':
@@ -633,7 +635,7 @@ export default function IncidentDetailsPage() {
   const isMgr = role === 'Duty Manager' || role === 'Duty Officer' || role === 'System Administrator' || role === 'Current Ops Administrator';
   const isAdmin = role === 'System Administrator';
   const isClosed = incident.status === 'Closed';
-  const isLocked = isClosed || incident.status === 'Live (Completed)' || (incident.status === 'Pending Endorsement' && !isMgr);
+  const isLocked = isClosed || incident.status === 'Live (Completed)' || (incident.status === 'Pending Endorsement' && !isMgr) || (incident.status === 'Live (Pending Controller Review)' && isRanger);
 
   // Warnings / Reminder Triggers
   const showCrisisReviewReminder = elapsedMinutes >= 45 && incident.status !== 'Closed';
@@ -1656,7 +1658,7 @@ export default function IncidentDetailsPage() {
                   Update to On-site
                 </button>
               )}
-              {incident.status === 'Live (On-Site)' && (
+              {incident.status === 'Live (Pending Controller Review)' && (
                 <>
                   <button
                     className="btn btn-warning btn-sm"
@@ -1665,15 +1667,10 @@ export default function IncidentDetailsPage() {
                   >
                     Return to Responder
                   </button>
-                  <button className="btn btn-success btn-sm" onClick={() => setShowCompleteModal(true)} disabled={saving}>
-                    Confirm Completion
+                  <button className="btn btn-primary btn-sm" onClick={() => performAction('submit-endorsement')} disabled={saving}>
+                    Submit for Endorsement
                   </button>
                 </>
-              )}
-              {incident.status === 'Live (Incomplete)' && (
-                <button className="btn btn-success btn-sm" onClick={() => setShowCompleteModal(true)} disabled={saving}>
-                  Confirm Completion
-                </button>
               )}
               {['Live (Completed)', 'Returned'].includes(incident.status) && (
                 <button className="btn btn-primary btn-sm" onClick={() => performAction('submit-endorsement')} disabled={saving}>

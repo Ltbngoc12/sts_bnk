@@ -259,7 +259,7 @@ export default function IncidentsPage() {
     const status = inc.status;
 
     if (tab === 'Active') {
-      return ['Live', 'Live (Assigned)', 'Live (Acknowledged)', 'Live (On-Site)', 'Live (Completed)', 'Live (Incomplete)'].includes(status);
+      return ['Live', 'Live (Assigned)', 'Live (Acknowledged)', 'Live (On-Site)', 'Live (Pending Controller Review)', 'Live (Completed)', 'Live (Incomplete)'].includes(status);
     }
     if (tab === 'Pending Endorsement') {
       return status === 'Pending Endorsement';
@@ -363,6 +363,8 @@ export default function IncidentsPage() {
         return 'badge-incomplete';
       case 'Live (On-Site)':
         return 'badge-onsite';
+      case 'Live (Pending Controller Review)':
+        return 'badge-pending-ctrl';
       case 'Live (Completed)':
         return 'badge-completed';
       case 'Pending Endorsement':

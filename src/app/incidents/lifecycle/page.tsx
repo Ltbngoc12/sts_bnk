@@ -98,6 +98,25 @@ const statusDetails: Record<string, StatusDetail> = {
     actionPanelState: 'On-Site Management: Ranger can post live updates and upload case photos directly.',
     relatedElements: ['Base64 Photo Uploads', 'Incident Updates timeline', 'e-Diary record']
   },
+  'Live (Pending Controller Review)': {
+    name: 'Live (Pending Controller Review)',
+    badgeClass: 'badge-pending-ctrl',
+    color: '#C2410C',
+    bgColor: 'rgba(194, 65, 12, 0.08)',
+    borderColor: 'rgba(194, 65, 12, 0.25)',
+    description: 'The Responder has notified completion of all ground activities and the incident is awaiting Controller verification. The record is locked for the Responder until the Controller either confirms completion or returns it for amendment.',
+    whoCanTransition: ['Responder (Ranger)'],
+    actionTriggers: [
+      'Ranger clicks "Notify Completion" after completing all on-site activities.'
+    ],
+    operationalImpacts: [
+      'Locks the incident record for the Responder — no further edits unless returned by the Controller.',
+      'Logs a Chronological Timeline entry: "Awaiting Controller verification".',
+      'Notifies the Controller that the Responder\'s ground activities are complete and pending review.'
+    ],
+    actionPanelState: 'Pending Review: Controller must verify Responder inputs, then either Confirm Completion or Return to Responder.',
+    relatedElements: ['Controller review panel', 'Return to Responder modal', 'Timeline: Awaiting Controller review']
+  },
   'Live (Incomplete)': {
     name: 'Live (Incomplete)',
     badgeClass: 'badge-ack',
@@ -224,8 +243,8 @@ export default function IncidentLifecyclePage() {
   const isNodeInPath = (nodeName: string) => {
     if (selectedPath === 'all') return true;
 
-    const happyNodes = ['Live', 'Live (Assigned)', 'Live (Acknowledged)', 'Live (On-Site)', 'Live (Completed)', 'Pending Endorsement', 'Closed'];
-    const returnedNodes = ['Live', 'Live (Assigned)', 'Live (Acknowledged)', 'Live (On-Site)', 'Live (Incomplete)', 'Live (Completed)', 'Pending Endorsement', 'Returned', 'Closed'];
+    const happyNodes = ['Live', 'Live (Assigned)', 'Live (Acknowledged)', 'Live (On-Site)', 'Live (Pending Controller Review)', 'Live (Completed)', 'Pending Endorsement', 'Closed'];
+    const returnedNodes = ['Live', 'Live (Assigned)', 'Live (Acknowledged)', 'Live (On-Site)', 'Live (Pending Controller Review)', 'Live (Incomplete)', 'Live (Completed)', 'Pending Endorsement', 'Returned', 'Closed'];
     const reopenedNodes = ['Closed', 'Reopened by Administrator', 'Live', 'Live (Assigned)', 'Live (Acknowledged)', 'Live (On-Site)', 'Live (Completed)', 'Pending Endorsement'];
 
     if (selectedPath === 'happy') return happyNodes.includes(nodeName);

@@ -143,7 +143,7 @@ export interface Incident {
   reportingSource?: string; // FSD §5.4.4 — channel of the report (e.g. "Public Phone", "VA", "State Agency")
   createdBy: string;
   category: string; // "Standard Incident" | "Proactive Incident" | "Backdated Incident" | "Ongoing Incident" | "Informational / Exercise Records"
-  status: string; // "Live" | "Live (Assigned)" | "Live (Acknowledged)" | "Live (On-Site)" | "Live (Incomplete)" | "Live (Completed)" | "Pending Endorsement" | "Returned" | "Closed"
+  status: string; // "Live" | "Live (Assigned)" | "Live (Acknowledged)" | "Live (On-Site)" | "Live (Pending Controller Review)" | "Live (Incomplete)" | "Live (Completed)" | "Pending Endorsement" | "Returned" | "Closed"
   assignedTo: string[]; // Array of responder display names
   responders?: IncidentResponder[]; // Rich metadata per assignment (assignedBy, assignedAt, status)
   location: Location;
