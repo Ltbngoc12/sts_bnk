@@ -219,23 +219,39 @@ export interface TaskAudit {
   details: string;
 }
 
+// Canonical Task statuses per FRD Section 7.3.2
+export type TaskStatus =
+  | 'Created'
+  | 'Assigned'
+  | 'Acknowledged'
+  | 'In Progress'
+  | 'Pending Further Action'
+  | 'Closed';
+
 export interface Task {
   id: string; // TASK-XXX
   caseId: string;
+  linkedIncidentId?: string; // Optional: incident this task runs alongside
   title: string;
   description: string;
-  assignee: string; // User or Group
+  assignee: string; // User name or Group name
+  assigneeType?: 'user' | 'group'; // FRD 7.2 — individual or pre-configured group
   priority: string; // "Normal" | "High"
   dueDate: string;
-  status: string; // Created, Assigned, Acknowledged, In Progress, Pending Further Action, Closed
-  closeReason?: string;
+  status: string; // TaskStatus — Created, Assigned, Acknowledged, In Progress, Pending Further Action, Closed
+  closeReason?: string; // Mandatory when closed without Assignee completion (FRD 7.3)
+  completed?: boolean; // True when Assignee marked complete (vs. Controller drop)
   checklist?: TaskChecklistItem[];
   comments?: TaskComment[];
   audits?: TaskAudit[];
-  recurrenceSchedule?: string;
+  recurrenceSchedule?: string; // Template only at this phase (no scheduler)
   attachments: string[];
   createdBy: string;
   createdDate: string;
+  acknowledgedAt?: string;
+  startedAt?: string;
+  closedAt?: string;
+  closedBy?: string;
 }
 
 export interface Occurrence {
@@ -399,7 +415,7 @@ function hydrateDb(normalizedDb: NormalizedDbSchema): DbSchema {
 
   return {
     cases: hydratedCases,
-    tasks: normalizedDb.tasks,
+    tasks: normalizedDb.tasks.map(normalizeTaskStatus),
     occurrences: normalizedDb.occurrences,
     faults: normalizedDb.faults,
     events: normalizedDb.events,
@@ -407,6 +423,21 @@ function hydrateDb(normalizedDb: NormalizedDbSchema): DbSchema {
     broadcasts: normalizedDb.broadcasts,
     auditLogs: normalizedDb.auditLogs
   };
+}
+
+// Map legacy task statuses to the canonical FRD 7.3.2 set so the whole
+// system (board columns, badges, action gating) stays consistent.
+function normalizeTaskStatus(t: Task): Task {
+  const map: Record<string, string> = {
+    'Re-Assigned': 'Assigned',
+    'Reassigned': 'Assigned',
+    'Pending': 'Pending Further Action',
+    'Further Action': 'Pending Further Action',
+    'Acknowledged / In Progress': 'In Progress',
+  };
+  const status = map[t.status] || t.status;
+  if (status === t.status) return t;
+  return { ...t, status };
 }
 
 function dehydrateDb(data: DbSchema): NormalizedDbSchema {

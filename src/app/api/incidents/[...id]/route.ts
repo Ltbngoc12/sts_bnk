@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getDb, saveDb, generateCaseId, generateFaultId } from '@/lib/db';
+import { getDb, saveDb, generateCaseId } from '@/lib/db';
 import { tryAutoCloseCase } from '@/lib/autoclose';
 
 // Helper: build a timestamped log entry
@@ -209,7 +209,7 @@ export async function POST(
       'assign', 'acknowledge', 'on-site', 'complete', 'notify-complete', 'close', 'return',
       'return-to-responder', 'submit-review', 'submit-endorsement', 'log',
       'update-fields', 'reopen', 'mark-false-alarm', 'link-duplicate',
-      'edit-log', 'delete-log', 'raise-fault'
+      'edit-log', 'delete-log'
     ];
 
     if (knownActions.includes(lastSegment)) {
@@ -397,10 +397,6 @@ export async function POST(
         });
         incident.closureBroadcastStatus = 'pending';
         incident.closureBroadcastId = broadcastId;
-
-        currentCase.incident = incident;
-        db.cases[caseIndex] = currentCase;
-        tryAutoCloseCase(db, caseId);
         break;
       }
 
@@ -564,39 +560,6 @@ export async function POST(
         break;
       }
 
-      // ── Raise Linked Fault (FRD §6.1 — from active Incident) ─────────────
-      case 'raise-fault': {
-        const faultType = body.faultType;
-        const faultSubType = body.faultSubType;
-        const description = body.description;
-
-        if (!faultType || !faultSubType || !description) {
-          return NextResponse.json({ error: 'faultType, faultSubType, and description are required' }, { status: 400 });
-        }
-
-        const faultNow = new Date().toISOString();
-        const newFaultId = generateFaultId(db);
-
-        if (!db.faults) db.faults = [];
-        db.faults.push({
-          id: newFaultId,
-          caseId,
-          faultType,
-          faultSubType,
-          location: { ...incident.location },
-          description,
-          attachments: [],
-          status: 'Pending Submission',
-          createdBy: actor,
-          createdAt: faultNow,
-          submittedAt: faultNow,
-          linkedIncidentId: incident.id,
-        });
-
-        incident.log.push(makeLogEntry(incident, `Fault ${newFaultId} (${faultType} — ${faultSubType}) raised and submitted to IFM CMMS by ${actor}.`));
-        break;
-      }
-
       // ── Update ancillary fields ────────────────────────────────
       case 'update-fields': {
         if (body.emergencyServices) incident.emergencyServices = { ...incident.emergencyServices, ...body.emergencyServices };
@@ -624,6 +587,9 @@ export async function POST(
 
     currentCase.incident = incident;
     db.cases[caseIndex] = currentCase;
+    if (action === 'close' || action === 'link-duplicate') {
+      tryAutoCloseCase(db, caseId);
+    }
     await saveDb(db);
 
     return NextResponse.json({ ok: true, incident, case: currentCase });

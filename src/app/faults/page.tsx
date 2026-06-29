@@ -9,17 +9,15 @@ import FaultCreateModal from '@/components/FaultCreateModal';
 
 interface FaultStats {
   total: number;
-  created: number;
   pendingSubmission: number;
   closed: number;
 }
 
 function faultStatusBadge(status: string) {
   switch (status) {
-    case 'Closed':           return 'badge badge-closed';
+    case 'Closed':             return 'badge badge-closed';
     case 'Pending Submission': return 'badge badge-ack';
-    case 'Created':          return 'badge badge-live';
-    default:                 return 'badge badge-closed';
+    default:                   return 'badge badge-closed';
   }
 }
 
@@ -27,7 +25,7 @@ export default function FaultsPage() {
   const { role, username } = useRole();
 
   const [faults, setFaults] = useState<Fault[]>([]);
-  const [stats, setStats] = useState<FaultStats>({ total: 0, created: 0, pendingSubmission: 0, closed: 0 });
+  const [stats, setStats] = useState<FaultStats>({ total: 0, pendingSubmission: 0, closed: 0 });
   const [loading, setLoading] = useState(true);
   const [faultTaxonomy, setFaultTaxonomy] = useState<Record<string, string[]>>({});
 
@@ -42,6 +40,10 @@ export default function FaultsPage() {
   // CMMS status lookup
   const [cmmsStatusMap, setCmmsStatusMap] = useState<Record<string, string>>({});
 
+  useEffect(() => {
+    setFaultTaxonomy(getFaultTaxonomy());
+  }, []);
+
   const fetchFaults = useCallback(async () => {
     setLoading(true);
     try {
@@ -52,7 +54,7 @@ export default function FaultsPage() {
       if (res.ok) {
         const data = await res.json();
         setFaults(data.faults || []);
-        setStats(data.stats || { total: 0, created: 0, pendingSubmission: 0, closed: 0 });
+        setStats(data.stats || { total: 0, pendingSubmission: 0, closed: 0 });
       }
     } catch (err) {
       console.error('Error fetching faults:', err);
@@ -166,7 +168,6 @@ export default function FaultsPage() {
             <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.04em' }}>Status:</label>
             <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="form-control select-dark" style={{ width: '100%' }}>
               <option value="">All Statuses</option>
-              <option value="Created">Created</option>
               <option value="Pending Submission">Pending Submission</option>
               <option value="Closed">Closed</option>
             </select>
@@ -271,7 +272,7 @@ export default function FaultsPage() {
                     </td>
                     {isController && (
                       <td onClick={e => e.stopPropagation()} style={{ whiteSpace: 'nowrap' }}>
-                        {f.status === 'Created' && (
+                        {f.status === 'Pending Submission' && (
                           <button
                             className="btn btn-primary btn-xs"
                             disabled={submittingFaultId === f.id}
@@ -288,6 +289,7 @@ export default function FaultsPage() {
                         )}
                       </td>
                     )}
+              
                   </tr>
                 ))}
               </tbody>

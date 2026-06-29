@@ -1,6 +1,33 @@
 import { NextResponse } from 'next/server';
-import { getDb, saveDb } from '@/lib/db';
+import { getDb, saveDb, Task, TaskAudit, TaskChecklistItem, TaskComment } from '@/lib/db';
 import { tryAutoCloseCase } from '@/lib/autoclose';
+
+const CONTROLLER_PLUS = [
+  'Controller',
+  'Duty Officer',
+  'Duty Manager',
+  'System Administrator',
+  'Current Ops Administrator',
+];
+
+function isControllerPlus(role?: string): boolean {
+  return !!role && CONTROLLER_PLUS.includes(role);
+}
+
+function makeAudit(operator: string, action: string, details: string): TaskAudit {
+  return {
+    id: `aud-${Math.random().toString(36).substring(2, 9)}`,
+    timestamp: new Date().toISOString(),
+    operator,
+    action,
+    details,
+  };
+}
+
+function pushAudit(task: Task, operator: string, action: string, details: string) {
+  if (!task.audits) task.audits = [];
+  task.audits.push(makeAudit(operator, action, details));
+}
 
 export async function GET(
   request: Request,
@@ -10,7 +37,6 @@ export async function GET(
     const { id } = await params;
     const db = await getDb();
     const task = db.tasks.find(t => t.id === id);
-    
     if (!task) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
@@ -28,40 +54,196 @@ export async function PUT(
     const { id } = await params;
     const body = await request.json();
     const db = await getDb();
-    
+
     const taskIndex = db.tasks.findIndex(t => t.id === id);
     if (taskIndex === -1) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
-    
+
     const task = db.tasks[taskIndex];
-    
-    // 1. Reassignment handler
-    if (body.assignee && body.assignee !== task.assignee) {
-      task.assignee = body.assignee;
-      task.status = 'Re-Assigned';
+    const action: string = body.action || '';
+    const actor: string = body.actor || body.username || 'Unknown';
+    const role: string = body.role || '';
+
+    const canControl = isControllerPlus(role);
+    const isAssignee =
+      actor === task.assignee ||
+      (task.assigneeType === 'group' && role === 'Responder (Ranger)');
+
+    const deny = (msg: string) =>
+      NextResponse.json({ error: msg }, { status: 403 });
+    const invalid = (msg: string) =>
+      NextResponse.json({ error: msg }, { status: 400 });
+
+    switch (action) {
+      // ─── Controller+ : assign / reassign ──────────────────────────────
+      case 'assign':
+      case 'reassign': {
+        if (!canControl) return deny('Only a Controller or higher may assign tasks.');
+        if (task.status === 'Closed') return invalid('Cannot reassign a closed task. Reopen it first.');
+        if (!body.assignee) return invalid('An assignee is required.');
+        const prev = task.assignee;
+        task.assignee = body.assignee;
+        task.assigneeType = body.assigneeType === 'group' ? 'group' : 'user';
+        // FRD 7.2: reassignment returns status to Assigned
+        task.status = 'Assigned';
+        task.completed = false;
+        task.acknowledgedAt = undefined;
+        task.startedAt = undefined;
+        pushAudit(
+          task,
+          actor,
+          action === 'assign' ? 'Assigned' : 'Reassigned',
+          `${action === 'assign' ? 'Assigned' : 'Reassigned'} to ${task.assignee} (${task.assigneeType})${prev && prev !== 'Unassigned' ? ` from ${prev}` : ''} by ${actor}. Status set to Assigned.`
+        );
+        break;
+      }
+
+      // ─── Assignee : acknowledge ───────────────────────────────────────
+      case 'acknowledge': {
+        if (!isAssignee) return deny('Only the assignee may acknowledge this task.');
+        if (task.status !== 'Assigned') return invalid('Task can only be acknowledged from the Assigned state.');
+        task.status = 'Acknowledged';
+        task.acknowledgedAt = new Date().toISOString();
+        pushAudit(task, actor, 'Acknowledged', `${actor} acknowledged receipt of the task.`);
+        break;
+      }
+
+      // ─── Assignee : begin task ────────────────────────────────────────
+      case 'begin': {
+        if (!isAssignee) return deny('Only the assignee may begin this task.');
+        if (task.status !== 'Acknowledged') return invalid('Task can only be started from the Acknowledged state.');
+        task.status = 'In Progress';
+        task.startedAt = new Date().toISOString();
+        pushAudit(task, actor, 'Started', `${actor} started the task (arrived on-site / commenced work).`);
+        break;
+      }
+
+      // ─── Assignee : mark complete (checklist gate) ────────────────────
+      case 'mark-complete': {
+        if (!isAssignee) return deny('Only the assignee may complete this task.');
+        if (task.status !== 'In Progress') return invalid('Task can only be completed from the In Progress state.');
+        const items = task.checklist || [];
+        if (items.length > 0 && !items.every(i => i.isCompleted)) {
+          return invalid('All checklist items must be ticked before marking the task complete.');
+        }
+        task.status = 'Closed';
+        task.completed = true;
+        task.closedAt = new Date().toISOString();
+        task.closedBy = actor;
+        pushAudit(task, actor, 'Completed', `${actor} marked the task complete. Status set to Closed.`);
+        break;
+      }
+
+      // ─── Assignee : flag cannot complete → Pending Further Action ──────
+      case 'flag-cannot-complete': {
+        if (!isAssignee) return deny('Only the assignee may flag this task.');
+        if (task.status !== 'In Progress') return invalid('Only an in-progress task can be flagged.');
+        task.status = 'Pending Further Action';
+        const reason = (body.reason || '').trim();
+        pushAudit(
+          task,
+          actor,
+          'Cannot Complete',
+          `${actor} flagged the task as cannot-complete${reason ? `: ${reason}` : ''}. Status set to Pending Further Action.`
+        );
+        break;
+      }
+
+      // ─── Controller+ : close / drop task ──────────────────────────────
+      case 'close': {
+        if (!canControl) return deny('Only a Controller or higher may close a task.');
+        if (task.status === 'Closed') return invalid('Task is already closed.');
+        // FRD 7.3: close reason mandatory if closing before Assignee completion
+        const reason = (body.closeReason || '').trim();
+        if (!task.completed && !reason) {
+          return invalid('A Close Reason is required when closing a task that has not been completed.');
+        }
+        task.status = 'Closed';
+        task.closedAt = new Date().toISOString();
+        task.closedBy = actor;
+        if (reason) task.closeReason = reason;
+        pushAudit(
+          task,
+          actor,
+          'Closed',
+          `${actor} closed the task${reason ? ` — reason: ${reason}` : ' (completed)'}.`
+        );
+        break;
+      }
+
+      // ─── Controller+ : reopen ─────────────────────────────────────────
+      case 'reopen': {
+        if (!canControl) return deny('Only a Controller or higher may reopen a task.');
+        if (task.status !== 'Closed') return invalid('Only a closed task can be reopened.');
+        task.status = 'Created';
+        task.completed = false;
+        task.closedAt = undefined;
+        task.closedBy = undefined;
+        task.closeReason = undefined;
+        task.acknowledgedAt = undefined;
+        task.startedAt = undefined;
+        pushAudit(task, actor, 'Reopened', `${actor} reopened the task. Status reset to Created.`);
+        break;
+      }
+
+      // ─── Assignee/Controller : update checklist ───────────────────────
+      case 'update-checklist': {
+        if (!isAssignee && !canControl) return deny('Not permitted to update the checklist.');
+        if (!Array.isArray(body.checklist)) return invalid('checklist array required.');
+        const cleaned: TaskChecklistItem[] = body.checklist
+          .filter((c: any) => c && typeof c.text === 'string' && c.text.trim())
+          .map((c: any) => ({
+            id: c.id || `chk-${Math.random().toString(36).substring(2, 9)}`,
+            text: String(c.text).trim(),
+            isCompleted: !!c.isCompleted,
+          }));
+        task.checklist = cleaned;
+        pushAudit(task, actor, 'Checklist Updated', `${actor} updated the checklist.`);
+        break;
+      }
+
+      // ─── Assignee/Controller : add comment / log activity ─────────────
+      case 'add-comment': {
+        if (!isAssignee && !canControl) return deny('Not permitted to comment on this task.');
+        const text = (body.text || '').trim();
+        if (!text) return invalid('Comment text is required.');
+        if (!task.comments) task.comments = [];
+        const comment: TaskComment = {
+          id: `cmt-${Math.random().toString(36).substring(2, 9)}`,
+          user: actor,
+          timestamp: new Date().toISOString(),
+          text,
+        };
+        task.comments.push(comment);
+        pushAudit(task, actor, 'Comment', `${actor} logged an activity / comment.`);
+        break;
+      }
+
+      // ─── Controller+ : edit task fields ───────────────────────────────
+      case 'edit-fields': {
+        if (!canControl) return deny('Only a Controller or higher may edit task details.');
+        if (task.status === 'Closed') return invalid('Cannot edit a closed task.');
+        if (typeof body.title === 'string' && body.title.trim()) task.title = body.title.trim();
+        if (typeof body.description === 'string') task.description = body.description;
+        if (body.priority === 'High' || body.priority === 'Normal') task.priority = body.priority;
+        if (typeof body.dueDate === 'string') task.dueDate = body.dueDate;
+        pushAudit(task, actor, 'Edited', `${actor} updated task details.`);
+        break;
+      }
+
+      default:
+        return invalid('Unknown or missing action.');
     }
-    
-    // 2. Status updater
-    if (body.status) {
-      task.status = body.status;
-    }
-    
-    // 3. Update description/title if provided
-    if (body.title) task.title = body.title;
-    if (body.description) task.description = body.description;
-    if (body.priority) task.priority = body.priority;
-    if (body.dueDate) task.dueDate = body.dueDate;
-    
+
     db.tasks[taskIndex] = task;
 
-    // When the last open task for a case is closed, attempt case auto-closure
+    // Attempt automated Case closure when a task closes (FRD 6 / autoclose)
     if (task.status === 'Closed' && task.caseId) {
       tryAutoCloseCase(db, task.caseId);
     }
 
     await saveDb(db);
-
     return NextResponse.json(task);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

@@ -168,8 +168,8 @@ export default function FaultCreateModal({
             </h2>
             <p style={{ fontSize: 11, color: 'var(--text-faint)', margin: 0 }}>
               {isLinked
-                ? 'Location pre-filled from incident. Fault saved as draft (Created) — submit to IFM CMMS from the fault list or fault detail page.'
-                : 'Fault saved as draft (Created). Submit to IFM CMMS separately from the fault list.'}
+                ? 'Location pre-filled from incident. Fault saved as draft — submit to IFM CMMS from the fault list or fault detail page.'
+                : 'Fault saved as draft. Submit to IFM CMMS separately from the fault list.'}
             </p>
           </div>
           <button className="close-btn" onClick={() => { onClose(); resetForm(); }}>
@@ -186,14 +186,14 @@ export default function FaultCreateModal({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <div style={{ color: 'var(--color-active)', fontWeight: 700, fontSize: 15 }}>Fault saved as draft</div>
+            <div style={{ color: 'var(--color-active)', fontWeight: 700, fontSize: 15 }}>Fault logged successfully</div>
             {submitResult.faultId && (
               <div style={{ fontSize: 13, color: 'var(--text-sub)' }}>
                 Fault ID: <code style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-primary)', fontWeight: 700 }}>{submitResult.faultId}</code>
               </div>
             )}
             <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 4 }}>
-              Status: Created. Click <strong>Submit to CMMS</strong> in the fault list when ready to send to IFM.
+              Status: Pending Submission. Click <strong>Submit to CMMS</strong> from the fault list or fault detail page to send to IFM.
             </div>
           </div>
         ) : (

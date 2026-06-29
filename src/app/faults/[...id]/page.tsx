@@ -25,7 +25,6 @@ function faultStatusBadge(status: string) {
   switch (status) {
     case 'Closed':             return 'badge badge-closed';
     case 'Pending Submission': return 'badge badge-ack';
-    case 'Created':            return 'badge badge-live';
     default:                   return 'badge badge-closed';
   }
 }
@@ -224,7 +223,7 @@ export default function FaultDetailPage() {
         </div>
 
         <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center', flexWrap: 'wrap' }}>
-          {isController && fault.status === 'Created' && (
+          {isController && fault.status === 'Pending Submission' && (
             <button
               className="btn btn-primary btn-sm"
               disabled={submittingToCmms}
@@ -535,5 +534,5 @@ function buildTimeline(fault: Fault) {
     dotColor: 'var(--color-primary)',
   });
 
-  return entries;}
-
+  return entries;
+}

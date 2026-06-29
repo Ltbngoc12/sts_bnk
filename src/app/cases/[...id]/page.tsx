@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Case, Task, Fault } from '@/lib/db';
 import { useRole } from '@/context/RoleContext';
-import { getIncidentTaxonomy, getFaultTaxonomy } from '@/lib/taxonomy';
+import { getIncidentTaxonomy } from '@/lib/taxonomy';
+import FaultCreateModal from '@/components/FaultCreateModal';
 
 // ─── Helper: case status → badge class ───────────────────────────────────────
 function caseBadgeClass(status: string) {
@@ -40,6 +41,7 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function CaseDetailsPage() {
   const params = useParams();
+  const router = useRouter();
   const { role, username } = useRole();
 
   const idArray = params?.id as string[] || [];
@@ -75,7 +77,6 @@ export default function CaseDetailsPage() {
 
   // Modals
   const [showTaskModal, setShowTaskModal] = useState(false);
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
   // Task create form
   const [taskTitle, setTaskTitle] = useState('');
@@ -84,26 +85,15 @@ export default function CaseDetailsPage() {
   const [taskPriority, setTaskPriority] = useState('Normal');
   const [taskDueDate, setTaskDueDate] = useState('');
 
-  // Task manage
-  const [newAssignee, setNewAssignee] = useState('');
-
   // Faults
   const [caseFaults, setCaseFaults] = useState<Fault[]>([]);
   const [showFaultModal, setShowFaultModal] = useState(false);
-  const [faultFormType, setFaultFormType] = useState('');
-  const [faultFormSubType, setFaultFormSubType] = useState('');
-  const [faultFormLocation, setFaultFormLocation] = useState('');
-  const [faultFormDesc, setFaultFormDesc] = useState('');
-  const [faultSubmitting, setFaultSubmitting] = useState(false);
-  const [faultSubmitResult, setFaultSubmitResult] = useState<{ faultId?: string } | null>(null);
-  const [faultTaxonomy, setFaultTaxonomy] = useState<Record<string, string[]>>({});
   const [cmmsStatusMap, setCmmsStatusMap] = useState<Record<string, string>>({});
 
   const [taxonomy, setTaxonomy] = useState<Record<string, string[]>>({});
 
   useEffect(() => {
     setTaxonomy(getIncidentTaxonomy());
-    setFaultTaxonomy(getFaultTaxonomy());
   }, []);
 
   useEffect(() => {
@@ -191,44 +181,6 @@ export default function CaseDetailsPage() {
     }
   };
 
-  const handleRaiseFault = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!faultFormType || !faultFormSubType || !faultFormDesc.trim() || faultSubmitting) return;
-    setFaultSubmitting(true);
-    setFaultSubmitResult(null);
-    try {
-      const res = await fetch('/api/faults', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          faultType: faultFormType,
-          faultSubType: faultFormSubType,
-          location: {
-            commonName: faultFormLocation || caseData?.incident?.location?.commonName || 'Sentosa Island',
-          },
-          description: faultFormDesc,
-          caseId,
-          linkedIncidentId: caseData?.incident?.id || undefined,
-          username,
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setFaultSubmitResult({ faultId: data.fault?.id });
-        setTimeout(() => {
-          setShowFaultModal(false);
-          setFaultSubmitResult(null);
-          setFaultFormType(''); setFaultFormSubType(''); setFaultFormLocation(''); setFaultFormDesc('');
-          refresh();
-        }, 2500);
-      } else {
-        const err = await res.json();
-        alert(`Failed to raise fault: ${err.error}`);
-      }
-    } catch (err) { console.error(err); }
-    finally { setFaultSubmitting(false); }
-  };
-
   async function fetchCmmsStatus(ticketId: string) {
     if (cmmsStatusMap[ticketId] || !ticketId) return;
     try {
@@ -255,27 +207,6 @@ export default function CaseDetailsPage() {
         await refresh();
       }
     } catch (e) { console.error(e); }
-  };
-
-  const handleUpdateTask = async (taskId: string, status: string) => {
-    await fetch(`/api/tasks/${taskId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
-    });
-    setSelectedTask(null);
-    await refresh();
-  };
-
-  const handleReassignTask = async (taskId: string) => {
-    if (!newAssignee) return;
-    await fetch(`/api/tasks/${taskId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ assignee: newAssignee }),
-    });
-    setSelectedTask(null); setNewAssignee('');
-    await refresh();
   };
 
   const handleAttachIncident = async (e: React.FormEvent) => {
@@ -468,7 +399,7 @@ export default function CaseDetailsPage() {
                 ) : (
                   tasks.map(t => (
                     <div key={t.id} className="active-case-item" style={{ padding: '6px 10px', borderRadius: 4, cursor: 'pointer', background: 'var(--bg-inset)' }}
-                      onClick={() => { setSelectedTask(t); setNewAssignee(t.assignee); }}>
+                      onClick={() => router.push(`/tasks/${encodeURIComponent(t.id)}`)}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                         <span style={{ fontSize: '12px', fontWeight: 600, maxWidth: '60%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
                         <span className={t.status === 'Closed' ? 'badge badge-closed' : t.status === 'In Progress' ? 'badge badge-onsite' : 'badge badge-ack'} style={{ fontSize: '9px', padding: '1px 6px' }}>{t.status}</span>
@@ -535,7 +466,7 @@ export default function CaseDetailsPage() {
               <div className="action-row" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '10px', marginTop: 0, justifyContent: 'space-between' }}>
                 {!isClosed ? (
                   <>
-                    <button className="btn btn-secondary btn-sm" onClick={() => { setShowFaultModal(true); setFaultSubmitResult(null); }}>
+                    <button className="btn btn-secondary btn-sm" onClick={() => setShowFaultModal(true)}>
                       + Log Infrastructure Fault
                     </button>
                     <Link href="/faults" className="view-all-link">Go to Fault Log →</Link>
@@ -745,150 +676,18 @@ export default function CaseDetailsPage() {
         </div>
       )}
 
-      {/* Task Detail Modal */}
-      {selectedTask && (
-        <div className="modal-overlay">
-          <div className="modal-box" style={{ maxWidth: 520 }}>
-            <div className="modal-title">
-              <span className="mono-id" style={{ fontSize: 11 }}>{selectedTask.id}</span>
-              {' '}— {selectedTask.title}
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12, display: 'flex', gap: 12 }}>
-              <span>Parent: <strong>{selectedTask.caseId}</strong></span>
-              <span>Priority: <strong>{selectedTask.priority}</strong></span>
-              {selectedTask.dueDate && <span>Due: <strong>{new Date(selectedTask.dueDate).toLocaleString('en-SG')}</strong></span>}
-            </div>
-            {selectedTask.description && <p style={{ fontSize: 13, color: 'var(--text-sub)', marginBottom: 14 }}>{selectedTask.description}</p>}
-
-            {/* Assignee row */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: 'var(--bg-inset)', border: '1px solid var(--border-color)', borderRadius: 6, marginBottom: 14 }}>
-              <span style={{ fontSize: 13 }}>Assigned to: <strong>{selectedTask.assignee}</strong></span>
-              {isCtrl && !isClosed && (
-                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                  <select className="form-control" style={{ width: 'auto', height: 32, fontSize: 12, padding: '0 8px' }}
-                    value={newAssignee} onChange={e => setNewAssignee(e.target.value)}>
-                    {['Ranger John','Ranger Sarah','Ranger Alex','Ranger Tommy'].map(r => <option key={r}>{r}</option>)}
-                  </select>
-                  <button className="btn btn-secondary btn-xs" onClick={() => handleReassignTask(selectedTask.id)}>Reassign</button>
-                </div>
-              )}
-            </div>
-
-            {/* State transitions */}
-            <div>
-              <h3 style={{ marginBottom: 10 }}>Update Task State</h3>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {selectedTask.status !== 'Closed' && !isClosed && (
-                  <>
-                    {(isRanger || isCtrl) && ['Created','Re-Assigned'].includes(selectedTask.status) && (
-                      <button className="btn btn-secondary btn-sm" onClick={() => handleUpdateTask(selectedTask.id, 'Acknowledged')}>Acknowledge</button>
-                    )}
-                    {(isRanger || isCtrl) && ['Acknowledged','Created'].includes(selectedTask.status) && (
-                      <button className="btn btn-primary btn-sm" onClick={() => handleUpdateTask(selectedTask.id, 'In Progress')}>Start Work</button>
-                    )}
-                    {(isRanger || isCtrl) && selectedTask.status === 'In Progress' && (
-                      <button className="btn btn-secondary btn-sm" onClick={() => handleUpdateTask(selectedTask.id, 'Pending')}>Set to Pending</button>
-                    )}
-                    {(isRanger || isCtrl) && (
-                      <button className="btn btn-success btn-sm" onClick={() => handleUpdateTask(selectedTask.id, 'Closed')}>Close Task</button>
-                    )}
-                  </>
-                )}
-                {selectedTask.status === 'Closed' && isCtrl && !isClosed && (
-                  <button className="btn btn-danger btn-sm" onClick={() => handleUpdateTask(selectedTask.id, 'Created')}>Reopen Task</button>
-                )}
-              </div>
-            </div>
-
-            <div className="modal-actions">
-              <button className="btn btn-secondary" onClick={() => setSelectedTask(null)}>Close</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Task actions now live in the centralized Task detail view (/tasks/[id]) */}
 
       {/* Log Infrastructure Fault Modal */}
-      {showFaultModal && (
-        <div className="modal-overlay">
-          <div className="modal-box" style={{ maxWidth: 520 }}>
-            {faultSubmitResult ? (
-              <>
-                <div className="modal-title">✓ Fault Saved as Draft</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '4px 0 16px' }}>
-                  {faultSubmitResult.faultId && (
-                    <div style={{ fontSize: 13 }}>Fault ID: <code style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-primary)' }}>{faultSubmitResult.faultId}</code></div>
-                  )}
-                  <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>Status: Created. Use <strong>Submit to CMMS</strong> in the fault list or fault detail page to send to IFM.</div>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="modal-title">Log Infrastructure Fault — {caseId}</div>
-                <form onSubmit={handleRaiseFault}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                    <div className="form-group">
-                      <label>Fault Type *</label>
-                      <select
-                        className="form-control select-dark"
-                        required
-                        value={faultFormType}
-                        onChange={e => { setFaultFormType(e.target.value); setFaultFormSubType(''); }}
-                      >
-                        <option value="">-- Select Type --</option>
-                        {Object.keys(faultTaxonomy).sort().map(t => (
-                          <option key={t} value={t}>{t}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="form-group">
-                      <label>Fault Sub-type *</label>
-                      <select
-                        className="form-control select-dark"
-                        required
-                        value={faultFormSubType}
-                        onChange={e => setFaultFormSubType(e.target.value)}
-                        disabled={!faultFormType}
-                      >
-                        <option value="">-- Select Sub-type --</option>
-                        {faultFormType && faultTaxonomy[faultFormType]?.map(st => (
-                          <option key={st} value={st}>{st}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                  <div className="form-group" style={{ marginTop: 10 }}>
-                    <label>Location (Common Name)</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder={caseData?.incident?.location?.commonName || 'e.g. Siloso Beach Station Carpark Entrance'}
-                      value={faultFormLocation}
-                      onChange={e => setFaultFormLocation(e.target.value)}
-                    />
-                  </div>
-                  <div className="form-group" style={{ marginTop: 10 }}>
-                    <label>Fault Description *</label>
-                    <textarea
-                      className="form-control"
-                      rows={3}
-                      required
-                      placeholder="Describe the defect and its impact..."
-                      value={faultFormDesc}
-                      onChange={e => setFaultFormDesc(e.target.value)}
-                    />
-                  </div>
-                  <div className="modal-actions">
-                    <button type="button" className="btn btn-secondary" onClick={() => { setShowFaultModal(false); setFaultFormType(''); setFaultFormSubType(''); setFaultFormLocation(''); setFaultFormDesc(''); }}>Cancel</button>
-                    <button type="submit" className="btn btn-primary" disabled={faultSubmitting || !faultFormType || !faultFormSubType}>
-                      {faultSubmitting ? 'Saving...' : 'Save Fault'}
-                    </button>
-                  </div>
-                </form>
-              </>
-            )}
-          </div>
-        </div>
-      )}
+      <FaultCreateModal
+        isOpen={showFaultModal}
+        onClose={() => setShowFaultModal(false)}
+        onSuccess={() => refresh()}
+        linkedCaseId={caseId}
+        linkedIncidentId={caseData?.incident?.id}
+        prefillLocation={caseData?.incident?.location}
+        username={username}
+      />
 
       {/* Log e-Diary Occurrence Modal */}
       {showEdiaryModal && (

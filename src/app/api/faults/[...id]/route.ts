@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, saveDb } from '@/lib/db';
+import { tryAutoCloseCase } from '@/lib/autoclose';
 
 export async function GET(
   _request: NextRequest,
@@ -37,7 +38,7 @@ export async function PATCH(
     const fault = db.faults![idx];
     const now = new Date().toISOString();
 
-    // action: "submit" — FRD §6.5
+    // action: "submit" — FRD §6.3.1: Pending Submission → Closed (on CMMS Fault ID receipt)
     if (body.action === 'submit') {
       if (fault.status !== 'Pending Submission') {
         return NextResponse.json(
@@ -47,11 +48,10 @@ export async function PATCH(
       }
 
       fault.submittedAt = now;
-
       db.faults![idx] = fault;
       await saveDb(db);
 
-      // Call CMMS mock API
+      // Call CMMS API — on success, auto-close (FRD §6.3.1)
       let cmmsTicketId: string | undefined;
       let cmmsAssignedTo: string | undefined;
       try {
@@ -76,9 +76,10 @@ export async function PATCH(
           cmmsAssignedTo = cmmsData.assignedTo;
         }
       } catch (_) {
-        // CMMS unreachable — fault stays at "Pending Submission"
+        // CMMS unreachable — fault stays at "Pending Submission", submittedAt recorded
       }
 
+      // Auto-close on receipt of CMMS Fault ID (FRD §6.3.1, §6.5)
       if (cmmsTicketId) {
         fault.cmmsTicketId = cmmsTicketId;
         fault.status = 'Closed';
@@ -91,6 +92,7 @@ export async function PATCH(
         }
 
         db.faults![idx] = fault;
+        tryAutoCloseCase(db, fault.caseId);
         await saveDb(db);
       }
 

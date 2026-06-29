@@ -59,6 +59,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const locationName = location?.commonName || location?.road || location?.building;
+    if (!locationName) {
+      return NextResponse.json(
+        { error: 'location is required — provide at least a common name, road, or building' },
+        { status: 400 }
+      );
+    }
+
     const db = await getDb();
     const now = new Date().toISOString();
 
@@ -84,7 +92,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Step 2 — create Fault record
+    // Step 2 — create Fault record (FRD §6.3.1: starts at "Pending Submission")
     const faultId = generateFaultId(db);
     const newFault: Fault = {
       id: faultId,
