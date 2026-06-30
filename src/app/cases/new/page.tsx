@@ -576,7 +576,7 @@ export default function NewCasePage() {
             <button
               type="button"
               className="btn btn-secondary"
-              onClick={() => router.push('/cases')}
+              onClick={() => router.push('/case-management?tab=cases')}
               disabled={submitting}
             >
               Cancel

@@ -21,11 +21,7 @@ const NAV_GROUPS = [
     label: 'Operations',
     items: [
       { name: 'Dashboard',       path: '/',             d: 'M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z', d2: 'M9 22V12h6v10' },
-      { name: 'Case Log',        path: '/cases',        d: 'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z' },
-      { name: 'Incident Log',    path: '/incidents',    d: 'M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z', d2: 'M12 9v4M12 17h.01' },
-      { name: 'Fault Log',       path: '/faults',       d: 'M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z' },
-      { name: 'Task Board',      path: '/tasks',        d: 'M9 11l3 3L22 4', d2: 'M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11' },
-      { name: 'e-Diary',         path: '/occurrences',  d: 'M4 19.5A2.5 2.5 0 0 1 6.5 17H20', d2: 'M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z' },
+      { name: 'Case Management',  path: '/case-management', d: 'M3 3h18v4H3zM3 10h18v4H3zM3 17h18v4H3z' },
     ]
   },
   {
@@ -89,8 +85,12 @@ export const Sidebar: React.FC = () => {
     'Current Ops Administrator', 'Responder (Ranger)', 'System Administrator', 'Stakeholder'
   ];
 
-  const isActive = (path: string) =>
-    path === '/' ? pathname === '/' : pathname?.startsWith(path);
+  const CASE_MGMT_PATHS = ['/case-management', '/cases', '/incidents', '/faults', '/tasks', '/occurrences'];
+  const isActive = (path: string) => {
+    if (path === '/') return pathname === '/';
+    if (path === '/case-management') return CASE_MGMT_PATHS.some(p => pathname?.startsWith(p));
+    return pathname?.startsWith(path);
+  };
 
   return (
     <div className={`sidebar-container ${isCollapsed ? 'collapsed' : ''}`}>

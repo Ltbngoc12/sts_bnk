@@ -272,7 +272,7 @@ export default function CaseDetailsPage() {
       <div className="glass" style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-            <Link href="/cases" style={{ color: 'var(--text-faint)', fontSize: 12, textDecoration: 'none' }}>← Case Log</Link>
+            <Link href="/case-management?tab=cases" style={{ color: 'var(--text-faint)', fontSize: 12, textDecoration: 'none' }}>← Case Log</Link>
             <span className="mono-id">{caseData.id}</span>
             <span className={caseBadgeClass(caseData.status)}>{caseData.status}</span>
             {caseData.linkedIncidentId && (
@@ -417,10 +417,10 @@ export default function CaseDetailsPage() {
                 {!isClosed ? (
                   <>
                     <button className="btn btn-secondary btn-sm" onClick={() => setShowTaskModal(true)}>+ Dispatch Task</button>
-                    <Link href="/tasks" className="view-all-link">Go to Task Board →</Link>
+                    <Link href="/case-management?tab=tasks" className="view-all-link">Go to Task Board →</Link>
                   </>
                 ) : (
-                  <Link href="/tasks" className="view-all-link" style={{ marginLeft: 'auto' }}>View Task Board →</Link>
+                  <Link href="/case-management?tab=tasks" className="view-all-link" style={{ marginLeft: 'auto' }}>View Task Board →</Link>
                 )}
               </div>
             </div>
@@ -469,10 +469,10 @@ export default function CaseDetailsPage() {
                     <button className="btn btn-secondary btn-sm" onClick={() => setShowFaultModal(true)}>
                       + Log Infrastructure Fault
                     </button>
-                    <Link href="/faults" className="view-all-link">Go to Fault Log →</Link>
+                    <Link href="/case-management?tab=faults" className="view-all-link">Go to Fault Log →</Link>
                   </>
                 ) : (
-                  <Link href="/faults" className="view-all-link" style={{ marginLeft: 'auto' }}>View Fault Log →</Link>
+                  <Link href="/case-management?tab=faults" className="view-all-link" style={{ marginLeft: 'auto' }}>View Fault Log →</Link>
                 )}
               </div>
             </div>
@@ -506,10 +506,10 @@ export default function CaseDetailsPage() {
                 {!isClosed ? (
                   <>
                     <button className="btn btn-secondary btn-sm" onClick={() => setShowEdiaryModal(true)}>+ Log Occurrence</button>
-                    <Link href="/occurrences" className="view-all-link">Go to e-Diary →</Link>
+                    <Link href="/case-management?tab=ediary" className="view-all-link">Go to e-Diary →</Link>
                   </>
                 ) : (
-                  <Link href="/occurrences" className="view-all-link" style={{ marginLeft: 'auto' }}>View e-Diary →</Link>
+                  <Link href="/case-management?tab=ediary" className="view-all-link" style={{ marginLeft: 'auto' }}>View e-Diary →</Link>
                 )}
               </div>
             </div>

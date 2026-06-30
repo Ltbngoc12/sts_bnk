@@ -191,7 +191,7 @@ export default function FaultDetailPage() {
     return (
       <div className="glass" style={{ padding: 40, textAlign: 'center', color: 'var(--color-critical)' }}>
         <p>Fault record not found.</p>
-        <Link href="/faults" style={{ color: 'var(--color-primary)', textDecoration: 'none', fontSize: 13 }}>← Back to Fault Log</Link>
+        <Link href="/case-management?tab=faults" style={{ color: 'var(--color-primary)', textDecoration: 'none', fontSize: 13 }}>← Back to Fault Log</Link>
       </div>
     );
   }
@@ -204,7 +204,7 @@ export default function FaultDetailPage() {
       <div className="glass" style={{ padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
-            <Link href="/faults" style={{ color: 'var(--text-faint)', fontSize: 12, textDecoration: 'none' }}>
+            <Link href="/case-management?tab=faults" style={{ color: 'var(--text-faint)', fontSize: 12, textDecoration: 'none' }}>
               ← Fault Log
             </Link>
             <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>/</span>

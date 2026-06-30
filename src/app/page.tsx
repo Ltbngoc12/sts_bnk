@@ -302,7 +302,7 @@ export default function DashboardPage() {
             <div className="active-cases-card glass">
               <div className="card-header">
                 <h2>ACTIVE CASES & INCIDENTS</h2>
-                <Link href="/cases" className="view-all-link">View All</Link>
+                <Link href="/case-management?tab=cases" className="view-all-link">View All</Link>
               </div>
               <div className="active-cases-list">
                 {cases.filter(c => c.status !== 'Closed').length === 0 ? (
@@ -349,7 +349,7 @@ export default function DashboardPage() {
             <div className="split-card glass">
               <div className="card-header">
                 <h2>ACTIVE TASKS</h2>
-                <Link href="/tasks" className="view-all-link">Manage Tasks</Link>
+                <Link href="/case-management?tab=tasks" className="view-all-link">Manage Tasks</Link>
               </div>
               <div className="split-list">
                 {tasks.filter(t => t.status !== 'Closed').length === 0 ? (
@@ -377,7 +377,7 @@ export default function DashboardPage() {
             <div className="split-card glass">
               <div className="card-header">
                 <h2>RECENT OCCURRENCES (E-DIARY)</h2>
-                <Link href="/occurrences" className="view-all-link">Open Log</Link>
+                <Link href="/case-management?tab=ediary" className="view-all-link">Open Log</Link>
               </div>
               <div className="split-list">
                 {occurrences.length === 0 ? (

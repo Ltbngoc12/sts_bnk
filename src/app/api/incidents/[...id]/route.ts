@@ -517,7 +517,11 @@ export async function POST(
         if (!body.description) return NextResponse.json({ error: 'description is required' }, { status: 400 });
         const isRangerLog = body.description.startsWith('[Ranger Log]');
         const text = isRangerLog ? body.description : `[MANUAL] ${body.description} — by ${actor}.`;
-        const entry = { ...makeLogEntry(incident, text), attachments: body.attachments || [] };
+        const baseEntry = makeLogEntry(incident, text);
+        // Use Controller-specified event date/time if provided, otherwise keep system now
+        if (body.eventDate) baseEntry.date = body.eventDate;
+        if (body.eventTime) baseEntry.time = body.eventTime.length === 5 ? `${body.eventTime}:00` : body.eventTime;
+        const entry = { ...baseEntry, attachments: body.attachments || [] };
         incident.log.push(entry);
         break;
       }
@@ -542,6 +546,9 @@ export async function POST(
             : `[MANUAL] ${newDescription} — by ${actor}.`;
         }
         logEntry.description = updatedText;
+        if (body.eventDate) logEntry.date = body.eventDate;
+        if (body.eventTime) logEntry.time = body.eventTime.length === 5 ? `${body.eventTime}:00` : body.eventTime;
+        if (body.attachments !== undefined) (logEntry as any).attachments = body.attachments;
         logEntry.edited = true;
         logEntry.editedBy = actor;
         logEntry.editedAt = new Date().toISOString();

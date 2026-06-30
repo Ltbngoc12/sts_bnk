@@ -188,7 +188,7 @@ export default function TaskDetailPage() {
       <div className="glass" style={{ padding: 32, margin: 16, textAlign: 'center' }}>
         <h2 style={{ marginBottom: 8 }}>No access</h2>
         <p style={{ color: 'var(--text-muted)' }}>This task is not assigned to you.</p>
-        <Link href="/tasks" className="btn btn-secondary" style={{ marginTop: 16, display: 'inline-block' }}>← Back to Task Board</Link>
+        <Link href="/case-management?tab=tasks" className="btn btn-secondary" style={{ marginTop: 16, display: 'inline-block' }}>← Back to Task Board</Link>
       </div>
     );
   }
@@ -209,7 +209,7 @@ export default function TaskDetailPage() {
   return (
     <div className="task-detail-page">
       <div className="td-topbar">
-        <Link href="/tasks" className="td-back">← Task Board</Link>
+        <Link href="/case-management?tab=tasks" className="td-back">← Task Board</Link>
       </div>
 
       {/* Header */}

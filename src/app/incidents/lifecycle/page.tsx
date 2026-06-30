@@ -468,7 +468,7 @@ export default function IncidentLifecyclePage() {
           </p>
         </div>
         <div>
-          <Link href="/incidents" className="btn btn-secondary btn-sm" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Link href="/case-management?tab=incidents" className="btn btn-secondary btn-sm" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             ← Back to Incidents
           </Link>
         </div>

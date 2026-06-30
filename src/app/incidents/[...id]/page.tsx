@@ -72,6 +72,13 @@ export default function IncidentDetailsPage() {
   const [rangerActivityText, setRangerActivity] = useState('');
   const [composerAttachments, setComposerAttachments] = useState<string[]>([]);
 
+  // Log event date/time (Controller-specified when the event occurred)
+  const getNowDate = () => new Date().toISOString().split('T')[0];
+  const getNowTime = () => new Date().toTimeString().slice(0, 5); // HH:MM
+  const [logTimeIsCustom, setLogTimeIsCustom] = useState(false);
+  const [logEventDate, setLogEventDate] = useState<string>(getNowDate());
+  const [logEventTime, setLogEventTime] = useState<string>(getNowTime());
+
   // Modals & Inline Inputs
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [showReturnModal, setShowReturnModal] = useState(false);
@@ -87,6 +94,9 @@ export default function IncidentDetailsPage() {
   const [activeTimelineTab, setActiveTimelineTab] = useState<'log' | 'system' | 'faults' | 'duplicates'>('log'); // 'faults' = Faults & e-Diary tab
   const [editingLogEventNumber, setEditingLogEventNumber] = useState<number | null>(null);
   const [editingLogText, setEditingLogText] = useState('');
+  const [editingLogDate, setEditingLogDate] = useState('');
+  const [editingLogTime, setEditingLogTime] = useState('');
+  const [editingLogAttachments, setEditingLogAttachments] = useState<string[]>([]);
 
   // Linked e-Diary entries (fetched by caseId)
   const [linkedEDiaryEntries, setLinkedEDiaryEntries] = useState<any[]>([]);
@@ -521,11 +531,14 @@ export default function IncidentDetailsPage() {
     }
   }
 
-  const handleSaveEdit = async (eventNumber: number, description: string) => {
-    const ok = await performAction('edit-log', { eventNumber, description });
+  const handleSaveEdit = async (eventNumber: number, description: string, date: string, time: string, attachments: string[]) => {
+    const ok = await performAction('edit-log', { eventNumber, description, eventDate: date, eventTime: time, attachments });
     if (ok) {
       setEditingLogEventNumber(null);
       setEditingLogText('');
+      setEditingLogDate('');
+      setEditingLogTime('');
+      setEditingLogAttachments([]);
     }
   };
 
@@ -1599,7 +1612,7 @@ export default function IncidentDetailsPage() {
       <div className="glass" style={{ padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Link href="/incidents" style={{ color: 'var(--text-faint)', fontSize: 11, textDecoration: 'none', fontWeight: 600 }}>
+            <Link href="/case-management?tab=incidents" style={{ color: 'var(--text-faint)', fontSize: 11, textDecoration: 'none', fontWeight: 600 }}>
               ← BACK TO INCIDENT LOG
             </Link>
             <span style={{ color: 'var(--text-faint)' }}>&bull;</span>
@@ -2693,10 +2706,72 @@ export default function IncidentDetailsPage() {
                 <form onSubmit={(e) => {
                   e.preventDefault();
                   if (!newLogText.trim()) return;
-                  performAction('log', { description: newLogText, attachments: composerAttachments });
+                  // If user hasn't set a custom time, snapshot current time at submit moment
+                  const payload: Record<string, any> = { description: newLogText, attachments: composerAttachments };
+                  if (logTimeIsCustom) {
+                    payload.eventDate = logEventDate;
+                    payload.eventTime = logEventTime;
+                  }
+                  performAction('log', payload);
                   setNewLogText('');
                   setComposerAttachments([]);
+                  setLogTimeIsCustom(false);
+                  setLogEventDate(getNowDate());
+                  setLogEventTime(getNowTime());
                 }} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {/* Event Date & Time row */}
+                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
+                    {logTimeIsCustom ? (
+                      <>
+                        <div className="form-group" style={{ marginBottom: 0, flex: 1 }}>
+                          <label style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>Event Date</label>
+                          <input
+                            type="date"
+                            className="form-control"
+                            value={logEventDate}
+                            onChange={e => setLogEventDate(e.target.value)}
+                            required
+                            style={{ fontSize: 13, height: 36 }}
+                          />
+                        </div>
+                        <div className="form-group" style={{ marginBottom: 0, flex: 1 }}>
+                          <label style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>Event Time</label>
+                          <input
+                            type="time"
+                            className="form-control"
+                            value={logEventTime}
+                            onChange={e => setLogEventTime(e.target.value)}
+                            required
+                            style={{ fontSize: 13, height: 36 }}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => { setLogTimeIsCustom(false); setLogEventDate(getNowDate()); setLogEventTime(getNowTime()); }}
+                          className="btn btn-secondary btn-xs"
+                          style={{ height: 36, padding: '0 10px', whiteSpace: 'nowrap', marginBottom: 0 }}
+                        >
+                          ↺ Use current time
+                        </button>
+                      </>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', background: 'var(--bg-inset)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', flex: 1 }}>
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                        </svg>
+                        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                          Event time will be captured automatically when you post
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => { setLogEventDate(getNowDate()); setLogEventTime(getNowTime()); setLogTimeIsCustom(true); }}
+                          style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, textDecoration: 'underline', whiteSpace: 'nowrap' }}
+                        >
+                          Set custom time
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <textarea
                       className="composer-textarea"
@@ -2901,6 +2976,11 @@ export default function IncidentDetailsPage() {
                                       }
                                     }
                                     setEditingLogText(cleanText);
+                                    // Pre-fill date/time from entry timestamp
+                                    const ts = evt.timestamp || '';
+                                    setEditingLogDate(ts.split('T')[0] || getNowDate());
+                                    setEditingLogTime(ts.split('T')[1]?.slice(0, 5) || getNowTime());
+                                    setEditingLogAttachments([...(evt.attachments || [])]);
                                   }}
                                 >
                                   ✏️ Edit
@@ -2918,40 +2998,118 @@ export default function IncidentDetailsPage() {
                         </div>
                         
                         {editingLogEventNumber === evt.eventNumber ? (
-                          <form 
+                          <form
                             onSubmit={(e) => {
                               e.preventDefault();
                               if (!editingLogText.trim()) return;
-                              handleSaveEdit(evt.eventNumber!, editingLogText);
-                            }} 
-                            style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 }}
+                              handleSaveEdit(evt.eventNumber!, editingLogText, editingLogDate, editingLogTime, editingLogAttachments);
+                            }}
+                            style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8, padding: '12px', background: 'var(--bg-inset)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}
                           >
+                            {/* Date + Time row */}
+                            <div style={{ display: 'flex', gap: 10 }}>
+                              <div style={{ flex: 1 }}>
+                                <label style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 3, display: 'block' }}>Event Date</label>
+                                <input
+                                  type="date"
+                                  className="form-control"
+                                  value={editingLogDate}
+                                  onChange={e => setEditingLogDate(e.target.value)}
+                                  required
+                                  style={{ fontSize: 12.5, height: 32 }}
+                                />
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <label style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 3, display: 'block' }}>Event Time</label>
+                                <input
+                                  type="time"
+                                  className="form-control"
+                                  value={editingLogTime}
+                                  onChange={e => setEditingLogTime(e.target.value)}
+                                  required
+                                  style={{ fontSize: 12.5, height: 32 }}
+                                />
+                              </div>
+                            </div>
+
+                            {/* Description */}
                             <textarea
                               className="form-control"
                               rows={2}
                               value={editingLogText}
                               onChange={(e) => setEditingLogText(e.target.value)}
-                              style={{ fontSize: '12.5px', padding: '6px 10px', background: 'var(--bg-inset)', width: '100%' }}
+                              style={{ fontSize: '12.5px', padding: '6px 10px', background: 'var(--bg-card)', width: '100%' }}
                               autoFocus
                             />
-                            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                              <button 
-                                type="button" 
-                                className="btn btn-secondary btn-xs" 
-                                onClick={() => {
-                                  setEditingLogEventNumber(null);
-                                  setEditingLogText('');
-                                }}
+
+                            {/* Attachments manager */}
+                            {editingLogAttachments.length > 0 && (
+                              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                {editingLogAttachments.map((img, imgIdx) => (
+                                  <div key={imgIdx} style={{ position: 'relative', width: 56, height: 56, borderRadius: 6, border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+                                    <img src={img} alt="attachment" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditingLogAttachments(prev => prev.filter((_, i) => i !== imgIdx))}
+                                      style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.65)', color: '#fff', border: 'none', borderRadius: '50%', width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 9, fontWeight: 'bold' }}
+                                      title="Remove image"
+                                    >✕</button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Actions row */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <label
+                                htmlFor={`edit-file-upload-${evt.eventNumber}`}
+                                className="btn btn-secondary btn-xs"
+                                style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, height: 26, padding: '3px 8px' }}
                               >
-                                Cancel
-                              </button>
-                              <button 
-                                type="submit" 
-                                className="btn btn-primary btn-xs" 
-                                disabled={saving || !editingLogText.trim()}
-                              >
-                                Save
-                              </button>
+                                📷 Add Image
+                                <input
+                                  id={`edit-file-upload-${evt.eventNumber}`}
+                                  type="file"
+                                  accept="image/*"
+                                  multiple
+                                  style={{ display: 'none' }}
+                                  onChange={(e) => {
+                                    const files = Array.from(e.target.files || []);
+                                    files.forEach(file => {
+                                      const reader = new FileReader();
+                                      reader.onload = (ev) => {
+                                        if (ev.target?.result) {
+                                          setEditingLogAttachments(prev => [...prev, ev.target!.result as string]);
+                                        }
+                                      };
+                                      reader.readAsDataURL(file);
+                                    });
+                                    e.target.value = '';
+                                  }}
+                                />
+                              </label>
+                              <div style={{ display: 'flex', gap: 6 }}>
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary btn-xs"
+                                  onClick={() => {
+                                    setEditingLogEventNumber(null);
+                                    setEditingLogText('');
+                                    setEditingLogDate('');
+                                    setEditingLogTime('');
+                                    setEditingLogAttachments([]);
+                                  }}
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  type="submit"
+                                  className="btn btn-primary btn-xs"
+                                  disabled={saving || !editingLogText.trim()}
+                                >
+                                  Save
+                                </button>
+                              </div>
                             </div>
                           </form>
                         ) : (

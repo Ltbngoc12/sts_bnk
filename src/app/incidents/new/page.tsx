@@ -702,7 +702,7 @@ export default function NewIncidentPage() {
           <p>Complete the strict 12 accordion sections below to log the incident.</p>
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <Link href="/incidents" className="btn btn-secondary btn-sm" style={{ display: 'inline-flex', alignItems: 'center', height: '32px' }}>
+          <Link href="/case-management?tab=incidents" className="btn btn-secondary btn-sm" style={{ display: 'inline-flex', alignItems: 'center', height: '32px' }}>
             Cancel
           </Link>
           <button type="submit" form="new-incident-form" className="btn btn-info" style={{ color: '#FFF', padding: '8px 18px', fontSize: '13px', height: '38px' }}>
@@ -2226,7 +2226,7 @@ export default function NewIncidentPage() {
               <button 
                 type="button"
                 onClick={() => {
-                  router.push('/incidents');
+                  router.push('/case-management?tab=incidents');
                 }}
                 className="btn btn-secondary"
                 style={{ width: '100%', padding: '10px' }}
