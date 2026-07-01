@@ -262,7 +262,6 @@ export interface Occurrence {
   topic: string;
   content: string;
   attachments?: string[];
-  amendments?: { timestamp: string; amendedBy: string; originalText: string }[];
 }
 
 export interface EventRecord {

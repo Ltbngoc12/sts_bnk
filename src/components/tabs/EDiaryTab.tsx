@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Occurrence } from '@/lib/db';
 import { useRole } from '@/context/RoleContext';
@@ -23,38 +22,25 @@ const TOPICS = [
   'Others',
 ];
 
-// TEMPORARY: Show "Upcoming" placeholder — remove this block when ready to demo
-const SHOW_UPCOMING = true;
-
-function UpcomingPlaceholder({ title }: { title: string }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: '16px', color: 'var(--text-muted)' }}>
-      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-faint)' }}>
-        <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
-      </svg>
-      <div style={{ textAlign: 'center' }}>
-        <p style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>{title}</p>
-        <p style={{ fontSize: '12px', color: 'var(--text-faint)' }}>This module is currently under review and will be available soon.</p>
-      </div>
-      <span style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', padding: '4px 12px', borderRadius: '99px', border: '1px solid var(--border-color)', color: 'var(--text-faint)', background: 'var(--bg-inset)' }}>Upcoming</span>
-    </div>
-  );
-}
+const ITEMS_PER_PAGE = 10;
 
 export function EDiaryTab() {
   const { role, username } = useRole();
   const router = useRouter();
 
-  if (SHOW_UPCOMING) return <UpcomingPlaceholder title="e-Diary" />;
-
   const [occurrences, setOccurrences] = useState<Occurrence[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   // Filters
   const [searchTerm, setSearchTerm]   = useState('');
   const [userFilter, setUserFilter]   = useState('All');
   const [dateStart, setDateStart]     = useState('');
   const [dateEnd, setDateEnd]         = useState('');
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Create entry states
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -64,14 +50,6 @@ export function EDiaryTab() {
   const [dateTime, setDateTime] = useState('');
   const [caseIdInput, setCaseIdInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
-
-  // Edit / amend entry states
-  const [editingEntry, setEditingEntry] = useState<Occurrence | null>(null);
-  const [editContent, setEditContent]   = useState('');
-  const [saving, setSaving] = useState(false);
-
-  // View amendment history
-  const [viewingAmendments, setViewingAmendments] = useState<Occurrence | null>(null);
 
   // Escalate to Incident
   const [escalatingEntry, setEscalatingEntry] = useState<Occurrence | null>(null);
@@ -94,6 +72,7 @@ export function EDiaryTab() {
   }, [dateStart, dateEnd, userFilter]);
 
   useEffect(() => { fetchOccurrences(); }, [fetchOccurrences]);
+  useEffect(() => { setCurrentPage(1); }, [searchTerm, dateStart, dateEnd, userFilter]);
 
   // Guard: roles without access see nothing
   if (!ALLOWED_ROLES.includes(role)) {
@@ -112,6 +91,17 @@ export function EDiaryTab() {
     const q = searchTerm.toLowerCase();
     return o.topic.toLowerCase().includes(q) || o.content.toLowerCase().includes(q);
   });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginated = filtered.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+  const resetFilters = () => {
+    setSearchTerm('');
+    setDateStart('');
+    setDateEnd('');
+    setUserFilter('All');
+  };
 
   // ── Create ──────────────────────────────────────────────────────────────────
   const handleCreate = async (e: React.FormEvent) => {
@@ -141,27 +131,6 @@ export function EDiaryTab() {
     }
   };
 
-  // ── Amend ────────────────────────────────────────────────────────────────────
-  const handleAmend = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingEntry || !editContent.trim()) return;
-    setSaving(true);
-    try {
-      const res = await fetch('/api/occurrences', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: editingEntry.id, newContent: editContent, username }),
-      });
-      if (res.ok) {
-        setEditingEntry(null);
-        setEditContent('');
-        await fetchOccurrences();
-      }
-    } finally {
-      setSaving(false);
-    }
-  };
-
   // ── Escalate to Incident ─────────────────────────────────────────────────────
   const handleEscalate = () => {
     if (!escalatingEntry) return;
@@ -174,138 +143,231 @@ export function EDiaryTab() {
     router.push(`/incidents/new?${params.toString()}`);
   };
 
+  const filtersActive = !!(searchTerm || dateStart || dateEnd || userFilter !== 'All');
+
   return (
     <>
-      <div className="occ-body-layout">
-        {/* Left: Filters */}
-        <div className="occ-filters-pane glass">
-          <h3>FILTERS</h3>
+      {/* Filter panel — matches Case Log / Incident Log / Fault Log / Task Board pattern */}
+      <div className="glass" style={{ padding: '20px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '16px', background: 'var(--bg-card)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
 
-          <div className="form-group">
-            <label>Search</label>
-            <input type="text" placeholder="Topic or content…" value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)} className="form-control" />
+          {/* Left: entry count */}
+          <div style={{ display: 'flex', gap: '4px' }}>
+            <span
+              className="tab-btn active"
+              style={{
+                background: 'transparent',
+                borderBottom: '2px solid var(--color-primary)',
+                color: 'var(--color-primary)',
+                padding: '8px 16px',
+                fontSize: '13px',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+              }}
+            >
+              All Entries
+              <span style={{
+                fontSize: '11px',
+                fontWeight: 700,
+                background: 'var(--color-primary-bg)',
+                color: 'var(--color-primary)',
+                padding: '2px 8px',
+                borderRadius: '10px',
+                minWidth: '20px',
+                textAlign: 'center',
+              }}>
+                {occurrences.length}
+              </span>
+            </span>
           </div>
 
-          <div className="form-group">
-            <label>Date From</label>
-            <input type="date" value={dateStart} max={dateEnd || undefined}
-              onChange={e => setDateStart(e.target.value)} className="form-control" />
-          </div>
+          {/* Right: filter toggle, search, new entry */}
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', flexGrow: 1, justifyContent: 'flex-end' }}>
 
-          <div className="form-group">
-            <label>Date To</label>
-            <input type="date" value={dateEnd} min={dateStart || undefined}
-              onChange={e => setDateEnd(e.target.value)} className="form-control" />
-          </div>
-
-          <div className="form-group">
-            <label>Logged By</label>
-            <select value={userFilter} onChange={e => setUserFilter(e.target.value)}
-              className="form-control select-dark">
-              <option value="All">All Operators</option>
-              {uniqueUsers.map(u => <option key={u} value={u}>{u}</option>)}
-            </select>
-          </div>
-
-          {(dateStart || dateEnd || userFilter !== 'All') && (
-            <button className="btn btn-secondary" style={{ width: '100%', marginTop: 4 }}
-              onClick={() => { setDateStart(''); setDateEnd(''); setUserFilter('All'); }}>
-              Clear Filters
-            </button>
-          )}
-
-          <div className="filter-stats glass" style={{ marginTop: 16 }}>
-            <div className="stat-row"><span className="lbl">Total entries:</span><span className="val">{occurrences.length}</span></div>
-            <div className="stat-row" style={{ marginTop: 8 }}><span className="lbl">Showing:</span><span className="val text-primary">{filtered.length}</span></div>
-          </div>
-
-          {canEdit && (
-            <button className="btn btn-primary" onClick={() => setShowCreateForm(true)} style={{ width: '100%', marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '12.5px', fontWeight: 600 }}>
-              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: 13, height: 13 }}>
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            <button
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+              className={`btn ${showAdvancedFilters ? 'btn-info' : 'btn-secondary'}`}
+              aria-label="Toggle filters"
+              style={{ padding: '0 10px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--radius-md)' }}
+            >
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
               </svg>
-              NEW ENTRY
             </button>
-          )}
 
-          <div style={{ marginTop: 12, padding: '10px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-            <strong style={{ color: 'var(--text-sub)' }}>FRD §8.2 —</strong> Entries may be amended after submission. All amendments are tracked and timestamped. Deletion requires System Administrator access.
+            <div style={{ position: 'relative', width: '100%', maxWidth: '300px' }}>
+              <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-faint)', display: 'flex', alignItems: 'center' }}>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+              </span>
+              <input
+                type="text"
+                placeholder="Search topic or content…"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="form-control"
+                style={{ width: '100%', paddingLeft: '36px', height: '36px', fontSize: '13px' }}
+              />
+            </div>
+
+            {canEdit && (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => setShowCreateForm(true)}
+                style={{ fontSize: '12.5px', height: '36px', padding: '0 14px', display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap', fontWeight: 600 }}
+              >
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: 13, height: 13 }}>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                </svg>
+                NEW ENTRY
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Right: Entries */}
-        <div className="occ-list-pane">
-          {loading ? (
-            <div className="occ-loading glass">Loading diary entries…</div>
-          ) : filtered.length === 0 ? (
-            <div className="occ-empty glass">No entries found matching your filters.</div>
-          ) : (
-            <div className="occ-entries-timeline">
-              {filtered.map(o => (
-                <div className="occ-card glass" key={o.id}>
-                  {/* Header row */}
-                  <div className="occ-card-header">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <span className="occ-id">{o.id}</span>
-                      {o.caseId && (
-                        <Link href={`/cases/${o.caseId}`} style={{ textDecoration: 'none' }}>
-                          <span className="badge badge-ack" style={{ fontSize: 10, padding: '1px 6px', cursor: 'pointer' }}>
-                            Case: {o.caseId}
-                          </span>
-                        </Link>
-                      )}
-                      {o.amendments && o.amendments.length > 0 && (
-                        <span
-                          className="badge"
-                          style={{ fontSize: 10, padding: '1px 6px', background: 'rgba(245,158,11,0.12)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.2)', cursor: 'pointer' }}
-                          onClick={() => setViewingAmendments(o)}
-                          title="View amendment history"
-                        >
-                          ✏ {o.amendments.length} amendment{o.amendments.length > 1 ? 's' : ''}
-                        </span>
-                      )}
-                    </div>
-                    <span className="occ-time">
-                      {new Date(o.dateTime).toLocaleDateString('en-SG', { day: '2-digit', month: 'short', year: 'numeric' })}
-                      {' · '}
-                      {new Date(o.dateTime).toLocaleTimeString('en-SG', { hour: '2-digit', minute: '2-digit', hour12: false })}
-                    </span>
-                  </div>
+        {/* Collapsible Advanced Filters */}
+        {showAdvancedFilters && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '16px', paddingTop: '4px' }}>
 
-                  <h2 className="occ-topic">{o.topic}</h2>
-                  <p className="occ-content">{o.content}</p>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Date From:</label>
+              <input type="date" value={dateStart} max={dateEnd || undefined}
+                onChange={e => setDateStart(e.target.value)} className="form-control" style={{ width: '100%', height: '36px' }} />
+            </div>
 
-                  <div className="occ-card-footer">
-                    <span>Logged by: <strong>{o.user}</strong></span>
-                    <div style={{ display: 'flex', gap: 8 }}>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Date To:</label>
+              <input type="date" value={dateEnd} min={dateStart || undefined}
+                onChange={e => setDateEnd(e.target.value)} className="form-control" style={{ width: '100%', height: '36px' }} />
+            </div>
+
+            <div className="form-group" style={{ margin: 0 }}>
+              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Logged By:</label>
+              <select value={userFilter} onChange={e => setUserFilter(e.target.value)} className="form-control select-dark" style={{ width: '100%' }}>
+                <option value="All">All Operators</option>
+                {uniqueUsers.map(u => <option key={u} value={u}>{u}</option>)}
+              </select>
+            </div>
+
+            {filtersActive && (
+              <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={resetFilters}
+                  className="btn btn-secondary"
+                  style={{ padding: '0 12px', fontSize: '12.5px', height: '34px', border: 'none', background: 'transparent', textDecoration: 'underline', whiteSpace: 'nowrap' }}
+                >
+                  Clear Filters
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Table & Content */}
+      <div className="glass" style={{ marginTop: '20px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        {loading ? (
+          <div className="loading-container" style={{ padding: '40px' }}>
+            <div className="spinner" />
+            <span>Loading diary entries…</span>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="empty-state" style={{ padding: '60px', textAlign: 'center' }}>
+            No entries found matching your filters.
+          </div>
+        ) : (
+          <>
+            <div className="table-container">
+              <table className="custom-table">
+                <thead>
+                  <tr>
+                    <th>Occurrence ID</th>
+                    <th>Date &amp; Time</th>
+                    <th>Topic</th>
+                    <th>Narrative</th>
+                    <th>Logged By</th>
+                    <th>Linked Case</th>
+                    {canEdit && <th>Actions</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginated.map(o => (
+                    <tr
+                      key={o.id}
+                      onClick={() => { if (o.caseId) window.location.href = `/cases/${o.caseId}`; }}
+                      style={{ cursor: o.caseId ? 'pointer' : 'default' }}
+                    >
+                      <td><span className="mono-id">{o.id}</span></td>
+                      <td style={{ whiteSpace: 'nowrap', fontSize: '12px', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>
+                        {new Date(o.dateTime).toLocaleDateString('en-SG', { day: '2-digit', month: 'short', year: 'numeric' })}{' '}
+                        {new Date(o.dateTime).toLocaleTimeString('en-SG', { hour: '2-digit', minute: '2-digit', hour12: false })}
+                      </td>
+                      <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{o.topic}</td>
+                      <td style={{ maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-sub)' }} title={o.content}>
+                        {o.content}
+                      </td>
+                      <td style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{o.user}</td>
+                      <td>
+                        {o.caseId ? <span className="mono-id">{o.caseId}</span> : <span style={{ color: 'var(--text-faint)' }}>—</span>}
+                      </td>
                       {canEdit && (
-                        <>
-                          {/* Edit / Amend */}
-                          <button
-                            className="btn btn-secondary"
-                            style={{ fontSize: 11, padding: '3px 10px' }}
-                            onClick={() => { setEditingEntry(o); setEditContent(o.content); }}
-                          >
-                            ✏ Amend
-                          </button>
-                          {/* Escalate to Incident */}
+                        <td onClick={e => e.stopPropagation()}>
                           <button
                             className="btn"
-                            style={{ fontSize: 11, padding: '3px 10px', background: 'rgba(239,68,68,0.12)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.25)' }}
+                            style={{ fontSize: 11, padding: '3px 10px', background: 'rgba(239,68,68,0.12)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.25)', whiteSpace: 'nowrap' }}
                             onClick={() => setEscalatingEntry(o)}
                           >
-                            🔺 Escalate to Incident
+                            🔺 Escalate
                           </button>
-                        </>
+                        </td>
                       )}
-                    </div>
-                  </div>
-                </div>
-              ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          )}
-        </div>
+
+            {/* Pagination Controls */}
+            <div className="pagination-bar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderTop: '1px solid var(--border-color)' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                Showing <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{startIndex + 1}</span> to <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{Math.min(startIndex + ITEMS_PER_PAGE, filtered.length)}</span> of <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{filtered.length}</span> entries
+              </div>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  style={{ height: '28px', padding: '0 8px', fontSize: '12px', minWidth: '40px' }}
+                >
+                  Prev
+                </button>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', padding: '0 8px' }}>
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  style={{ height: '28px', padding: '0 8px', fontSize: '12px', minWidth: '40px' }}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Immutability note */}
+      <div style={{ marginTop: 12, padding: '10px 14px', background: 'rgba(255,255,255,0.03)', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+        <strong style={{ color: 'var(--text-sub)' }}>FRD §8.2 —</strong> Once submitted, an entry is immutable and cannot be edited or deleted. To correct a mistake, log a new entry referencing this Occurrence ID.
       </div>
 
       {/* ── Create Modal ───────────────────────────────────────────────────────── */}
@@ -365,78 +427,6 @@ export function EDiaryTab() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* ── Amend Modal ────────────────────────────────────────────────────────── */}
-      {editingEntry && (
-        <div className="modal-backdrop">
-          <div className="create-case-modal glass" style={{ maxWidth: 520 }}>
-            <div className="modal-header">
-              <h2>AMEND ENTRY · {editingEntry.id}</h2>
-              <button className="close-btn" onClick={() => { setEditingEntry(null); setEditContent(''); }}>✕</button>
-            </div>
-            <form onSubmit={handleAmend} className="modal-form">
-              <div className="modal-scroll-area">
-                <div style={{ padding: '10px 12px', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 6, fontSize: 12, color: '#F59E0B', marginBottom: 16 }}>
-                  ⚠ The original text will be preserved in the amendment history. All amendments are timestamped and attributed.
-                </div>
-                <div className="form-group">
-                  <label>Original Text</label>
-                  <div style={{ padding: '8px 12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-                    {editingEntry.content}
-                  </div>
-                </div>
-                <div className="form-group">
-                  <label>Amended Text *</label>
-                  <textarea value={editContent} onChange={e => setEditContent(e.target.value)}
-                    required className="form-control" rows={5} />
-                </div>
-              </div>
-              <div className="modal-actions">
-                <button type="button" className="btn btn-secondary" onClick={() => { setEditingEntry(null); setEditContent(''); }}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={saving}>
-                  {saving ? 'Saving…' : 'SAVE AMENDMENT'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ── Amendment History Modal ─────────────────────────────────────────────── */}
-      {viewingAmendments && (
-        <div className="modal-backdrop">
-          <div className="create-case-modal glass" style={{ maxWidth: 520 }}>
-            <div className="modal-header">
-              <h2>AMENDMENT HISTORY · {viewingAmendments.id}</h2>
-              <button className="close-btn" onClick={() => setViewingAmendments(null)}>✕</button>
-            </div>
-            <div className="modal-form">
-              <div className="modal-scroll-area">
-                <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
-                  {viewingAmendments.amendments?.length || 0} amendment(s) recorded. Showing original text before each amendment.
-                </p>
-                {(viewingAmendments.amendments || []).map((am, idx) => (
-                  <div key={idx} style={{ marginBottom: 14, padding: '10px 12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6 }}>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>
-                      Amendment #{idx + 1} · {new Date(am.timestamp).toLocaleString('en-SG')} · by <strong>{am.amendedBy}</strong>
-                    </div>
-                    <div style={{ fontSize: 12, color: 'var(--text-sub)', fontStyle: 'italic' }}>
-                      Original: "{am.originalText}"
-                    </div>
-                  </div>
-                ))}
-                <div style={{ marginTop: 12, padding: '10px 12px', background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)', borderRadius: 6 }}>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Current text:</div>
-                  <div style={{ fontSize: 13, color: 'var(--text-main)' }}>{viewingAmendments.content}</div>
-                </div>
-              </div>
-              <div className="modal-actions">
-                <button className="btn btn-secondary" onClick={() => setViewingAmendments(null)}>Close</button>
-              </div>
-            </div>
           </div>
         </div>
       )}

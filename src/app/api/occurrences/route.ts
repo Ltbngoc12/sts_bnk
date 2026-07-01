@@ -44,7 +44,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'e-Diary entry content is required.' }, { status: 400 });
     }
 
-    // Auto-create a Case if no caseId provided (FRD §8.2)
+    // NOTE: FRD Section 8 states occurrences are standalone and not linked to Case;
+    // auto-linking a Case here is a confirmed, deliberate deviation (see EDIARY_MODULE_UPDATE_PLAN.md §3).
     let caseId: string = body.caseId || '';
     if (!caseId) {
       const newCaseId = generateCaseId(db);
@@ -72,7 +73,6 @@ export async function POST(request: Request) {
       topic: body.topic || 'General Notice',
       content: body.content,
       attachments: [],
-      amendments: [],
     };
 
     db.occurrences.push(newOccurrence);
@@ -84,40 +84,6 @@ export async function POST(request: Request) {
   }
 }
 
-// PATCH — amend an existing e-Diary entry (FRD §8.2: mutable, amendments tracked)
-export async function PATCH(request: Request) {
-  try {
-    const body = await request.json();
-    const { id, newContent, username } = body;
-
-    if (!id || !newContent?.trim()) {
-      return NextResponse.json({ error: 'id and newContent are required.' }, { status: 400 });
-    }
-
-    const db = await getDb();
-    const idx = db.occurrences.findIndex(o => o.id === id);
-    if (idx === -1) {
-      return NextResponse.json({ error: 'Entry not found.' }, { status: 404 });
-    }
-
-    const entry = db.occurrences[idx];
-
-    // Record the amendment with the original text
-    const amendment = {
-      timestamp: new Date().toISOString(),
-      amendedBy: username || 'System',
-      originalText: entry.content,
-    };
-
-    db.occurrences[idx] = {
-      ...entry,
-      content: newContent.trim(),
-      amendments: [...(entry.amendments || []), amendment],
-    };
-
-    await saveDb(db);
-    return NextResponse.json(db.occurrences[idx]);
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-}
+// NOTE: No PATCH/DELETE endpoint by design. Per FRD §8.2, an occurrence entry is
+// immutable once submitted — it cannot be edited or deleted. To correct a mistake,
+// log a new entry referencing the original Occurrence ID.

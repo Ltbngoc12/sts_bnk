@@ -783,8 +783,7 @@ textarea.form-control { resize: vertical; min-height: 72px; line-height: 1.5; }
 
 /* ─── Table page containers ──────────────────────────────────────── */
 .cases-list-container { padding: 0; }
-.cases-loading, .empty-cases,
-.occ-loading, .occ-empty {
+.cases-loading, .empty-cases {
   padding: 60px 40px;
   text-align: center;
   color: var(--text-muted);
@@ -950,58 +949,6 @@ textarea.form-control { resize: vertical; min-height: 72px; line-height: 1.5; }
   text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px;
 }
 .state-btns { display: flex; flex-wrap: wrap; gap: 8px; }
-
-/* ─── Occurrence / e-Diary Page ──────────────────────────────────── */
-.occ-header-bar {
-  padding: 16px 20px; display: flex; justify-content: space-between; align-items: center;
-}
-.occ-body-layout {
-  display: grid; grid-template-columns: 220px 1fr;
-  gap: 14px; align-items: start;
-}
-.occ-filters-pane {
-  padding: 16px; display: flex; flex-direction: column; gap: 16px;
-}
-.occ-filters-pane h3 {
-  font-size: 11px; font-weight: 700; color: var(--text-muted);
-  text-transform: uppercase; letter-spacing: 0.06em;
-  border-bottom: 1px solid var(--border-color); padding-bottom: 6px;
-}
-.filter-stats {
-  padding: 12px; background: var(--bg-inset);
-  border: 1px solid var(--border-color); border-radius: var(--radius-md);
-}
-.stat-row { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px; }
-.stat-row:last-child { margin-bottom: 0; }
-.stat-row .lbl { color: var(--text-muted); }
-.stat-row .val { font-weight: 700; color: var(--text-main); }
-.text-primary { color: var(--color-primary); }
-
-.warning-note {
-  padding: 10px 12px;
-  background: var(--color-critical-bg);
-  border: 1px solid var(--color-critical-border);
-  border-radius: var(--radius-md);
-  font-size: 11.5px; color: var(--text-main); line-height: 1.5;
-}
-
-.occ-list-pane { display: flex; flex-direction: column; gap: 12px; }
-.occ-entries-timeline { display: flex; flex-direction: column; gap: 12px; }
-.occ-card { padding: 16px 18px; display: flex; flex-direction: column; gap: 9px; }
-.occ-card-header {
-  display: flex; justify-content: space-between; align-items: center;
-  font-family: var(--font-mono); font-size: 11px;
-}
-.occ-id { font-weight: 700; color: var(--color-info); }
-.occ-time { color: var(--text-faint); }
-.occ-topic { font-size: 14px; font-weight: 700; color: var(--text-main); }
-.occ-content { font-size: 13px; color: var(--text-sub); line-height: 1.6; white-space: pre-wrap; }
-.occ-card-footer {
-  display: flex; justify-content: space-between; align-items: center;
-  font-size: 11px; color: var(--text-muted);
-  padding-top: 9px; border-top: 1px solid var(--border-color);
-}
-.immutable-stamp { color: var(--color-active); font-weight: 600; }
 
 /* ─── Dashboard Grids ────────────────────────────────────────────── */
 .dashboard-layout-grid {
