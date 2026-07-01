@@ -2831,11 +2831,72 @@ export default function IncidentDetailsPage() {
                 <form onSubmit={(e) => {
                   e.preventDefault();
                   if (!rangerActivityText.trim()) return;
-                  performAction('log', { description: `[Ranger Log] ${rangerActivityText}`, attachments: composerAttachments });
+                  const payload: Record<string, any> = { description: `[Ranger Log] ${rangerActivityText}`, attachments: composerAttachments };
+                  if (logTimeIsCustom) {
+                    payload.eventDate = logEventDate;
+                    payload.eventTime = logEventTime;
+                  }
+                  performAction('log', payload);
                   setRangerActivity('');
                   setComposerAttachments([]);
+                  setLogTimeIsCustom(false);
+                  setLogEventDate(getNowDate());
+                  setLogEventTime(getNowTime());
                 }} style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: isCtrl ? 12 : 0 }}>
                   {isCtrl && <div className="section-separator" style={{ margin: '8px 0' }} />}
+                  {/* Event Date & Time row */}
+                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
+                    {logTimeIsCustom ? (
+                      <>
+                        <div className="form-group" style={{ marginBottom: 0, flex: 1 }}>
+                          <label style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>Event Date</label>
+                          <input
+                            type="date"
+                            className="form-control"
+                            value={logEventDate}
+                            onChange={e => setLogEventDate(e.target.value)}
+                            required
+                            style={{ fontSize: 13, height: 36 }}
+                          />
+                        </div>
+                        <div className="form-group" style={{ marginBottom: 0, flex: 1 }}>
+                          <label style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>Event Time</label>
+                          <input
+                            type="time"
+                            className="form-control"
+                            value={logEventTime}
+                            onChange={e => setLogEventTime(e.target.value)}
+                            required
+                            style={{ fontSize: 13, height: 36 }}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => { setLogTimeIsCustom(false); setLogEventDate(getNowDate()); setLogEventTime(getNowTime()); }}
+                          className="btn btn-secondary btn-xs"
+                          style={{ height: 36, padding: '0 10px', whiteSpace: 'nowrap', marginBottom: 0 }}
+                        >
+                          ↺ Use current time
+                        </button>
+                      </>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', background: 'var(--bg-inset)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', flex: 1 }}>
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                        </svg>
+                        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                          Event time will be captured automatically when you post
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => { setLogEventDate(getNowDate()); setLogEventTime(getNowTime()); setLogTimeIsCustom(true); }}
+                          style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, textDecoration: 'underline', whiteSpace: 'nowrap' }}
+                        >
+                          Set custom time
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)' }}>Ranger Ground Update</label>
                     <input
