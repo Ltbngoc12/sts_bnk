@@ -34,6 +34,10 @@ export function FaultLogTab() {
   const [filterType, setFilterType] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
 
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [submittingFaultId, setSubmittingFaultId] = useState<string | null>(null);
 
@@ -115,6 +119,14 @@ export function FaultLogTab() {
     );
   });
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterType, filterStatus]);
+
+  const totalPages = Math.ceil(filteredFaults.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedFaults = filteredFaults.slice(startIndex, startIndex + itemsPerPage);
+
   const isController = ['Controller', 'Duty Manager', 'Duty Officer', 'System Administrator', 'Current Ops Administrator'].includes(role);
 
   return (
@@ -191,48 +203,64 @@ export function FaultLogTab() {
             <table className="custom-table">
               <thead>
                 <tr>
+                  <th>Case ID</th>
                   <th>Fault ID</th>
-                  <th>Fault Type / Sub-type</th>
+                  <th>Fault Type</th>
+                  <th>Sub-type</th>
                   <th>Location</th>
                   <th>Description</th>
                   <th>CMMS Ticket</th>
                   <th>Status</th>
-                  <th>Linked Case</th>
                   <th>Logged By</th>
                   <th>Date Logged</th>
                   {isController && <th></th>}
                 </tr>
               </thead>
               <tbody>
-                {filteredFaults.map(f => (
+                {paginatedFaults.map(f => (
                   <tr key={f.id} onClick={() => window.location.href = `/faults/${f.id}`} style={{ cursor: 'pointer' }}>
-                    <td className="case-id-cell">
-                      <Link
-                        href={`/faults/${f.id}`}
-                        onClick={e => e.stopPropagation()}
-                        style={{ color: 'var(--color-primary)', fontWeight: 700, fontSize: 11, textDecoration: 'none', fontFamily: 'var(--font-mono)' }}
-                      >
-                        {f.id}
-                      </Link>
+                    <td>
+                      <span className="mono-id">
+                        <Link
+                          href={`/cases/${f.caseId}`}
+                          onClick={e => e.stopPropagation()}
+                          style={{ textDecoration: 'none', color: 'inherit' }}
+                        >
+                          {f.caseId}
+                        </Link>
+                      </span>
+                      {f.linkedIncidentId && (
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
+                          via {f.linkedIncidentId}
+                        </div>
+                      )}
                     </td>
                     <td>
-                      <div style={{ fontWeight: 600, fontSize: 12 }}>{f.faultType}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{f.faultSubType}</div>
+                      <span className="mono-id" style={{ color: 'var(--color-primary)', background: 'var(--color-primary-bg)', borderColor: 'var(--color-primary-border)' }}>
+                        <Link
+                          href={`/faults/${f.id}`}
+                          onClick={e => e.stopPropagation()}
+                          style={{ textDecoration: 'none', color: 'inherit' }}
+                        >
+                          {f.id}
+                        </Link>
+                      </span>
                     </td>
+                    <td style={{ fontWeight: 600, fontSize: 12 }}>{f.faultType}</td>
+                    <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{f.faultSubType}</td>
                     <td style={{ fontSize: 12, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {f.location.commonName || f.location.road || '—'}
                     </td>
                     <td style={{ fontSize: 12, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {f.description}
                     </td>
-                    <td onClick={e => { e.stopPropagation(); if (f.cmmsTicketId) fetchCmmsStatus(f.cmmsTicketId); }}>
+                    <td onClick={e => { e.stopPropagation(); if (f.cmmsTicketId) fetchCmmsStatus(f.cmmsTicketId); }} style={{ whiteSpace: 'nowrap' }}>
                       {f.cmmsTicketId ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <span className="cmms-pill" style={{ cursor: 'pointer' }}>{f.cmmsTicketId}</span>
-                          {cmmsStatusMap[f.cmmsTicketId] && (
+                          {cmmsStatusMap[f.cmmsTicketId] ? (
                             <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>CMMS: {cmmsStatusMap[f.cmmsTicketId]}</span>
-                          )}
-                          {!cmmsStatusMap[f.cmmsTicketId] && (
+                          ) : (
                             <span style={{ fontSize: 10, color: 'var(--color-primary)', cursor: 'pointer' }}>↻ Check CMMS</span>
                           )}
                         </div>
@@ -242,20 +270,6 @@ export function FaultLogTab() {
                     </td>
                     <td>
                       <span className={faultStatusBadge(f.status)}>{f.status}</span>
-                    </td>
-                    <td>
-                      <Link
-                        href={`/cases/${f.caseId}`}
-                        onClick={e => e.stopPropagation()}
-                        style={{ color: 'var(--color-primary)', fontWeight: 600, fontSize: 11, textDecoration: 'none' }}
-                      >
-                        {f.caseId}
-                      </Link>
-                      {f.linkedIncidentId && (
-                        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
-                          via {f.linkedIncidentId}
-                        </div>
-                      )}
                     </td>
                     <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>{f.createdBy}</td>
                     <td className="date-cell">
@@ -286,6 +300,54 @@ export function FaultLogTab() {
                 ))}
               </tbody>
             </table>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                  Showing <strong>{startIndex + 1}</strong> to <strong>{Math.min(startIndex + itemsPerPage, filteredFaults.length)}</strong> of <strong>{filteredFaults.length}</strong> faults
+                </div>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="btn btn-secondary btn-xs"
+                    style={{ padding: '6px 12px', fontSize: '11px', borderRadius: '6px', opacity: currentPage === 1 ? 0.5 : 1, cursor: currentPage === 1 ? 'default' : 'pointer' }}
+                  >
+                    Previous
+                  </button>
+
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => {
+                    const isCurrent = p === currentPage;
+                    return (
+                      <button
+                        key={p}
+                        onClick={() => setCurrentPage(p)}
+                        className={`btn ${isCurrent ? 'btn-primary' : 'btn-secondary'} btn-xs`}
+                        style={{
+                          padding: '6px 10px',
+                          fontSize: '11px',
+                          borderRadius: '6px',
+                          fontWeight: isCurrent ? 'bold' : 'normal',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {p}
+                      </button>
+                    );
+                  })}
+
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className="btn btn-secondary btn-xs"
+                    style={{ padding: '6px 12px', fontSize: '11px', borderRadius: '6px', opacity: currentPage === totalPages ? 0.5 : 1, cursor: currentPage === totalPages ? 'default' : 'pointer' }}
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
