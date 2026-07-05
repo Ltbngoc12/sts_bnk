@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
-import { getDb, saveDb, generateTaskId, generateCaseId, Task, TaskChecklistItem, TaskAudit } from '@/lib/db';
+import { getDb, saveDb, generateTaskId, generateCaseId, generateSeriesId, Task, TaskChecklistItem, TaskAudit, RecurrenceSeries } from '@/lib/db';
+import { validateRecurrence } from '@/lib/recurrence';
+import { advanceSeries } from '@/lib/seriesEngine';
 
 function makeAudit(operator: string, action: string, details: string): TaskAudit {
   return {
@@ -14,7 +16,8 @@ function makeAudit(operator: string, action: string, details: string): TaskAudit
 export async function GET() {
   try {
     const db = await getDb();
-    return NextResponse.json(db.tasks);
+    // Hide soft-deleted occurrences (e.g. removed by a series edit) from boards/lists.
+    return NextResponse.json(db.tasks.filter(t => !t.deleted));
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -103,9 +106,51 @@ export async function POST(request: Request) {
         ],
       };
 
+      // ── Recurrence: create the series (source of truth) and generate the
+      //    first lead-time window of real occurrence tasks (Model A). ──
+      if (body.recurrence) {
+        const cfgErr = validateRecurrence(body.recurrence);
+        if (cfgErr) throw new Error(cfgErr);
+
+        const series: RecurrenceSeries = {
+          id: generateSeriesId(db),
+          caseId: targetCaseId,
+          config: body.recurrence,
+          status: 'Active',
+          templateTaskId: newTask.id,
+          createdBy: creator,
+          createdDate: new Date().toISOString(),
+          audits: [makeAudit(creator, 'Series created', `Recurrence series created by ${creator}.`)],
+          taskTemplate: {
+            title: newTask.title,
+            description: newTask.description,
+            priority: newTask.priority === 'High' ? 'High' : 'Normal',
+            assignee: newTask.assignee,
+            assigneeType: newTask.assigneeType,
+            checklist,
+          },
+        };
+
+        // This task holds the template card; it is not itself an occurrence.
+        newTask.seriesId = series.id;
+        newTask.isSeriesTemplate = true;
+
+        if (!db.recurrenceSeries) db.recurrenceSeries = [];
+        db.recurrenceSeries.push(series);
+        db.tasks.push(newTask);
+
+        // Generate occurrences from max(startDate, today) → today + leadTime.
+        const today = new Date().toISOString().slice(0, 10);
+        const fromISO = series.config.startDate > today ? series.config.startDate : today;
+        advanceSeries(db, series, fromISO);
+
+        await saveDb(db); // Commit transaction
+        return NextResponse.json(newTask, { status: 201 });
+      }
+
       db.tasks.push(newTask);
       await saveDb(db); // Commit transaction
-      
+
       return NextResponse.json(newTask, { status: 201 });
     } catch (validationError: any) {
       // Rollback: do not save db. Any local array modifications in `db` are in-memory

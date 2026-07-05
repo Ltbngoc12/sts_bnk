@@ -2,62 +2,14 @@
 
 import React, { useMemo } from 'react';
 import { RecurrenceConfig, RecurrenceFrequency, Weekday } from '@/lib/db';
+import { defaultRecurrence, previewOccurrences, recurrenceSummary, pad } from '@/lib/recurrence';
+
+// Re-export shared logic so existing imports from this component keep working.
+export { defaultRecurrence, previewOccurrences, recurrenceSummary } from '@/lib/recurrence';
 
 const WEEKDAYS: Weekday[] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const WD_SHORT: Record<Weekday, string> = { Mon: 'Mo', Tue: 'Tu', Wed: 'We', Thu: 'Th', Fri: 'Fr', Sat: 'Sa', Sun: 'Su' };
-const JS_DAY: Record<Weekday, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
 const DAY_NAME = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-const pad = (n: number) => String(n).padStart(2, '0');
-const iso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-const todayStr = () => iso(new Date());
-
-export function defaultRecurrence(): RecurrenceConfig {
-  return { frequency: 'Daily', weekdays: [], monthlyDay: 15, startDate: todayStr(), dueTime: '09:00', endType: 'never', leadTimeDays: 14 };
-}
-
-// Generate the occurrence dates that fall inside the lead-time window (mirrors scheduler rule W3).
-export function previewOccurrences(cfg: RecurrenceConfig, maxShow = 60): Date[] {
-  const today = new Date(todayStr() + 'T00:00:00');
-  const start = new Date((cfg.startDate || todayStr()) + 'T00:00:00');
-  const windowEnd = new Date(today);
-  windowEnd.setDate(windowEnd.getDate() + (cfg.leadTimeDays || 0));
-  const wdSet = new Set((cfg.weekdays || []).map(w => JS_DAY[w]));
-  const cursor = new Date(Math.max(start.getTime(), today.getTime())); // no backfill
-  const out: Date[] = [];
-  let count = 0, guard = 0;
-  while (cursor <= windowEnd && guard < 3000) {
-    guard++;
-    let hit = false;
-    if (cfg.frequency === 'Daily') hit = true;
-    else if (cfg.frequency === 'Weekly') hit = wdSet.has(cursor.getDay());
-    else if (cfg.frequency === 'Monthly') {
-      const lastDay = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate();
-      hit = cursor.getDate() === Math.min(cfg.monthlyDay || 1, lastDay);
-    }
-    if (hit && cursor >= start) {
-      if (cfg.endType === 'onDate' && cfg.endDate && iso(cursor) > cfg.endDate) break;
-      if (cfg.endType === 'afterCount' && count >= (cfg.occurrenceCount || 0)) break;
-      out.push(new Date(cursor));
-      count++;
-      if (out.length >= maxShow) break;
-    }
-    cursor.setDate(cursor.getDate() + 1);
-  }
-  return out;
-}
-
-// Human-readable summary stored on the task for list/detail display.
-export function recurrenceSummary(cfg: RecurrenceConfig): string {
-  let base = '';
-  if (cfg.frequency === 'Daily') base = 'Daily';
-  else if (cfg.frequency === 'Weekly') base = `Weekly on ${(cfg.weekdays || []).join('/')}`;
-  else base = `Monthly on day ${cfg.monthlyDay}`;
-  if (cfg.dueTime) base += ` at ${cfg.dueTime}`;
-  if (cfg.endType === 'onDate' && cfg.endDate) base += ` until ${cfg.endDate}`;
-  else if (cfg.endType === 'afterCount') base += ` × ${cfg.occurrenceCount}`;
-  return base;
-}
 
 interface Props {
   value: RecurrenceConfig | null;

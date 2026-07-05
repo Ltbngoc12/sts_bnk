@@ -987,7 +987,7 @@ export default function CaseDetailsPage() {
           min-height: 360px;
         }
         .comp-card h3 {
-          font-family: var(--font-title), 'Playfair Display', Georgia, serif;
+          font-family: var(--font-headline);
           font-size: 13.5px;
           font-weight: 700;
           letter-spacing: 0.03em;
@@ -1012,7 +1012,7 @@ export default function CaseDetailsPage() {
           background: var(--border-color-hover);
         }
         .section-title {
-          font-family: var(--font-title), 'Playfair Display', Georgia, serif;
+          font-family: var(--font-headline);
           font-size: 14px;
           font-weight: 700;
           text-transform: none;

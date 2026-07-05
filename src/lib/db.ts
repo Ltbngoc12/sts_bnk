@@ -249,6 +249,30 @@ export interface RecurrenceConfig {
   leadTimeDays: number;        // generate-ahead window (default 14)
 }
 
+// The recurrence template as a first-class entity (Model A source of truth).
+// Occurrences link back via Task.seriesId; the config here is what the
+// generation engine reads. Editing a series reconciles its future occurrences.
+export interface RecurrenceSeries {
+  id: string;                       // SEN/RS/YYYYMMDD/NNN
+  caseId: string;                   // Case the series (and its occurrences) belong to
+  config: RecurrenceConfig;         // current template
+  status: 'Active' | 'Ended' | 'Cancelled';
+  templateTaskId?: string;          // the task that created the series (holds the card)
+  createdBy: string;
+  createdDate: string;
+  lastGeneratedDate?: string;       // last date the lead-window was advanced to (idempotency)
+  audits?: TaskAudit[];             // history of template edits
+  // Snapshot used to mint each occurrence task:
+  taskTemplate: {
+    title: string;
+    description?: string;
+    priority: 'High' | 'Normal';
+    assignee: string;
+    assigneeType?: 'user' | 'group';
+    checklist?: TaskChecklistItem[];
+  };
+}
+
 export interface Task {
   id: string; // SEN/TA/YYYYMMDD/NNN
   caseId: string;
@@ -268,10 +292,15 @@ export interface Task {
   recurrenceSchedule?: string; // Human-readable summary of the recurrence rule
   recurrence?: RecurrenceConfig; // Structured recurrence template (FRD 7.1.2)
   seriesId?: string; // Link back to RecurrenceSeries when this is a generated occurrence
-  occurrenceDate?: string; // The date this occurrence belongs to within its series
+  isSeriesTemplate?: boolean; // True for the task that created/holds the series template
+  occurrenceDate?: string; // The date this occurrence belongs to within its series (YYYY-MM-DD)
   isRecurringInstance?: boolean;
   detachedFromSeries?: boolean; // W11 — edited "this occurrence only"
   recurrenceCancelled?: boolean; // W12 — series cancelled ("this + all future")
+  deleted?: boolean; // Soft-delete (e.g. occurrence removed by a series edit); hidden from boards
+  deletedAt?: string;
+  deletedBy?: string;
+  deletedReason?: string;
   attachments: string[];
   createdBy: string;
   createdDate: string;
@@ -375,6 +404,7 @@ export interface NormalizedDbSchema {
   nops: NOPRecord[];
   broadcasts: BroadcastRecord[];
   auditLogs: AuditLog[];
+  recurrenceSeries?: RecurrenceSeries[];
 }
 
 // The hydrated schema used by the application
@@ -387,6 +417,7 @@ export interface DbSchema {
   nops?: NOPRecord[];
   broadcasts?: BroadcastRecord[];
   auditLogs?: AuditLog[];
+  recurrenceSeries?: RecurrenceSeries[];
 }
 
 // Path to db.json — used only for one-time seeding when MongoDB is empty
@@ -453,7 +484,8 @@ function hydrateDb(normalizedDb: NormalizedDbSchema): DbSchema {
     events: normalizedDb.events,
     nops: normalizedDb.nops,
     broadcasts: normalizedDb.broadcasts,
-    auditLogs: normalizedDb.auditLogs
+    auditLogs: normalizedDb.auditLogs,
+    recurrenceSeries: normalizedDb.recurrenceSeries || []
   };
 }
 
@@ -482,7 +514,8 @@ function dehydrateDb(data: DbSchema): NormalizedDbSchema {
     events: data.events || [],
     nops: data.nops || [],
     broadcasts: data.broadcasts || [],
-    auditLogs: data.auditLogs || []
+    auditLogs: data.auditLogs || [],
+    recurrenceSeries: data.recurrenceSeries || []
   };
 
   for (const c of data.cases) {
@@ -653,7 +686,7 @@ export async function getDb(): Promise<DbSchema> {
   try {
     const mdb = await getMongoDB();
 
-    const [cases, incidents, faults, tasks, occurrences, events, nops, broadcasts, auditLogs] = await Promise.all([
+    const [cases, incidents, faults, tasks, occurrences, events, nops, broadcasts, auditLogs, recurrenceSeries] = await Promise.all([
       mdb.collection('cases').find({}, { projection: { _id: 0 } }).toArray(),
       mdb.collection('incidents').find({}, { projection: { _id: 0 } }).toArray(),
       mdb.collection('faults').find({}, { projection: { _id: 0 } }).toArray(),
@@ -663,6 +696,7 @@ export async function getDb(): Promise<DbSchema> {
       mdb.collection('nops').find({}, { projection: { _id: 0 } }).toArray(),
       mdb.collection('broadcasts').find({}, { projection: { _id: 0 } }).toArray(),
       mdb.collection('auditLogs').find({}, { projection: { _id: 0 } }).toArray(),
+      mdb.collection('recurrenceSeries').find({}, { projection: { _id: 0 } }).toArray(),
     ]);
 
     let normalizedDb: NormalizedDbSchema;
@@ -681,6 +715,7 @@ export async function getDb(): Promise<DbSchema> {
         nops: nops as any,
         broadcasts: broadcasts as any,
         auditLogs: auditLogs as any,
+        recurrenceSeries: recurrenceSeries as any,
       };
     }
 
@@ -706,6 +741,7 @@ export async function saveDb(data: DbSchema): Promise<void> {
       saveCollection(mdb, 'nops', normalizedDb.nops as any[]),
       saveCollection(mdb, 'broadcasts', normalizedDb.broadcasts as any[]),
       saveCollection(mdb, 'auditLogs', normalizedDb.auditLogs as any[]),
+      saveCollection(mdb, 'recurrenceSeries', (normalizedDb.recurrenceSeries || []) as any[]),
     ]);
   } catch (err) {
     console.error('Error writing to MongoDB:', err);
@@ -806,6 +842,25 @@ export function generateFaultId(db: DbSchema): string {
   if (todayFaults.length > 0) {
     const sequences = todayFaults.map(f => {
       const parts = f.id.split('/');
+      return parseInt(parts[parts.length - 1], 10);
+    }).filter(num => !isNaN(num));
+    if (sequences.length > 0) nextSeq = Math.max(...sequences) + 1;
+  }
+  return `${prefix}${String(nextSeq).padStart(3, '0')}`;
+}
+
+export function generateSeriesId(db: DbSchema): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const prefix = `SEN/RS/${year}${month}${day}/`;
+
+  const todaySeries = (db.recurrenceSeries || []).filter(s => s.id.startsWith(prefix));
+  let nextSeq = 1;
+  if (todaySeries.length > 0) {
+    const sequences = todaySeries.map(s => {
+      const parts = s.id.split('/');
       return parseInt(parts[parts.length - 1], 10);
     }).filter(num => !isNaN(num));
     if (sequences.length > 0) nextSeq = Math.max(...sequences) + 1;

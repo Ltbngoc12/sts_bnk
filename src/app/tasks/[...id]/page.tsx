@@ -370,9 +370,6 @@ export default function TaskDetailPage() {
                   <button className="btn btn-success btn-sm" disabled={busy} onClick={handleAcceptCompletion}>Accept &amp; Close</button>
                 </>
               )}
-              {isAssignee && !canControl && task.status === 'Pending Closure' && (
-                <span className="td-await">Awaiting Controller review…</span>
-              )}
               {/* Drop is only offered from Pending Further Action (Fig 7-1 "Continue or drop?") */}
               {canControl && task.status === 'Pending Further Action' && (
                 <button className="btn btn-danger btn-sm" disabled={busy} onClick={() => setShowClose(true)}>Drop Task</button>
@@ -748,7 +745,7 @@ export default function TaskDetailPage() {
                 {task.recurrenceCancelled && <span className="td-series-tag cancelled">Series cancelled</span>}
               </div>
               <p className="td-empty" style={{ marginBottom: 12 }}>
-                Defines how future tasks are scheduled. Each planned date will be created as its own separate task with its own lifecycle — the status of <em>this</em> task is unaffected.
+                Defines how future tasks are scheduled. Each planned date is created as its own separate task with its own lifecycle — the status of <em>this</em> task is unaffected.
               </p>
               <div className="td-meta">
                 <div className="td-meta-item"><span>Frequency</span><strong>{task.recurrence.frequency}</strong></div>
@@ -766,9 +763,12 @@ export default function TaskDetailPage() {
                 </strong></div>
                 <div className="td-meta-item"><span>Lead time</span><strong>{task.recurrence.leadTimeDays} days</strong></div>
               </div>
-              {!task.recurrenceCancelled && (
-                <div className="td-next">
-                  <span className="td-next-note">Occurrence generation is a later phase — no separate task records are created from this template yet.</span>
+              {task.seriesId && !task.recurrenceCancelled && (
+                <div className="td-next" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <Link href={`/series/${task.seriesId}`} className="btn btn-secondary btn-sm">View series &amp; occurrences</Link>
+                  {canControl && (
+                    <Link href={`/series/${task.seriesId}`} className="btn btn-primary btn-sm">Edit template</Link>
+                  )}
                 </div>
               )}
             </div>
@@ -951,15 +951,6 @@ export default function TaskDetailPage() {
           flex-shrink: 0;
           justify-content: flex-end;
           align-items: center;
-        }
-        .td-await {
-          font-size: 12.5px;
-          font-weight: 600;
-          color: #4338CA;
-          background: #EEF2FF;
-          border: 1px solid #C7D2FE;
-          padding: 8px 16px;
-          border-radius: var(--radius-md);
         }
         .td-id-row {
           display: flex;
