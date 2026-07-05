@@ -399,7 +399,7 @@ export default function CaseDetailsPage() {
                 ) : (
                   tasks.map(t => (
                     <div key={t.id} className="active-case-item" style={{ padding: '6px 10px', borderRadius: 4, cursor: 'pointer', background: 'var(--bg-inset)' }}
-                      onClick={() => router.push(`/tasks/${encodeURIComponent(t.id)}`)}>
+                      onClick={() => router.push(`/tasks/${t.id}`)}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                         <span style={{ fontSize: '12px', fontWeight: 600, maxWidth: '60%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
                         <span className={t.status === 'Closed' ? 'badge badge-closed' : t.status === 'In Progress' ? 'badge badge-onsite' : 'badge badge-ack'} style={{ fontSize: '9px', padding: '1px 6px' }}>{t.status}</span>

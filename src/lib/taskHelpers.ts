@@ -8,6 +8,8 @@ export const TASK_STATUSES = [
   'Acknowledged',
   'In Progress',
   'Pending Further Action',
+  'Pending Closure',
+  'Returned',
   'Closed',
 ] as const;
 
@@ -21,6 +23,8 @@ export function taskBadgeClass(status: string): string {
     case 'Acknowledged': return 'badge-ack';
     case 'In Progress': return 'badge-onsite';
     case 'Pending Further Action': return 'badge-pending-ctrl';
+    case 'Pending Closure': return 'badge-pending-closure';
+    case 'Returned': return 'badge-returned';
     case 'Closed': return 'badge-closed';
     default: return 'badge-info';
   }
@@ -30,9 +34,9 @@ export function taskBadgeClass(status: string): string {
 export type TaskColumn = 'created' | 'active' | 'pending' | 'closed';
 
 export function columnForStatus(status: string): TaskColumn {
-  if (status === 'Created' || status === 'Assigned') return 'created';
+  if (status === 'Created' || status === 'Assigned' || status === 'Returned') return 'created';
   if (status === 'Acknowledged' || status === 'In Progress') return 'active';
-  if (status === 'Pending Further Action') return 'pending';
+  if (status === 'Pending Further Action' || status === 'Pending Closure') return 'pending';
   return 'closed';
 }
 

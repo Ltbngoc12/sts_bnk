@@ -90,6 +90,8 @@ export async function POST(request: Request) {
         checklist,
         comments: [],
         recurrenceSchedule: body.recurrenceSchedule || undefined,
+        recurrence: body.recurrence || undefined,
+        isRecurringInstance: false,
         createdBy: creator,
         createdDate: new Date().toISOString(),
         attachments: Array.isArray(body.attachments) ? body.attachments : [],

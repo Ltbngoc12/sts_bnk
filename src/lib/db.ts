@@ -226,10 +226,30 @@ export type TaskStatus =
   | 'Acknowledged'
   | 'In Progress'
   | 'Pending Further Action'
+  | 'Pending Closure'
+  | 'Returned'
   | 'Closed';
 
+// ── Recurrence (FRD 7.1.2 + Shin Feng clarifications) ──
+export type RecurrenceFrequency = 'Daily' | 'Weekly' | 'Monthly';
+export type RecurrenceEndType = 'never' | 'onDate' | 'afterCount';
+export type Weekday = 'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun';
+
+// Config captured in the Create Task form. Persisted as the series template.
+export interface RecurrenceConfig {
+  frequency: RecurrenceFrequency;
+  weekdays?: Weekday[];        // required when frequency = 'Weekly'
+  monthlyDay?: number;         // 1..31; clamps to last day of shorter months
+  startDate: string;           // YYYY-MM-DD anchor
+  dueTime?: string;            // HH:mm applied to each occurrence
+  endType: RecurrenceEndType;
+  endDate?: string;            // when endType = 'onDate'
+  occurrenceCount?: number;    // when endType = 'afterCount'
+  leadTimeDays: number;        // generate-ahead window (default 14)
+}
+
 export interface Task {
-  id: string; // TASK-XXX
+  id: string; // SEN/TA/YYYYMMDD/NNN
   caseId: string;
   linkedIncidentId?: string; // Optional: incident this task runs alongside
   title: string;
@@ -238,20 +258,29 @@ export interface Task {
   assigneeType?: 'user' | 'group'; // FRD 7.2 — individual or pre-configured group
   priority: string; // "Normal" | "High"
   dueDate: string;
-  status: string; // TaskStatus — Created, Assigned, Acknowledged, In Progress, Pending Further Action, Closed
+  status: string; // TaskStatus — Created, Assigned, Acknowledged, In Progress, Pending Further Action, Pending Closure, Closed
   closeReason?: string; // Mandatory when closed without Assignee completion (FRD 7.3)
   completed?: boolean; // True when Assignee marked complete (vs. Controller drop)
   checklist?: TaskChecklistItem[];
   comments?: TaskComment[];
   audits?: TaskAudit[];
-  recurrenceSchedule?: string; // Template only at this phase (no scheduler)
+  recurrenceSchedule?: string; // Human-readable summary of the recurrence rule
+  recurrence?: RecurrenceConfig; // Structured recurrence template (FRD 7.1.2)
+  seriesId?: string; // Link back to RecurrenceSeries when this is a generated occurrence
+  occurrenceDate?: string; // The date this occurrence belongs to within its series
+  isRecurringInstance?: boolean;
+  detachedFromSeries?: boolean; // W11 — edited "this occurrence only"
+  recurrenceCancelled?: boolean; // W12 — series cancelled ("this + all future")
   attachments: string[];
   createdBy: string;
   createdDate: string;
   acknowledgedAt?: string;
   startedAt?: string;
+  completedAt?: string; // When the Assignee marked complete (entered Pending Closure)
+  completedBy?: string; // Assignee who marked complete → moved task to Pending Closure (FRD 7, Fig 7-1)
   closedAt?: string;
   closedBy?: string;
+  reviewNote?: string; // Controller's note when accepting/rejecting a completion at Pending Closure
 }
 
 export interface Occurrence {
@@ -724,15 +753,22 @@ export function generateIncidentId(db: DbSchema): string {
 }
 
 export function generateTaskId(db: DbSchema): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const prefix = `SEN/TA/${year}${month}${day}/`;
+
+  const todayTasks = db.tasks.filter(t => t.id.startsWith(prefix));
   let nextSeq = 1;
-  if (db.tasks.length > 0) {
-    const sequences = db.tasks.map(t => {
-      const parts = t.id.split('-');
-      return parseInt(parts[1], 10);
+  if (todayTasks.length > 0) {
+    const sequences = todayTasks.map(t => {
+      const parts = t.id.split('/');
+      return parseInt(parts[parts.length - 1], 10);
     }).filter(num => !isNaN(num));
     if (sequences.length > 0) nextSeq = Math.max(...sequences) + 1;
   }
-  return `TASK-${String(nextSeq).padStart(3, '0')}`;
+  return `${prefix}${String(nextSeq).padStart(3, '0')}`;
 }
 
 export function generateOccurrenceId(db: DbSchema): string {

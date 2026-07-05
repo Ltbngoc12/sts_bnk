@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Task, Case } from '@/lib/db';
+import { Task, Case, RecurrenceConfig } from '@/lib/db';
+import { RecurrenceScheduleField, recurrenceSummary } from '@/components/RecurrenceScheduleField';
 import { useRole } from '@/context/RoleContext';
 import { useNotifications } from '@/context/NotificationContext';
 import {
@@ -53,7 +54,7 @@ export function TaskBoardTab() {
   const [taskAssignee, setTaskAssignee] = useState('');
   const [taskPriority, setTaskPriority] = useState('Normal');
   const [taskDueDate, setTaskDueDate] = useState('');
-  const [taskRecurrence, setTaskRecurrence] = useState('');
+  const [recurrence, setRecurrence] = useState<RecurrenceConfig | null>(null);
   const [checklist, setChecklist] = useState<ChecklistDraft[]>([]);
   const [checklistInput, setChecklistInput] = useState('');
   const [attachments, setAttachments] = useState<string[]>([]);
@@ -88,7 +89,7 @@ export function TaskBoardTab() {
 
   // ─── Derived data ─────────────────────────────────────────────────
   const now = Date.now();
-  const isOverdue = (t: Task) => !!t.dueDate && new Date(t.dueDate).getTime() < now && t.status !== 'Closed';
+  const isOverdue = (t: Task) => !!t.dueDate && new Date(t.dueDate).getTime() < now && t.status !== 'Closed' && t.status !== 'Pending Closure';
 
   // Base set respecting tab / role visibility
   const baseTasks = (isRanger || tab === 'mine') ? tasks.filter(isMine) : tasks;
@@ -142,7 +143,7 @@ export function TaskBoardTab() {
 
   const resetForm = () => {
     setTaskTitle(''); setTaskDesc(''); setTaskDueDate('');
-    setTaskRecurrence(''); setChecklist([]); setChecklistInput('');
+    setRecurrence(null); setChecklist([]); setChecklistInput('');
     setAttachments([]); setTaskAssignee(''); setAssignType('user');
     setTaskPriority('Normal'); setCreateError('');
   };
@@ -170,7 +171,8 @@ export function TaskBoardTab() {
       assigneeType: assignType,
       priority: taskPriority,
       dueDate: taskDueDate,
-      recurrenceSchedule: taskRecurrence,
+      recurrence: recurrence || undefined,
+      recurrenceSchedule: recurrence ? recurrenceSummary(recurrence) : '',
       checklist,
       attachments,
       username,
@@ -392,7 +394,7 @@ export function TaskBoardTab() {
               </thead>
               <tbody>
                 {paginatedTasks.map((t) => (
-                  <tr key={t.id} onClick={() => router.push(`/tasks/${encodeURIComponent(t.id)}`)}>
+                  <tr key={t.id} onClick={() => router.push(`/tasks/${t.id}`)}>
                     <td>
                       <span className="mono-id" style={{ color: 'var(--color-info)', background: 'var(--color-info-bg)', borderColor: 'var(--color-info-border)' }}>
                         {t.id}
@@ -530,15 +532,13 @@ export function TaskBoardTab() {
                   )}
                 </div>
 
-                <div className="form-grid">
-                  <div className="form-group">
-                    <label>Recurrence (template only)</label>
-                    <input type="text" placeholder="e.g. Daily 09:00, Weekly Mon" value={taskRecurrence} onChange={e => setTaskRecurrence(e.target.value)} className="form-control" />
-                  </div>
-                  <div className="form-group">
-                    <label>Attachments</label>
-                    <input type="file" multiple onChange={handleFiles} className="form-control" />
-                  </div>
+                <div className="form-group">
+                  <RecurrenceScheduleField value={recurrence} onChange={setRecurrence} />
+                </div>
+
+                <div className="form-group">
+                  <label>Attachments</label>
+                  <input type="file" multiple onChange={handleFiles} className="form-control" />
                 </div>
                 {attachments.length > 0 && (
                   <div className="attach-draft">{attachments.map((a, i) => <span key={i}>📎 {a}</span>)}</div>
