@@ -3,10 +3,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Case, Task, Fault } from '@/lib/db';
+import { Case, Task, Fault, RecurrenceConfig } from '@/lib/db';
 import { useRole } from '@/context/RoleContext';
 import { getIncidentTaxonomy } from '@/lib/taxonomy';
 import FaultCreateModal from '@/components/FaultCreateModal';
+import { RecurrenceScheduleField, recurrenceSummary } from '@/components/RecurrenceScheduleField';
+import { getAssignableUsers, getAssignableGroups } from '@/lib/taskHelpers';
+import { getUsers } from '@/lib/users';
+import { useNotifications } from '@/context/NotificationContext';
 
 // ─── Helper: case status → badge class ───────────────────────────────────────
 function caseBadgeClass(status: string) {
@@ -43,6 +47,7 @@ export default function CaseDetailsPage() {
   const params = useParams();
   const router = useRouter();
   const { role, username } = useRole();
+  const { addNotification } = useNotifications();
 
   const idArray = params?.id as string[] || [];
   const caseId = idArray.join('/');
@@ -81,9 +86,47 @@ export default function CaseDetailsPage() {
   // Task create form
   const [taskTitle, setTaskTitle] = useState('');
   const [taskDesc, setTaskDesc] = useState('');
-  const [taskAssignee, setTaskAssignee] = useState('Ranger John');
+  const [assignType, setAssignType] = useState<'user' | 'group'>('user');
+  const [taskAssignee, setTaskAssignee] = useState('');
   const [taskPriority, setTaskPriority] = useState('Normal');
   const [taskDueDate, setTaskDueDate] = useState('');
+  const [recurrence, setRecurrence] = useState<RecurrenceConfig | null>(null);
+  interface ChecklistDraft { id: string; text: string; isCompleted: boolean; }
+  const [checklist, setChecklist] = useState<ChecklistDraft[]>([]);
+  const [checklistInput, setChecklistInput] = useState('');
+  const [attachments, setAttachments] = useState<string[]>([]);
+  const [createError, setCreateError] = useState('');
+
+  const assignableUsers = getAssignableUsers();
+  const assignableGroups = getAssignableGroups();
+
+  const notifyNewAssignee = (name: string, type: 'user' | 'group', title: string) => {
+    if (type === 'group') {
+      addNotification({ title: 'Task Assigned', message: `New task "${title}" assigned to group ${name}.`, role: 'Responder (Ranger)', type: 'task', link: '/tasks' });
+    } else {
+      const u = getUsers().find(x => x.name === name);
+      const targetRole = u?.role === 'Responder' ? 'Responder (Ranger)' : ((u?.role as any) || 'Responder (Ranger)');
+      addNotification({ title: 'Task Assigned', message: `New task "${title}" assigned to you.`, role: targetRole, type: 'task', link: '/tasks' });
+    }
+  };
+
+  const addChecklistItem = () => {
+    if (!checklistInput.trim()) return;
+    setChecklist([...checklist, { id: `chk-${Date.now()}`, text: checklistInput.trim(), isCompleted: false }]);
+    setChecklistInput('');
+  };
+
+  const handleFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []).map(f => f.name);
+    setAttachments(prev => [...prev, ...files]);
+  };
+
+  const resetForm = () => {
+    setTaskTitle(''); setTaskDesc(''); setTaskDueDate('');
+    setRecurrence(null); setChecklist([]); setChecklistInput('');
+    setAttachments([]); setTaskAssignee(''); setAssignType('user');
+    setTaskPriority('Normal'); setCreateError('');
+  };
 
   // Faults
   const [caseFaults, setCaseFaults] = useState<Fault[]>([]);
@@ -194,19 +237,43 @@ export default function CaseDetailsPage() {
 
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
+    setCreateError('');
     if (!taskTitle.trim()) return;
+
+    const payload = {
+      caseId,
+      title: taskTitle,
+      description: taskDesc,
+      assignee: taskAssignee || 'Unassigned',
+      assigneeType: assignType,
+      priority: taskPriority,
+      dueDate: taskDueDate,
+      recurrence: recurrence || undefined,
+      recurrenceSchedule: recurrence ? recurrenceSummary(recurrence) : '',
+      checklist,
+      attachments,
+      username,
+    };
+
     try {
       const res = await fetch('/api/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ caseId, title: taskTitle, description: taskDesc, assignee: taskAssignee, priority: taskPriority, dueDate: taskDueDate, username }),
+        body: JSON.stringify(payload),
       });
       if (res.ok) {
+        if (taskAssignee) notifyNewAssignee(taskAssignee, assignType, taskTitle);
         setShowTaskModal(false);
-        setTaskTitle(''); setTaskDesc(''); setTaskDueDate('');
+        resetForm();
         await refresh();
+      } else {
+        const data = await res.json();
+        setCreateError(data.error || 'Failed to create task.');
       }
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+      setCreateError('Network error.');
+    }
   };
 
   const handleAttachIncident = async (e: React.FormEvent) => {
@@ -646,30 +713,106 @@ export default function CaseDetailsPage() {
 
       {/* Create Task Modal */}
       {showTaskModal && (
-        <div className="modal-overlay">
-          <div className="modal-box" style={{ maxWidth: 560 }}>
-            <div className="modal-title">Dispatch New Task — {caseId}</div>
-            <form onSubmit={handleCreateTask}>
-              <div className="form-group"><label>Task Title *</label><input className="form-control" required value={taskTitle} onChange={e => setTaskTitle(e.target.value)} placeholder="e.g. Escort contractor to substation" /></div>
-              <div className="form-group"><label>Description</label><textarea className="form-control" rows={2} value={taskDesc} onChange={e => setTaskDesc(e.target.value)} placeholder="Ground activities needed…" /></div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div className="modal-backdrop">
+          <div className="create-case-modal glass">
+            <div className="modal-header">
+              <h2>CREATE NEW OPERATIONAL TASK</h2>
+              <button className="close-btn" onClick={() => setShowTaskModal(false)}>Close</button>
+            </div>
+
+            <form onSubmit={handleCreateTask} className="modal-form">
+              <div className="modal-scroll-area">
+                {createError && <div className="td-create-error">{createError}</div>}
+
                 <div className="form-group">
-                  <label>Assignee</label>
-                  <select className="form-control" value={taskAssignee} onChange={e => setTaskAssignee(e.target.value)}>
-                    {['Ranger John','Ranger Sarah','Ranger Alex','Ranger Tommy'].map(r => <option key={r}>{r}</option>)}
-                  </select>
+                  <label>Link to Parent Case *</label>
+                  <input className="form-control" value={caseId} disabled style={{ opacity: 0.8, cursor: 'not-allowed', background: 'var(--bg-inset)' }} />
                 </div>
+
                 <div className="form-group">
-                  <label>Priority</label>
-                  <select className="form-control" value={taskPriority} onChange={e => setTaskPriority(e.target.value)}>
-                    {['High','Normal'].map(p => <option key={p}>{p}</option>)}
-                  </select>
+                  <label>Task Title *</label>
+                  <input type="text" placeholder="e.g. Escort contractor to substation" value={taskTitle} onChange={e => setTaskTitle(e.target.value)} required className="form-control" />
                 </div>
+
+                <div className="form-group">
+                  <label>Task Description</label>
+                  <textarea placeholder="Provide details on ground activities needed..." value={taskDesc} onChange={e => setTaskDesc(e.target.value)} className="form-control" rows={2} />
+                </div>
+
+                <div className="form-group">
+                  <label>Checklist (optional)</label>
+                  <div className="checklist-builder">
+                    <input
+                      type="text"
+                      placeholder="Add a checklist item and press Add"
+                      value={checklistInput}
+                      onChange={e => setChecklistInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addChecklistItem(); } }}
+                      className="form-control"
+                    />
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={addChecklistItem}>Add</button>
+                  </div>
+                  {checklist.length > 0 && (
+                    <ul className="checklist-draft">
+                      {checklist.map(c => (
+                        <li key={c.id}>
+                          <span>☐ {c.text}</span>
+                          <button type="button" onClick={() => setChecklist(checklist.filter(x => x.id !== c.id))}>✕</button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label>Assign To</label>
+                    <select value={assignType} onChange={e => { setAssignType(e.target.value as any); setTaskAssignee(''); }} className="form-control select-dark">
+                      <option value="user">Individual User</option>
+                      <option value="group">Group</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>{assignType === 'user' ? 'Assignee' : 'Group'}</label>
+                    <select value={taskAssignee} onChange={e => setTaskAssignee(e.target.value)} className="form-control select-dark">
+                      <option value="">-- Unassigned --</option>
+                      {assignType === 'user'
+                        ? assignableUsers.map(u => <option key={u.id} value={u.name}>{u.name} ({u.role})</option>)
+                        : assignableGroups.map(g => <option key={g.id} value={g.name}>{g.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label>Priority</label>
+                    <select value={taskPriority} onChange={e => setTaskPriority(e.target.value)} className="form-control select-dark">
+                      <option value="Normal">Normal</option>
+                      <option value="High">High</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Due Date & Time</label>
+                    <input type="datetime-local" value={taskDueDate} onChange={e => setTaskDueDate(e.target.value)} className="form-control" />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <RecurrenceScheduleField value={recurrence} onChange={setRecurrence} />
+                </div>
+
+                <div className="form-group">
+                  <label>Attachments</label>
+                  <input type="file" multiple onChange={handleFiles} className="form-control" />
+                </div>
+                {attachments.length > 0 && (
+                  <div className="attach-draft">{attachments.map((a, i) => <span key={i}>📎 {a}</span>)}</div>
+                )}
               </div>
-              <div className="form-group"><label>Due Date & Time</label><input className="form-control" type="datetime-local" value={taskDueDate} onChange={e => setTaskDueDate(e.target.value)} /></div>
-              <div className="modal-actions">
+
+              <div className="modal-actions-bar">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowTaskModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Dispatch Task</button>
+                <button type="submit" className="btn btn-primary">DISPATCH TASK</button>
               </div>
             </form>
           </div>
@@ -786,6 +929,14 @@ export default function CaseDetailsPage() {
         .cd-info-row:last-child { border-bottom: none; }
         .cd-info-label { color: var(--text-muted); font-weight: 500; }
         .cd-info-value { text-align: right; color: var(--text-main); font-weight: 500; }
+
+        .checklist-builder { display: flex; gap: 8px; }
+        .checklist-builder input { flex: 1; }
+        .btn-sm { padding: 6px 12px; font-size: 12px; height: auto; white-space: nowrap; }
+        .checklist-draft { margin-top: 8px; display: flex; flex-direction: column; gap: 5px; }
+        .checklist-draft li { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; color: var(--text-sub); background: var(--bg-inset); padding: 5px 10px; border-radius: var(--radius-sm); }
+        .checklist-draft button { background: none; border: none; color: var(--color-critical); cursor: pointer; font-size: 12px; }
+        .td-create-error { background: var(--color-critical-bg); color: var(--color-critical); border: 1px solid var(--color-critical-border); padding: 8px 12px; border-radius: var(--radius-sm); font-size: 12.5px; margin-bottom: 12px; }
       `}</style>
     </>
   );

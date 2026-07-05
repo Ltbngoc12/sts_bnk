@@ -49,7 +49,7 @@ export function TaskBoardTab() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [taskTitle, setTaskTitle] = useState('');
   const [taskDesc, setTaskDesc] = useState('');
-  const [taskCaseId, setTaskCaseId] = useState('');
+  const [taskCaseId, setTaskCaseId] = useState('new-case');
   const [assignType, setAssignType] = useState<'user' | 'group'>('user');
   const [taskAssignee, setTaskAssignee] = useState('');
   const [taskPriority, setTaskPriority] = useState('Normal');
@@ -59,6 +59,11 @@ export function TaskBoardTab() {
   const [checklistInput, setChecklistInput] = useState('');
   const [attachments, setAttachments] = useState<string[]>([]);
   const [createError, setCreateError] = useState('');
+
+  // Searchable case dropdown states
+  const [caseSearchText, setCaseSearchText] = useState('');
+  const [showCaseDropdown, setShowCaseDropdown] = useState(false);
+  const [selectedCase, setSelectedCase] = useState<any>({ id: 'NEW CASE', title: 'Auto-create new case' });
 
   const fetchTasksAndCases = async () => {
     try {
@@ -70,8 +75,8 @@ export function TaskBoardTab() {
       if (casesRes.ok) {
         const casesList = (await casesRes.json()) as Case[];
         setCases(casesList);
-        const active = casesList.find(c => c.status !== 'Closed');
-        if (active) setTaskCaseId(active.id);
+        setTaskCaseId('new-case');
+        setSelectedCase({ id: 'NEW CASE', title: 'Auto-create new case' });
       }
     } catch (err) {
       console.error('Error fetching data:', err);
@@ -153,6 +158,12 @@ export function TaskBoardTab() {
     setRecurrence(null); setChecklist([]); setChecklistInput('');
     setAttachments([]); setTaskAssignee(''); setAssignType('user');
     setTaskPriority('Normal'); setCreateError('');
+    
+    // Default to create new case for List screen
+    setTaskCaseId('new-case');
+    setSelectedCase({ id: 'NEW CASE', title: 'Auto-create new case' });
+    setCaseSearchText('');
+    setShowCaseDropdown(false);
   };
 
   const notifyNewAssignee = (name: string, type: 'user' | 'group', title: string) => {
@@ -170,22 +181,43 @@ export function TaskBoardTab() {
     setCreateError('');
     if (!taskTitle.trim() || !taskCaseId) return;
 
-    const payload = {
-      caseId: taskCaseId,
-      title: taskTitle,
-      description: taskDesc,
-      assignee: taskAssignee || 'Unassigned',
-      assigneeType: assignType,
-      priority: taskPriority,
-      dueDate: taskDueDate,
-      recurrence: recurrence || undefined,
-      recurrenceSchedule: recurrence ? recurrenceSummary(recurrence) : '',
-      checklist,
-      attachments,
-      username,
-    };
+    let targetCaseId = taskCaseId;
 
     try {
+      if (taskCaseId === 'new-case') {
+        const caseRes = await fetch('/api/cases', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: `Case for Task: ${taskTitle}`,
+            status: 'Active',
+            username,
+          }),
+        });
+        if (!caseRes.ok) {
+          const errData = await caseRes.json();
+          setCreateError(errData.error || 'Failed to create new case.');
+          return;
+        }
+        const newCaseObj = await caseRes.json();
+        targetCaseId = newCaseObj.id;
+      }
+
+      const payload = {
+        caseId: targetCaseId,
+        title: taskTitle,
+        description: taskDesc,
+        assignee: taskAssignee || 'Unassigned',
+        assigneeType: assignType,
+        priority: taskPriority,
+        dueDate: taskDueDate,
+        recurrence: recurrence || undefined,
+        recurrenceSchedule: recurrence ? recurrenceSummary(recurrence) : '',
+        checklist,
+        attachments,
+        username,
+      };
+
       const res = await fetch('/api/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -480,14 +512,152 @@ export function TaskBoardTab() {
               <div className="modal-scroll-area">
                 {createError && <div className="td-create-error">{createError}</div>}
 
-                <div className="form-group">
+                 <div className="form-group" style={{ position: 'relative' }}>
                   <label>Link to Parent Case *</label>
-                  <select value={taskCaseId} onChange={e => setTaskCaseId(e.target.value)} required className="form-control select-dark">
-                    <option value="">-- Choose Case --</option>
-                    {cases.filter(c => c.status !== 'Closed').map(c => (
-                      <option key={c.id} value={c.id}>{c.id} - {c.title}</option>
-                    ))}
-                  </select>
+                  
+                  {/* Select Trigger Box */}
+                  <div
+                    onClick={() => setShowCaseDropdown(!showCaseDropdown)}
+                    className="form-control select-dark search-select-trigger"
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      cursor: 'pointer',
+                      background: 'var(--bg-card)',
+                      border: '1px solid var(--border-color)',
+                      padding: '8px 12px',
+                      borderRadius: 'var(--radius-md)',
+                      fontSize: '13px'
+                    }}
+                  >
+                    <span>
+                      {selectedCase
+                        ? `${selectedCase.id} - ${selectedCase.title}`
+                        : '-- Choose Case --'}
+                    </span>
+                    <span style={{ fontSize: '10px', opacity: 0.7 }}>▼</span>
+                  </div>
+
+                  {/* Dropdown Menu */}
+                  {showCaseDropdown && (
+                    <div
+                      className="glass search-select-dropdown"
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        zIndex: 100,
+                        marginTop: '4px',
+                        background: 'var(--bg-card)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: 'var(--radius-md)',
+                        boxShadow: '0 8px 30px rgba(0,0,0,0.15)',
+                        maxHeight: '260px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      {/* Search Input field */}
+                      <div style={{ padding: '8px', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-inset)' }}>
+                        <input
+                          type="text"
+                          placeholder="Search case ID or title..."
+                          value={caseSearchText}
+                          onChange={e => setCaseSearchText(e.target.value)}
+                          onClick={e => e.stopPropagation()}
+                          className="form-control"
+                          style={{
+                            fontSize: '12px',
+                            height: '30px',
+                            padding: '4px 8px',
+                            width: '100%',
+                            boxSizing: 'border-box'
+                          }}
+                          autoFocus
+                        />
+                      </div>
+
+                      {/* Options list */}
+                      <div style={{ overflowY: 'auto', flex: 1, maxHeight: '200px' }}>
+                        {/* Option: Create New Case */}
+                        <div
+                          onClick={() => {
+                            setTaskCaseId('new-case');
+                            setSelectedCase({ id: 'NEW CASE', title: 'Auto-create new case' });
+                            setShowCaseDropdown(false);
+                            setCaseSearchText('');
+                          }}
+                          className="search-select-option create-new-opt"
+                          style={{
+                            padding: '8px 12px',
+                            cursor: 'pointer',
+                            fontSize: '12.5px',
+                            color: 'var(--color-primary)',
+                            fontWeight: '600',
+                            borderBottom: '1px solid var(--border-color)',
+                            background: taskCaseId === 'new-case' ? 'var(--bg-hover)' : 'transparent'
+                          }}
+                        >
+                          ➕ Create New Case
+                        </div>
+
+                        {/* Filtered Active Cases */}
+                        {cases
+                          .filter(c => c.status !== 'Closed')
+                          .filter(c => {
+                            if (!caseSearchText.trim()) return true;
+                            const query = caseSearchText.toLowerCase();
+                            return (
+                              c.id.toLowerCase().includes(query) ||
+                              c.title.toLowerCase().includes(query)
+                            );
+                          })
+                          .map(c => {
+                            const isSelected = taskCaseId === c.id;
+                            return (
+                              <div
+                                key={c.id}
+                                onClick={() => {
+                                  setTaskCaseId(c.id);
+                                  setSelectedCase(c);
+                                  setShowCaseDropdown(false);
+                                  setCaseSearchText('');
+                                }}
+                                className="search-select-option"
+                                style={{
+                                  padding: '8px 12px',
+                                  cursor: 'pointer',
+                                  fontSize: '12.5px',
+                                  color: isSelected ? 'var(--color-primary)' : 'var(--text-main)',
+                                  background: isSelected ? 'var(--bg-hover)' : 'transparent'
+                                }}
+                              >
+                                {c.id} - {c.title}
+                              </div>
+                            );
+                          })}
+
+                        {/* Empty results */}
+                        {cases
+                          .filter(c => c.status !== 'Closed')
+                          .filter(c => {
+                            if (!caseSearchText.trim()) return true;
+                            const query = caseSearchText.toLowerCase();
+                            return (
+                              c.id.toLowerCase().includes(query) ||
+                              c.title.toLowerCase().includes(query)
+                            );
+                          }).length === 0 && (
+                          <div style={{ padding: '8px 12px', fontSize: '12.5px', color: 'var(--text-muted)', textAlign: 'center' }}>
+                            No cases found
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="form-group">
@@ -498,6 +668,31 @@ export function TaskBoardTab() {
                 <div className="form-group">
                   <label>Task Description</label>
                   <textarea placeholder="Provide details on ground activities needed..." value={taskDesc} onChange={e => setTaskDesc(e.target.value)} className="form-control" rows={2} />
+                </div>
+
+                <div className="form-group">
+                  <label>Checklist (optional)</label>
+                  <div className="checklist-builder">
+                    <input
+                      type="text"
+                      placeholder="Add a checklist item and press Add"
+                      value={checklistInput}
+                      onChange={e => setChecklistInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addChecklistItem(); } }}
+                      className="form-control"
+                    />
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={addChecklistItem}>Add</button>
+                  </div>
+                  {checklist.length > 0 && (
+                    <ul className="checklist-draft">
+                      {checklist.map(c => (
+                        <li key={c.id}>
+                          <span>☐ {c.text}</span>
+                          <button type="button" onClick={() => setChecklist(checklist.filter(x => x.id !== c.id))}>✕</button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
 
                 <div className="form-grid">
@@ -534,31 +729,6 @@ export function TaskBoardTab() {
                 </div>
 
                 <div className="form-group">
-                  <label>Checklist (optional)</label>
-                  <div className="checklist-builder">
-                    <input
-                      type="text"
-                      placeholder="Add a checklist item and press Add"
-                      value={checklistInput}
-                      onChange={e => setChecklistInput(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addChecklistItem(); } }}
-                      className="form-control"
-                    />
-                    <button type="button" className="btn btn-secondary btn-sm" onClick={addChecklistItem}>Add</button>
-                  </div>
-                  {checklist.length > 0 && (
-                    <ul className="checklist-draft">
-                      {checklist.map(c => (
-                        <li key={c.id}>
-                          <span>☐ {c.text}</span>
-                          <button type="button" onClick={() => setChecklist(checklist.filter(x => x.id !== c.id))}>✕</button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-
-                <div className="form-group">
                   <RecurrenceScheduleField value={recurrence} onChange={setRecurrence} />
                 </div>
 
@@ -571,7 +741,7 @@ export function TaskBoardTab() {
                 )}
               </div>
 
-              <div className="modal-actions">
+              <div className="modal-actions-bar">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowCreateModal(false)}>Cancel</button>
                 <button type="submit" className="btn btn-primary">DISPATCH TASK</button>
               </div>
@@ -588,6 +758,8 @@ export function TaskBoardTab() {
         .checklist-draft li { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; color: var(--text-sub); background: var(--bg-inset); padding: 5px 10px; border-radius: var(--radius-sm); }
         .checklist-draft button { background: none; border: none; color: var(--color-critical); cursor: pointer; font-size: 12px; }
         .td-create-error { background: var(--color-critical-bg); color: var(--color-critical); border: 1px solid var(--color-critical-border); padding: 8px 12px; border-radius: var(--radius-sm); font-size: 12.5px; margin-bottom: 12px; }
+        .search-select-option:hover { background: var(--bg-hover) !important; }
+        .create-new-opt:hover { background: var(--color-primary-bg) !important; color: var(--color-primary-dark) !important; }
       `}</style>
     </>
   );
