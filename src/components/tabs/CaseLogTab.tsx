@@ -442,11 +442,27 @@ export function CaseLogTab() {
                           {c.incident && (
                             <span className="badge badge-live" style={{ fontSize: '10px' }} title={c.incident.title}>🚨 Incident</span>
                           )}
-                          {(c.cmmsTickets?.length ?? 0) > 0 && (
-                            <span className="badge badge-ack" style={{ fontSize: '10px' }}>🔧 Fault ({c.cmmsTickets.length})</span>
+                          {((c.faultCount ?? c.cmmsTickets?.length ?? 0) > 0) && (
+                            <span className="badge badge-ack" style={{ fontSize: '10px' }}>
+                              🛠 Fault ({c.faultCount ?? c.cmmsTickets?.length ?? 0})
+                            </span>
                           )}
-                          {/* Checked elements for tasks and occurrences via state flags or subjoins in data */}
-                          <span className="badge-elements-summary"></span>
+                          {((c.taskCount ?? 0) > 0) && (
+                            <span className="badge badge-onsite" style={{ fontSize: '10px' }}>
+                              🔧 Task ({c.taskCount})
+                            </span>
+                          )}
+                          {((c.occurrenceCount ?? 0) > 0) && (
+                            <span className="badge badge-incomplete" style={{ fontSize: '10px' }}>
+                              📝 e-Diary ({c.occurrenceCount})
+                            </span>
+                          )}
+                          {!c.incident && 
+                           !(c.faultCount ?? c.cmmsTickets?.length ?? 0) && 
+                           !(c.taskCount ?? 0) && 
+                           !(c.occurrenceCount ?? 0) && (
+                            <span style={{ color: 'var(--text-faint)' }}>—</span>
+                          )}
                         </div>
                       </td>
                       <td style={{ fontSize: '12px', color: 'var(--text-muted)' }}>

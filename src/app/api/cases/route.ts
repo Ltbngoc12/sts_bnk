@@ -95,9 +95,21 @@ export async function GET(request: NextRequest) {
       return sortOrder === 'asc' ? valA - valB : valB - valA;
     });
 
+    const mapCaseCounts = (c: Case) => {
+      const taskCount = db.tasks.filter(t => t.caseId === c.id).length;
+      const occurrenceCount = db.occurrences.filter(o => o.caseId === c.id).length;
+      const faultCount = db.faults?.filter(f => f.caseId === c.id).length || c.cmmsTickets?.length || 0;
+      return {
+        ...c,
+        taskCount,
+        occurrenceCount,
+        faultCount
+      };
+    };
+
     // 7. Pagination
     if (!searchParams.has('page')) {
-      return NextResponse.json(cases);
+      return NextResponse.json(cases.map(mapCaseCounts));
     }
 
     const totalItems = cases.length;
@@ -105,7 +117,7 @@ export async function GET(request: NextRequest) {
     const paginatedCases = cases.slice(startIndex, startIndex + limit);
 
     return NextResponse.json({
-      data: paginatedCases,
+      data: paginatedCases.map(mapCaseCounts),
       pagination: {
         page,
         limit,

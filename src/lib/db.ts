@@ -359,6 +359,9 @@ export interface Case {
   cmmsTickets: string[]; // Dynamically joined from faults table
   incident: Incident | null; // Dynamically joined from incidents table
   linkedIncidentId?: string;
+  taskCount?: number;
+  occurrenceCount?: number;
+  faultCount?: number;
 }
 
 // The database schema physically stored on disk (db.json)
