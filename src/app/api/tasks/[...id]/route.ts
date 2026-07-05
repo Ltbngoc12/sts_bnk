@@ -272,6 +272,7 @@ export async function PUT(
           user: actor,
           timestamp: new Date().toISOString(),
           text,
+          images: Array.isArray(body.images) ? body.images : undefined,
         };
         task.comments.push(comment);
         pushAudit(task, actor, 'Comment', `${actor} logged an activity / comment.`);

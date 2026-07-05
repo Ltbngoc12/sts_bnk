@@ -111,9 +111,16 @@ export function TaskBoardTab() {
     return true;
   });
 
-  const totalPages = Math.ceil(filteredTasks.length / ITEMS_PER_PAGE);
+  // Sort tasks by createdDate in descending order (Z-A / newest first)
+  const sortedTasks = [...filteredTasks].sort((a, b) => {
+    const da = a.createdDate ? new Date(a.createdDate).getTime() : 0;
+    const db = b.createdDate ? new Date(b.createdDate).getTime() : 0;
+    return db - da;
+  });
+
+  const totalPages = Math.ceil(sortedTasks.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const paginatedTasks = filteredTasks.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  const paginatedTasks = sortedTasks.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   // Metric counts (over the visible base set)
   const totalCount = baseTasks.length;
@@ -383,24 +390,18 @@ export function TaskBoardTab() {
             <table className="custom-table">
               <thead>
                 <tr>
+                  <th>Case ID</th>
                   <th>Task ID</th>
                   <th>Task Title</th>
-                  <th>Case ID</th>
                   <th>Assignee</th>
-                  <th>Priority</th>
                   <th>Status</th>
                   <th>Due Date</th>
+                  <th>Created Date</th>
                 </tr>
               </thead>
               <tbody>
                 {paginatedTasks.map((t) => (
                   <tr key={t.id} onClick={() => router.push(`/tasks/${t.id}`)}>
-                    <td>
-                      <span className="mono-id" style={{ color: 'var(--color-info)', background: 'var(--color-info-bg)', borderColor: 'var(--color-info-border)' }}>
-                        {t.id}
-                      </span>
-                    </td>
-                    <td className="case-title-cell" style={{ fontWeight: 500 }}>{t.title}</td>
                     <td>
                       <span className="mono-id">
                         <Link href={`/cases/${t.caseId}`} style={{ textDecoration: 'none', color: 'inherit' }} onClick={(e) => e.stopPropagation()}>
@@ -408,15 +409,40 @@ export function TaskBoardTab() {
                         </Link>
                       </span>
                     </td>
-                    <td>{t.assignee}{t.assigneeType === 'group' ? ' (group)' : ''}</td>
                     <td>
-                      <span className={`badge ${t.priority === 'High' ? 'badge-live' : 'badge-closed'}`}>{t.priority}</span>
+                      <span className="mono-id" style={{ color: 'var(--color-critical)', background: 'var(--color-critical-bg)', borderColor: 'var(--color-critical-border)' }}>
+                        {t.id}
+                      </span>
+                    </td>
+                    <td className="case-title-cell" style={{ fontWeight: 500 }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', width: '100%' }}>
+                        {t.priority === 'High' ? (
+                          /* Double chevron up — High */
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="High" style={{ flexShrink: 0 }}>
+                            <path d="M3 10L8 5L13 10" stroke="#E53E3E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M3 14L8 9L13 14" stroke="#E53E3E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        ) : (
+                          /* Equals sign — Normal */
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Normal" style={{ flexShrink: 0 }}>
+                            <rect x="2" y="5.5" width="12" height="2" rx="1" fill="#F6AD55"/>
+                            <rect x="2" y="9.5" width="12" height="2" rx="1" fill="#F6AD55"/>
+                          </svg>
+                        )}
+                        <span>{t.title}</span>
+                      </span>
+                    </td>
+                    <td>
+                      <RespondersAvatars names={t.assignee} />
                     </td>
                     <td>
                       <span className={`badge ${taskBadgeClass(t.status)}`}>{t.status}</span>
                     </td>
                     <td className="date-cell" style={{ color: isOverdue(t) ? 'var(--color-critical)' : undefined, fontWeight: isOverdue(t) ? 600 : undefined }}>
                       {t.dueDate ? `${new Date(t.dueDate).toLocaleDateString('en-US')} ${new Date(t.dueDate).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })}` : '—'}
+                    </td>
+                    <td className="date-cell">
+                      {t.createdDate ? `${new Date(t.createdDate).toLocaleDateString('en-US')} ${new Date(t.createdDate).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })}` : '—'}
                     </td>
                   </tr>
                 ))}
@@ -426,7 +452,7 @@ export function TaskBoardTab() {
             {totalPages > 1 && (
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
                 <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                  Showing <strong>{startIndex + 1}</strong> to <strong>{Math.min(startIndex + ITEMS_PER_PAGE, filteredTasks.length)}</strong> of <strong>{filteredTasks.length}</strong> tasks
+                  Showing <strong>{startIndex + 1}</strong> to <strong>{Math.min(startIndex + ITEMS_PER_PAGE, sortedTasks.length)}</strong> of <strong>{sortedTasks.length}</strong> tasks
                 </div>
                 <div style={{ display: 'flex', gap: '6px' }}>
                   <button onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1} className="btn btn-secondary btn-xs" style={{ padding: '6px 12px', fontSize: '11px', borderRadius: '6px', opacity: currentPage === 1 ? 0.5 : 1, cursor: currentPage === 1 ? 'default' : 'pointer' }}>Previous</button>
@@ -564,5 +590,91 @@ export function TaskBoardTab() {
         .td-create-error { background: var(--color-critical-bg); color: var(--color-critical); border: 1px solid var(--color-critical-border); padding: 8px 12px; border-radius: var(--radius-sm); font-size: 12.5px; margin-bottom: 12px; }
       `}</style>
     </>
+  );
+}
+
+function RespondersAvatars({ names }: { names: string | string[] }) {
+  const list = (Array.isArray(names) ? names : [names])
+    .filter(Boolean)
+    .filter(name => name !== 'Unassigned');
+    
+  if (list.length === 0) {
+    return <span style={{ color: 'var(--text-faint)' }}>—</span>;
+  }
+
+  const getAvatarColor = (name: string) => {
+    const charCode = name.charCodeAt(0) || 65;
+    const colors = [
+      '#10B981', // Teal/green
+      '#3B82F6', // Blue
+      '#EC4899', // Pink
+      '#8B5CF6', // Purple
+      '#F97316', // Orange
+      '#0D9488', // Dark teal
+      '#6366F1', // Indigo
+    ];
+    return colors[charCode % colors.length];
+  };
+
+  if (list.length === 1) {
+    const name = list[0];
+    const letter = name.trim().charAt(0).toUpperCase();
+    const color = getAvatarColor(name);
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <span style={{
+          width: '20px',
+          height: '20px',
+          borderRadius: '50%',
+          background: color,
+          color: '#FFF',
+          fontSize: '10px',
+          fontWeight: 700,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          border: '1.5px solid #FFF',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.08)'
+        }}>
+          {letter}
+        </span>
+        <span style={{ fontSize: '13px', color: 'var(--text-main)' }}>{name}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center' }}>
+      <div style={{ display: 'flex', marginRight: '6px' }}>
+        {list.map((name, idx) => {
+          const letter = name.trim().charAt(0).toUpperCase();
+          const color = getAvatarColor(name);
+          return (
+            <span
+              key={idx}
+              title={name}
+              style={{
+                width: '20px',
+                height: '20px',
+                borderRadius: '50%',
+                background: color,
+                color: '#FFF',
+                fontSize: '10px',
+                fontWeight: 700,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: '1.5px solid #FFF',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
+                marginLeft: idx > 0 ? '-6px' : '0',
+                zIndex: 10 - idx
+              }}
+            >
+              {letter}
+            </span>
+          );
+        })}
+      </div>
+    </div>
   );
 }

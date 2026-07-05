@@ -30,9 +30,11 @@ export default function TaskDetailPage() {
   // Reassign / assign
   const [assignTarget, setAssignTarget] = useState('');
   const [assignType, setAssignType] = useState<'user' | 'group'>('user');
+  const [reassigning, setReassigning] = useState(false);
 
   // Comment
   const [commentText, setCommentText] = useState('');
+  const [commentAttachments, setCommentAttachments] = useState<string[]>([]);
 
   // Edit mode
   const [editing, setEditing] = useState(false);
@@ -146,6 +148,7 @@ export default function TaskDetailPage() {
     if (ok) {
       notifyAssignee(assignTarget, assignType, verb);
       setAssignTarget('');
+      setReassigning(false);
     }
   };
 
@@ -158,9 +161,31 @@ export default function TaskDetailPage() {
   };
 
   const handleAddComment = async () => {
-    if (!commentText.trim()) return;
-    const ok = await performAction('add-comment', { text: commentText });
-    if (ok) setCommentText('');
+    if (!commentText.trim() && commentAttachments.length === 0) return;
+    const ok = await performAction('add-comment', { text: commentText, images: commentAttachments });
+    if (ok) {
+      setCommentText('');
+      setCommentAttachments([]);
+    }
+  };
+
+  const handleCommentFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const filesArray = Array.from(e.target.files);
+      filesArray.forEach(file => {
+        if (file.size > 1.5 * 1024 * 1024) {
+          alert('Image size exceeds 1.5MB. Please choose a smaller image.');
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          if (event.target?.result) {
+            setCommentAttachments(prev => [...prev, event.target!.result as string]);
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+    }
   };
 
   const startEditing = () => {
@@ -263,59 +288,86 @@ export default function TaskDetailPage() {
 
   // Comments = user discussion, separate from the audit trail
   const commentFeed = (task.comments || [])
-    .map(c => ({ ts: c.timestamp, operator: c.user, body: c.text }))
+    .map(c => ({ ts: c.timestamp, operator: c.user, body: c.text, images: c.images || [] }))
     .sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
 
   const assignableUsers = getAssignableUsers();
   const assignableGroups = getAssignableGroups();
 
+  const getInitials = (name: string) => {
+    if (!name || name === 'Unassigned') return '?';
+    return name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase();
+  };
+  const assigneeInitials = getInitials(task.assignee || '');
+  const checklistProgress = checklistTotal > 0 ? Math.round((checklistDone / checklistTotal) * 100) : 0;
+
   return (
     <div className="task-detail-page">
-      <div className="td-topbar">
-        <Link href="/case-management?tab=tasks" className="td-back">← Task Board</Link>
-      </div>
-
-      {/* Header */}
-      <div className="glass td-header">
-        <div className="td-header-main">
-          <div>
-            <div className="td-id-row">
-              <span className="td-id">{task.id}</span>
-              <span className={`badge ${taskBadgeClass(task.status)}`}>{task.status}</span>
-              <span className={`badge ${task.priority === 'High' ? 'badge-live' : 'badge-info'}`}>{task.priority} Priority</span>
-            </div>
-            <h1 className="td-title">{task.title}</h1>
-            <div className="td-links">
-              <span>Case: <Link href={`/cases/${task.caseId}`} className="link">{task.caseId}</Link></span>
-              {task.linkedIncidentId && (
-                <span> · Incident: <Link href={`/incidents/${task.linkedIncidentId}`} className="link">{task.linkedIncidentId}</Link></span>
-              )}
-            </div>
+      {/* 1. Header Card (Compact & High Density) - Matching Incident Detail Header */}
+      <div className="glass" style={{ padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <Link href="/case-management?tab=tasks" style={{ color: 'var(--text-faint)', fontSize: 11, textDecoration: 'none', fontWeight: 600 }}>
+              ← BACK TO TASK BOARD
+            </Link>
+            <span style={{ color: 'var(--text-faint)' }}>&bull;</span>
+            <span className="mono-id" style={{ background: 'var(--color-critical-bg)', color: 'var(--color-critical)', borderColor: 'var(--color-critical-border)', fontSize: '11px', padding: '1px 6px' }}>
+              Task: {task.id}
+            </span>
+            <Link
+              href={`/cases/${task.caseId}`}
+              className="mono-id"
+              style={{ background: 'var(--color-info-bg)', color: 'var(--color-info)', borderColor: 'var(--color-info-border)', fontSize: '11px', padding: '1px 6px', textDecoration: 'none' }}
+            >
+              Case: {task.caseId}
+            </Link>
+            {task.linkedIncidentId && (
+              <>
+                <span style={{ color: 'var(--text-faint)' }}>&bull;</span>
+                <Link
+                  href={`/incidents/${task.linkedIncidentId}`}
+                  className="mono-id"
+                  style={{ background: 'var(--color-critical-bg)', color: 'var(--color-critical)', borderColor: 'var(--color-critical-border)', fontSize: '11px', padding: '1px 6px', textDecoration: 'none' }}
+                >
+                  Incident: {task.linkedIncidentId}
+                </Link>
+              </>
+            )}
           </div>
+          <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>{task.title}</h1>
+        </div>
 
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span className={`badge ${taskBadgeClass(task.status)}`} style={{ marginRight: 8 }}>{task.status}</span>
+          
           {/* Contextual action bar (role × status) */}
           {!editing && (
-            <div className="td-header-actions">
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               {canControl && task.status !== 'Closed' && (
-                <button className="btn btn-secondary" onClick={startEditing} disabled={busy}>Edit</button>
+                <button className="btn btn-secondary btn-sm" onClick={startEditing} disabled={busy}>Edit</button>
               )}
               {isAssignee && (task.status === 'Assigned' || task.status === 'Returned') && (
-                <button className="btn btn-primary" disabled={busy} onClick={() => performAction('acknowledge')}>Acknowledge</button>
+                <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => performAction('acknowledge')}>Acknowledge</button>
               )}
               {isAssignee && task.status === 'Acknowledged' && (
-                <button className="btn btn-primary" disabled={busy} onClick={() => performAction('begin')}>Begin Task</button>
+                <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => performAction('begin')}>Begin Task</button>
               )}
               {isAssignee && task.status === 'In Progress' && (
                 <>
-                  <button className="btn btn-secondary" disabled={busy} onClick={() => setShowFlag(true)}>Cannot Complete</button>
-                  <button className="btn btn-success" disabled={busy || !checklistComplete} title={!checklistComplete ? 'Complete all checklist items first' : ''} onClick={() => performAction('mark-complete')}>Mark Complete</button>
+                  <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => setShowFlag(true)}>Cannot Complete</button>
+                  <button className="btn btn-success btn-sm" disabled={busy || !checklistComplete} title={!checklistComplete ? 'Complete all checklist items first' : ''} onClick={() => performAction('mark-complete')}>Mark Complete</button>
                 </>
               )}
               {/* Controller reviews the completion (Fig 7-1) */}
               {canControl && task.status === 'Pending Closure' && (
                 <>
-                  <button className="btn btn-secondary" disabled={busy} onClick={() => setShowReject(true)}>Return to Assignee</button>
-                  <button className="btn btn-success" disabled={busy} onClick={handleAcceptCompletion}>Accept &amp; Close</button>
+                  <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => setShowReject(true)}>Return to Assignee</button>
+                  <button className="btn btn-success btn-sm" disabled={busy} onClick={handleAcceptCompletion}>Accept &amp; Close</button>
                 </>
               )}
               {isAssignee && !canControl && task.status === 'Pending Closure' && (
@@ -323,10 +375,10 @@ export default function TaskDetailPage() {
               )}
               {/* Drop is only offered from Pending Further Action (Fig 7-1 "Continue or drop?") */}
               {canControl && task.status === 'Pending Further Action' && (
-                <button className="btn btn-danger" disabled={busy} onClick={() => setShowClose(true)}>Drop Task</button>
+                <button className="btn btn-danger btn-sm" disabled={busy} onClick={() => setShowClose(true)}>Drop Task</button>
               )}
               {canControl && task.status === 'Closed' && (
-                <button className="btn btn-secondary" disabled={busy} onClick={() => performAction('reopen')}>Reopen Task</button>
+                <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => performAction('reopen')}>Reopen Task</button>
               )}
             </div>
           )}
@@ -352,7 +404,7 @@ export default function TaskDetailPage() {
         <div className="td-col">
           <div className="glass td-card">
             <div className="td-card-head">
-              <h3>DETAILS</h3>
+              <h3>📋 TASK DETAILS</h3>
             </div>
 
             {editing ? (
@@ -406,19 +458,64 @@ export default function TaskDetailPage() {
               <>
                 <div className="td-desc-block">
                   <span className="td-desc-label">Task Description</span>
-                  <p className="td-desc">{task.description || 'No description provided.'}</p>
+                  <div className="td-desc-wrapper">
+                    <p className="td-desc">{task.description || 'No description provided.'}</p>
+                  </div>
                 </div>
                 <div className="td-meta">
-                  <div><span>Assignee</span><strong>{task.assignee}{task.assigneeType === 'group' ? ' (group)' : ''}</strong></div>
-                  <div><span>Priority</span><strong>{task.priority}</strong></div>
-                  <div><span>Due</span><strong className={overdue ? 'td-overdue' : ''}>{task.dueDate ? new Date(task.dueDate).toLocaleString() : '—'}{overdue ? ' · Overdue' : ''}</strong></div>
-                  <div><span>Created by</span><strong>{task.createdBy}</strong></div>
-                  <div><span>Created</span><strong>{new Date(task.createdDate).toLocaleString()}</strong></div>
-                  {task.recurrenceSchedule && !task.recurrence && <div><span>Recurrence</span><strong>{task.recurrenceSchedule}</strong></div>}
-                  {task.completedBy && <div><span>Completed by</span><strong>{task.completedBy}</strong></div>}
-                  {task.closedBy && <div><span>Closed by</span><strong>{task.closedBy}</strong></div>}
-                  {task.closeReason && <div className="td-meta-wide"><span>Close reason</span><strong>{task.closeReason}</strong></div>}
-                  {task.reviewNote && <div className="td-meta-wide"><span>Controller review note</span><strong>{task.reviewNote}</strong></div>}
+                  <div className="td-meta-item">
+                    <span>Assignee</span>
+                    <strong>{task.assignee}{task.assigneeType === 'group' ? ' (group)' : ''}</strong>
+                  </div>
+                  <div className="td-meta-item">
+                    <span>Priority</span>
+                    <strong>{task.priority}</strong>
+                  </div>
+                  <div className="td-meta-item">
+                    <span>Due Date</span>
+                    <strong className={overdue ? 'td-overdue' : ''}>
+                      {task.dueDate ? new Date(task.dueDate).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : '—'}
+                      {overdue ? ' · Overdue' : ''}
+                    </strong>
+                  </div>
+                  <div className="td-meta-item">
+                    <span>Created by</span>
+                    <strong>{task.createdBy}</strong>
+                  </div>
+                  <div className="td-meta-item">
+                    <span>Created Date</span>
+                    <strong>{new Date(task.createdDate).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}</strong>
+                  </div>
+                  {task.recurrenceSchedule && !task.recurrence && (
+                    <div className="td-meta-item">
+                      <span>Recurrence</span>
+                      <strong>{task.recurrenceSchedule}</strong>
+                    </div>
+                  )}
+                  {task.completedBy && (
+                    <div className="td-meta-item">
+                      <span>Completed by</span>
+                      <strong>{task.completedBy}</strong>
+                    </div>
+                  )}
+                  {task.closedBy && (
+                    <div className="td-meta-item">
+                      <span>Closed by</span>
+                      <strong>{task.closedBy}</strong>
+                    </div>
+                  )}
+                  {task.closeReason && (
+                    <div className="td-meta-item td-meta-wide">
+                      <span>Close reason</span>
+                      <strong>{task.closeReason}</strong>
+                    </div>
+                  )}
+                  {task.reviewNote && (
+                    <div className="td-meta-item td-meta-wide">
+                      <span>Controller review note</span>
+                      <strong>{task.reviewNote}</strong>
+                    </div>
+                  )}
                 </div>
               </>
             )}
@@ -426,16 +523,25 @@ export default function TaskDetailPage() {
 
           {/* Checklist */}
           <div className="glass td-card">
-            <div className="td-card-head">
-              <h3>CHECKLIST</h3>
-              {checklistTotal > 0 && <span className="td-count">{checklistDone}/{checklistTotal}</span>}
+            <div className="td-card-head" style={{ marginBottom: checklistTotal > 0 ? '8px' : '12px' }}>
+              <h3>✅ CHECKLIST</h3>
+              {checklistTotal > 0 && <span className="td-count">{checklistDone}/{checklistTotal} ({checklistProgress}%)</span>}
             </div>
+
+            {checklistTotal > 0 && (
+              <div className="checklist-progress-container">
+                <div className="checklist-progress-bar">
+                  <div className="checklist-progress-fill" style={{ width: `${checklistProgress}%` }} />
+                </div>
+              </div>
+            )}
+
             {checklistTotal === 0 ? (
               <p className="td-empty">No checklist items. Assignee may mark complete freely.</p>
             ) : (
               <ul className="td-checklist">
                 {task.checklist!.map(item => (
-                  <li key={item.id}>
+                  <li key={item.id} className={`td-checklist-item ${item.isCompleted ? 'is-completed' : ''}`}>
                     <label className={item.isCompleted ? 'done' : ''}>
                       <input
                         type="checkbox"
@@ -443,7 +549,7 @@ export default function TaskDetailPage() {
                         disabled={busy || task.status !== 'In Progress' || !isAssignee}
                         onChange={() => handleToggleChecklist(item.id)}
                       />
-                      <span>{item.text}</span>
+                      <span className="td-checklist-text">{item.text}</span>
                     </label>
                   </li>
                 ))}
@@ -454,11 +560,10 @@ export default function TaskDetailPage() {
             )}
           </div>
 
-          {/* Comments — user discussion (separate from audit trail) */}
           <div className="glass td-card">
-            <div className="td-card-head"><h3>COMMENTS</h3></div>
+            <div className="td-card-head"><h3>💬 COMMENTS</h3></div>
             {(isAssignee || canControl) && task.status !== 'Closed' && (
-              <div className="td-comment-box">
+              <div className="td-comment-box" style={{ display: 'flex', flexDirection: 'column' }}>
                 <textarea
                   className="form-control"
                   rows={2}
@@ -466,30 +571,101 @@ export default function TaskDetailPage() {
                   value={commentText}
                   onChange={e => setCommentText(e.target.value)}
                 />
-                <button className="btn btn-secondary btn-sm" disabled={busy || !commentText.trim()} onClick={handleAddComment}>Post</button>
+                
+                {commentAttachments.length > 0 && (
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', margin: '8px 0' }}>
+                    {commentAttachments.map((img, idx) => (
+                      <div key={idx} style={{ position: 'relative', width: 60, height: 60, borderRadius: 4, overflow: 'hidden', border: '1px solid var(--border-color)' }}>
+                        <img src={img} alt="attachment" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <button
+                          type="button"
+                          onClick={() => setCommentAttachments(prev => prev.filter((_, i) => i !== idx))}
+                          style={{
+                            position: 'absolute',
+                            top: 2,
+                            right: 2,
+                            background: 'rgba(0,0,0,0.6)',
+                            color: '#FFF',
+                            border: 'none',
+                            borderRadius: '50%',
+                            width: 16,
+                            height: 16,
+                            fontSize: 10,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <input
+                  id="comment-image-upload"
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleCommentFileChange}
+                  style={{ display: 'none' }}
+                />
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+                  <label htmlFor="comment-image-upload" className="btn btn-secondary btn-xs" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, height: 26, padding: '3px 8px', fontSize: '11px', fontWeight: 600 }}>
+                    📷 Attach Image
+                  </label>
+                  <button className="btn btn-secondary btn-sm" disabled={busy || (!commentText.trim() && commentAttachments.length === 0)} onClick={handleAddComment}>Post</button>
+                </div>
               </div>
             )}
-            <ul className="td-feed">
+            <ul className="td-feed comments-feed">
               {commentFeed.length === 0 && <li className="td-empty">No comments yet.</li>}
-              {commentFeed.map((c, i) => (
-                <li key={i} className="td-feed-item comment">
-                  <div className="td-feed-dot" />
-                  <div className="td-feed-content">
-                    <div className="td-feed-head">
-                      <strong>{c.operator}</strong>
-                      <span>{new Date(c.ts).toLocaleString()}</span>
+              {commentFeed.map((c, i) => {
+                const commentInitials = getInitials(c.operator);
+                return (
+                  <li key={i} className="comment-item">
+                    <div className="comment-avatar">{commentInitials}</div>
+                    <div className="comment-bubble">
+                      <div className="comment-header">
+                        <strong className="comment-author">{c.operator}</strong>
+                        <span className="comment-time">
+                          {new Date(c.ts).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}
+                        </span>
+                      </div>
+                      <p className="comment-body">{c.body}</p>
+                      {c.images && c.images.length > 0 && (
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+                          {c.images.map((img: string, idx: number) => (
+                            <img
+                              key={idx}
+                              src={img}
+                              alt="comment attachment"
+                              style={{
+                                maxWidth: '200px',
+                                maxHeight: '150px',
+                                borderRadius: 4,
+                                border: '1px solid var(--border-color)',
+                                cursor: 'pointer',
+                              }}
+                              onClick={() => window.open(img, '_blank')}
+                            />
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    <p>{c.body}</p>
-                  </div>
-                </li>
-              ))}
+                  </li>
+                );
+              })}
             </ul>
           </div>
 
           {/* Attachments */}
           {task.attachments && task.attachments.length > 0 && (
             <div className="glass td-card">
-              <div className="td-card-head"><h3>ATTACHMENTS</h3></div>
+              <div className="td-card-head"><h3>📎 ATTACHMENTS</h3></div>
               <ul className="td-attach">
                 {task.attachments.map((a, i) => (<li key={i}>📎 {a}</li>))}
               </ul>
@@ -501,25 +677,50 @@ export default function TaskDetailPage() {
         <div className="td-col">
           {/* Assignee (display + Controller reassign) */}
           <div className="glass td-card">
-            <div className="td-card-head"><h3>ASSIGNEE</h3></div>
-            <p className="td-assignee-name">{task.assignee}{task.assigneeType === 'group' ? ' (group)' : ''}</p>
+            <div className="td-card-head"><h3>👤 ASSIGNEE</h3></div>
+
+            <div className="assignee-profile-card">
+              <div className="assignee-avatar-large">{assigneeInitials}</div>
+              <div className="assignee-info">
+                <p className="td-assignee-name">{task.assignee}</p>
+                <span className="td-assignee-badge">
+                  {task.assigneeType === 'group' ? 'Distribution Group' : 'Assigned Staff'}
+                </span>
+              </div>
+            </div>
+
             {canControl && task.status !== 'Closed' && task.status !== 'Pending Closure' && (
               <div className="td-reassign">
-                <h4>{task.assignee && task.assignee !== 'Unassigned' ? 'REASSIGN' : 'ASSIGN'}</h4>
-                <div className="td-reassign-row">
-                  <select className="form-control select-dark" value={assignType} onChange={e => { setAssignType(e.target.value as any); setAssignTarget(''); }}>
-                    <option value="user">User</option>
-                    <option value="group">Group</option>
-                  </select>
-                  <select className="form-control select-dark" value={assignTarget} onChange={e => setAssignTarget(e.target.value)}>
-                    <option value="">-- Select {assignType} --</option>
-                    {assignType === 'user'
-                      ? assignableUsers.map(u => <option key={u.id} value={u.name}>{u.name} ({u.role})</option>)
-                      : assignableGroups.map(g => <option key={g.id} value={g.name}>{g.name}</option>)}
-                  </select>
-                  <button className="btn btn-primary btn-sm" disabled={busy || !assignTarget || sameAssignee} onClick={handleAssign}>Go</button>
-                </div>
-                {sameAssignee && <p className="td-hint" style={{ marginTop: 8 }}>Already assigned to {task.assignee} — choose a different assignee.</p>}
+                {!reassigning ? (
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    style={{ width: '100%', marginTop: '12px' }}
+                    onClick={() => setReassigning(true)}
+                  >
+                    {task.assignee && task.assignee !== 'Unassigned' ? 'Reassign' : 'Assign'}
+                  </button>
+                ) : (
+                  <>
+                    <h4>{task.assignee && task.assignee !== 'Unassigned' ? 'REASSIGN TASK' : 'ASSIGN TASK'}</h4>
+                    <div className="td-reassign-row" style={{ marginTop: '8px' }}>
+                      <select className="form-control select-dark" value={assignType} onChange={e => { setAssignType(e.target.value as any); setAssignTarget(''); }}>
+                        <option value="user">User</option>
+                        <option value="group">Group</option>
+                      </select>
+                      <select className="form-control select-dark" value={assignTarget} onChange={e => setAssignTarget(e.target.value)}>
+                        <option value="">-- Select {assignType} --</option>
+                        {assignType === 'user'
+                          ? assignableUsers.map(u => <option key={u.id} value={u.name}>{u.name} ({u.role})</option>)
+                          : assignableGroups.map(g => <option key={g.id} value={g.name}>{g.name}</option>)}
+                      </select>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '12px', justifyContent: 'flex-end' }}>
+                      <button className="btn btn-secondary btn-sm" onClick={() => { setReassigning(false); setAssignTarget(''); }}>Cancel</button>
+                      <button className="btn btn-primary btn-sm" disabled={busy || !assignTarget || sameAssignee} onClick={handleAssign}>Apply</button>
+                    </div>
+                    {sameAssignee && <p className="td-hint" style={{ marginTop: 8 }}>Already assigned to {task.assignee} — choose a different assignee.</p>}
+                  </>
+                )}
               </div>
             )}
             {!isAssignee && !canControl && (
@@ -537,7 +738,7 @@ export default function TaskDetailPage() {
           {task.recurrence && (
             <div className="glass td-card">
               <div className="td-card-head">
-                <h3>RECURRENCE TEMPLATE</h3>
+                <h3>🔁 RECURRENCE TEMPLATE</h3>
                 {task.recurrenceCancelled && <span className="td-series-tag cancelled">Cancelled</span>}
               </div>
               <div className="td-series-banner" style={{ marginBottom: 12 }}>
@@ -550,20 +751,20 @@ export default function TaskDetailPage() {
                 Defines how future tasks are scheduled. Each planned date will be created as its own separate task with its own lifecycle — the status of <em>this</em> task is unaffected.
               </p>
               <div className="td-meta">
-                <div><span>Frequency</span><strong>{task.recurrence.frequency}</strong></div>
+                <div className="td-meta-item"><span>Frequency</span><strong>{task.recurrence.frequency}</strong></div>
                 {task.recurrence.frequency === 'Weekly' && (
-                  <div><span>Repeat on</span><strong>{(task.recurrence.weekdays || []).join(', ') || '—'}</strong></div>
+                  <div className="td-meta-item"><span>Repeat on</span><strong>{(task.recurrence.weekdays || []).join(', ') || '—'}</strong></div>
                 )}
                 {task.recurrence.frequency === 'Monthly' && (
-                  <div><span>Day of month</span><strong>{task.recurrence.monthlyDay}</strong></div>
+                  <div className="td-meta-item"><span>Day of month</span><strong>{task.recurrence.monthlyDay}</strong></div>
                 )}
-                <div><span>Start</span><strong>{task.recurrence.startDate}{task.recurrence.dueTime ? ` ${task.recurrence.dueTime}` : ''}</strong></div>
-                <div><span>Ends</span><strong>
+                <div className="td-meta-item"><span>Start</span><strong>{task.recurrence.startDate}{task.recurrence.dueTime ? ` ${task.recurrence.dueTime}` : ''}</strong></div>
+                <div className="td-meta-item"><span>Ends</span><strong>
                   {task.recurrence.endType === 'never' && 'Never'}
                   {task.recurrence.endType === 'onDate' && `On ${task.recurrence.endDate}`}
                   {task.recurrence.endType === 'afterCount' && `After ${task.recurrence.occurrenceCount} occurrences`}
                 </strong></div>
-                <div><span>Lead time</span><strong>{task.recurrence.leadTimeDays} days</strong></div>
+                <div className="td-meta-item"><span>Lead time</span><strong>{task.recurrence.leadTimeDays} days</strong></div>
               </div>
               {!task.recurrenceCancelled && (
                 <div className="td-next">
@@ -575,23 +776,30 @@ export default function TaskDetailPage() {
 
           {/* Activity Log — system audit trail */}
           <div className="glass td-card">
-            <div className="td-card-head"><h3>ACTIVITY LOG</h3></div>
-            <ul className="td-feed">
-              {auditFeed.length === 0 && <li className="td-empty">No activity yet.</li>}
-              {auditFeed.map((f, i) => (
-                <li key={i} className="td-feed-item audit">
-                  <div className="td-feed-dot" />
-                  <div className="td-feed-content">
-                    <div className="td-feed-head">
-                      <strong>{f.title}</strong>
-                      <span>{new Date(f.ts).toLocaleString()}</span>
-                    </div>
-                    <p>{f.body}</p>
-                    <span className="td-feed-op">— {f.operator}</span>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <div className="td-card-head"><h3>📜 ACTIVITY LOG</h3></div>
+            <div className="timeline-container">
+              {auditFeed.length === 0 ? (
+                <p className="td-empty">No activity yet.</p>
+              ) : (
+                <ul className="timeline-feed">
+                  {auditFeed.map((f, i) => (
+                    <li key={i} className="timeline-item">
+                      <div className="timeline-badge" />
+                      <div className="timeline-content">
+                        <div className="timeline-header">
+                          <strong className="timeline-title">{f.title}</strong>
+                          <span className="timeline-time">
+                            {new Date(f.ts).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}
+                          </span>
+                        </div>
+                        {f.body && <p className="timeline-body">{f.body}</p>}
+                        <span className="timeline-operator">By {f.operator}</span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -701,87 +909,635 @@ export default function TaskDetailPage() {
       )}
 
       <style jsx>{`
-        .task-detail-page { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
-        .td-topbar { display: flex; }
-        .td-back { font-size: 12px; color: var(--text-muted); font-weight: 600; }
-        .td-back:hover { color: var(--color-primary); }
-        .td-header { padding: 18px 20px; }
-        .td-header-main { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
-        .td-header-actions { display: flex; gap: 8px; flex-wrap: wrap; flex-shrink: 0; justify-content: flex-end; align-items: center; }
-        .td-await { font-size: 12px; font-weight: 600; color: #4338CA; background: #EEF2FF; border: 1px solid #C7D2FE; padding: 6px 12px; border-radius: 8px; }
-        .td-assignee-name { font-size: 14px; font-weight: 600; color: var(--text-main); margin-bottom: 4px; }
-        .td-id-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
-        .td-id { font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--text-main); }
-        .td-title { font-size: 20px; font-weight: 700; color: var(--text-main); margin: 4px 0; }
-        .td-links { font-size: 12px; color: var(--text-muted); }
-        .td-error { padding: 10px 16px; color: var(--color-critical); font-size: 13px; }
-        .td-grid { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 14px; align-items: start; }
-        .td-col { display: flex; flex-direction: column; gap: 14px; }
-        .td-card { padding: 16px 18px; }
-        .td-card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-        .td-card-head h3 { font-size: 11.5px; font-weight: 700; letter-spacing: 0.05em; color: var(--text-muted); text-transform: uppercase; }
-        .td-count { font-size: 11px; font-weight: 700; color: var(--text-muted); background: var(--bg-inset); border: 1px solid var(--border-color); border-radius: 99px; padding: 2px 8px; }
-        .td-desc-block { margin-bottom: 14px; }
-        .td-desc-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-faint); display: block; margin-bottom: 4px; }
-        .td-desc { font-size: 13px; color: var(--text-sub); line-height: 1.5; margin-bottom: 0; }
-        .td-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 18px; }
-        .td-meta > div { display: flex; flex-direction: column; gap: 2px; }
-        .td-meta-wide { grid-column: 1 / -1; }
-        .td-meta span { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-faint); }
-        .td-meta strong { font-size: 13px; color: var(--text-main); font-weight: 600; }
-        .td-checklist { display: flex; flex-direction: column; gap: 8px; }
-        .td-checklist label { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-sub); cursor: pointer; }
-        .td-checklist label.done span { text-decoration: line-through; color: var(--text-faint); }
-        .td-checklist input { width: 16px; height: 16px; accent-color: var(--color-active); }
-        .td-empty, .td-hint { font-size: 12px; color: var(--text-faint); }
-        .td-hint { margin-top: 10px; color: var(--color-high); }
-        .td-attach { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--text-sub); }
-        .td-actions-wrap { display: flex; flex-wrap: wrap; gap: 8px; }
-        .td-reassign { margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--border-color); }
-        .td-reassign h4 { font-size: 10.5px; font-weight: 700; letter-spacing: 0.05em; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px; }
-        .td-reassign-row { display: flex; gap: 8px; align-items: center; }
-        .td-reassign-row select { font-size: 12px; height: 34px; padding: 4px 8px; }
-        .td-edit-form { display: flex; flex-direction: column; gap: 8px; }
-        .td-edit-form label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-faint); }
-        .td-edit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-        .td-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
-        .btn-sm { padding: 5px 12px; font-size: 12px; height: auto; }
-        .td-comment-box { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
-        .td-comment-box button { align-self: flex-end; }
-        .td-feed { display: flex; flex-direction: column; gap: 2px; }
-        .td-feed-item { display: flex; gap: 10px; padding: 8px 0; border-left: none; }
-        .td-feed-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; background: var(--border-color); }
-        .td-feed-item.comment .td-feed-dot { background: var(--color-info); }
-        .td-feed-content { flex: 1; }
-        .td-feed-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-        .td-feed-head strong { font-size: 12.5px; color: var(--text-main); }
-        .td-feed-head span { font-size: 10.5px; color: var(--text-faint); }
-        .td-feed-content p { font-size: 12px; color: var(--text-sub); line-height: 1.4; margin: 2px 0; }
-        .td-feed-op { font-size: 10.5px; color: var(--text-faint); }
-        .td-series-banner { display: flex; align-items: center; gap: 10px; padding: 10px 16px; font-size: 12.5px; color: var(--color-primary-dark); background: var(--color-primary-bg); border: 1px solid var(--color-primary-border); border-radius: var(--radius-md); flex-wrap: wrap; }
-        .td-series-icon { font-size: 15px; }
-        .td-series-tag { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; padding: 2px 8px; border-radius: 99px; margin-left: 4px; }
-        .td-series-tag.detached { background: var(--bg-inset); color: var(--text-muted); border: 1px solid var(--border-color); }
-        .td-series-tag.cancelled { background: var(--color-critical-bg); color: var(--color-critical); border: 1px solid var(--color-critical-border); }
-        .td-overdue { color: var(--color-critical) !important; }
-        .td-next { margin-top: 14px; border-top: 1px dashed var(--border-color); padding-top: 12px; }
-        .td-next-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-faint); display: block; margin-bottom: 8px; }
-        .td-next-pill { display: inline-block; background: var(--bg-inset); border: 1px solid var(--border-color); border-radius: 99px; padding: 3px 10px; font-size: 11.5px; color: var(--text-sub); margin: 0 5px 5px 0; font-variant-numeric: tabular-nums; }
-        .td-next-note { display: block; margin-top: 6px; font-size: 11px; color: var(--text-faint); font-style: italic; }
-        .td-chk-builder { display: flex; gap: 8px; margin-bottom: 8px; }
-        .td-chk-builder input { flex: 1; }
-        .td-chk-edit { display: flex; flex-direction: column; gap: 5px; margin-bottom: 4px; }
-        .td-chk-edit li { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; color: var(--text-sub); background: var(--bg-inset); padding: 5px 10px; border-radius: var(--radius-sm); }
-        .td-chk-edit button { background: none; border: none; color: var(--color-critical); cursor: pointer; font-size: 12px; }
-        .td-scope { display: flex; flex-direction: column; gap: 8px; padding: 12px; background: var(--color-primary-bg); border: 1px solid var(--color-primary-border); border-radius: var(--radius-md); }
-        .td-scope > label:first-child { font-size: 11.5px; font-weight: 700; color: var(--color-primary-dark); }
-        .td-scope-opt { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-main); cursor: pointer; }
-        .td-scope-opt input { accent-color: var(--color-primary); }
-        .td-scope-card { display: flex; flex-direction: column; gap: 3px; text-align: left; padding: 12px 14px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: #fff; cursor: pointer; transition: 0.15s; }
-        .td-scope-card:hover:not(:disabled) { border-color: var(--color-primary); background: var(--color-primary-bg); }
-        .td-scope-card strong { font-size: 13.5px; color: var(--text-main); }
-        .td-scope-card span { font-size: 11.5px; color: var(--text-muted); }
-        @media (max-width: 900px) { .td-grid { grid-template-columns: 1fr; } }
+        .task-detail-page {
+          padding: 24px;
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
+          max-width: 1400px;
+          margin: 0 auto;
+        }
+        .td-topbar {
+          display: flex;
+          align-items: center;
+        }
+        .td-back {
+          font-size: 13px;
+          color: var(--text-muted);
+          font-weight: 600;
+          display: flex;
+          align-items: center;
+          text-decoration: none;
+          transition: color 0.15s ease, transform 0.15s ease;
+        }
+        .td-back:hover {
+          color: var(--color-primary);
+          transform: translateX(-2px);
+        }
+        .td-header {
+          padding: 24px;
+          background: var(--bg-card);
+        }
+        .td-header-main {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 24px;
+        }
+        .td-header-actions {
+          display: flex;
+          gap: 10px;
+          flex-wrap: wrap;
+          flex-shrink: 0;
+          justify-content: flex-end;
+          align-items: center;
+        }
+        .td-await {
+          font-size: 12.5px;
+          font-weight: 600;
+          color: #4338CA;
+          background: #EEF2FF;
+          border: 1px solid #C7D2FE;
+          padding: 8px 16px;
+          border-radius: var(--radius-md);
+        }
+        .td-id-row {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          flex-wrap: wrap;
+          margin-bottom: 12px;
+        }
+        .td-title {
+          font-size: 24px;
+          font-weight: 700;
+          color: var(--text-main);
+          margin: 6px 0 10px;
+          line-height: 1.25;
+        }
+        .td-links {
+          font-size: 12.5px;
+          color: var(--text-muted);
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .td-error {
+          padding: 12px 18px;
+          color: var(--color-critical);
+          background: var(--color-critical-bg);
+          border: 1px solid var(--color-critical-border);
+          border-radius: var(--radius-md);
+          font-size: 13px;
+        }
+        .td-grid {
+          display: grid;
+          grid-template-columns: 1.15fr 0.85fr;
+          gap: 20px;
+          align-items: start;
+        }
+        .td-col {
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
+        }
+        .td-card {
+          padding: 24px;
+          background: var(--bg-card);
+        }
+        .td-card-head {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 18px;
+          padding-bottom: 12px;
+          border-bottom: 1px solid var(--border-color);
+        }
+        .td-card-head h3 {
+          font-size: 12.5px;
+          font-weight: 700;
+          letter-spacing: 0.06em;
+          color: var(--color-active);
+          text-transform: uppercase;
+          margin: 0;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .td-count {
+          font-size: 11px;
+          font-weight: 700;
+          color: var(--color-primary-dark);
+          background: var(--color-primary-bg);
+          border: 1px solid var(--color-primary-border);
+          border-radius: 99px;
+          padding: 2px 10px;
+        }
+        
+        /* Details & Inset Panel */
+        .td-desc-block {
+          margin-bottom: 20px;
+        }
+        .td-desc-label {
+          font-size: 10.5px;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          color: var(--text-muted);
+          font-weight: 600;
+          display: block;
+          margin-bottom: 6px;
+        }
+        .td-desc-wrapper {
+          padding: 2px 0 12px;
+          border-bottom: 1px solid var(--border-color);
+          margin-bottom: 16px;
+        }
+        .td-desc {
+          font-size: 13.5px;
+          color: var(--text-main);
+          line-height: 1.55;
+          margin: 0;
+        }
+        .td-meta {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px 24px;
+        }
+        .td-meta-item {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+          padding: 0 0 10px 0;
+          border-bottom: 1px solid var(--border-color);
+        }
+        .td-meta-wide {
+          grid-column: 1 / -1;
+        }
+        .td-meta span {
+          font-size: 10.5px;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          color: var(--text-muted);
+          font-weight: 600;
+        }
+        .td-meta strong {
+          font-size: 13.5px;
+          color: var(--text-main);
+          font-weight: 600;
+        }
+        
+        /* Checklist styles */
+        .checklist-progress-container {
+          background: var(--border-color);
+          height: 6px;
+          border-radius: 99px;
+          overflow: hidden;
+          margin-bottom: 20px;
+        }
+        .checklist-progress-bar {
+          width: 100%;
+          height: 100%;
+          background: transparent;
+        }
+        .checklist-progress-fill {
+          height: 100%;
+          background: var(--color-primary);
+          border-radius: 99px;
+          transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .td-checklist {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+        .td-checklist-item {
+          display: flex;
+          align-items: center;
+          padding: 10px 14px;
+          background: var(--bg-inset);
+          border: 1px solid var(--border-color);
+          border-radius: var(--radius-md);
+          transition: border-color 0.15s ease, background 0.15s ease;
+        }
+        .td-checklist-item:hover {
+          border-color: var(--border-color-hover);
+          background: var(--bg-hover);
+        }
+        .td-checklist-item.is-completed {
+          opacity: 0.75;
+          border-color: var(--border-color);
+        }
+        .td-checklist label {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          font-size: 13.5px;
+          color: var(--text-main);
+          cursor: pointer;
+          width: 100%;
+        }
+        .td-checklist label.done span.td-checklist-text {
+          text-decoration: line-through;
+          color: var(--text-muted);
+        }
+        .td-checklist input[type="checkbox"] {
+          width: 18px;
+          height: 18px;
+          accent-color: var(--color-primary);
+          cursor: pointer;
+        }
+        .td-empty, .td-hint {
+          font-size: 12.5px;
+          color: var(--text-muted);
+          margin: 0;
+        }
+        .td-hint {
+          margin-top: 12px;
+          color: var(--color-high);
+          font-weight: 500;
+        }
+        
+        /* Comments thread */
+        .td-comment-box {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          margin-bottom: 20px;
+        }
+        .td-comment-box button {
+          align-self: flex-end;
+        }
+        .comments-feed {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+        .comment-item {
+          display: flex;
+          gap: 12px;
+          align-items: flex-start;
+        }
+        .comment-avatar {
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+          background: var(--color-primary-bg);
+          border: 1px solid var(--color-primary-border);
+          color: var(--color-primary-dark);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 12px;
+          font-weight: 700;
+          flex-shrink: 0;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .comment-bubble {
+          flex: 1;
+          background: var(--bg-inset);
+          border: 1px solid var(--border-color);
+          border-radius: 0 var(--radius-md) var(--radius-md) var(--radius-md);
+          padding: 12px 16px;
+          position: relative;
+        }
+        .comment-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: baseline;
+          margin-bottom: 6px;
+          gap: 8px;
+        }
+        .comment-author {
+          font-size: 13px;
+          color: var(--text-main);
+          font-weight: 700;
+        }
+        .comment-time {
+          font-size: 11px;
+          color: var(--text-muted);
+        }
+        .comment-body {
+          font-size: 13px;
+          color: var(--text-main);
+          line-height: 1.45;
+          margin: 0;
+          word-break: break-word;
+        }
+        
+        /* Assignee Profile */
+        .assignee-profile-card {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          padding: 14px 18px;
+          background: var(--bg-inset);
+          border: 1px solid var(--border-color);
+          border-radius: var(--radius-md);
+          margin-bottom: 16px;
+        }
+        .assignee-avatar-large {
+          width: 48px;
+          height: 48px;
+          border-radius: 50%;
+          background: var(--color-primary-bg);
+          border: 2px solid var(--color-primary-border);
+          color: var(--color-primary-dark);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 16px;
+          font-weight: 700;
+          box-shadow: 0 2px 6px rgba(109,53,0,0.08);
+        }
+        .assignee-info {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+        .assignee-info .td-assignee-name {
+          font-size: 15px;
+          font-weight: 700;
+          color: var(--text-main);
+          margin: 0;
+        }
+        .td-assignee-badge {
+          font-size: 11px;
+          color: var(--text-muted);
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
+        .td-reassign {
+          margin-top: 20px;
+          padding-top: 18px;
+          border-top: 1px dashed var(--border-color);
+        }
+        .td-reassign h4 {
+          font-size: 10.5px;
+          font-weight: 700;
+          letter-spacing: 0.05em;
+          color: var(--text-muted);
+          text-transform: uppercase;
+          margin-bottom: 10px;
+        }
+        .td-reassign-row {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+        }
+        .td-reassign-row select {
+          font-size: 12.5px;
+          height: 36px;
+          padding: 6px 12px;
+          border-radius: var(--radius-md);
+        }
+        
+        /* System Activity Timeline */
+        .timeline-container {
+          position: relative;
+          max-height: 380px;
+          overflow-y: auto;
+          padding-right: 4px;
+        }
+        .timeline-feed {
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
+          position: relative;
+          padding-left: 18px;
+          margin: 0;
+          list-style: none;
+        }
+        .timeline-feed::before {
+          content: '';
+          position: absolute;
+          left: 4px;
+          top: 8px;
+          bottom: 8px;
+          width: 2px;
+          background: var(--border-color);
+        }
+        .timeline-item {
+          position: relative;
+        }
+        .timeline-badge {
+          position: absolute;
+          left: -18px;
+          top: 6px;
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          background: var(--bg-card);
+          border: 2px solid var(--color-primary);
+          z-index: 1;
+        }
+        .timeline-content {
+          background: var(--bg-inset);
+          border: 1px solid var(--border-color);
+          border-radius: var(--radius-md);
+          padding: 10px 14px;
+        }
+        .timeline-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: baseline;
+          margin-bottom: 4px;
+          gap: 8px;
+        }
+        .timeline-title {
+          font-size: 12.5px;
+          font-weight: 700;
+          color: var(--text-main);
+        }
+        .timeline-time {
+          font-size: 10.5px;
+          color: var(--text-muted);
+        }
+        .timeline-body {
+          font-size: 12.5px;
+          color: var(--text-sub);
+          line-height: 1.4;
+          margin: 4px 0;
+        }
+        .timeline-operator {
+          font-size: 10.5px;
+          color: var(--text-muted);
+          font-weight: 600;
+          display: block;
+          margin-top: 2px;
+        }
+        
+        /* Series and Recurrence templates */
+        .td-series-banner {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 12px 18px;
+          font-size: 13px;
+          color: var(--color-primary-dark);
+          background: var(--color-primary-bg);
+          border: 1px solid var(--color-primary-border);
+          border-radius: var(--radius-md);
+          flex-wrap: wrap;
+        }
+        .td-series-icon {
+          font-size: 16px;
+        }
+        .td-series-tag {
+          font-size: 10px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          padding: 2px 8px;
+          border-radius: 99px;
+          margin-left: auto;
+        }
+        .td-series-tag.detached {
+          background: var(--bg-card);
+          color: var(--text-muted);
+          border: 1px solid var(--border-color);
+        }
+        .td-series-tag.cancelled {
+          background: var(--color-critical-bg);
+          color: var(--color-critical);
+          border: 1px solid var(--color-critical-border);
+        }
+        .td-overdue {
+          color: var(--color-critical) !important;
+        }
+        .td-next {
+          margin-top: 16px;
+          border-top: 1px dashed var(--border-color);
+          padding-top: 14px;
+        }
+        .td-next-note {
+          display: block;
+          font-size: 11.5px;
+          color: var(--text-muted);
+          font-style: italic;
+        }
+        
+        /* Recurrence and scope styles */
+        .td-scope {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          padding: 12px;
+          background: var(--color-primary-bg);
+          border: 1px solid var(--color-primary-border);
+          border-radius: var(--radius-md);
+        }
+        .td-scope > label:first-child {
+          font-size: 11.5px;
+          font-weight: 700;
+          color: var(--color-primary-dark);
+        }
+        .td-scope-opt {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 13px;
+          color: var(--text-main);
+          cursor: pointer;
+        }
+        .td-scope-opt input {
+          accent-color: var(--color-primary);
+        }
+        .td-scope-card {
+          display: flex;
+          flex-direction: column;
+          gap: 3px;
+          text-align: left;
+          padding: 14px;
+          border: 1px solid var(--border-color);
+          border-radius: var(--radius-md);
+          background: #fff;
+          cursor: pointer;
+          transition: border-color 0.15s ease, background 0.15s ease;
+          width: 100%;
+        }
+        .td-scope-card:hover:not(:disabled) {
+          border-color: var(--color-primary);
+          background: var(--color-primary-bg);
+        }
+        .td-scope-card strong {
+          font-size: 13.5px;
+          color: var(--text-main);
+        }
+        .td-scope-card span {
+          font-size: 11.5px;
+          color: var(--text-muted);
+        }
+        
+        /* Forms, inputs, selections */
+        .td-edit-form {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+        .td-edit-form label {
+          font-size: 11px;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          color: var(--text-muted);
+          font-weight: 600;
+        }
+        .td-edit-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 16px;
+        }
+        .td-actions {
+          display: flex;
+          justify-content: flex-end;
+          gap: 8px;
+          margin-top: 12px;
+        }
+        .td-chk-builder {
+          display: flex;
+          gap: 8px;
+          margin-bottom: 10px;
+        }
+        .td-chk-builder input {
+          flex: 1;
+        }
+        .td-chk-edit {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          margin-bottom: 8px;
+        }
+        .td-chk-edit li {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          font-size: 13px;
+          color: var(--text-main);
+          background: var(--bg-inset);
+          padding: 8px 12px;
+          border-radius: var(--radius-sm);
+          border: 1px solid var(--border-color);
+        }
+        .td-chk-edit button {
+          background: none;
+          border: none;
+          color: var(--color-critical);
+          cursor: pointer;
+          font-size: 13px;
+          padding: 0 4px;
+        }
+        .td-attach {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          font-size: 13px;
+          color: var(--text-sub);
+        }
+        @media (max-width: 900px) {
+          .td-grid {
+            grid-template-columns: 1fr;
+          }
+        }
       `}</style>
     </div>
   );

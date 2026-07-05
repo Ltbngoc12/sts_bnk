@@ -209,6 +209,7 @@ export interface TaskComment {
   user: string;
   timestamp: string;
   text: string;
+  images?: string[];
 }
 
 export interface TaskAudit {
