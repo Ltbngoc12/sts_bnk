@@ -42,6 +42,93 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+// ─── RespondersAvatars Helper Component (Assignee Circles) ──────────────────
+function RespondersAvatars({ names }: { names: string | string[] }) {
+  const list = (Array.isArray(names) ? names : [names])
+    .filter(Boolean)
+    .filter(name => name !== 'Unassigned');
+    
+  if (list.length === 0) {
+    return <span style={{ color: 'var(--text-faint)' }}>—</span>;
+  }
+
+  const getAvatarColor = (name: string) => {
+    const charCode = name.charCodeAt(0) || 65;
+    const colors = [
+      '#10B981', // Teal/green
+      '#3B82F6', // Blue
+      '#EC4899', // Pink
+      '#8B5CF6', // Purple
+      '#F97316', // Orange
+      '#0D9488', // Dark teal
+      '#6366F1', // Indigo
+    ];
+    return colors[charCode % colors.length];
+  };
+
+  if (list.length === 1) {
+    const name = list[0];
+    const letter = name.trim().charAt(0).toUpperCase();
+    const color = getAvatarColor(name);
+    return (
+      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+        <span style={{
+          width: '16px',
+          height: '16px',
+          borderRadius: '50%',
+          background: color,
+          color: '#FFF',
+          fontSize: '9px',
+          fontWeight: 700,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          border: '1px solid #FFF',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.08)'
+        }}>
+          {letter}
+        </span>
+        <span style={{ fontSize: '11px', color: 'var(--text-sub)' }}>{name}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'inline-flex', alignItems: 'center' }}>
+      <div style={{ display: 'flex', marginRight: '6px' }}>
+        {list.map((name, idx) => {
+          const letter = name.trim().charAt(0).toUpperCase();
+          const color = getAvatarColor(name);
+          return (
+            <span
+              key={idx}
+              title={name}
+              style={{
+                width: '16px',
+                height: '16px',
+                borderRadius: '50%',
+                background: color,
+                color: '#FFF',
+                fontSize: '9px',
+                fontWeight: 700,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: '1px solid #FFF',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
+                marginLeft: idx > 0 ? '-4px' : '0',
+                zIndex: 10 - idx
+              }}
+            >
+              {letter}
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function CaseDetailsPage() {
   const params = useParams();
@@ -357,7 +444,7 @@ export default function CaseDetailsPage() {
                 className="form-control"
                 value={editTitleText}
                 onChange={e => setEditTitleText(e.target.value)}
-                style={{ fontSize: 16, fontWeight: 700, height: 36, width: '320px', padding: '0 8px' }}
+                style={{ fontFamily: 'var(--font-title), serif', fontSize: 16, fontWeight: 700, height: 36, width: '320px', padding: '0 8px' }}
                 autoFocus
               />
               <button className="btn btn-success btn-xs" onClick={async () => {
@@ -372,7 +459,7 @@ export default function CaseDetailsPage() {
               }}>Cancel</button>
             </div>
           ) : (
-            <h1 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <h1 style={{ fontFamily: 'var(--font-title), serif', fontSize: 18, fontWeight: 700, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
               {caseData.title}
               {!isClosed && (
                 <button 
@@ -389,10 +476,6 @@ export default function CaseDetailsPage() {
             </h1>
           )}
 
-          <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-            Logged {new Date(caseData.createdAt).toLocaleString('en-SG')} &bull; Creator: {caseData.createdBy}
-            {caseData.closedAt ? ` • Closed ${new Date(caseData.closedAt).toLocaleString('en-SG')} — System` : ''}
-          </p>
         </div>
 
         {/* Case Actions — closure is system-managed; manual status update to No Action Required is permitted for controller */}
@@ -458,7 +541,7 @@ export default function CaseDetailsPage() {
                 <span className="count-badge">{tasks.length}</span>
               </div>
 
-              <div className="comp-card-body" style={{ maxHeight: '130px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div className="comp-card-body" style={{ maxHeight: '220px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {tasks.length === 0 ? (
                   <div className="empty-comp-state" style={{ padding: '24px 0', minHeight: '100px' }}>
                     <p style={{ fontSize: '12px', color: 'var(--text-faint)' }}>No operational tasks have been dispatched.</p>
@@ -471,8 +554,8 @@ export default function CaseDetailsPage() {
                         <span style={{ fontSize: '12px', fontWeight: 600, maxWidth: '60%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
                         <span className={t.status === 'Closed' ? 'badge badge-closed' : t.status === 'In Progress' ? 'badge badge-onsite' : 'badge badge-ack'} style={{ fontSize: '9px', padding: '1px 6px' }}>{t.status}</span>
                       </div>
-                      <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
-                        <span>👤 {t.assignee}</span>
+                      <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                        <RespondersAvatars names={t.assignee} />
                         <span>Priority: {t.priority}</span>
                       </div>
                     </div>
@@ -499,7 +582,7 @@ export default function CaseDetailsPage() {
                 <span className="count-badge">{caseFaults.length}</span>
               </div>
 
-              <div className="comp-card-body" style={{ maxHeight: '130px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div className="comp-card-body" style={{ maxHeight: '220px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {caseFaults.length === 0 ? (
                   <div className="empty-comp-state" style={{ padding: '24px 0', minHeight: '100px' }}>
                     <p style={{ fontSize: '12px', color: 'var(--text-faint)' }}>No infrastructure faults logged for this case.</p>
@@ -551,7 +634,7 @@ export default function CaseDetailsPage() {
                 <span className="count-badge">{ediaryLogs.length}</span>
               </div>
 
-              <div className="comp-card-body" style={{ maxHeight: '130px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div className="comp-card-body" style={{ maxHeight: '220px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {ediaryLogs.length === 0 ? (
                   <div className="empty-comp-state" style={{ padding: '24px 0', minHeight: '100px' }}>
                     <p style={{ fontSize: '12px', color: 'var(--text-faint)' }}>No occurrence diary entries logged for this case.</p>
@@ -900,13 +983,44 @@ export default function CaseDetailsPage() {
           display: flex;
           flex-direction: column;
           justify-content: space-between;
-          padding: 16px 20px;
-          min-height: 250px;
+          padding: 24px;
+          min-height: 360px;
+        }
+        .comp-card h3 {
+          font-family: var(--font-title), 'Playfair Display', Georgia, serif;
+          font-size: 13.5px;
+          font-weight: 700;
+          letter-spacing: 0.03em;
+          text-transform: uppercase;
         }
         .comp-card-body {
           flex: 1;
           margin-top: 12px;
           margin-bottom: 14px;
+        }
+        .comp-card-body::-webkit-scrollbar {
+          width: 5px;
+        }
+        .comp-card-body::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .comp-card-body::-webkit-scrollbar-thumb {
+          background: var(--border-color);
+          border-radius: 10px;
+        }
+        .comp-card-body::-webkit-scrollbar-thumb:hover {
+          background: var(--border-color-hover);
+        }
+        .section-title {
+          font-family: var(--font-title), 'Playfair Display', Georgia, serif;
+          font-size: 14px;
+          font-weight: 700;
+          text-transform: none;
+          letter-spacing: 0.02em;
+          border-bottom: 1px solid var(--border-color);
+          padding-bottom: 10px;
+          margin-bottom: 16px;
+          color: var(--text-main);
         }
 
         /* ── Empty component state ────────────────────────────────────── */
