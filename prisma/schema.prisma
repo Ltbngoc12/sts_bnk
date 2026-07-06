@@ -14,16 +14,29 @@ enum CaseStatus {
   CLOSED
 }
 
+// Incident-level status (Controller-driven). Per-Responder progress used to live here
+// but has been split out into ResponderStatus below — see
+// Incident_Status_Model_Design_Updated.docx (Incident/Responder Status Split decision).
+// NOTE: this schema is not currently wired to a Prisma client at runtime (the live
+// datastore is MongoDB via src/lib/db.ts) — kept in sync here for documentation /
+// future-migration purposes only.
 enum IncidentStatus {
   LIVE
   LIVE_ASSIGNED
-  LIVE_ACKNOWLEDGED
-  LIVE_ON_SITE
-  LIVE_INCOMPLETE
-  LIVE_COMPLETED
   PENDING_ENDORSEMENT
   RETURNED
   CLOSED
+}
+
+// Responder-level status, tracked per assignment (IncidentResponder), running in
+// parallel for every Responder on an Incident.
+enum ResponderStatus {
+  ASSIGNED
+  ACKNOWLEDGED
+  ON_SITE
+  PENDING_CONTROLLER_REVIEW
+  LIVE_INCOMPLETE
+  COMPLETED
 }
 
 enum FaultStatus {
@@ -128,8 +141,32 @@ model Incident {
   personsInvolved   PersonInvolved[]
   cctvBwcFootage    CCTVBWC[]
   attachments       Attachment[]
+  responders        IncidentResponder[]
 
   @@map("incidents")
+}
+
+// Per-Responder assignment + lifecycle status (Assigned/Removed is the assignment
+// status; ResponderStatus is the parallel workflow progress). Replaces the old model
+// where Incident.status alone tracked every Responder's progress.
+model IncidentResponder {
+  id                String          @id @default(uuid())
+  incidentId        String
+  incident          Incident        @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  responderId       String          // Display name, e.g. "Ranger John"
+  assignedBy        String
+  assignedAt        DateTime        @default(now())
+  assignmentStatus  String          @default("Active") // "Active" | "Removed"
+  lifecycleStatus   ResponderStatus @default(ASSIGNED)
+  acknowledgedAt    DateTime?
+  onSiteAt          DateTime?
+  pendingReviewAt   DateTime?
+  completedAt       DateTime?
+  completionRemarks String?         @db.Text // Per-Responder remark, set on Return
+  returnedAt        DateTime?
+  returnedBy        String?
+
+  @@map("incident_responders")
 }
 
 model IncidentLog {

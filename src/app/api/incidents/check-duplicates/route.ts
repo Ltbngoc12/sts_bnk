@@ -19,7 +19,7 @@ export async function GET(request: Request) {
     const TWO_HOURS = 2 * 60 * 60 * 1000;
 
     const db = await getDb();
-    const openStatuses = ['Live', 'Live (Assigned)', 'Live (Acknowledged)', 'Live (On-Site)', 'Live (Completed)', 'Live (Incomplete)', 'Pending Endorsement', 'Returned'];
+    const openStatuses = ['Live', 'Live (Assigned)', 'Pending Endorsement', 'Returned'];
 
     const candidates = db.cases
       .filter(c => c.incident && openStatuses.includes(c.incident.status))

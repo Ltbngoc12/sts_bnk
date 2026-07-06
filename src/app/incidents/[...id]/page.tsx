@@ -29,6 +29,9 @@ interface HydratedIncident extends Incident {
 }
 
 // Helper: incident status → badge class
+// (Incident-level status is now just Live / Live (Assigned) / Pending Endorsement /
+// Returned / Closed — per-Responder progress lives on IncidentResponder.lifecycleStatus,
+// see responderBadgeClass below. Old cases kept harmlessly for legacy data in transit.)
 function incBadgeClass(status: string) {
   switch (status) {
     case 'Live':
@@ -52,6 +55,41 @@ function incBadgeClass(status: string) {
     default:
       return 'badge badge-closed';
   }
+}
+
+// Helper: per-Responder lifecycle status → badge class
+function responderBadgeClass(status?: string) {
+  switch (status) {
+    case 'Assigned':
+      return 'badge badge-assigned';
+    case 'Acknowledged':
+      return 'badge badge-ack';
+    case 'On-Site':
+      return 'badge badge-onsite';
+    case 'Pending Controller Review':
+      return 'badge badge-pending-ctrl';
+    case 'Live (Incomplete)':
+      return 'badge badge-ack';
+    case 'Completed':
+      return 'badge badge-completed';
+    default:
+      return 'badge badge-closed';
+  }
+}
+
+// Helper: display-only "Responder Progress" aggregation (e.g. "2/3 On-Site").
+// UI aggregation only — does not participate in the workflow state machine or gating.
+function computeResponderProgress(responders?: { status: string; lifecycleStatus?: string }[]): string | null {
+  const active = (responders || []).filter(r => r.status === 'Active');
+  if (active.length === 0) return null;
+  const total = active.length;
+  const counts: Record<string, number> = {};
+  active.forEach(r => {
+    const key = r.lifecycleStatus || 'Assigned';
+    counts[key] = (counts[key] || 0) + 1;
+  });
+  const [topStage, topCount] = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+  return `${topCount}/${total} ${topStage}`;
 }
 
 export default function IncidentDetailsPage() {
@@ -80,14 +118,20 @@ export default function IncidentDetailsPage() {
   const [logEventTime, setLogEventTime] = useState<string>(getNowTime());
 
   // Modals & Inline Inputs
-  const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [showReturnToResponderModal, setShowReturnToResponderModal] = useState(false);
-  const [returnToResponderRemarks, setReturnToResponderRemarks] = useState('');
+  // Per-Responder, multi-select Return: which Responders are selected, and each one's own remark.
+  const [returnResponderIds, setReturnResponderIds] = useState<string[]>([]);
+  const [returnRemarksByResponder, setReturnRemarksByResponder] = useState<Record<string, string>>({});
   const [modalRemarks, setModalRemarks] = useState('');
   const [assignmentError, setAssignmentError] = useState('');
   const [pendingResponders, setPendingResponders] = useState<string[] | null>(null);
+  // Manage Responders now lives in its own card (Incident Details tab), decoupled from
+  // the "Edit Incident Details" toggle — assigning/reassigning Responders is a dispatch
+  // action, not an edit to the incident's static particulars.
+  const [showResponderManager, setShowResponderManager] = useState(false);
+  const [mapExpanded, setMapExpanded] = useState(true);
   const [reviewRemarks, setReviewRemarks] = useState('');
 
   // Timeline & Refactoring States
@@ -333,6 +377,56 @@ export default function IncidentDetailsPage() {
     } catch (err: any) {
       console.error(err);
       alert(err.message || 'Error occurred while saving.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Standalone Responder assign/reassign save — split out of handleSaveAll so managing
+  // Responders doesn't require going through (or validating) the Edit Incident Details form.
+  const handleSaveResponders = async () => {
+    if (!incident) return;
+    setSaving(true);
+    setAssignmentError('');
+    try {
+      const currentList = Array.isArray(incident.assignedTo) ? incident.assignedTo : [];
+      const pending = pendingResponders ?? currentList;
+      const toAdd = pending.filter(r => !currentList.includes(r));
+      const toRemove = currentList.filter(r => !pending.includes(r));
+
+      for (const name of toAdd) {
+        const res = await fetch(`/api/incidents/${incidentId}/assign`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ addResponder: name, username, role }),
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          setAssignmentError(err.error || 'Failed to add responder.');
+          setSaving(false);
+          return;
+        }
+      }
+      for (const name of toRemove) {
+        const res = await fetch(`/api/incidents/${incidentId}/assign`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ removeResponder: name, username, role }),
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          setAssignmentError(err.error || 'Failed to remove responder.');
+          setSaving(false);
+          return;
+        }
+      }
+
+      setPendingResponders(null);
+      await fetchIncidentData();
+      setShowResponderManager(false);
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Error occurred while saving responders.');
     } finally {
       setSaving(false);
     }
@@ -606,10 +700,49 @@ export default function IncidentDetailsPage() {
 
   // Removed handleAssignResponders in favor of unified handleSaveAll
 
-  const handleComplete = async () => {
-    const ok = await performAction('complete');
-    if (ok) {
-      setShowCompleteModal(false);
+  // Submit for Endorsement — standard submit if every active Responder has already
+  // reached Pending Controller Review; otherwise offers Force Submit (confirm only,
+  // no justification text) which locks every active Responder to Completed regardless
+  // of their current stage.
+  const handleSubmitEndorsement = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/incidents/${incidentId}/submit-endorsement`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, role }),
+      });
+      if (res.ok) {
+        await fetchIncidentData();
+        return;
+      }
+      const err = await res.json();
+      if (err.requiresForce) {
+        const names = (err.outstandingResponders || []).join(', ');
+        const confirmed = confirm(
+          `The following Responder(s) have not yet reached Pending Controller Review: ${names}.\n\n` +
+          `Force Submit will lock the Incident for endorsement now and mark every assigned Responder as Completed regardless of progress. Continue?`
+        );
+        if (confirmed) {
+          const res2 = await fetch(`/api/incidents/${incidentId}/submit-endorsement`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, role, force: true }),
+          });
+          if (res2.ok) {
+            await fetchIncidentData();
+          } else {
+            const err2 = await res2.json();
+            alert(`Force Submit failed: ${err2.error}`);
+          }
+        }
+      } else {
+        alert(`Action failed: ${err.error}`);
+      }
+    } catch (err: any) {
+      alert(`Request error: ${err.message}`);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -648,7 +781,24 @@ export default function IncidentDetailsPage() {
   const isMgr = role === 'Duty Manager' || role === 'Duty Officer' || role === 'System Administrator' || role === 'Current Ops Administrator';
   const isAdmin = role === 'System Administrator';
   const isClosed = incident.status === 'Closed';
-  const isLocked = isClosed || incident.status === 'Live (Completed)' || (incident.status === 'Pending Endorsement' && !isMgr) || (incident.status === 'Live (Pending Controller Review)' && isRanger);
+
+  // Per-Responder status split: each assigned Responder now has its own lifecycleStatus
+  // running in parallel, instead of one shared incident.status.
+  const activeResponders = (incident.responders || []).filter(r => r.status === 'Active');
+  const myResponderRecord = activeResponders.find(r => r.responderId === username);
+  const responderProgressLabel = computeResponderProgress(incident.responders);
+  // Only Responders who actually submitted something can be returned — nothing to
+  // reject yet if they're still Assigned/Acknowledged/On-Site. "Completed" only
+  // counts while the Incident itself was bounced back by the Duty Manager (Returned);
+  // Return-to-Responder is blocked entirely while Pending Endorsement (Controller
+  // can't silently pull back a submission before the Duty Manager has acted on it).
+  const returnEligibleResponders = activeResponders.filter(r =>
+    r.lifecycleStatus === 'Pending Controller Review' ||
+    (r.lifecycleStatus === 'Completed' && incident.status === 'Returned')
+  );
+  const isRangerLocked = isRanger && !!myResponderRecord && ['Pending Controller Review', 'Completed'].includes(myResponderRecord.lifecycleStatus);
+
+  const isLocked = isClosed || (incident.status === 'Pending Endorsement' && !isMgr) || isRangerLocked;
 
   // Warnings / Reminder Triggers
   const showCrisisReviewReminder = elapsedMinutes >= 45 && incident.status !== 'Closed';
@@ -1035,23 +1185,61 @@ export default function IncidentDetailsPage() {
           margin-top: 1rem;
         }
 
-        /* Section A: Unified Info Panel */
-        .incident-info-panel {
+        /* Section A: Top Grid — two independent cards side by side (Incident
+           Particulars & Location, and Responder Assignment). align-items: start
+           on both levels stops one card/column from stretching to match a
+           taller sibling (e.g. when the Incident Map is expanded), which was
+           causing uneven column heights / broken-looking whitespace. */
+        .incident-top-grid {
           display: grid;
-          grid-template-columns: 1fr 1fr 1fr;
+          grid-template-columns: 2fr 1fr;
           gap: 20px;
-          padding: 16px 20px;
+          margin-top: 20px;
           margin-bottom: 20px;
+          align-items: start;
         }
         @media (max-width: 1100px) {
-          .incident-info-panel {
-            grid-template-columns: 1fr 1fr;
-          }
-        }
-        @media (max-width: 650px) {
-          .incident-info-panel {
+          .incident-top-grid {
             grid-template-columns: 1fr;
           }
+        }
+        .incident-particulars-card {
+          display: flex;
+          flex-direction: column;
+          height: 440px;
+          padding: 16px 20px;
+          overflow: hidden;
+        }
+        .incident-particulars-body {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 20px;
+          align-items: start;
+          flex: 1;
+          min-height: 0;
+          overflow-y: auto;
+          padding-right: 6px;
+        }
+        @media (max-width: 650px) {
+          .incident-particulars-body {
+            grid-template-columns: 1fr;
+          }
+        }
+        .responder-assignment-card {
+          display: flex;
+          flex-direction: column;
+          height: 440px;
+          padding: 16px 20px;
+          overflow: hidden;
+        }
+        .responder-assignment-body {
+          flex: 1;
+          min-height: 0;
+          overflow-y: auto;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          padding-right: 6px;
         }
         .info-panel-col {
           display: flex;
@@ -1633,25 +1821,25 @@ export default function IncidentDetailsPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span className={incBadgeClass(incident.status)} style={{ marginRight: 8 }}>{incident.status}</span>
           
-          {/* Ranger Actions */}
-          {isRanger && !isClosed && (
+          {/* Ranger Actions — gated on MY OWN Responder record's lifecycleStatus, not the shared Incident status */}
+          {isRanger && !isClosed && myResponderRecord && (
             <>
-              {incident.status === 'Live (Assigned)' && (
-                <button className="btn btn-primary btn-sm" onClick={() => performAction('acknowledge')} disabled={saving}>
+              {myResponderRecord.lifecycleStatus === 'Assigned' && (
+                <button className="btn btn-primary btn-sm" onClick={() => performAction('acknowledge', { responderId: username })} disabled={saving}>
                   Acknowledge Dispatch
                 </button>
               )}
-              {incident.status === 'Live (Acknowledged)' && (
-                <button className="btn btn-success btn-sm" onClick={() => performAction('on-site')} disabled={saving}>
+              {myResponderRecord.lifecycleStatus === 'Acknowledged' && (
+                <button className="btn btn-success btn-sm" onClick={() => performAction('on-site', { responderId: username })} disabled={saving}>
                   Arrive On-Site
                 </button>
               )}
-              {['Live (On-Site)', 'Live (Incomplete)'].includes(incident.status) && (
+              {['On-Site', 'Live (Incomplete)'].includes(myResponderRecord.lifecycleStatus) && (
                 <button
                   className="btn btn-success btn-sm"
                   onClick={async () => {
                     if (confirm('Notify Controller that your ground activities are complete?')) {
-                      await performAction('notify-complete');
+                      await performAction('notify-complete', { responderId: username });
                     }
                   }}
                   disabled={saving}
@@ -1662,41 +1850,24 @@ export default function IncidentDetailsPage() {
             </>
           )}
 
-          {/* Controller/Admin Actions */}
+          {/* Controller/Admin Actions — per-Responder acknowledge/on-site/notify-complete now live in the
+              Responder Assignment panel below (each Responder progresses independently). This bar keeps
+              only the Incident-level actions: Return to Responder (multi-select), Submit/Force Submit for
+              Endorsement, and Mark False Alarm. */}
           {isCtrl && !isClosed && (
             <>
-              {/* Reassign button moved to Assigned Responders section below */}
-              {incident.status === 'Live (Acknowledged)' && (
-                <button className="btn btn-primary btn-sm" onClick={() => performAction('on-site')} disabled={saving}>
-                  Update to On-site
-                </button>
-              )}
-              {incident.status === 'Live (Pending Controller Review)' && (
-                <>
-                  <button
-                    className="btn btn-warning btn-sm"
-                    onClick={() => { setReturnToResponderRemarks(''); setShowReturnToResponderModal(true); }}
-                    disabled={saving}
-                  >
-                    Return to Responder
-                  </button>
-                  <button className="btn btn-primary btn-sm" onClick={() => performAction('submit-endorsement')} disabled={saving}>
-                    Submit for Endorsement
-                  </button>
-                </>
-              )}
-              {['Live (Completed)', 'Returned'].includes(incident.status) && (
-                <button className="btn btn-primary btn-sm" onClick={() => performAction('submit-endorsement')} disabled={saving}>
-                  Submit for Endorsement
-                </button>
-              )}
-              {incident.status === 'Returned' && (
+              {['Live (Assigned)', 'Returned'].includes(incident.status) && returnEligibleResponders.length > 0 && (
                 <button
                   className="btn btn-warning btn-sm"
-                  onClick={() => { setReturnToResponderRemarks(''); setShowReturnToResponderModal(true); }}
+                  onClick={() => { setReturnResponderIds([]); setReturnRemarksByResponder({}); setShowReturnToResponderModal(true); }}
                   disabled={saving}
                 >
                   Return to Responder
+                </button>
+              )}
+              {['Live (Assigned)', 'Returned'].includes(incident.status) && (
+                <button className="btn btn-primary btn-sm" onClick={handleSubmitEndorsement} disabled={saving}>
+                  Submit for Endorsement
                 </button>
               )}
               {incident.status === 'Live' && (
@@ -1742,13 +1913,10 @@ export default function IncidentDetailsPage() {
           )}
 
           {/* Duty Manager Actions — Returned */}
-          {isMgr && incident.status === 'Returned' && (
+          {isMgr && incident.status === 'Returned' && returnEligibleResponders.length > 0 && (
             <button
               className="btn btn-warning btn-sm"
-              onClick={async () => {
-                const r = prompt('Reason for returning to responder:');
-                if (r !== null) await performAction('return-to-responder', { returnRemarks: r });
-              }}
+              onClick={() => { setReturnResponderIds([]); setReturnRemarksByResponder({}); setShowReturnToResponderModal(true); }}
               disabled={saving}
             >
               Return to Responder
@@ -1764,11 +1932,15 @@ export default function IncidentDetailsPage() {
         </div>
       </div>
 
-      {/* Section A: Unified Info Panel (Top Grid) */}
-      <div className="glass incident-info-panel" style={{ marginTop: 20 }}>
-        {/* Header spanning all columns */}
-        <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px dashed var(--border-color)', paddingBottom: '10px', marginBottom: '10px' }}>
-          <h2 style={{ fontSize: '13px', fontWeight: 700, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-primary-dark)', borderLeft: '3px solid var(--color-primary)', paddingLeft: '8px' }}>Incident Particulars, Location & Responders</h2>
+      {/* Section A: Top Grid — split into two independent cards for easier
+          management: Card A (Incident Particulars & Location) and Card B
+          (Responder Assignment), each with its own header and edit action. */}
+      <div className="incident-top-grid">
+      {/* Card A: Incident Particulars & Location */}
+      <div className="glass incident-particulars-card">
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px dashed var(--border-color)', paddingBottom: '10px', marginBottom: '10px' }}>
+          <h2 style={{ fontSize: '13px', fontWeight: 700, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-primary-dark)', borderLeft: '3px solid var(--color-primary)', paddingLeft: '8px' }}>Incident Particulars & Location</h2>
           {isCtrl && !isLocked && (
             isEditingInfo ? (
               <div style={{ display: 'flex', gap: 8 }}>
@@ -1781,6 +1953,8 @@ export default function IncidentDetailsPage() {
           )}
         </div>
 
+        {/* Scrollable body — fixed-height card, content scrolls instead of pushing the card taller */}
+        <div className="incident-particulars-body">
         {/* Core Particulars */}
         <div className="info-panel-col">
           <div className="info-panel-title">General Information</div>
@@ -1927,78 +2101,170 @@ export default function IncidentDetailsPage() {
             )}
           </div>
 
-          {/* Assigned Responders */}
-          <div className="assigned-responders-section" style={{ marginTop: '12px' }}>
-            <div className="info-panel-title">Responder Assignment</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                {Array.isArray(incident.assignedTo) && incident.assignedTo.length > 0 ? (
-                  incident.assignedTo.map(name => (
-                    <span
-                      key={name}
-                      className="badge badge-ack"
-                      style={{
-                        background: 'rgba(66, 153, 225, 0.15)',
-                        color: 'var(--color-info, #4299e1)',
-                        borderColor: 'rgba(66, 153, 225, 0.3)',
-                        fontSize: '11px',
-                        padding: '1px 6px'
-                      }}
-                    >
-                      {name}
-                    </span>
-                  ))
-                ) : (
-                  <span style={{ color: 'var(--text-faint)', fontSize: '12px', fontStyle: 'italic' }}>Unassigned</span>
-                )}
-              </div>
-
-              {/* Inline Dispatcher Controls */}
-              {isCtrl && !isLocked && isEditingInfo && (
-                <div style={{ marginTop: 8 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                    <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)' }}>RE-ASSIGN RESPONDERS</label>
-                    {pendingResponders !== null && JSON.stringify(pendingResponders) !== JSON.stringify(Array.isArray(incident.assignedTo) ? incident.assignedTo : []) && (
-                      <span style={{ fontSize: 10, color: 'var(--color-warning)', fontWeight: 600 }}>● Unsaved</span>
-                    )}
-                  </div>
-                  <MultiResponderSelect
-                    value={pendingResponders ?? (Array.isArray(incident.assignedTo) ? incident.assignedTo : [])}
-                    onChange={handleResponderChange}
-                    disabled={saving}
-                    allowEmpty={false}
-                  />
-                  {assignmentError && (
-                    <div style={{ marginTop: 6, color: 'var(--color-critical)', fontSize: 11 }}>
-                      ⚠️ {assignmentError}
-                    </div>
-                  )}
-                </div>
-              )}
+          {/* Incident Map — moved here below Location, collapsible so it doesn't push the
+              rest of the page down when the Responder Assignment column needs more room. */}
+          <div style={{ marginTop: '12px' }}>
+            <div
+              className="info-panel-title"
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
+              onClick={() => setMapExpanded(v => !v)}
+            >
+              <span>Incident Map</span>
+              <span style={{ fontSize: 10 }}>{mapExpanded ? '▼' : '▶'}</span>
             </div>
-          </div>
-        </div>
-
-        {/* Column 3: Sentosa Map (pins latitude & longitude location) */}
-        <div className="info-panel-col" style={{ minHeight: '260px' }}>
-          <div className="info-panel-title">Incident Map</div>
-          <div style={{ flexGrow: 1, height: '100%', minHeight: '260px' }}>
-            {incident.location.lat && incident.location.lng ? (
-              <IncidentMap
-                lat={incident.location.lat}
-                lng={incident.location.lng}
-                commonName={incident.location.commonName}
-                road={incident.location.road}
-                priority={incident.priority}
-                type={incident.type}
-              />
-            ) : (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', border: '1px solid var(--border-color)', borderRadius: '8px', background: 'var(--bg-inset)', color: 'var(--text-faint)', fontSize: '12px' }}>
-                Coordinates unavailable
+            {mapExpanded && (
+              <div style={{ height: '220px', minHeight: '220px', overflow: 'hidden' }}>
+                {incident.location.lat && incident.location.lng ? (
+                  <IncidentMap
+                    lat={incident.location.lat}
+                    lng={incident.location.lng}
+                    commonName={incident.location.commonName}
+                    road={incident.location.road}
+                    priority={incident.priority}
+                    type={incident.type}
+                  />
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', border: '1px solid var(--border-color)', borderRadius: '8px', background: 'var(--bg-inset)', color: 'var(--text-faint)', fontSize: '12px' }}>
+                    Coordinates unavailable
+                  </div>
+                )}
               </div>
             )}
           </div>
         </div>
+        </div>
+      </div>
+
+      {/* Card B: Responder Assignment — its own fully independent card, same
+          level as Card A, with its own Edit Assignee action (decoupled from
+          "Edit Incident Details") and full per-Responder status tracking. */}
+      <div className="glass responder-assignment-card">
+        <div className="info-panel-col" style={{ height: '100%', minHeight: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px dashed var(--border-color)', paddingBottom: '10px', marginBottom: '10px' }}>
+            <h2 style={{ fontSize: '13px', fontWeight: 700, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-primary-dark)', borderLeft: '3px solid var(--color-primary)', paddingLeft: '8px' }}>Responder Assignment</h2>
+            {isCtrl && !isLocked && (
+              <button
+                type="button"
+                className="btn btn-secondary btn-xs"
+                style={{ padding: '3px 10px', fontSize: 11 }}
+                onClick={() => setShowResponderManager(v => !v)}
+              >
+                {showResponderManager ? 'Close' : '✏️ Edit Assignee'}
+              </button>
+            )}
+          </div>
+          {responderProgressLabel && (
+            <div style={{ textAlign: 'right', fontSize: '10.5px', fontWeight: 700, color: 'var(--text-muted)' }}
+              title="Display-only aggregation — does not affect workflow or permissions">
+              {responderProgressLabel}
+            </div>
+          )}
+          {/* Scrollable body — fixed-height card, content scrolls instead of pushing the card taller */}
+          <div className="responder-assignment-body">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {activeResponders.length > 0 ? (
+              activeResponders.map(r => {
+                const isMe = r.responderId === username;
+                return (
+                  <div
+                    key={r.responderId}
+                    style={{
+                      display: 'flex', flexDirection: 'column', gap: 4,
+                      padding: '6px 8px', borderRadius: '6px',
+                      background: isMe ? 'var(--bg-inset)' : 'transparent',
+                      border: '1px solid var(--border-color)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: '12px', fontWeight: isMe ? 700 : 500 }}>{r.responderId}</span>
+                        <span className={responderBadgeClass(r.lifecycleStatus)} style={{ fontSize: '10px', padding: '1px 6px' }}>
+                          {r.lifecycleStatus}
+                        </span>
+                      </div>
+                      {/* Controller can advance any Responder's lifecycle on their behalf */}
+                      {isCtrl && !isLocked && (
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          {r.lifecycleStatus === 'Assigned' && (
+                            <button className="btn btn-secondary btn-sm" style={{ fontSize: '10.5px', padding: '2px 6px' }}
+                              onClick={() => performAction('acknowledge', { responderId: r.responderId })} disabled={saving}>
+                              Acknowledge
+                            </button>
+                          )}
+                          {r.lifecycleStatus === 'Acknowledged' && (
+                            <button className="btn btn-secondary btn-sm" style={{ fontSize: '10.5px', padding: '2px 6px' }}
+                              onClick={() => performAction('on-site', { responderId: r.responderId })} disabled={saving}>
+                              On-Site
+                            </button>
+                          )}
+                          {['On-Site', 'Live (Incomplete)'].includes(r.lifecycleStatus) && (
+                            <button className="btn btn-secondary btn-sm" style={{ fontSize: '10.5px', padding: '2px 6px' }}
+                              onClick={() => performAction('notify-complete', { responderId: r.responderId })} disabled={saving}>
+                              Notify Completion
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    {/* Surfaces the Controller's Completion Remarks back to whoever is looking —
+                        this Responder included — instead of the remark being write-only. */}
+                    {r.lifecycleStatus === 'Live (Incomplete)' && r.completionRemarks && (
+                      <div style={{
+                        fontSize: '11px', color: '#C05621', background: 'rgba(234, 88, 12, 0.08)',
+                        border: '1px solid rgba(234, 88, 12, 0.25)', borderRadius: '4px', padding: '4px 6px'
+                      }}>
+                        <strong>Return reason:</strong> {r.completionRemarks}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            ) : (
+              <span style={{ color: 'var(--text-faint)', fontSize: '12px', fontStyle: 'italic' }}>Unassigned</span>
+            )}
+          </div>
+
+          {isCtrl && !isLocked && showResponderManager && (
+            <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: 10, marginTop: 4 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)' }}>ASSIGN / REASSIGN RESPONDERS</label>
+                {pendingResponders !== null && JSON.stringify(pendingResponders) !== JSON.stringify(Array.isArray(incident.assignedTo) ? incident.assignedTo : []) && (
+                  <span style={{ fontSize: 10, color: 'var(--color-warning)', fontWeight: 600 }}>● Unsaved</span>
+                )}
+              </div>
+              <MultiResponderSelect
+                value={pendingResponders ?? (Array.isArray(incident.assignedTo) ? incident.assignedTo : [])}
+                onChange={handleResponderChange}
+                disabled={saving}
+                allowEmpty={false}
+              />
+              {assignmentError && (
+                <div style={{ marginTop: 6, color: 'var(--color-critical)', fontSize: 11 }}>
+                  ⚠️ {assignmentError}
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 10 }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => { setPendingResponders(null); setAssignmentError(''); setShowResponderManager(false); }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-success btn-sm"
+                  onClick={handleSaveResponders}
+                  disabled={saving}
+                >
+                  Save Responders
+                </button>
+              </div>
+            </div>
+          )}
+          </div>
+        </div>
+      </div>
       </div>
 
       {/* Section B: Operational Workspace Tabs */}
@@ -3492,54 +3758,76 @@ export default function IncidentDetailsPage() {
     )}
       </div>
 
-      {/* Return to Responder Modal */}
+      {/* Return to Responder Modal — per-Responder, multi-select. The Controller picks one
+          or more specific assigned Responders to return for rework; each selected Responder
+          gets its own Completion Remarks (not a single shared remark). */}
       {showReturnToResponderModal && (
         <div className="modal-overlay">
           <div className="modal-box glass">
             <h2 className="modal-title">Return to Responder</h2>
             <div className="form-group" style={{ marginTop: '12px' }}>
-              <label style={{ fontSize: '13px', fontWeight: '600', display: 'block', marginBottom: '6px' }}>Reason for Return *</label>
-              <textarea
-                className="form-control"
-                rows={4}
-                value={returnToResponderRemarks}
-                onChange={(e) => setReturnToResponderRemarks(e.target.value)}
-                placeholder="Specify what the Responder needs to address..."
-                style={{ width: '100%', padding: '8px', fontSize: '13px' }}
-                autoFocus
-              />
+              <label style={{ fontSize: '13px', fontWeight: '600', display: 'block', marginBottom: '6px' }}>
+                Select Responder(s) to Return *
+              </label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {returnEligibleResponders.map(r => {
+                  const checked = returnResponderIds.includes(r.responderId);
+                  return (
+                    <div key={r.responderId} style={{ border: '1px solid var(--border-color)', borderRadius: '6px', padding: '8px' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setReturnResponderIds([...returnResponderIds, r.responderId]);
+                            } else {
+                              setReturnResponderIds(returnResponderIds.filter(id => id !== r.responderId));
+                              const rest = { ...returnRemarksByResponder };
+                              delete rest[r.responderId];
+                              setReturnRemarksByResponder(rest);
+                            }
+                          }}
+                        />
+                        {r.responderId}
+                        <span className={responderBadgeClass(r.lifecycleStatus)} style={{ fontSize: '10px', padding: '1px 6px' }}>
+                          {r.lifecycleStatus}
+                        </span>
+                      </label>
+                      {checked && (
+                        <textarea
+                          className="form-control"
+                          rows={3}
+                          value={returnRemarksByResponder[r.responderId] || ''}
+                          onChange={(e) => setReturnRemarksByResponder({ ...returnRemarksByResponder, [r.responderId]: e.target.value })}
+                          placeholder={`Completion Remarks for ${r.responderId} — what they need to address...`}
+                          style={{ width: '100%', padding: '8px', fontSize: '13px', marginTop: '8px' }}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
             <div className="modal-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
               <button className="btn btn-secondary btn-sm" onClick={() => setShowReturnToResponderModal(false)}>Cancel</button>
               <button
                 className="btn btn-warning btn-sm"
                 onClick={async () => {
-                  if (!returnToResponderRemarks.trim()) return;
-                  const ok = await performAction('return-to-responder', { returnRemarks: returnToResponderRemarks.trim() });
+                  const ok = await performAction('return-to-responder', {
+                    responderIds: returnResponderIds,
+                    remarksByResponder: returnRemarksByResponder
+                  });
                   if (ok) setShowReturnToResponderModal(false);
                 }}
-                disabled={saving || !returnToResponderRemarks.trim()}
+                disabled={
+                  saving ||
+                  returnResponderIds.length === 0 ||
+                  returnResponderIds.some(id => !(returnRemarksByResponder[id] || '').trim())
+                }
               >
-                Return to Responder
+                Return to Responder ({returnResponderIds.length})
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Controller Confirm Completion Modal */}
-      {showCompleteModal && (
-        <div className="modal-overlay">
-          <div className="modal-box glass">
-            <h2 className="modal-title">Confirm Completion</h2>
-            <div className="form-group">
-              <p style={{ fontSize: '13px', color: 'var(--text-sub)', margin: '8px 0' }}>
-                Confirm that all Responder inputs have been reviewed and the Incident record is complete. Status will change to <strong>Live (Completed)</strong>.
-              </p>
-            </div>
-            <div className="modal-actions">
-              <button className="btn btn-secondary btn-sm" onClick={() => setShowCompleteModal(false)}>Cancel</button>
-              <button className="btn btn-success btn-sm" onClick={handleComplete} disabled={saving}>Confirm</button>
             </div>
           </div>
         </div>

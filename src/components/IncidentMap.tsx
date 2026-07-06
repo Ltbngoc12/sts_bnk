@@ -97,8 +97,8 @@ const IncidentMap: React.FC<IncidentMapProps> = ({ lat, lng, commonName, road, p
   }, [lat, lng, commonName, road, priority, type]);
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: '260px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
-      <div ref={mapRef} style={{ width: '100%', height: '100%', minHeight: '260px' }} />
+    <div style={{ position: 'relative', width: '100%', height: '100%', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
+      <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
     </div>
   );
 };

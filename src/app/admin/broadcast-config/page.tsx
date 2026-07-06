@@ -69,7 +69,7 @@ const MOCK_VARS = {
   location: 'Siloso Beach Walk - Siloso Beach Station Level 1 Space ticket-counter',
   time: '2026-06-13 22:45:00',
   crisis_level: '3',
-  status: 'Live (On-Site)',
+  status: 'Live (Assigned)',
   summary: 'Major water leakage detected under ticketing kiosk. Tram lines flooded.',
   total_incidents: '12',
   open_incidents: '4',

@@ -122,11 +122,30 @@ export interface SlaveIncident {
   status: string; // Open, Closed
 }
 
+// Responder-level lifecycle status (per assignment), tracked independently and in
+// parallel for every Responder on an Incident. Split out from Incident.status per the
+// Incident/Responder Status Model Design decision (see Incident_Status_Model_Design_Updated.docx).
+export type ResponderLifecycleStatus =
+  | 'Assigned'
+  | 'Acknowledged'
+  | 'On-Site'
+  | 'Pending Controller Review'
+  | 'Live (Incomplete)'
+  | 'Completed';
+
 export interface IncidentResponder {
   responderId: string;   // Display name, e.g. "Ranger John"
   assignedBy: string;    // Username of Controller who made the assignment
   assignedAt: string;    // ISO datetime of assignment
   status: 'Active' | 'Removed'; // 'Removed' when explicitly unassigned
+  lifecycleStatus: ResponderLifecycleStatus; // Per-Responder workflow status (parallel to other Responders)
+  acknowledgedAt?: string;
+  onSiteAt?: string;
+  pendingReviewAt?: string;
+  completedAt?: string;
+  completionRemarks?: string; // Set when Controller returns this specific Responder (per-Responder remark)
+  returnedAt?: string;
+  returnedBy?: string;
 }
 
 export interface Incident {
@@ -143,7 +162,9 @@ export interface Incident {
   reportingSource?: string; // FSD §5.4.4 — channel of the report (e.g. "Public Phone", "VA", "State Agency")
   createdBy: string;
   category: string; // "Standard Incident" | "Proactive Incident" | "Backdated Incident" | "Ongoing Incident" | "Informational / Exercise Records"
-  status: string; // "Live" | "Live (Assigned)" | "Live (Acknowledged)" | "Live (On-Site)" | "Live (Pending Controller Review)" | "Live (Incomplete)" | "Live (Completed)" | "Pending Endorsement" | "Returned" | "Closed"
+  status: string; // Incident-level (Controller-driven): "Live" | "Live (Assigned)" | "Pending Endorsement" | "Returned" | "Closed"
+                   // NOTE: "Live (Acknowledged)" / "Live (On-Site)" / "Live (Pending Controller Review)" / "Live (Incomplete)" / "Live (Completed)"
+                   // used to live here but now live on IncidentResponder.lifecycleStatus (per-Responder, parallel). See hydrateDb() for legacy migration.
   assignedTo: string[]; // Array of responder display names
   responders?: IncidentResponder[]; // Rich metadata per assignment (assignedBy, assignedAt, status)
   location: Location;
@@ -425,9 +446,70 @@ const DB_PATH = path.join(process.cwd(), 'src', 'lib', 'db.json');
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+// Incident/Responder Status Split migration (see Incident_Status_Model_Design_Updated.docx):
+// old data only had ONE shared status per Incident. We derive a per-Responder
+// lifecycleStatus from that legacy value (best-effort — the old data has no way to know
+// what each individual Responder's true progress was), and collapse the Incident-level
+// status down to the new 5-value set. This is an approximation for pre-existing records;
+// new records will get proper per-Responder progress going forward.
+function legacyStatusToResponderLifecycle(legacyStatus: string): ResponderLifecycleStatus {
+  switch (legacyStatus) {
+    case 'Live':
+    case 'Live (Assigned)':
+      return 'Assigned';
+    case 'Live (Acknowledged)':
+      return 'Acknowledged';
+    case 'Live (On-Site)':
+      return 'On-Site';
+    case 'Live (Pending Controller Review)':
+      return 'Pending Controller Review';
+    case 'Live (Incomplete)':
+      return 'Live (Incomplete)';
+    case 'Live (Completed)':
+    case 'Pending Endorsement':
+    case 'Returned':
+    case 'Closed':
+      return 'Completed';
+    default:
+      return 'Assigned';
+  }
+}
+
+function legacyStatusToIncidentStatus(legacyStatus: string): string {
+  switch (legacyStatus) {
+    case 'Live':
+      return 'Live';
+    case 'Live (Assigned)':
+    case 'Live (Acknowledged)':
+    case 'Live (On-Site)':
+    case 'Live (Pending Controller Review)':
+    case 'Live (Incomplete)':
+    case 'Live (Completed)':
+      return 'Live (Assigned)';
+    case 'Pending Endorsement':
+      return 'Pending Endorsement';
+    case 'Returned':
+      return 'Returned';
+    case 'Closed':
+      return 'Closed';
+    default:
+      return legacyStatus;
+  }
+}
+
 function hydrateDb(normalizedDb: NormalizedDbSchema): DbSchema {
   // Ensure all incidents follow strict FRD status and category taxonomy
   const normalizedIncidents = normalizedDb.incidents.map(inc => {
+    // Normalize legacy status typos/aliases before deriving anything from it
+    let legacyStatus = inc.status || 'Live';
+    if (legacyStatus === 'Live Acknowledged') legacyStatus = 'Live (Acknowledged)';
+    else if (legacyStatus === 'Live On-Site') legacyStatus = 'Live (On-Site)';
+    else if (legacyStatus === 'Live Completed') legacyStatus = 'Live (Completed)';
+    else if (legacyStatus === 'Pending Review') legacyStatus = 'Pending Endorsement';
+    else if (legacyStatus === 'Live (Returned to Responder)') legacyStatus = 'Live (Incomplete)';
+
+    const derivedLifecycleStatus = legacyStatusToResponderLifecycle(legacyStatus);
+
     const legacyResponders = inc.responders || [];
     let finalResponders = legacyResponders;
     if (legacyResponders.length === 0) {
@@ -441,20 +523,21 @@ function hydrateDb(normalizedDb: NormalizedDbSchema): DbSchema {
         responderId: r,
         assignedBy: inc.createdBy || 'System',
         assignedAt: inc.dateTime || new Date().toISOString(),
-        status: 'Active' as const
+        status: 'Active' as const,
+        lifecycleStatus: derivedLifecycleStatus
       }));
+    } else {
+      // Backfill lifecycleStatus on responders created before the status split existed
+      finalResponders = legacyResponders.map(r => (
+        r.lifecycleStatus ? r : { ...r, lifecycleStatus: derivedLifecycleStatus }
+      ));
     }
 
     const derivedAssignedTo = finalResponders
       .filter(r => r.status === 'Active')
       .map(r => r.responderId);
 
-    let mappedStatus = inc.status || 'Live';
-    if (mappedStatus === 'Live Acknowledged') mappedStatus = 'Live (Acknowledged)';
-    else if (mappedStatus === 'Live On-Site') mappedStatus = 'Live (On-Site)';
-    else if (mappedStatus === 'Live Completed') mappedStatus = 'Live (Completed)';
-    else if (mappedStatus === 'Pending Review') mappedStatus = 'Pending Endorsement';
-    else if (mappedStatus === 'Live (Returned to Responder)') mappedStatus = 'Live (Incomplete)';
+    const mappedStatus = legacyStatusToIncidentStatus(legacyStatus);
 
     return {
       ...inc,

@@ -109,7 +109,8 @@ export async function PUT(
               responderId: r,
               assignedBy: actor,
               assignedAt: new Date().toISOString(),
-              status: 'Active'
+              status: 'Active',
+              lifecycleStatus: 'Assigned'
             });
           }
         });
@@ -206,7 +207,7 @@ export async function POST(
     let queryId = id.join('/');
 
     const knownActions = [
-      'assign', 'acknowledge', 'on-site', 'complete', 'notify-complete', 'close', 'return',
+      'assign', 'acknowledge', 'on-site', 'notify-complete', 'close', 'return',
       'return-to-responder', 'submit-review', 'submit-endorsement', 'log',
       'update-fields', 'reopen', 'mark-false-alarm', 'link-duplicate',
       'edit-log', 'delete-log'
@@ -243,7 +244,7 @@ export async function POST(
           incident.assignedTo = [...currentList, body.addResponder];
           incident.responders = [
             ...(incident.responders || []),
-            { responderId: body.addResponder, assignedBy: actor, assignedAt: new Date().toISOString(), status: 'Active' }
+            { responderId: body.addResponder, assignedBy: actor, assignedAt: new Date().toISOString(), status: 'Active', lifecycleStatus: 'Assigned' }
           ];
           if (incident.status === 'Live') {
             incident.status = 'Live (Assigned)';
@@ -280,7 +281,7 @@ export async function POST(
           incoming.forEach(r => {
             const exists = updatedResponders.find(x => x.responderId === r);
             if (exists) { exists.status = 'Active'; }
-            else { updatedResponders.push({ responderId: r, assignedBy: actor, assignedAt: new Date().toISOString(), status: 'Active' }); }
+            else { updatedResponders.push({ responderId: r, assignedBy: actor, assignedAt: new Date().toISOString(), status: 'Active', lifecycleStatus: 'Assigned' }); }
           });
           incident.responders = updatedResponders;
           incident.assignedTo = incoming;
@@ -291,61 +292,103 @@ export async function POST(
         return NextResponse.json({ error: 'assignedTo, addResponder, or removeResponder is required' }, { status: 400 });
       }
 
-      // ── Responder acknowledges ─────────────────────────────────
+      // ── Responder acknowledges (per-Responder; Incident.status stays Live (Assigned)) ──
       case 'acknowledge': {
         if (!['Live', 'Live (Assigned)'].includes(incident.status)) {
           return NextResponse.json({ error: `Cannot acknowledge: current status is "${incident.status}"` }, { status: 409 });
         }
-        incident.status = 'Live (Acknowledged)';
-        incident.acknowledgedAt = new Date().toISOString();
-        incident.log.push(makeLogEntry(incident, `Responder ${Array.isArray(incident.assignedTo) && incident.assignedTo.length > 0 ? incident.assignedTo.join(', ') : actor} acknowledged dispatch. Status changed to Live (Acknowledged).`));
+        const activeResponders = (incident.responders || []).filter(r => r.status === 'Active');
+        const targetId = body.responderId || actor;
+        const target = activeResponders.find(r => r.responderId === targetId)
+          || (activeResponders.length === 1 ? activeResponders[0] : undefined);
+        if (!target) {
+          return NextResponse.json({ error: 'Could not determine which Responder is acknowledging. Pass responderId explicitly.' }, { status: 400 });
+        }
+        if (target.lifecycleStatus !== 'Assigned') {
+          return NextResponse.json({ error: `Cannot acknowledge: Responder ${target.responderId} is currently "${target.lifecycleStatus}"` }, { status: 409 });
+        }
+        target.lifecycleStatus = 'Acknowledged';
+        target.acknowledgedAt = new Date().toISOString();
+        if (incident.status === 'Live') incident.status = 'Live (Assigned)';
+        incident.log.push(makeLogEntry(incident, `Responder ${target.responderId} acknowledged dispatch.`));
         break;
       }
 
-      // ── Responder arrives on-site ──────────────────────────────
+      // ── Responder arrives on-site (per-Responder) ──────────────────────────────
       case 'on-site': {
-        if (incident.status !== 'Live (Acknowledged)') {
+        if (!['Live', 'Live (Assigned)'].includes(incident.status)) {
           return NextResponse.json({ error: `Cannot mark on-site: current status is "${incident.status}"` }, { status: 409 });
         }
-        incident.status = 'Live (On-Site)';
-        incident.onSiteAt = new Date().toISOString();
-        incident.log.push(makeLogEntry(incident, `Responder ${Array.isArray(incident.assignedTo) && incident.assignedTo.length > 0 ? incident.assignedTo.join(', ') : actor} confirmed arrival on-site. Status changed to Live (On-Site).`));
+        const activeResponders = (incident.responders || []).filter(r => r.status === 'Active');
+        const targetId = body.responderId || actor;
+        const target = activeResponders.find(r => r.responderId === targetId)
+          || (activeResponders.length === 1 ? activeResponders[0] : undefined);
+        if (!target) {
+          return NextResponse.json({ error: 'Could not determine which Responder arrived on-site. Pass responderId explicitly.' }, { status: 400 });
+        }
+        if (target.lifecycleStatus !== 'Acknowledged') {
+          return NextResponse.json({ error: `Cannot mark on-site: Responder ${target.responderId} is currently "${target.lifecycleStatus}"` }, { status: 409 });
+        }
+        target.lifecycleStatus = 'On-Site';
+        target.onSiteAt = new Date().toISOString();
+        incident.log.push(makeLogEntry(incident, `Responder ${target.responderId} confirmed arrival on-site.`));
         break;
       }
 
-      // ── Responder notifies Controller of completion ───────────────
+      // ── Responder notifies Controller of completion (per-Responder) ───────────────
       case 'notify-complete': {
-        if (!['Live (On-Site)', 'Live (Acknowledged)', 'Live', 'Live (Assigned)', 'Live (Incomplete)'].includes(incident.status)) {
+        if (!['Live', 'Live (Assigned)'].includes(incident.status)) {
           return NextResponse.json({ error: `Cannot notify completion: current status is "${incident.status}"` }, { status: 409 });
         }
-        incident.status = 'Live (Pending Controller Review)';
-        incident.log.push(makeLogEntry(incident,
-          `${actor} has notified completion of ground activities. Status changed to Live (Pending Controller Review) — awaiting Controller verification.`
-        ));
-        break;
-      }
-
-      // ── Controller locks incident (all responders done) ────────
-      case 'complete': {
-        if (!['Live (Pending Controller Review)', 'Live (Acknowledged)', 'Live', 'Live (Assigned)', 'Live (Incomplete)'].includes(incident.status)) {
-          return NextResponse.json({ error: `Cannot lock incident: current status is "${incident.status}"` }, { status: 409 });
+        const activeResponders = (incident.responders || []).filter(r => r.status === 'Active');
+        const targetId = body.responderId || actor;
+        const target = activeResponders.find(r => r.responderId === targetId)
+          || (activeResponders.length === 1 ? activeResponders[0] : undefined);
+        if (!target) {
+          return NextResponse.json({ error: 'Could not determine which Responder is notifying completion. Pass responderId explicitly.' }, { status: 400 });
         }
-        incident.status = 'Live (Completed)';
-        incident.completedAt = new Date().toISOString();
+        if (!['On-Site', 'Acknowledged', 'Assigned', 'Live (Incomplete)'].includes(target.lifecycleStatus)) {
+          return NextResponse.json({ error: `Cannot notify completion: Responder ${target.responderId} is currently "${target.lifecycleStatus}"` }, { status: 409 });
+        }
+        target.lifecycleStatus = 'Pending Controller Review';
+        target.pendingReviewAt = new Date().toISOString();
         incident.log.push(makeLogEntry(incident,
-          `Incident locked by Controller ${actor}. All ground activities verified. Status changed to Live (Completed).`
+          `Responder ${target.responderId} has notified completion of ground activities — awaiting Controller review.`
         ));
         break;
       }
 
-      // ── Submit for Duty Manager review ─────────────────────────
+      // ── Submit (or Force Submit) for Duty Manager endorsement ─────────────────────
+      // Standard submit requires every active Responder to already be at
+      // "Pending Controller Review" (or already Live (Incomplete)/Completed). Force
+      // Submit (body.force === true) bypasses that gate and locks every active
+      // Responder to Completed regardless of their current stage.
       case 'submit-review':
       case 'submit-endorsement': {
-        if (!['Live (Pending Controller Review)', 'Live (Completed)', 'Returned'].includes(incident.status)) {
-          return NextResponse.json({ error: `Cannot submit for endorsement: incident must be pending Controller review, completed, or returned (current: "${incident.status}").` }, { status: 409 });
+        if (!['Live (Assigned)', 'Returned'].includes(incident.status)) {
+          return NextResponse.json({ error: `Cannot submit for endorsement: incident must be Live (Assigned) or Returned (current: "${incident.status}").` }, { status: 409 });
         }
+        const activeResponders = (incident.responders || []).filter(r => r.status === 'Active');
+        const notYetReviewed = activeResponders.filter(r => !['Pending Controller Review', 'Live (Incomplete)', 'Completed'].includes(r.lifecycleStatus));
+        const isForceSubmit = notYetReviewed.length > 0;
+        if (isForceSubmit && !body.force) {
+          return NextResponse.json({
+            error: 'Some Responders have not yet reached Pending Controller Review. Confirm Force Submit to proceed.',
+            requiresForce: true,
+            outstandingResponders: notYetReviewed.map(r => r.responderId)
+          }, { status: 409 });
+        }
+        const submitNow = new Date().toISOString();
+        activeResponders.forEach(r => {
+          r.lifecycleStatus = 'Completed';
+          r.completedAt = submitNow;
+        });
         incident.status = 'Pending Endorsement';
-        incident.log.push(makeLogEntry(incident, `Incident submitted for Duty Manager endorsement by ${actor}.`));
+        incident.log.push(makeLogEntry(incident,
+          isForceSubmit
+            ? `Incident FORCE-SUBMITTED for Duty Manager endorsement by ${actor}. Responder(s) still in progress at the time (${notYetReviewed.map(r => r.responderId).join(', ')}) have been locked to Completed.`
+            : `Incident submitted for Duty Manager endorsement by ${actor}. All Responders marked Completed.`
+        ));
         break;
       }
 
@@ -417,14 +460,65 @@ export async function POST(
         break;
       }
 
-      // ── Controller/DM returns to Responder for further action ──
+      // ── Controller/DM returns specific Responder(s) for further action ──
+      // Per-Responder, multi-select: the Controller picks one or more assigned
+      // Responders to return for rework, each with its own Completion Remarks —
+      // Responders not selected are left untouched (updated per Shin Feng's review
+      // comment; previously this applied to every assigned Responder at once).
+      //
+      // Only Responders who have actually SUBMITTED something can be returned —
+      // there's nothing to reject if they're still Assigned/Acknowledged/On-Site:
+      //   - "Pending Controller Review": normal case, Controller reviews and rejects.
+      //   - "Completed" — only while Incident.status is "Returned": the whole
+      //     Incident was force-locked and the Duty Manager bounced it back, so the
+      //     Controller may need to reopen a specific Responder's work.
+      // Not allowed while Incident.status is "Pending Endorsement" — the Controller
+      // can't silently pull back a submission before the Duty Manager has acted on it.
       case 'return-to-responder': {
-        if (!['Live (Pending Controller Review)', 'Live (Incomplete)', 'Pending Endorsement', 'Returned'].includes(incident.status)) {
-          return NextResponse.json({ error: `Cannot return to responder: incident status is "${incident.status}"` }, { status: 409 });
+        if (!['Live (Assigned)', 'Returned'].includes(incident.status)) {
+          return NextResponse.json({ error: `Cannot return to responder: incident status is "${incident.status}". A Responder can only be returned while the Controller is still reviewing (Live (Assigned)), or after the Duty Manager has returned the Incident.` }, { status: 409 });
         }
-        incident.status = 'Live (Incomplete)';
+        const responderIds: string[] = Array.isArray(body.responderIds)
+          ? body.responderIds
+          : (body.responderId ? [body.responderId] : []);
+        if (responderIds.length === 0) {
+          return NextResponse.json({ error: 'At least one responderId is required.' }, { status: 400 });
+        }
+        const remarksByResponder: Record<string, string> = body.remarksByResponder || {};
+        for (const rid of responderIds) {
+          const remark = remarksByResponder[rid];
+          if (!remark || !remark.trim()) {
+            return NextResponse.json({ error: `Completion Remarks are required for Responder ${rid}.` }, { status: 400 });
+          }
+        }
+        const activeResponders = (incident.responders || []).filter(r => r.status === 'Active');
+        const eligible = activeResponders.filter(r =>
+          r.lifecycleStatus === 'Pending Controller Review' ||
+          (r.lifecycleStatus === 'Completed' && incident.status === 'Returned')
+        );
+        const ineligibleSelected = responderIds.filter(rid => !eligible.some(r => r.responderId === rid));
+        if (ineligibleSelected.length > 0) {
+          return NextResponse.json({ error: `Responder(s) ${ineligibleSelected.join(', ')} haven't submitted for review yet and cannot be returned.` }, { status: 409 });
+        }
+        const targets = eligible.filter(r => responderIds.includes(r.responderId));
+        if (targets.length === 0) {
+          return NextResponse.json({ error: 'None of the specified Responders are eligible to be returned.' }, { status: 404 });
+        }
+        const returnNow = new Date().toISOString();
+        targets.forEach(r => {
+          r.lifecycleStatus = 'Live (Incomplete)';
+          r.completionRemarks = remarksByResponder[r.responderId];
+          r.returnedAt = returnNow;
+          r.returnedBy = actor;
+        });
+        // If the Duty Manager had bounced the whole Incident back (Returned), returning
+        // a Responder for rework brings the Incident back down to Live (Assigned).
+        if (incident.status === 'Returned') {
+          incident.status = 'Live (Assigned)';
+        }
         incident.log.push(makeLogEntry(incident,
-          `Incident returned to Responder for further action by ${actor}${body.returnRemarks ? `. Reason: ${body.returnRemarks}` : '.'}`
+          `Incident returned to Responder(s) for further action by ${actor}: ` +
+          targets.map(r => `${r.responderId} — "${remarksByResponder[r.responderId]}"`).join('; ')
         ));
         break;
       }
