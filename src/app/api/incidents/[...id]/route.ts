@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDb, saveDb, generateCaseId } from '@/lib/db';
 import { tryAutoCloseCase } from '@/lib/autoclose';
+import { isValidIncidentCategory } from '@/lib/incidentCategory';
 
 // Helper: build a timestamped log entry
 function makeLogEntry(db_incident: any, description: string) {
@@ -154,7 +155,12 @@ export async function PUT(
     if (body.crisisLevel !== undefined) incident.crisisLevel = parseInt(body.crisisLevel, 10);
     if (body.requestedBy) incident.requestedBy = body.requestedBy;
     if (body.reporterName !== undefined) incident.reporterName = body.reporterName;
-    if (body.category) incident.category = body.category;
+    if (body.category) {
+      if (!isValidIncidentCategory(body.category)) {
+        return NextResponse.json({ error: `Invalid Incident Category: "${body.category}".` }, { status: 400 });
+      }
+      incident.category = body.category;
+    }
     if (body.reportingSource !== undefined) incident.reportingSource = body.reportingSource;
 
     // Location updates
@@ -246,7 +252,10 @@ export async function POST(
             ...(incident.responders || []),
             { responderId: body.addResponder, assignedBy: actor, assignedAt: new Date().toISOString(), status: 'Active', lifecycleStatus: 'Assigned' }
           ];
-          if (incident.status === 'Live') {
+          // Backdated Incident (FSD v0.5 §5.1.2) never goes through the live ground-response
+          // cycle — assigning a Responder is a record only (who handled it), not a dispatch.
+          // Status stays as-is; acknowledge/on-site/notify-complete are blocked below too.
+          if (incident.status === 'Live' && incident.category !== 'Backdated Incident') {
             incident.status = 'Live (Assigned)';
             incident.log.push(makeLogEntry(incident, `Responder assigned: ${body.addResponder} — by ${actor}. Status changed to Live (Assigned).`));
           } else {
@@ -294,6 +303,9 @@ export async function POST(
 
       // ── Responder acknowledges (per-Responder; Incident.status stays Live (Assigned)) ──
       case 'acknowledge': {
+        if (incident.category === 'Backdated Incident') {
+          return NextResponse.json({ error: 'Backdated Incidents do not go through the ground-response cycle — there is nothing to acknowledge.' }, { status: 409 });
+        }
         if (!['Live', 'Live (Assigned)'].includes(incident.status)) {
           return NextResponse.json({ error: `Cannot acknowledge: current status is "${incident.status}"` }, { status: 409 });
         }
@@ -316,6 +328,9 @@ export async function POST(
 
       // ── Responder arrives on-site (per-Responder) ──────────────────────────────
       case 'on-site': {
+        if (incident.category === 'Backdated Incident') {
+          return NextResponse.json({ error: 'Backdated Incidents do not go through the ground-response cycle — there is no on-site step.' }, { status: 409 });
+        }
         if (!['Live', 'Live (Assigned)'].includes(incident.status)) {
           return NextResponse.json({ error: `Cannot mark on-site: current status is "${incident.status}"` }, { status: 409 });
         }
@@ -337,6 +352,9 @@ export async function POST(
 
       // ── Responder notifies Controller of completion (per-Responder) ───────────────
       case 'notify-complete': {
+        if (incident.category === 'Backdated Incident') {
+          return NextResponse.json({ error: 'Backdated Incidents do not go through the ground-response cycle — submit the Incident directly for endorsement instead.' }, { status: 409 });
+        }
         if (!['Live', 'Live (Assigned)'].includes(incident.status)) {
           return NextResponse.json({ error: `Cannot notify completion: current status is "${incident.status}"` }, { status: 409 });
         }
@@ -365,11 +383,23 @@ export async function POST(
       // Responder to Completed regardless of their current stage.
       case 'submit-review':
       case 'submit-endorsement': {
-        if (!['Live (Assigned)', 'Returned'].includes(incident.status)) {
-          return NextResponse.json({ error: `Cannot submit for endorsement: incident must be Live (Assigned) or Returned (current: "${incident.status}").` }, { status: 409 });
+        // "Live" is included alongside "Live (Assigned)"/"Returned" so an incident that never
+        // had a Responder assigned can still be submitted for endorsement — this is required for
+        // Backdated Incident and Informational/Exercise Records (FSD v0.5 §5.1.2), which by design
+        // may have zero Responders. Before the Incident Category feature this branch was
+        // unreachable in practice since Category had no UI, so no incident ever legitimately
+        // stayed at "Live" through to submission.
+        if (!['Live', 'Live (Assigned)', 'Returned'].includes(incident.status)) {
+          return NextResponse.json({ error: `Cannot submit for endorsement: incident must be Live, Live (Assigned) or Returned (current: "${incident.status}").` }, { status: 409 });
         }
         const activeResponders = (incident.responders || []).filter(r => r.status === 'Active');
-        const notYetReviewed = activeResponders.filter(r => !['Pending Controller Review', 'Live (Incomplete)', 'Completed'].includes(r.lifecycleStatus));
+        // Backdated Incident Responders never go through the ground-response cycle (see the
+        // 'acknowledge'/'on-site'/'notify-complete' guards above), so their lifecycleStatus
+        // legitimately stays "Assigned" forever — that's expected, not "outstanding work",
+        // so the Force Submit warning gate below doesn't apply to this category.
+        const notYetReviewed = incident.category === 'Backdated Incident'
+          ? []
+          : activeResponders.filter(r => !['Pending Controller Review', 'Live (Incomplete)', 'Completed'].includes(r.lifecycleStatus));
         const isForceSubmit = notYetReviewed.length > 0;
         if (isForceSubmit && !body.force) {
           return NextResponse.json({
@@ -676,7 +706,12 @@ export async function POST(
         if (body.personsInvolved) incident.personsInvolved = body.personsInvolved;
         if (body.cctvBwc) incident.cctvBwc = body.cctvBwc;
         if (body.summary !== undefined) incident.summary = body.summary;
-        if (body.category) incident.category = body.category;
+        if (body.category) {
+          if (!isValidIncidentCategory(body.category)) {
+            return NextResponse.json({ error: `Invalid Incident Category: "${body.category}".` }, { status: 400 });
+          }
+          incident.category = body.category;
+        }
         if (body.reportingSource !== undefined) incident.reportingSource = body.reportingSource;
         incident.log.push(makeLogEntry(incident, `Ancillary fields updated by ${actor}.`));
         break;
@@ -698,3 +733,4 @@ export async function POST(
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
+      

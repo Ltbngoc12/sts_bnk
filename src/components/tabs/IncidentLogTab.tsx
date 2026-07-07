@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Case, Incident } from '@/lib/db';
 import { useRole } from '@/context/RoleContext';
 import { getIncidentTaxonomy } from '@/lib/taxonomy';
+import { INCIDENT_CATEGORIES, DEFAULT_INCIDENT_CATEGORY } from '@/lib/incidentCategory';
 
 function CrisisIcon({ level }: { level: string | number }) {
   const lvl = String(level);
@@ -154,6 +155,7 @@ export function IncidentLogTab() {
   const [filterStatus, setFilterStatus] = useState<string>('All');
   const [filterType, setFilterType] = useState<string>('All');
   const [filterSubType, setFilterSubType] = useState<string>('All');
+  const [filterCategory, setFilterCategory] = useState<string>('All'); // Incident Category (Operational/Backdated/Informational) — distinct from filterType (Incident Type taxonomy)
   const [filterCrisisLevel, setFilterCrisisLevel] = useState<string>('All');
   const [filterSource, setFilterSource] = useState<string>('All');
   const [filterController, setFilterController] = useState<string>('All');
@@ -186,7 +188,7 @@ export function IncidentLogTab() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, filterStatus, filterType, filterSubType, filterCrisisLevel, filterSource, filterController, filterDateStart, filterDateEnd, activeTab]);
+  }, [searchTerm, filterStatus, filterType, filterSubType, filterCategory, filterCrisisLevel, filterSource, filterController, filterDateStart, filterDateEnd, activeTab]);
 
   // Reset Filters
   const resetFilters = () => {
@@ -194,6 +196,7 @@ export function IncidentLogTab() {
     setFilterStatus('All');
     setFilterType('All');
     setFilterSubType('All');
+    setFilterCategory('All');
     setFilterCrisisLevel('All');
     setFilterSource('All');
     setFilterController('All');
@@ -309,6 +312,7 @@ export function IncidentLogTab() {
     if (filterStatus !== 'All' && inc.status !== filterStatus) return false;
     if (filterType !== 'All' && inc.type !== filterType) return false;
     if (filterSubType !== 'All' && inc.subType !== filterSubType) return false;
+    if (filterCategory !== 'All' && (inc.category || DEFAULT_INCIDENT_CATEGORY) !== filterCategory) return false;
     if (filterCrisisLevel !== 'All' && String(inc.crisisLevel) !== filterCrisisLevel) return false;
     if (!matchesSource(filterSource, inc)) return false;
     if (filterController !== 'All' && inc.createdBy !== filterController) return false;
@@ -744,13 +748,26 @@ export function IncidentLogTab() {
               </select>
             </div>
 
-            {/* Category dropdown */}
+            {/* Incident Type dropdown — NOTE: this used to be mislabeled "Category:" even though it
+                filters by Incident Type (Security/Safety/Transport/...) taxonomy, not the real
+                Incident Category (Operational/Backdated/Informational) below. Renamed for clarity. */}
             <div className="form-group" style={{ margin: 0 }}>
-              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Category:</label>
+              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Incident Type:</label>
               <select value={filterType} onChange={(e) => { setFilterType(e.target.value); setFilterSubType('All'); setCurrentPage(1); }} className="form-control select-dark" style={{ width: '100%' }}>
-                <option value="All">All Categories</option>
+                <option value="All">All Types</option>
                 {Object.keys(taxonomy).sort().map(t => (
                   <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Incident Category dropdown (FSD v0.5 §5.1.2) — Operational / Backdated / Informational-Exercise */}
+            <div className="form-group" style={{ margin: 0 }}>
+              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Incident Category:</label>
+              <select value={filterCategory} onChange={(e) => { setFilterCategory(e.target.value); setCurrentPage(1); }} className="form-control select-dark" style={{ width: '100%' }}>
+                <option value="All">All Categories</option>
+                {INCIDENT_CATEGORIES.map(c => (
+                  <option key={c} value={c}>{c}</option>
                 ))}
               </select>
             </div>
@@ -836,7 +853,7 @@ export function IncidentLogTab() {
 
 
             {/* Clear Filters — inside panel */}
-            {(searchTerm || filterStatus !== 'All' || filterType !== 'All' || filterSubType !== 'All' || filterCrisisLevel !== 'All' || filterSource !== 'All' || filterController !== 'All' || filterDateStart || filterDateEnd || activeTab !== 'All') && (
+            {(searchTerm || filterStatus !== 'All' || filterType !== 'All' || filterSubType !== 'All' || filterCategory !== 'All' || filterCrisisLevel !== 'All' || filterSource !== 'All' || filterController !== 'All' || filterDateStart || filterDateEnd || activeTab !== 'All') && (
               <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end' }}>
                 <button
                   onClick={resetFilters}
@@ -866,6 +883,7 @@ export function IncidentLogTab() {
                   <th>Case ID</th>
                   <th>Incident ID</th>
                   <th>Incident Title</th>
+                  <th>Category</th>
                   <th>Type</th>
                   <th>Subtype</th>
                   <th>Crisis Level</th>
@@ -921,6 +939,11 @@ export function IncidentLogTab() {
                           >
                             {c.title}
                           </span>
+                        </span>
+                      </td>
+                      <td>
+                        <span className="badge" style={{ fontSize: '11px', whiteSpace: 'nowrap' }}>
+                          {inc.category || DEFAULT_INCIDENT_CATEGORY}
                         </span>
                       </td>
                       <td>{inc.type}</td>

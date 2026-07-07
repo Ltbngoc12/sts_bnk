@@ -181,7 +181,7 @@ export const mockIncidents: Incident[] = [
     reporterName: "Mrs. Chan (Public)",
     requestedBy: "Public Phone",
     createdBy: "Controller Steve",
-    category: "Standard Incident",
+    category: "Operational Incident",
     status: "Closed",
     assignedTo: "Ranger John",
     location: {
@@ -218,7 +218,7 @@ export const mockIncidents: Incident[] = [
     reporterName: "Mr. Lee (Father)",
     requestedBy: "Public Phone",
     createdBy: "Controller Steve",
-    category: "Standard Incident",
+    category: "Operational Incident",
     status: "Live",
     assignedTo: "",
     location: {
@@ -250,7 +250,7 @@ export const mockIncidents: Incident[] = [
     reporterName: "Tourist James (Email)",
     requestedBy: "Public Email",
     createdBy: "Controller Steve",
-    category: "Standard Incident",
+    category: "Operational Incident",
     status: "Live",
     assignedTo: "Ranger Sarah",
     location: {
@@ -282,7 +282,7 @@ export const mockIncidents: Incident[] = [
     reporterName: "Club Manager (Tanjong)",
     requestedBy: "Public Phone",
     createdBy: "Controller Steve",
-    category: "Standard Incident",
+    category: "Operational Incident",
     status: "Live (Acknowledged)",
     assignedTo: "Ranger John",
     location: {
@@ -316,7 +316,7 @@ export const mockIncidents: Incident[] = [
     reporterName: "Patrol Ranger Dave",
     requestedBy: "Ranger Patrol",
     createdBy: "Ranger Dave",
-    category: "Standard Incident",
+    category: "Operational Incident",
     status: "Live (On-Site)",
     assignedTo: "Ranger Dave",
     location: {
@@ -350,7 +350,7 @@ export const mockIncidents: Incident[] = [
     reporterName: "Security Guard Tan",
     requestedBy: "Public Phone",
     createdBy: "Controller Steve",
-    category: "Standard Incident",
+    category: "Operational Incident",
     status: "Live",
     assignedTo: "Ranger John",
     location: {
@@ -383,7 +383,7 @@ export const mockIncidents: Incident[] = [
     reporterName: "Shuttle Driver Ali",
     requestedBy: "Ranger Patrol",
     createdBy: "Controller Steve",
-    category: "Standard Incident",
+    category: "Operational Incident",
     status: "Live (Completed)",
     assignedTo: "Ranger John",
     location: {
@@ -418,7 +418,7 @@ export const mockIncidents: Incident[] = [
     reporterName: "Ranger Dave",
     requestedBy: "Ranger Patrol",
     createdBy: "Ranger Dave",
-    category: "Standard Incident",
+    category: "Operational Incident",
     status: "Pending Endorsement",
     assignedTo: "Ranger Dave",
     location: {
@@ -452,7 +452,7 @@ export const mockIncidents: Incident[] = [
     reporterName: "Visitor Smith",
     requestedBy: "Public Email",
     createdBy: "Controller Steve",
-    category: "Standard Incident",
+    category: "Operational Incident",
     status: "Returned",
     assignedTo: "Ranger Sarah",
     location: {
@@ -485,7 +485,7 @@ export const mockIncidents: Incident[] = [
     reporterName: "Gantry Officer Rahim",
     requestedBy: "Public Phone",
     createdBy: "Controller Steve",
-    category: "Standard Incident",
+    category: "Operational Incident",
     status: "Closed",
     assignedTo: "Ranger John",
     location: {
@@ -519,7 +519,7 @@ export const mockIncidents: Incident[] = [
     reporterName: "SCDF Dispatch Liaison",
     requestedBy: "Government Agency",
     createdBy: "Controller Steve",
-    category: "Standard Incident",
+    category: "Operational Incident",
     status: "Closed",
     assignedTo: "Ranger John",
     location: {
@@ -553,7 +553,7 @@ export const mockIncidents: Incident[] = [
     reporterName: "Maritime Authority (MPA)",
     requestedBy: "Government Agency",
     createdBy: "Controller Steve",
-    category: "Standard Incident",
+    category: "Operational Incident",
     status: "Closed",
     assignedTo: "Ranger Sarah",
     location: {
@@ -589,7 +589,7 @@ export const mockIncidents: Incident[] = [
     reporterName: "Ranger Dave",
     requestedBy: "Ranger Patrol",
     createdBy: "Ranger Dave",
-    category: "Proactive Incident",
+    category: "Operational Incident",
     status: "Closed",
     assignedTo: "Ranger Dave",
     location: {
@@ -623,7 +623,7 @@ export const mockIncidents: Incident[] = [
     reporterName: "Ranger Sarah",
     requestedBy: "Ranger Patrol",
     createdBy: "Ranger Sarah",
-    category: "Proactive Incident",
+    category: "Operational Incident",
     status: "Closed",
     assignedTo: "Ranger Sarah",
     location: {
@@ -657,7 +657,7 @@ export const mockIncidents: Incident[] = [
     reporterName: "Ranger John",
     requestedBy: "Ranger Patrol",
     createdBy: "Ranger John",
-    category: "Proactive Incident",
+    category: "Operational Incident",
     status: "Closed",
     assignedTo: "Ranger John",
     location: {
@@ -691,7 +691,7 @@ export const mockIncidents: Incident[] = [
     reporterName: "Ranger Dave",
     requestedBy: "Ranger Patrol",
     createdBy: "Ranger Dave",
-    category: "Proactive Incident",
+    category: "Operational Incident",
     status: "Closed",
     assignedTo: "Ranger Dave",
     location: {
@@ -724,7 +724,7 @@ export const mockIncidents: Incident[] = [
     reporterName: "Ranger John",
     requestedBy: "Ranger Patrol",
     createdBy: "Ranger John",
-    category: "Proactive Incident",
+    category: "Operational Incident",
     status: "Closed",
     assignedTo: "Ranger John",
     location: {
@@ -757,7 +757,7 @@ export const mockIncidents: Incident[] = [
     reporterName: "Ranger Dave",
     requestedBy: "Ranger Patrol",
     createdBy: "Ranger Dave",
-    category: "Proactive Incident",
+    category: "Operational Incident",
     status: "Closed",
     assignedTo: "Ranger Dave",
     location: {
@@ -931,7 +931,7 @@ export const mockIncidents: Incident[] = [
     reporterName: "Alarm System (UCS)",
     requestedBy: "UCS",
     createdBy: "system",
-    category: "Ongoing Incident",
+    category: "Operational Incident",
     status: "Live (On-Site)",
     assignedTo: "Ranger Sarah",
     location: {
@@ -964,7 +964,7 @@ export const mockIncidents: Incident[] = [
     reporterName: "Video Analytics master",
     requestedBy: "Video Analytics",
     createdBy: "system",
-    category: "Ongoing Incident",
+    category: "Operational Incident",
     status: "Live (Acknowledged)",
     assignedTo: "Ranger John",
     location: {
@@ -998,7 +998,7 @@ export const mockIncidents: Incident[] = [
     reporterName: "Controller observation screen",
     requestedBy: "Controller Observation",
     createdBy: "system",
-    category: "Ongoing Incident",
+    category: "Operational Incident",
     status: "Live",
     assignedTo: "Ranger Dave",
     location: {
@@ -1030,7 +1030,7 @@ export const mockIncidents: Incident[] = [
     reporterName: "Met Service Agency",
     requestedBy: "Government Agency",
     createdBy: "Controller Steve",
-    category: "Ongoing Incident",
+    category: "Operational Incident",
     status: "Live (On-Site)",
     assignedTo: "Ranger Sarah",
     location: {
@@ -1066,7 +1066,7 @@ export const mockIncidents: Incident[] = [
     reporterName: "Safety Coordinator",
     requestedBy: "Internal SDC",
     createdBy: "Safety Coordinator",
-    category: "Operational Record",
+    category: "Informational / Exercise Records",
     status: "Closed",
     assignedTo: "HQ Fire Wardens",
     location: {
@@ -1100,7 +1100,7 @@ export const mockIncidents: Incident[] = [
     reporterName: "IIOC Supervisor Steve",
     requestedBy: "Internal SDC",
     createdBy: "Controller Steve",
-    category: "Operational Record",
+    category: "Informational / Exercise Records",
     status: "Closed",
     assignedTo: "IIOC Technicians",
     location: {
@@ -1133,7 +1133,7 @@ export const mockIncidents: Incident[] = [
     reporterName: "Ranger Lead Gan",
     requestedBy: "Internal SDC",
     createdBy: "Controller Steve",
-    category: "Operational Record",
+    category: "Informational / Exercise Records",
     status: "Closed",
     assignedTo: "Ranger John",
     location: {
@@ -1167,7 +1167,7 @@ export const mockIncidents: Incident[] = [
     reporterName: "Medical Officer Tan",
     requestedBy: "Internal SDC",
     createdBy: "Controller Steve",
-    category: "Operational Record",
+    category: "Informational / Exercise Records",
     status: "Closed",
     assignedTo: "Ranger Sarah",
     location: {

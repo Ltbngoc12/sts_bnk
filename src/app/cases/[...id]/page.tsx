@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Case, Task, Fault, RecurrenceConfig } from '@/lib/db';
 import { useRole } from '@/context/RoleContext';
 import { getIncidentTaxonomy } from '@/lib/taxonomy';
+import { INCIDENT_CATEGORIES, DEFAULT_INCIDENT_CATEGORY } from '@/lib/incidentCategory';
 import FaultCreateModal from '@/components/FaultCreateModal';
 import { RecurrenceScheduleField, recurrenceSummary } from '@/components/RecurrenceScheduleField';
 import { getAssignableUsers, getAssignableGroups } from '@/lib/taskHelpers';
@@ -150,7 +151,7 @@ export default function CaseDetailsPage() {
 
   // Attach Incident Report Modal States
   const [showAttachIncidentModal, setShowAttachIncidentModal] = useState(false);
-  const [attachCategory, setAttachCategory] = useState('Standard Incident');
+  const [attachCategory, setAttachCategory] = useState<string>(DEFAULT_INCIDENT_CATEGORY);
   const [attachType, setAttachType] = useState('');
   const [attachSubType, setAttachSubType] = useState('');
   const [attachPriority, setAttachPriority] = useState('Normal');
@@ -712,6 +713,14 @@ export default function CaseDetailsPage() {
             <form onSubmit={handleAttachIncident}>
               <div className="form-grid">
 
+                <div className="form-group">
+                  <label>Incident Category *</label>
+                  <select value={attachCategory} onChange={(e) => setAttachCategory(e.target.value)} className="form-control select-dark" required>
+                    {INCIDENT_CATEGORIES.map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
 
                 <div className="form-group">
                   <label>Incident Type *</label>

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, saveDb, generateCaseId, generateIncidentId, Case, Incident } from '@/lib/db';
+import { normalizeIncidentCategory } from '@/lib/incidentCategory';
 
 export async function GET(request: NextRequest) {
   try {
@@ -194,7 +195,7 @@ export async function POST(request: Request) {
           requestedBy: incidentData.requestedBy || 'IIOC Controller',
           reportingSource: incidentData.reportingSource || '',
           createdBy: body.username || 'admin',
-          category: incidentData.category || 'Standard Incident',
+          category: normalizeIncidentCategory(incidentData.category),
           crisisReminderDue,
           status: incidentData.status || 'Live',
           assignedTo: Array.isArray(incidentData.assignedTo)

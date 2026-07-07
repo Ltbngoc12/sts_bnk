@@ -125,7 +125,7 @@ const demoIncidents = [
     ],
     "summary": "Water leakage from Level 2 air-conditioning duct at Beach Station, causing floor wetness. Closed after repair and review.",
     "completionRemarks": "Leak isolated and area dried.",
-    "category": "Standard Incident",
+    "category": "Operational Incident",
     ...defaultSubStructures
   },
   {
@@ -159,7 +159,7 @@ const demoIncidents = [
     ],
     "summary": "Ranger Dave proactively spotted and resolved an unattended backpack near Palawan Beach on patrol. Returned bag to owner.",
     "completionRemarks": "Bag returned to verified owner. Cordon removed.",
-    "category": "Proactive Incident",
+    "category": "Operational Incident",
     ...defaultSubStructures
   },
   {
@@ -229,7 +229,7 @@ const demoIncidents = [
     ],
     "summary": "Active power failure affecting multiple kiosks on Siloso Beach Walk. SP Group technicians investigating on-site.",
     "completionRemarks": "",
-    "category": "Ongoing Incident",
+    "category": "Operational Incident",
     ...defaultSubStructures
   },
   {
@@ -263,7 +263,7 @@ const demoIncidents = [
     ],
     "summary": "Evacuation fire drill conducted at SDC headquarters building. Evacuation time logged: 5m 12s.",
     "completionRemarks": "Fire drill completed successfully. Evacuation time: 5m 12s.",
-    "category": "Operational Record",
+    "category": "Informational / Exercise Records",
     ...defaultSubStructures
   },
   {
@@ -300,7 +300,7 @@ const demoIncidents = [
     ],
     "summary": "A 6-year-old child reported missing near the Siloso Beach restrooms. The report was returned by supervisor for missing BWC footage bookmarks.",
     "completionRemarks": "Child reunited safe. Report returned by DM for BWC attachment.",
-    "category": "Standard Incident",
+    "category": "Operational Incident",
     ...defaultSubStructures
   }
 ];

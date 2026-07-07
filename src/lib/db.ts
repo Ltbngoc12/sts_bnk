@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { Db } from 'mongodb';
 import clientPromise from './mongodb';
+import { normalizeIncidentCategory } from './incidentCategory';
 
 // Core entities matching the normalized database structure
 
@@ -161,7 +162,9 @@ export interface Incident {
   requestedBy: string;
   reportingSource?: string; // FSD §5.4.4 — channel of the report (e.g. "Public Phone", "VA", "State Agency")
   createdBy: string;
-  category: string; // "Standard Incident" | "Proactive Incident" | "Backdated Incident" | "Ongoing Incident" | "Informational / Exercise Records"
+  category: string; // FSD v0.5 §5.1.2 — "Operational Incident" | "Backdated Incident" | "Informational / Exercise Records".
+                     // Legacy v0.4 values ("Standard/Proactive/Ongoing Incident", "Operational Record") are normalized
+                     // onto these 3 by normalizeIncidentCategory() in hydrateDb() below — see src/lib/incidentCategory.ts.
   status: string; // Incident-level (Controller-driven): "Live" | "Live (Assigned)" | "Pending Endorsement" | "Returned" | "Closed"
                    // NOTE: "Live (Acknowledged)" / "Live (On-Site)" / "Live (Pending Controller Review)" / "Live (Incomplete)" / "Live (Completed)"
                    // used to live here but now live on IncidentResponder.lifecycleStatus (per-Responder, parallel). See hydrateDb() for legacy migration.
@@ -542,7 +545,7 @@ function hydrateDb(normalizedDb: NormalizedDbSchema): DbSchema {
     return {
       ...inc,
       status: mappedStatus,
-      category: inc.category || 'Standard Incident',
+      category: normalizeIncidentCategory(inc.category),
       attachments: inc.attachments || [],
       responders: finalResponders,
       assignedTo: derivedAssignedTo

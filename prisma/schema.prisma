@@ -39,6 +39,15 @@ enum ResponderStatus {
   COMPLETED
 }
 
+// Incident Category — FSD v0.5 §5.1.2. Drives default response/assignment/closure/
+// broadcast behaviour (see src/lib/incidentCategory.ts for the runtime equivalent —
+// this schema is doc-only, not wired at runtime; see note on IncidentStatus below).
+enum IncidentCategory {
+  OPERATIONAL
+  BACKDATED
+  INFORMATIONAL_EXERCISE
+}
+
 enum FaultStatus {
   CREATED
   SUBMITTED
@@ -98,6 +107,7 @@ model Incident {
   dateTime          DateTime           @default(now())
   type              String
   subType           String
+  category          IncidentCategory   @default(OPERATIONAL)
   priority          Priority           @default(NORMAL)
   crisisLevel       Int                @default(4)
   reporterName      String

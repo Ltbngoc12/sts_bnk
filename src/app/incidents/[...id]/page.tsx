@@ -15,6 +15,7 @@ import {
 } from '@/lib/db';
 import { useRole } from '@/context/RoleContext';
 import { getIncidentTaxonomy } from '@/lib/taxonomy';
+import { INCIDENT_CATEGORIES, DEFAULT_INCIDENT_CATEGORY } from '@/lib/incidentCategory';
 import dynamic from 'next/dynamic';
 import MultiResponderSelect from '@/components/MultiResponderSelect';
 const IncidentMap = dynamic(() => import('@/components/IncidentMap'), { ssr: false });
@@ -131,7 +132,7 @@ export default function IncidentDetailsPage() {
   // the "Edit Incident Details" toggle — assigning/reassigning Responders is a dispatch
   // action, not an edit to the incident's static particulars.
   const [showResponderManager, setShowResponderManager] = useState(false);
-  const [mapExpanded, setMapExpanded] = useState(true);
+  const [mapExpanded, setMapExpanded] = useState(false);
   const [reviewRemarks, setReviewRemarks] = useState('');
 
   // Timeline & Refactoring States
@@ -219,7 +220,7 @@ export default function IncidentDetailsPage() {
   // Unified Edit Info State
   const [isEditingInfo, setIsEditingInfo] = useState(false);
   const [editTitle, setEditTitle] = useState('');
-  const [editCategory, setEditCategory] = useState('Standard Incident');
+  const [editCategory, setEditCategory] = useState<string>(DEFAULT_INCIDENT_CATEGORY);
   const [editType, setEditType] = useState('');
   const [editSubType, setEditSubType] = useState('');
   const [editPriority, setEditPriority] = useState('Normal');
@@ -250,7 +251,7 @@ export default function IncidentDetailsPage() {
   const handleStartEditingAll = () => {
     if (!incident) return;
     setEditTitle(incident.title);
-    setEditCategory(incident.category || 'Standard Incident');
+    setEditCategory(incident.category || DEFAULT_INCIDENT_CATEGORY);
     setEditType(incident.type);
     setEditSubType(incident.subType);
     setEditPriority(incident.priority);
@@ -304,6 +305,7 @@ export default function IncidentDetailsPage() {
       
       const updatePayload = {
         title: editTitle,
+        category: editCategory,
         type: editType,
         subType: editSubType,
         priority: editPriority,
@@ -1821,8 +1823,9 @@ export default function IncidentDetailsPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span className={incBadgeClass(incident.status)} style={{ marginRight: 8 }}>{incident.status}</span>
           
-          {/* Ranger Actions — gated on MY OWN Responder record's lifecycleStatus, not the shared Incident status */}
-          {isRanger && !isClosed && myResponderRecord && (
+          {/* Ranger Actions — gated on MY OWN Responder record's lifecycleStatus, not the shared Incident status.
+              Hidden for Backdated Incident: that category never goes through the ground-response cycle. */}
+          {isRanger && !isClosed && myResponderRecord && incident.category !== 'Backdated Incident' && (
             <>
               {myResponderRecord.lifecycleStatus === 'Assigned' && (
                 <button className="btn btn-primary btn-sm" onClick={() => performAction('acknowledge', { responderId: username })} disabled={saving}>
@@ -1965,6 +1968,12 @@ export default function IncidentDetailsPage() {
                 <input className="form-control" type="text" value={editTitle} onChange={e => setEditTitle(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }} />
               </div>
               <div className="form-group" style={{ marginBottom: 0 }}>
+                <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Incident Category *</label>
+                <select className="form-control select-dark" value={editCategory} onChange={e => setEditCategory(e.target.value)} style={{ padding: '4px 8px', fontSize: 12 }}>
+                  {INCIDENT_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
                 <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Incident Type *</label>
                 <select className="form-control select-dark" value={editType} onChange={e => {
                   const nextType = e.target.value;
@@ -2026,6 +2035,7 @@ export default function IncidentDetailsPage() {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
+              <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Category</span><span className="cd-info-value"><strong>{incident.category || DEFAULT_INCIDENT_CATEGORY}</strong></span></div>
               <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Incident Type</span><span className="cd-info-value"><strong>{incident.type}</strong></span></div>
               <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Sub-Type</span><span className="cd-info-value"><strong>{incident.subType}</strong></span></div>
               <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Crisis Level</span><span className="cd-info-value"><span className="badge badge-ack" style={{ background: 'var(--color-high-bg)', color: 'var(--color-high)', borderColor: 'var(--color-high-border)', fontSize: '11px', padding: '1px 6px' }}>Level {incident.crisisLevel}</span></span></div>
@@ -2035,7 +2045,6 @@ export default function IncidentDetailsPage() {
               <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Reporter Name</span><span className="cd-info-value">{incident.reporterName || 'TBD'}</span></div>
               <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Created By</span><span className="cd-info-value">{incident.createdBy}</span></div>
               <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Occurred</span><span className="cd-info-value">{new Date(incident.dateTime).toLocaleString('en-SG')}</span></div>
-              <div className="cd-info-row" style={{ padding: '4px 0' }}><span className="cd-info-label">Logged</span><span className="cd-info-value" style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{parentCase ? new Date(parentCase.createdAt).toLocaleString('en-SG') : '—'}</span></div>
             </div>
           )}
         </div>
@@ -2182,8 +2191,9 @@ export default function IncidentDetailsPage() {
                           {r.lifecycleStatus}
                         </span>
                       </div>
-                      {/* Controller can advance any Responder's lifecycle on their behalf */}
-                      {isCtrl && !isLocked && (
+                      {/* Controller can advance any Responder's lifecycle on their behalf.
+                          Hidden for Backdated Incident: no ground-response cycle applies. */}
+                      {isCtrl && !isLocked && incident.category !== 'Backdated Incident' && (
                         <div style={{ display: 'flex', gap: 4 }}>
                           {r.lifecycleStatus === 'Assigned' && (
                             <button className="btn btn-secondary btn-sm" style={{ fontSize: '10.5px', padding: '2px 6px' }}

@@ -8,6 +8,8 @@ import LocationSelector, { DEFAULT_NODES, type LocationNode } from '@/components
 import MultiResponderSelect from '@/components/MultiResponderSelect';
 
 import { getIncidentTaxonomy } from '@/lib/taxonomy';
+import { INCIDENT_CATEGORIES, DEFAULT_INCIDENT_CATEGORY, INCIDENT_CATEGORY_HELP } from '@/lib/incidentCategory';
+import { Case } from '@/lib/db';
 
 export default function NewIncidentPage() {
   const router = useRouter();
@@ -31,9 +33,22 @@ export default function NewIncidentPage() {
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [pendingPayload, setPendingPayload] = useState<any>(null);
 
+  // Link to Parent Case State — pick an existing case with no incident yet, or auto-create one
+  const [cases, setCases] = useState<Case[]>([]);
+  const [selectedCaseId, setSelectedCaseId] = useState('new-case');
+  const [caseSearchText, setCaseSearchText] = useState('');
+  const [showCaseDropdown, setShowCaseDropdown] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/cases')
+      .then(res => (res.ok ? res.json() : []))
+      .then((data: Case[]) => setCases(data.filter(c => !c.incident && c.status !== 'Closed')))
+      .catch(() => {});
+  }, []);
+
   // 1. General Information State
   const [title, setTitle] = useState('');
-  const [category, setCategory] = useState('Standard Incident');
+  const [category, setCategory] = useState<string>(DEFAULT_INCIDENT_CATEGORY);
   const [incType, setIncType] = useState('');
   const [incSubType, setIncSubType] = useState('');
   const [priority, setPriority] = useState('Normal');
@@ -181,6 +196,13 @@ export default function NewIncidentPage() {
   const elapsedMinutes = elapsedMs / (60 * 1000);
   const elapsedDays = elapsedMs / (24 * 60 * 60 * 1000);
 
+  // Operational Incident: Responder fills in ground details progressively via the Incident
+  // detail page as the response unfolds — Controller only needs General Info, Location and
+  // Responder Assignment to get it moving. Sections 3-10 & 12 are edited later, not here.
+  // Backdated / Informational-Exercise (TBC — see INCIDENT_CATEGORY_IMPLEMENTATION_PLAN.md §3.3):
+  // everything is already known at write-up time, so the full form is shown.
+  const isMinimalForm = category === 'Operational Incident';
+
   const showCrisisLevelBanner = elapsedMinutes >= 45 && elapsedDays < 12;
   const showReviewWarningBanner = elapsedDays >= 12 && elapsedDays < 14;
   const showEscalationWarningBanner = elapsedDays >= 14;
@@ -259,9 +281,20 @@ export default function NewIncidentPage() {
       return;
     }
 
+    // NOTE — Category status handling (FSD v0.5 §5.1.2 / §5.10.1):
+    // Backdated Incident used to be force-set to "Closed" the instant it was created,
+    // which skipped Duty Manager endorsement entirely. That contradicted FSD §5.10 (every
+    // incident, including Backdated, requires DM review before Closed) and was inconsistent
+    // with our own read of the spec — see QnA_FSD_v0.5_IncidentCategory.md Q2. Every category
+    // now creates the same way (status "Live"); the Controller submits it for endorsement via
+    // the normal "submit-endorsement" action, which routes to Pending Endorsement regardless of
+    // whether a Responder was ever assigned (see the /api/incidents/[...id]/route.ts fix that
+    // accompanies this change).
+    // TODO: confirm with BA — Backdated/Informational-Exercise status flow is still a TBC point
+    // pending Shin Feng's reply (see INCIDENT_CATEGORY_IMPLEMENTATION_PLAN.md §3.2/§3.3).
     const payload: any = {
       title: title || `Incident: ${incType} - ${incSubType}`,
-      status: category === 'Backdated Incident' ? 'Closed' : 'Active',
+      status: 'Active',
       username: createdBy || username || 'admin',
       incident: {
         dateTime: new Date(incidentDateTime).toISOString(),
@@ -273,7 +306,7 @@ export default function NewIncidentPage() {
         requestedBy: requestedBy || '',
         reportingSource: reportingSource,
         category: category,
-        status: category === 'Backdated Incident' ? 'Closed' : 'Live',
+        status: 'Live',
         assignedTo: assignedResponders,
         location: {
           road: road,
@@ -355,7 +388,9 @@ export default function NewIncidentPage() {
       }
     };
 
-    // Check for potential duplicates (FRD 5.7) before submitting
+    // Check for potential duplicates (FRD 5.7) before submitting.
+    // Skipped for Backdated Incident — it documents something already over, so it
+    // can't be a live duplicate of an active incident.
     if (incType && incidentDateTime && category !== 'Backdated Incident') {
       try {
         const params = new URLSearchParams({ type: incType, date: new Date(incidentDateTime).toISOString() });
@@ -380,11 +415,17 @@ export default function NewIncidentPage() {
 
   const submitIncident = async (payload: any) => {
     try {
-      const res = await fetch('/api/cases', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+      const res = selectedCaseId === 'new-case'
+        ? await fetch('/api/cases', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          })
+        : await fetch(`/api/cases/${selectedCaseId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ incident: payload.incident, username: payload.username })
+          });
 
       if (res.ok) {
         const data = await res.json();
@@ -699,7 +740,7 @@ export default function NewIncidentPage() {
       >
         <div className="title-section">
           <h1>Log New Incident Report</h1>
-          <p>Complete the strict 12 accordion sections below to log the incident.</p>
+          <p>Complete the required sections below to log the incident — remaining details can be updated from the incident detail page later.</p>
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <Link href="/case-management?tab=incidents" className="btn btn-secondary btn-sm" style={{ display: 'inline-flex', alignItems: 'center', height: '32px' }}>
@@ -816,16 +857,143 @@ export default function NewIncidentPage() {
                 </div>
 
                 <div className="form-group">
-                  <label>Incident ID (Auto)</label>
-                  <input type="text" value="SEN/IR/YYYYMMDD/NNNN" disabled className="form-control" style={{ fontStyle: 'italic', background: 'var(--bg-inset)' }} />
+                  <label>Case ID {selectedCaseId === 'new-case' ? '(Auto)' : ''}</label>
+
+                  <div style={{ position: 'relative' }}>
+                  <div
+                    onClick={() => setShowCaseDropdown(!showCaseDropdown)}
+                    className="form-control select-dark search-select-trigger"
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      cursor: 'pointer',
+                      background: 'var(--bg-card)',
+                      border: '1px solid var(--border-color)',
+                      padding: '8px 12px',
+                      borderRadius: 'var(--radius-md)',
+                      fontSize: '13px'
+                    }}
+                  >
+                    <span style={selectedCaseId === 'new-case' ? { fontStyle: 'italic', color: 'var(--text-muted)' } : undefined}>
+                      {selectedCaseId === 'new-case'
+                        ? 'SEN/CI/YYYYMMDD/NNN — Auto-create new case'
+                        : `${selectedCaseId} - ${cases.find(c => c.id === selectedCaseId)?.title || ''}`}
+                    </span>
+                    <span style={{ fontSize: '10px', opacity: 0.7 }}>▼</span>
+                  </div>
+
+                  {showCaseDropdown && (
+                    <div
+                      className="glass search-select-dropdown"
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        zIndex: 100,
+                        marginTop: '4px',
+                        background: 'var(--bg-card)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: 'var(--radius-md)',
+                        boxShadow: '0 8px 30px rgba(0,0,0,0.15)',
+                        maxHeight: '260px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      <div style={{ padding: '8px', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-inset)' }}>
+                        <input
+                          type="text"
+                          placeholder="Search case ID or title..."
+                          value={caseSearchText}
+                          onChange={e => setCaseSearchText(e.target.value)}
+                          onClick={e => e.stopPropagation()}
+                          className="form-control"
+                          style={{ fontSize: '12px', height: '30px', padding: '4px 8px', width: '100%', boxSizing: 'border-box' }}
+                          autoFocus
+                        />
+                      </div>
+
+                      <div style={{ overflowY: 'auto', flex: 1, maxHeight: '200px' }}>
+                        <div
+                          onClick={() => {
+                            setSelectedCaseId('new-case');
+                            setShowCaseDropdown(false);
+                            setCaseSearchText('');
+                          }}
+                          className="search-select-option create-new-opt"
+                          style={{
+                            padding: '8px 12px',
+                            cursor: 'pointer',
+                            fontSize: '12.5px',
+                            color: 'var(--color-primary)',
+                            fontWeight: '600',
+                            borderBottom: '1px solid var(--border-color)',
+                            background: selectedCaseId === 'new-case' ? 'var(--bg-hover)' : 'transparent'
+                          }}
+                        >
+                          ➕ Auto-create New Case
+                        </div>
+
+                        {cases
+                          .filter(c => {
+                            if (!caseSearchText.trim()) return true;
+                            const query = caseSearchText.toLowerCase();
+                            return c.id.toLowerCase().includes(query) || c.title.toLowerCase().includes(query);
+                          })
+                          .map(c => {
+                            const isSelected = selectedCaseId === c.id;
+                            return (
+                              <div
+                                key={c.id}
+                                onClick={() => {
+                                  setSelectedCaseId(c.id);
+                                  setShowCaseDropdown(false);
+                                  setCaseSearchText('');
+                                }}
+                                className="search-select-option"
+                                style={{
+                                  padding: '8px 12px',
+                                  cursor: 'pointer',
+                                  fontSize: '12.5px',
+                                  color: isSelected ? 'var(--color-primary)' : 'var(--text-main)',
+                                  background: isSelected ? 'var(--bg-hover)' : 'transparent'
+                                }}
+                              >
+                                {c.id} - {c.title}
+                              </div>
+                            );
+                          })}
+
+                        {cases.filter(c => {
+                          if (!caseSearchText.trim()) return true;
+                          const query = caseSearchText.toLowerCase();
+                          return c.id.toLowerCase().includes(query) || c.title.toLowerCase().includes(query);
+                        }).length === 0 && (
+                          <div style={{ padding: '8px 12px', fontSize: '12.5px', color: 'var(--text-muted)', textAlign: 'center' }}>
+                            No eligible cases found
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  </div>
                 </div>
+
 
                 <div className="form-group">
-                  <label>Case ID (Auto)</label>
-                  <input type="text" value="SEN/CI/YYYYMMDD/NNN" disabled className="form-control" style={{ fontStyle: 'italic', background: 'var(--bg-inset)' }} />
+                  <label>Incident Category *</label>
+                  <select value={category} onChange={(e) => setCategory(e.target.value)} className="form-control select-dark" required>
+                    {INCIDENT_CATEGORIES.map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                  <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', marginBottom: 0 }}>
+                    {INCIDENT_CATEGORY_HELP[category as keyof typeof INCIDENT_CATEGORY_HELP]}
+                  </p>
                 </div>
-
-
 
                 <div className="form-group">
                   <label>Incident Type *</label>
@@ -1016,6 +1184,8 @@ export default function NewIncidentPage() {
           )}
         </div>
 
+        {!isMinimalForm && (
+        <>
         {/* 3. INCIDENT LOG */}
         <div id="incident-section-3" className={`accordion-item ${expandedSections[3] ? 'expanded' : ''}`}>
           <div className="accordion-header" onClick={() => toggleSection(3)}>
@@ -2005,6 +2175,8 @@ export default function NewIncidentPage() {
             </div>
           )}
         </div>
+        </>
+        )}
 
         {/* 11. RESPONDER ASSIGNMENT */}
         <div id="incident-section-11" className={`accordion-item ${expandedSections[11] ? 'expanded' : ''}`}>
@@ -2029,11 +2201,18 @@ export default function NewIncidentPage() {
               </div>
               <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '8px' }}>
                 * Note: Assigning a Responder is optional. Controllers can log and process the incident without assigning a responder to the ground.
+                {category !== DEFAULT_INCIDENT_CATEGORY && (
+                  <> {category === 'Backdated Incident'
+                    ? 'For Backdated Incidents the event is already over — only assign a Responder if someone genuinely needs to be recorded against follow-up action.'
+                    : 'Informational / Exercise Records do not require a Responder by default — only assign one if ground tracking is actually needed for this record.'}</>
+                )}
               </p>
             </div>
           )}
         </div>
 
+        {!isMinimalForm && (
+        <>
         {/* 12. SUMMARY & CLOSURE */}
         <div id="incident-section-12" className={`accordion-item ${expandedSections[12] ? 'expanded' : ''}`}>
           <div className="accordion-header" onClick={() => toggleSection(12)}>
@@ -2050,7 +2229,7 @@ export default function NewIncidentPage() {
             <div className="accordion-content">
               <div className="form-group">
                 <label>Incident Summary (Rich-Text Editor Mock) *</label>
-                <textarea 
+                <textarea
                   placeholder="Provide a detailed operational summary of the incident..."
                   value={summary}
                   onChange={(e) => setSummary(e.target.value)}
@@ -2062,6 +2241,8 @@ export default function NewIncidentPage() {
             </div>
           )}
         </div>
+        </>
+        )}
         </div>
 
           {/* Right Column: Sticky Navigation Panel */}
@@ -2082,7 +2263,7 @@ export default function NewIncidentPage() {
                   { id: 10, label: '10. Attachments' },
                   { id: 11, label: '11. Responder Assignment' },
                   { id: 12, label: '12. Summary & Closure' }
-                ].map(sec => (
+                ].filter(sec => !isMinimalForm || [1, 2, 11].includes(sec.id)).map(sec => (
                   <li 
                     key={sec.id} 
                     onClick={() => scrollToSection(sec.id)}
@@ -2211,7 +2392,7 @@ export default function NewIncidentPage() {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <button 
+              <button
                 type="button"
                 onClick={() => {
                   // Hard redirect to the newly generated mock incident detail page
@@ -2223,7 +2404,7 @@ export default function NewIncidentPage() {
               >
                 🔍 Open Incident Details
               </button>
-              <button 
+              <button
                 type="button"
                 onClick={() => {
                   router.push('/case-management?tab=incidents');
@@ -2241,3 +2422,4 @@ export default function NewIncidentPage() {
     </div>
   );
 }
+   
