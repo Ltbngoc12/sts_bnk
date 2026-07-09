@@ -119,7 +119,6 @@ export function EDiaryTab() {
     );
   }
 
-  const uniqueUsers = Array.from(new Set(occurrences.map(o => o.user)));
 
   const filtered = occurrences.filter(o => {
     const q = searchTerm.toLowerCase();
@@ -134,7 +133,7 @@ export function EDiaryTab() {
     setSearchTerm('');
     setDateStart('');
     setDateEnd('');
-    setUserFilter('All');
+    setTopicFilter('All');
   };
 
   // ── Create ──────────────────────────────────────────────────────────────────
