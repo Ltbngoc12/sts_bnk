@@ -410,7 +410,7 @@ export default function FaultDetailPage() {
                     </Link>
                   } />
                   <InfoRow label="Classification" value={`${linkedIncident.type} — ${linkedIncident.subType}`} />
-                  <InfoRow label="Status" value={<span className="badge badge-closed" style={{ fontSize: 10 }}>{linkedIncident.status}</span>} />
+                  <InfoRow label="Status" value={<span className="badge badge-closed" style={{ fontSize: 10 }}>{linkedIncident.status === 'Live (Assigned)' ? 'Assigned' : linkedIncident.status}</span>} />
                   <InfoRow label="Priority" value={linkedIncident.priority} />
                   <InfoRow label="Location" value={linkedIncident.location?.commonName || linkedIncident.location?.road || '—'} />
                   {linkedIncident.summary && (

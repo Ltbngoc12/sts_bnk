@@ -252,10 +252,11 @@ export async function POST(
             ...(incident.responders || []),
             { responderId: body.addResponder, assignedBy: actor, assignedAt: new Date().toISOString(), status: 'Active', lifecycleStatus: 'Assigned' }
           ];
-          // Backdated Incident (FSD v0.5 §5.1.2) never goes through the live ground-response
-          // cycle — assigning a Responder is a record only (who handled it), not a dispatch.
-          // Status stays as-is; acknowledge/on-site/notify-complete are blocked below too.
-          if (incident.status === 'Live' && incident.category !== 'Backdated Incident') {
+          // Confirmed with BA (Shin Feng, FSD v0.5 §5.1.2): all 3 categories share the same
+          // standard lifecycle. Responder assignment is optional for every category — but if a
+          // Responder IS assigned (including on a Backdated Incident, e.g. for post-action log
+          // updates), the normal ground-response cycle applies same as Operational.
+          if (incident.status === 'Live') {
             incident.status = 'Live (Assigned)';
             incident.log.push(makeLogEntry(incident, `Responder assigned: ${body.addResponder} — by ${actor}. Status changed to Live (Assigned).`));
           } else {
@@ -303,9 +304,6 @@ export async function POST(
 
       // ── Responder acknowledges (per-Responder; Incident.status stays Live (Assigned)) ──
       case 'acknowledge': {
-        if (incident.category === 'Backdated Incident') {
-          return NextResponse.json({ error: 'Backdated Incidents do not go through the ground-response cycle — there is nothing to acknowledge.' }, { status: 409 });
-        }
         if (!['Live', 'Live (Assigned)'].includes(incident.status)) {
           return NextResponse.json({ error: `Cannot acknowledge: current status is "${incident.status}"` }, { status: 409 });
         }
@@ -328,9 +326,6 @@ export async function POST(
 
       // ── Responder arrives on-site (per-Responder) ──────────────────────────────
       case 'on-site': {
-        if (incident.category === 'Backdated Incident') {
-          return NextResponse.json({ error: 'Backdated Incidents do not go through the ground-response cycle — there is no on-site step.' }, { status: 409 });
-        }
         if (!['Live', 'Live (Assigned)'].includes(incident.status)) {
           return NextResponse.json({ error: `Cannot mark on-site: current status is "${incident.status}"` }, { status: 409 });
         }
@@ -352,9 +347,6 @@ export async function POST(
 
       // ── Responder notifies Controller of completion (per-Responder) ───────────────
       case 'notify-complete': {
-        if (incident.category === 'Backdated Incident') {
-          return NextResponse.json({ error: 'Backdated Incidents do not go through the ground-response cycle — submit the Incident directly for endorsement instead.' }, { status: 409 });
-        }
         if (!['Live', 'Live (Assigned)'].includes(incident.status)) {
           return NextResponse.json({ error: `Cannot notify completion: current status is "${incident.status}"` }, { status: 409 });
         }
@@ -383,23 +375,21 @@ export async function POST(
       // Responder to Completed regardless of their current stage.
       case 'submit-review':
       case 'submit-endorsement': {
-        // "Live" is included alongside "Live (Assigned)"/"Returned" so an incident that never
-        // had a Responder assigned can still be submitted for endorsement — this is required for
-        // Backdated Incident and Informational/Exercise Records (FSD v0.5 §5.1.2), which by design
-        // may have zero Responders. Before the Incident Category feature this branch was
-        // unreachable in practice since Category had no UI, so no incident ever legitimately
-        // stayed at "Live" through to submission.
+        // "Live" is included alongside "Live (Assigned)"/"Returned" so an incident that never had
+        // a Responder assigned can still be submitted for endorsement. Confirmed with BA: Responder
+        // assignment is optional across all 3 categories (FSD v0.5 §5.1.2) — when the Controller
+        // doesn't need one, they fill in the Incident themselves and submit straight for Duty
+        // Manager endorsement. Before the Incident Category feature this branch was unreachable in
+        // practice since Category had no UI, so no incident ever legitimately stayed at "Live"
+        // through to submission.
         if (!['Live', 'Live (Assigned)', 'Returned'].includes(incident.status)) {
           return NextResponse.json({ error: `Cannot submit for endorsement: incident must be Live, Live (Assigned) or Returned (current: "${incident.status}").` }, { status: 409 });
         }
         const activeResponders = (incident.responders || []).filter(r => r.status === 'Active');
-        // Backdated Incident Responders never go through the ground-response cycle (see the
-        // 'acknowledge'/'on-site'/'notify-complete' guards above), so their lifecycleStatus
-        // legitimately stays "Assigned" forever — that's expected, not "outstanding work",
-        // so the Force Submit warning gate below doesn't apply to this category.
-        const notYetReviewed = incident.category === 'Backdated Incident'
-          ? []
-          : activeResponders.filter(r => !['Pending Controller Review', 'Live (Incomplete)', 'Completed'].includes(r.lifecycleStatus));
+        // Applies uniformly across all 3 categories (confirmed with BA — same standard
+        // lifecycle regardless of category). If no Responder was ever assigned, activeResponders
+        // is empty and this is naturally a no-op — Controller can submit straight from "Live".
+        const notYetReviewed = activeResponders.filter(r => !['Pending Controller Review', 'Live (Incomplete)', 'Completed'].includes(r.lifecycleStatus));
         const isForceSubmit = notYetReviewed.length > 0;
         if (isForceSubmit && !body.force) {
           return NextResponse.json({

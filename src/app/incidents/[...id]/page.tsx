@@ -1821,11 +1821,12 @@ export default function IncidentDetailsPage() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <span className={incBadgeClass(incident.status)} style={{ marginRight: 8 }}>{incident.status}</span>
+          <span className={incBadgeClass(incident.status)} style={{ marginRight: 8 }}>{incident.status === 'Live (Assigned)' ? 'Assigned' : incident.status}</span>
           
           {/* Ranger Actions — gated on MY OWN Responder record's lifecycleStatus, not the shared Incident status.
-              Hidden for Backdated Incident: that category never goes through the ground-response cycle. */}
-          {isRanger && !isClosed && myResponderRecord && incident.category !== 'Backdated Incident' && (
+              Applies to every category: confirmed with BA that an assigned Responder on a
+              Backdated Incident still goes through the normal cycle if ground/post-action input is needed. */}
+          {isRanger && !isClosed && myResponderRecord && (
             <>
               {myResponderRecord.lifecycleStatus === 'Assigned' && (
                 <button className="btn btn-primary btn-sm" onClick={() => performAction('acknowledge', { responderId: username })} disabled={saving}>
@@ -1915,8 +1916,9 @@ export default function IncidentDetailsPage() {
             </>
           )}
 
-          {/* Duty Manager Actions — Returned */}
-          {isMgr && incident.status === 'Returned' && returnEligibleResponders.length > 0 && (
+          {/* Duty Manager Actions — Returned (isCtrl already covers this for System Administrator,
+              which satisfies both isCtrl and isMgr — skip here to avoid a duplicate button). */}
+          {isMgr && !isCtrl && incident.status === 'Returned' && returnEligibleResponders.length > 0 && (
             <button
               className="btn btn-warning btn-sm"
               onClick={() => { setReturnResponderIds([]); setReturnRemarksByResponder({}); setShowReturnToResponderModal(true); }}
@@ -2191,9 +2193,9 @@ export default function IncidentDetailsPage() {
                           {r.lifecycleStatus}
                         </span>
                       </div>
-                      {/* Controller can advance any Responder's lifecycle on their behalf.
-                          Hidden for Backdated Incident: no ground-response cycle applies. */}
-                      {isCtrl && !isLocked && incident.category !== 'Backdated Incident' && (
+                      {/* Controller can advance any Responder's lifecycle on their behalf — applies
+                          to every category (confirmed with BA, same standard lifecycle throughout). */}
+                      {isCtrl && !isLocked && (
                         <div style={{ display: 'flex', gap: 4 }}>
                           {r.lifecycleStatus === 'Assigned' && (
                             <button className="btn btn-secondary btn-sm" style={{ fontSize: '10.5px', padding: '2px 6px' }}
@@ -3750,7 +3752,7 @@ export default function IncidentDetailsPage() {
                           </Link>
                         )}
                       </div>
-                      <span className={s.status === 'Closed' ? 'badge badge-closed' : 'badge badge-live'} style={{ scale: '0.9', transformOrigin: 'right center' }}>{s.status}</span>
+                      <span className={s.status === 'Closed' ? 'badge badge-closed' : 'badge badge-live'} style={{ scale: '0.9', transformOrigin: 'right center' }}>{s.status === 'Live (Assigned)' ? 'Assigned' : s.status}</span>
                     </div>
                     <div style={{ fontWeight: 600, fontSize: 13 }}>{s.title}</div>
                     <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>

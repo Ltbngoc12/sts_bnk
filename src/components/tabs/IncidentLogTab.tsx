@@ -737,7 +737,7 @@ export function IncidentLogTab() {
               <select value={filterStatus} onChange={(e) => { setFilterStatus(e.target.value); setCurrentPage(1); }} className="form-control select-dark" style={{ width: '100%' }}>
                 <option value="All">All Statuses</option>
                 <option value="Live">Live</option>
-                <option value="Live (Assigned)">Live (Assigned)</option>
+                <option value="Live (Assigned)">Assigned</option>
                 <option value="Live (Acknowledged)">Live (Acknowledged)</option>
                 <option value="Live (On-Site)">Live (On-Site)</option>
                 <option value="Live (Completed)">Live (Completed)</option>
@@ -965,7 +965,7 @@ export function IncidentLogTab() {
                       </td>
                       <td>
                         <span className={`badge ${getStatusBadgeClass(inc.status)}`}>
-                          {inc.status}
+                          {inc.status === 'Live (Assigned)' ? 'Assigned' : inc.status}
                         </span>
                       </td>
                       <td className="date-cell">

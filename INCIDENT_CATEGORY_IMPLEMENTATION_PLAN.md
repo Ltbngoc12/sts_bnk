@@ -1,8 +1,9 @@
 # Incident Category — Implementation Plan
 
-> **Bám theo:** FSD_V0.5_ENHANCEMENT_PLAN.md (mục A4/B2/Phase 2) + QnA_FSD_v0.5_IncidentCategory.md (BA **chưa trả lời** — 3 điểm được đánh dấu **TBC** bên dưới cần Shin Feng confirm trước khi code phần hành vi theo category).
-> **Ngày:** 2026-07-07
+> **Bám theo:** FSD_V0.5_ENHANCEMENT_PLAN.md (mục A4/B2/Phase 2) + QnA_FSD_v0.5_IncidentCategory.md.
+> **Ngày:** 2026-07-07, cập nhật 2026-07-08 sau khi Shin Feng (BA) trả lời QnA — **cả 3 điểm TBC đã được chốt**, xem mục 6.
 > **Phạm vi:** Chỉ tính năng Incident Category (FSD §5.1.2). Không đụng tới Duty Manager Elevation, Closure Endorsement separation-of-duties — đã có plan riêng trong FSD_V0.5_ENHANCEMENT_PLAN.md.
+> **Trạng thái:** Đã code xong Phase 1-4 theo đúng câu trả lời của BA (xem mục 6). Phase 5 (verification) — Kyle cần tự chạy `npx tsc`/dev server để confirm build sạch, xem lưu ý ở cuối file.
 
 ---
 
@@ -36,23 +37,28 @@
 
 ---
 
-## 3. Hành vi theo Category — phần đã chắc vs phần TBC (chờ BA)
+## 3. Hành vi theo Category — đã chốt với BA (Shin Feng), 2026-07-08
 
-### 3.1 Operational Incident (default) — **chắc chắn, không có gì mới**
-Giữ nguyên toàn bộ luồng hiện tại (assign → acknowledge → on-site → notify-complete → submit-endorsement → close). Không cần thay đổi logic API, chỉ cần category được lưu đúng.
+**Kết luận chung của BA — quan trọng nhất, đảo ngược giả định ban đầu của plan:** cả 3 category dùng chung **đúng một luồng lifecycle chuẩn** (giống hệt Operational), không có nhánh riêng nào skip ground-response cycle. Category chỉ là phân loại use-case lúc tạo, không phải workflow riêng biệt. Nguyên văn BA: *"The categories represent different use cases under the same incident lifecycle... Responder assignment should be kept optional and the response milestone tracking only applied when responders are assigned. All incident will still need endorsement by Duty Manager to close."*
 
-### 3.2 Backdated Incident — **TBC, dùng default hợp lý cho tới khi BA confirm**
-- **Điểm mâu thuẫn cần xử lý ngay khi code (không thể để nguyên):** bỏ đoạn `status: category === 'Backdated Incident' ? 'Closed' : ...` ở `incidents/new/page.tsx` dòng 264/276. Default áp dụng theo đúng lập luận trong QnA doc: Backdated khi submit → **`Pending Endorsement`** (không phải `Closed` ngay), Duty Manager vẫn phải review/approve trước khi thành `Closed`.
-- Ẩn/skip các bước ground-response (Live (Assigned) → Acknowledged → On-Site) vì sự việc đã kết thúc — record đi thẳng `Live` (hoặc trạng thái tương đương) → `Pending Endorsement` khi Controller submit, bỏ qua bước gán Responder theo flow thời gian thực.
-- **TBC #1 (QnA câu 2):** Responder assignment field có nên hiện cho Backdated không? Default đề xuất: **vẫn hiện field nhưng optional** (không bắt buộc), vì mục đích chỉ để ghi nhận ai đã xử lý sau thực tế, không phải dispatch — nhưng cần Shin Feng confirm.
+Điều này khác với bản draft ban đầu của plan này (mục 3.2/3.3 cũ đã đề xuất chặn hẳn acknowledge/on-site/notify-complete cho Backdated) — bản draft đó SAI, đã bị revert khỏi code sau khi có câu trả lời chính thức.
 
-### 3.3 Informational / Exercise Records — **TBC, dùng default hợp lý cho tới khi BA confirm**
-- Không bắt buộc Responder/ground response/broadcast mặc định (theo đúng spec text).
-- Nếu **không gán Responder**: record không có gì để track ở cấp Responder, nhưng **vẫn nên qua `Pending Endorsement` / Duty Manager review** trước khi `Closed` — giữ cùng governance với Operational, chỉ bỏ bước ground-response ở giữa. Đây là default đề xuất.
-- **TBC #2 (QnA câu 3):** Có luồng đóng trực tiếp (rút gọn, bỏ qua Pending Endorsement) riêng cho case này không, hay bắt buộc qua Duty Manager như trên? **Cần Shin Feng confirm** — nếu câu trả lời là "có đường tắt", cần thêm 1 action mới hoặc field cờ `skipEndorsement` ở API.
-- Nếu **có gán Responder**: chạy y hệt luồng Operational bình thường (đã đúng theo spec, không cần logic riêng).
+### 3.1 Operational Incident (default) — không đổi
+Giữ nguyên toàn bộ luồng hiện tại (assign → acknowledge → on-site → notify-complete → submit-endorsement → close).
 
-> Ghi chú triển khai: vì 2 mục TBC trên chỉ ảnh hưởng **hành vi rẽ nhánh nâng cao** (auto-skip bước nào, có đường tắt đóng hay không), không ảnh hưởng tới việc thêm field/UI/lưu dữ liệu — nên Phase 1-2 dưới đây có thể làm ngay, chỉ Phase 3 (wiring hành vi) cần chờ hoặc làm theo default rồi sửa sau khi có câu trả lời.
+### 3.2 Backdated Incident — đã chốt
+- Luồng giống Operational 100%. Responder assignment **optional** (đã optional sẵn cho mọi category trong code, không cần logic riêng).
+- Nếu **không cần Responder**: Controller tự điền đầy đủ thông tin đã biết rồi submit thẳng cho Duty Manager endorsement — record ở status `Live` cho tới lúc submit (không auto-`Closed`, đã sửa xong bug cũ).
+- Nếu **có gán Responder** (BA: *"there are cases where post-action input is required, and the Controller may still assign a Responder to update the incident log or any operational details"*) — Responder đó chạy **đúng chu trình bình thường** (acknowledge/on-site/notify-complete) như Operational, không bị chặn.
+- Mọi incident, kể cả Backdated, **luôn cần Duty Manager endorsement** trước khi Closed — không có đường tắt.
+
+### 3.3 Informational / Exercise Records — đã chốt
+- Cũng dùng luồng chuẩn y hệt, luôn qua `Pending Endorsement` trước khi `Closed` — **không có** đường tắt đóng riêng (điểm TBC #2 cũ đã bị loại bỏ theo câu trả lời BA).
+- Responder assignment optional; nếu gán thì response milestone tracking mới áp dụng, không gán thì Controller tự submit thẳng.
+
+### Bối cảnh thêm từ BA (không ảnh hưởng code, chỉ để hiểu lý do rút từ 5 → 3 category)
+- **Ongoing** (v0.4) gộp vào Operational vì chỉ là incident kéo dài sang ngày hôm sau — giờ xử lý bằng interim broadcast, không cần flag riêng nữa.
+- **Proactive** (v0.4) — occurrence chưa đủ nghiêm trọng để thành incident — giờ dùng e-Diary để ghi nhận thay vì tạo Incident.
 
 ---
 
@@ -99,9 +105,12 @@ Giữ nguyên toàn bộ luồng hiện tại (assign → acknowledge → on-sit
 - Duty Manager Role Elevation, Closure Endorsement separation-of-duties rule, Events Management matrix — xem FSD_V0.5_ENHANCEMENT_PLAN.md Phase 4/5/6.
 - `overrideRemark` bắt buộc khi Force Submit — gap có thật (route.ts dòng 366-393) nhưng thuộc §5.10.1, không phải §5.1.2 Category.
 
-## 6. Cần chốt với BA (Shin Feng) trước khi merge Phase 3
-1. Backdated Incident: xác nhận status đích khi submit là **Pending Endorsement** (không phải Closed ngay) — QnA đã gửi, chưa có trả lời.
-2. Backdated Incident: field Responder Assignment — hiện nhưng optional, hay ẩn hẳn?
-3. Informational/Exercise không gán Responder: bắt buộc qua Pending Endorsement như Operational, hay có đường tắt đóng riêng?
+## 6. Trả lời của BA (Shin Feng) — 2026-07-08, đã áp dụng vào code
 
-Cho tới khi có câu trả lời, Phase 1-2 (data foundation + UI field) có thể làm ngay và không phụ thuộc; Phase 3 (wiring hành vi chi tiết theo category) nên implement theo default đã nêu ở mục 3, đánh dấu rõ trong code comment (`// TODO: confirm with BA — see QnA_FSD_v0.5_IncidentCategory.md`) để dễ sửa khi có câu trả lời chính thức.
+1. **Backdated Incident: status đích khi submit là Pending Endorsement (không phải Closed ngay)?** → **Đúng, confirmed.** Đã sửa (bỏ auto-Closed lúc tạo).
+2. **Backdated Incident: field Responder Assignment — hiện nhưng optional, hay ẩn hẳn?** → **Hiện, optional.** Nếu không cần Responder, Controller tự điền và submit thẳng cho DM endorsement. Nếu CÓ gán Responder (vd: cần cập nhật log/operational details sau đó), Responder đó chạy **đúng chu trình bình thường** (acknowledge/on-site/notify-complete) — **không** bị suppress như bản code nháp đầu tiên từng làm.
+3. **Informational/Exercise không gán Responder: bắt buộc qua Pending Endorsement như Operational, hay có đường tắt đóng riêng?** → **Bắt buộc qua Pending Endorsement, không có đường tắt.** Mọi category đều cần DM endorsement mới được Closed.
+
+**Tóm gọn của BA:** cả 3 category dùng chung một lifecycle chuẩn; khác biệt duy nhất là Responder assignment optional (áp dụng như nhau cho cả 3 category) và nếu không gán Responder thì Controller tự submit thẳng. Không có category nào có workflow riêng/rút gọn.
+
+Code đã được cập nhật khớp 100% với 3 câu trả lời trên trong `src/app/api/incidents/[...id]/route.ts` và `src/app/incidents/[...id]/page.tsx` (bỏ hết các đoạn chặn ground-response cycle cho Backdated mà bản nháp đầu tiên đã thêm nhầm).

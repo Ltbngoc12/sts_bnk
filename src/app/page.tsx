@@ -332,7 +332,7 @@ export default function DashboardPage() {
                               c.incident.status === 'Returned' ? 'badge-live' :
                               'badge-closed'
                             }`}>
-                              {c.incident.status}
+                              {c.incident.status === 'Live (Assigned)' ? 'Assigned' : c.incident.status}
                             </span>
                           </Link>
                         )}

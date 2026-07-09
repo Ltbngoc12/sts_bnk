@@ -914,8 +914,6 @@ export default function TaskDetailPage() {
           display: flex;
           flex-direction: column;
           gap: 20px;
-          max-width: 1400px;
-          margin: 0 auto;
         }
         .td-topbar {
           display: flex;

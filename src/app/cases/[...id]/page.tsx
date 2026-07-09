@@ -12,6 +12,7 @@ import { RecurrenceScheduleField, recurrenceSummary } from '@/components/Recurre
 import { getAssignableUsers, getAssignableGroups } from '@/lib/taskHelpers';
 import { getUsers } from '@/lib/users';
 import { useNotifications } from '@/context/NotificationContext';
+import { TOPICS as EDIARY_TOPICS } from '@/components/tabs/EDiaryTab';
 
 // ─── Helper: case status → badge class ───────────────────────────────────────
 function caseBadgeClass(status: string) {
@@ -166,7 +167,9 @@ export default function CaseDetailsPage() {
   // Active tabs
   const [ediaryLogs, setEdiaryLogs] = useState<any[]>([]);
   const [ediaryTopic, setEdiaryTopic] = useState('');
+  const [ediaryCustomTopic, setEdiaryCustomTopic] = useState('');
   const [ediaryContent, setEdiaryContent] = useState('');
+  const [ediaryDateTime, setEdiaryDateTime] = useState('');
 
   // Modals
   const [showTaskModal, setShowTaskModal] = useState(false);
@@ -289,21 +292,25 @@ export default function CaseDetailsPage() {
 
   const handleCreateEDiary = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!ediaryTopic.trim() || !ediaryContent.trim()) return;
+    const finalTopic = ediaryTopic === 'Others' ? ediaryCustomTopic.trim() : ediaryTopic;
+    if (!finalTopic || !ediaryContent.trim()) return;
     try {
       const res = await fetch('/api/occurrences', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           caseId,
-          topic: ediaryTopic,
-          content: ediaryContent,
+          topic: finalTopic,
+          content: ediaryContent.trim(),
+          dateTime: ediaryDateTime ? new Date(ediaryDateTime).toISOString() : undefined,
           username
         })
       });
       if (res.ok) {
         setEdiaryTopic('');
+        setEdiaryCustomTopic('');
         setEdiaryContent('');
+        setEdiaryDateTime('');
         setShowEdiaryModal(false);
         await refresh();
       }
@@ -498,7 +505,7 @@ export default function CaseDetailsPage() {
             <div className="glass comp-card">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 style={{ color: 'var(--color-critical)' }}>🚨 SECURITY & SAFETY INCIDENT</h3>
-                {inc ? <span className={incBadgeClass(inc.status)}>{inc.status}</span> : <span className="badge badge-closed">Not Attached</span>}
+                {inc ? <span className={incBadgeClass(inc.status)}>{inc.status === 'Live (Assigned)' ? 'Assigned' : inc.status}</span> : <span className="badge badge-closed">Not Attached</span>}
               </div>
               
               <div className="comp-card-body">
@@ -926,45 +933,55 @@ export default function CaseDetailsPage() {
 
       {/* Log e-Diary Occurrence Modal */}
       {showEdiaryModal && (
-        <div className="modal-overlay">
-          <div className="modal-box" style={{ maxWidth: 500 }}>
-            <div className="modal-title">Write Occurrence Diary Entry</div>
-            <form onSubmit={handleCreateEDiary}>
-              <div className="form-group">
-                <label>Occurrence Topic/Subject *</label>
-                <select
-                  value={ediaryTopic}
-                  onChange={e => setEdiaryTopic(e.target.value)}
-                  required
-                  className="form-control select-dark"
-                >
-                  <option value="">-- Select Topic --</option>
-                  <option value="VIP Visit Advisory">VIP Visit Advisory</option>
-                  <option value="Routine Siren Testing">Routine Siren Testing</option>
-                  <option value="Ranger Shift Handover">Ranger Shift Handover</option>
-                  <option value="General Public Interaction">General Public Interaction</option>
-                  <option value="Coordinated Drill/Exercise">Coordinated Drill/Exercise</option>
-                  <option value="Lost and Found Report">Lost and Found Report</option>
-                  <option value="Contractor Access Granted">Contractor Access Granted</option>
-                  <option value="Others">Others</option>
-                </select>
-              </div>
+        <div className="modal-backdrop">
+          <div className="create-case-modal glass" style={{ maxWidth: 560 }}>
+            <div className="modal-header">
+              <h2>NEW E-DIARY ENTRY</h2>
+              <button className="close-btn" onClick={() => setShowEdiaryModal(false)}>✕</button>
+            </div>
+            <form onSubmit={handleCreateEDiary} className="modal-form">
+              <div className="modal-scroll-area">
 
-              <div className="form-group">
-                <label>Narrative Log Details *</label>
-                <textarea
-                  placeholder="Describe the check or interaction details..."
-                  value={ediaryContent}
-                  onChange={e => setEdiaryContent(e.target.value)}
-                  required
-                  className="form-control"
-                  rows={4}
-                />
-              </div>
+                <div className="form-group">
+                  <label>Topic / Subject *</label>
+                  <select
+                    value={ediaryTopic}
+                    onChange={e => setEdiaryTopic(e.target.value)}
+                    required
+                    className="form-control select-dark"
+                  >
+                    <option value="">— Select topic —</option>
+                    {EDIARY_TOPICS.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
 
-              <div className="modal-actions">
+                {ediaryTopic === 'Others' && (
+                  <div className="form-group">
+                    <label>Custom Topic *</label>
+                    <input type="text" placeholder="e.g. Unusual weather advisory"
+                      value={ediaryCustomTopic} onChange={e => setEdiaryCustomTopic(e.target.value)}
+                      required className="form-control" />
+                  </div>
+                )}
+
+                <div className="form-group">
+                  <label>Date &amp; Time of Occurrence</label>
+                  <input type="datetime-local" value={ediaryDateTime}
+                    onChange={e => setEdiaryDateTime(e.target.value)} className="form-control" />
+                  <p className="sub-desc">Defaults to now. Backdating is permitted.</p>
+                </div>
+
+                <div className="form-group">
+                  <label>Narrative *</label>
+                  <textarea placeholder="Describe the occurrence, interaction, or advisory…"
+                    value={ediaryContent} onChange={e => setEdiaryContent(e.target.value)}
+                    required className="form-control" rows={5} />
+                </div>
+
+              </div>
+              <div className="modal-actions-bar">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowEdiaryModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Submit Diary Log</button>
+                <button type="submit" className="btn btn-primary">SUBMIT ENTRY</button>
               </div>
             </form>
           </div>

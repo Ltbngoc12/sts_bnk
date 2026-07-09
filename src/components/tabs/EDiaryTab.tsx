@@ -2,14 +2,14 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Occurrence } from '@/lib/db';
+import { Case, Occurrence } from '@/lib/db';
 import { useRole } from '@/context/RoleContext';
 
 // Roles allowed to access e-Diary per FRD §8.3
 const ALLOWED_ROLES = ['Controller', 'Duty Officer', 'Duty Manager', 'System Administrator', 'Current Ops Administrator'];
 
 // Predefined occurrence topics
-const TOPICS = [
+export const TOPICS = [
   'VIP Visit Advisory',
   'Dignitary Visit Notification',
   'Routine Siren Testing',
@@ -51,6 +51,11 @@ export function EDiaryTab() {
   const [caseIdInput, setCaseIdInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // Link to Existing Case — searchable dropdown (mirrors the Task Board's case selector)
+  const [cases, setCases] = useState<Case[]>([]);
+  const [showCaseDropdown, setShowCaseDropdown] = useState(false);
+  const [caseSearchText, setCaseSearchText] = useState('');
+
   // Escalate to Incident
   const [escalatingEntry, setEscalatingEntry] = useState<Occurrence | null>(null);
 
@@ -73,6 +78,13 @@ export function EDiaryTab() {
 
   useEffect(() => { fetchOccurrences(); }, [fetchOccurrences]);
   useEffect(() => { setCurrentPage(1); }, [searchTerm, dateStart, dateEnd, userFilter]);
+
+  useEffect(() => {
+    fetch('/api/cases')
+      .then(res => res.ok ? res.json() : [])
+      .then(setCases)
+      .catch(err => console.error('Error fetching cases:', err));
+  }, []);
 
   // Guard: roles without access see nothing
   if (!ALLOWED_ROLES.includes(role)) {
@@ -124,6 +136,7 @@ export function EDiaryTab() {
       if (res.ok) {
         setShowCreateForm(false);
         setTopic(''); setCustomTopic(''); setContent(''); setDateTime(''); setCaseIdInput('');
+        setCaseSearchText(''); setShowCaseDropdown(false);
         await fetchOccurrences();
       }
     } finally {
@@ -269,8 +282,13 @@ export function EDiaryTab() {
         )}
       </div>
 
+      {/* Immutability note */}
+      <div style={{ marginTop: 10, padding: '6px 14px', background: 'rgba(255,255,255,0.03)', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+        <strong style={{ color: 'var(--text-sub)' }}>FRD §8.2 —</strong> Once submitted, an entry is immutable and cannot be edited or deleted. To correct a mistake, log a new entry referencing this Occurrence ID.
+      </div>
+
       {/* Table & Content */}
-      <div className="glass" style={{ marginTop: '20px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <div className="glass" style={{ marginTop: '10px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         {loading ? (
           <div className="loading-container" style={{ padding: '40px' }}>
             <div className="spinner" />
@@ -286,12 +304,12 @@ export function EDiaryTab() {
               <table className="custom-table">
                 <thead>
                   <tr>
-                    <th>Occurrence ID</th>
-                    <th>Date &amp; Time</th>
+                    <th>Case ID</th>
+                    <th>e-Diary ID</th>
                     <th>Topic</th>
+                    <th>Date &amp; Time</th>
                     <th>Narrative</th>
                     <th>Logged By</th>
-                    <th>Linked Case</th>
                     {canEdit && <th>Actions</th>}
                   </tr>
                 </thead>
@@ -302,19 +320,23 @@ export function EDiaryTab() {
                       onClick={() => { if (o.caseId) window.location.href = `/cases/${o.caseId}`; }}
                       style={{ cursor: o.caseId ? 'pointer' : 'default' }}
                     >
-                      <td><span className="mono-id">{o.id}</span></td>
+                      <td>
+                        {o.caseId ? <span className="mono-id">{o.caseId}</span> : <span style={{ color: 'var(--text-faint)' }}>—</span>}
+                      </td>
+                      <td>
+                        <span className="mono-id" style={{ color: 'var(--color-critical)', background: 'var(--color-critical-bg)', borderColor: 'var(--color-critical-border)' }}>
+                          {o.id}
+                        </span>
+                      </td>
+                      <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{o.topic}</td>
                       <td style={{ whiteSpace: 'nowrap', fontSize: '12px', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>
                         {new Date(o.dateTime).toLocaleDateString('en-SG', { day: '2-digit', month: 'short', year: 'numeric' })}{' '}
                         {new Date(o.dateTime).toLocaleTimeString('en-SG', { hour: '2-digit', minute: '2-digit', hour12: false })}
                       </td>
-                      <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{o.topic}</td>
                       <td style={{ maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-sub)' }} title={o.content}>
                         {o.content}
                       </td>
                       <td style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{o.user}</td>
-                      <td>
-                        {o.caseId ? <span className="mono-id">{o.caseId}</span> : <span style={{ color: 'var(--text-faint)' }}>—</span>}
-                      </td>
                       {canEdit && (
                         <td onClick={e => e.stopPropagation()}>
                           <button
@@ -365,11 +387,6 @@ export function EDiaryTab() {
         )}
       </div>
 
-      {/* Immutability note */}
-      <div style={{ marginTop: 12, padding: '10px 14px', background: 'rgba(255,255,255,0.03)', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-        <strong style={{ color: 'var(--text-sub)' }}>FRD §8.2 —</strong> Once submitted, an entry is immutable and cannot be edited or deleted. To correct a mistake, log a new entry referencing this Occurrence ID.
-      </div>
-
       {/* ── Create Modal ───────────────────────────────────────────────────────── */}
       {showCreateForm && (
         <div className="modal-backdrop">
@@ -405,10 +422,151 @@ export function EDiaryTab() {
                   <p className="sub-desc">Defaults to now. Backdating is permitted.</p>
                 </div>
 
-                <div className="form-group">
+                <div className="form-group" style={{ position: 'relative' }}>
                   <label>Link to Existing Case ID <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
-                  <input type="text" placeholder="e.g. SEN/CI/20260621/001 — leave blank to auto-create"
-                    value={caseIdInput} onChange={e => setCaseIdInput(e.target.value)} className="form-control" />
+
+                  {/* Select Trigger Box */}
+                  <div
+                    onClick={() => setShowCaseDropdown(!showCaseDropdown)}
+                    className="form-control select-dark search-select-trigger"
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      cursor: 'pointer',
+                      background: 'var(--bg-card)',
+                      border: '1px solid var(--border-color)',
+                      padding: '8px 12px',
+                      borderRadius: 'var(--radius-md)',
+                      fontSize: '13px'
+                    }}
+                  >
+                    <span>
+                      {caseIdInput
+                        ? `${caseIdInput}${cases.find(c => c.id === caseIdInput) ? ' - ' + cases.find(c => c.id === caseIdInput)!.title : ''}`
+                        : 'Auto-create new case'}
+                    </span>
+                    <span style={{ fontSize: '10px', opacity: 0.7 }}>▼</span>
+                  </div>
+
+                  {/* Dropdown Menu */}
+                  {showCaseDropdown && (
+                    <div
+                      className="glass search-select-dropdown"
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        zIndex: 100,
+                        marginTop: '4px',
+                        background: 'var(--bg-card)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: 'var(--radius-md)',
+                        boxShadow: '0 8px 30px rgba(0,0,0,0.15)',
+                        maxHeight: '260px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      {/* Search Input field */}
+                      <div style={{ padding: '8px', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-inset)' }}>
+                        <input
+                          type="text"
+                          placeholder="Search case ID or title..."
+                          value={caseSearchText}
+                          onChange={e => setCaseSearchText(e.target.value)}
+                          onClick={e => e.stopPropagation()}
+                          className="form-control"
+                          style={{
+                            fontSize: '12px',
+                            height: '30px',
+                            padding: '4px 8px',
+                            width: '100%',
+                            boxSizing: 'border-box'
+                          }}
+                          autoFocus
+                        />
+                      </div>
+
+                      {/* Options list */}
+                      <div style={{ overflowY: 'auto', flex: 1, maxHeight: '200px' }}>
+                        {/* Option: Auto-create new case */}
+                        <div
+                          onClick={() => {
+                            setCaseIdInput('');
+                            setShowCaseDropdown(false);
+                            setCaseSearchText('');
+                          }}
+                          className="search-select-option create-new-opt"
+                          style={{
+                            padding: '8px 12px',
+                            cursor: 'pointer',
+                            fontSize: '12.5px',
+                            color: 'var(--color-primary)',
+                            fontWeight: '600',
+                            borderBottom: '1px solid var(--border-color)',
+                            background: !caseIdInput ? 'var(--bg-hover)' : 'transparent'
+                          }}
+                        >
+                          ➕ Auto-create new case
+                        </div>
+
+                        {/* Filtered Active Cases */}
+                        {cases
+                          .filter(c => c.status !== 'Closed')
+                          .filter(c => {
+                            if (!caseSearchText.trim()) return true;
+                            const query = caseSearchText.toLowerCase();
+                            return (
+                              c.id.toLowerCase().includes(query) ||
+                              c.title.toLowerCase().includes(query)
+                            );
+                          })
+                          .map(c => {
+                            const isSelected = caseIdInput === c.id;
+                            return (
+                              <div
+                                key={c.id}
+                                onClick={() => {
+                                  setCaseIdInput(c.id);
+                                  setShowCaseDropdown(false);
+                                  setCaseSearchText('');
+                                }}
+                                className="search-select-option"
+                                style={{
+                                  padding: '8px 12px',
+                                  cursor: 'pointer',
+                                  fontSize: '12.5px',
+                                  color: isSelected ? 'var(--color-primary)' : 'var(--text-main)',
+                                  background: isSelected ? 'var(--bg-hover)' : 'transparent'
+                                }}
+                              >
+                                {c.id} - {c.title}
+                              </div>
+                            );
+                          })}
+
+                        {/* Empty results */}
+                        {cases
+                          .filter(c => c.status !== 'Closed')
+                          .filter(c => {
+                            if (!caseSearchText.trim()) return true;
+                            const query = caseSearchText.toLowerCase();
+                            return (
+                              c.id.toLowerCase().includes(query) ||
+                              c.title.toLowerCase().includes(query)
+                            );
+                          }).length === 0 && (
+                          <div style={{ padding: '8px 12px', fontSize: '12.5px', color: 'var(--text-muted)', textAlign: 'center' }}>
+                            No cases found
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   <p className="sub-desc">If left blank, a Case will be auto-created and linked to this entry.</p>
                 </div>
 
@@ -420,7 +578,7 @@ export function EDiaryTab() {
                 </div>
 
               </div>
-              <div className="modal-actions">
+              <div className="modal-actions-bar">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowCreateForm(false)}>Cancel</button>
                 <button type="submit" className="btn btn-primary" disabled={submitting}>
                   {submitting ? 'Submitting…' : 'SUBMIT ENTRY'}
@@ -455,7 +613,7 @@ export function EDiaryTab() {
                   The e-Diary entry will be <strong>retained</strong> as a journal record. The new Incident will be linked to the same Case.
                 </p>
               </div>
-              <div className="modal-actions">
+              <div className="modal-actions-bar">
                 <button className="btn btn-primary" onClick={handleEscalate} style={{ background: '#EF4444', borderColor: '#EF4444' }}>
                   🔺 CREATE INCIDENT
                 </button>

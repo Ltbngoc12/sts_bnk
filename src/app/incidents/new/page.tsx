@@ -196,13 +196,6 @@ export default function NewIncidentPage() {
   const elapsedMinutes = elapsedMs / (60 * 1000);
   const elapsedDays = elapsedMs / (24 * 60 * 60 * 1000);
 
-  // Operational Incident: Responder fills in ground details progressively via the Incident
-  // detail page as the response unfolds — Controller only needs General Info, Location and
-  // Responder Assignment to get it moving. Sections 3-10 & 12 are edited later, not here.
-  // Backdated / Informational-Exercise (TBC — see INCIDENT_CATEGORY_IMPLEMENTATION_PLAN.md §3.3):
-  // everything is already known at write-up time, so the full form is shown.
-  const isMinimalForm = category === 'Operational Incident';
-
   const showCrisisLevelBanner = elapsedMinutes >= 45 && elapsedDays < 12;
   const showReviewWarningBanner = elapsedDays >= 12 && elapsedDays < 14;
   const showEscalationWarningBanner = elapsedDays >= 14;
@@ -1184,8 +1177,6 @@ export default function NewIncidentPage() {
           )}
         </div>
 
-        {!isMinimalForm && (
-        <>
         {/* 3. INCIDENT LOG */}
         <div id="incident-section-3" className={`accordion-item ${expandedSections[3] ? 'expanded' : ''}`}>
           <div className="accordion-header" onClick={() => toggleSection(3)}>
@@ -2175,8 +2166,6 @@ export default function NewIncidentPage() {
             </div>
           )}
         </div>
-        </>
-        )}
 
         {/* 11. RESPONDER ASSIGNMENT */}
         <div id="incident-section-11" className={`accordion-item ${expandedSections[11] ? 'expanded' : ''}`}>
@@ -2203,16 +2192,14 @@ export default function NewIncidentPage() {
                 * Note: Assigning a Responder is optional. Controllers can log and process the incident without assigning a responder to the ground.
                 {category !== DEFAULT_INCIDENT_CATEGORY && (
                   <> {category === 'Backdated Incident'
-                    ? 'For Backdated Incidents the event is already over — only assign a Responder if someone genuinely needs to be recorded against follow-up action.'
-                    : 'Informational / Exercise Records do not require a Responder by default — only assign one if ground tracking is actually needed for this record.'}</>
+                    ? 'For Backdated Incidents, if no ground/post-action input is needed you can fill in the record yourself and submit straight for endorsement. Only assign a Responder if someone needs to update the incident log or other operational details.'
+                    : 'Informational / Exercise Records do not require a Responder by default — assign one only if response milestone tracking is actually needed for this record.'}</>
                 )}
               </p>
             </div>
           )}
         </div>
 
-        {!isMinimalForm && (
-        <>
         {/* 12. SUMMARY & CLOSURE */}
         <div id="incident-section-12" className={`accordion-item ${expandedSections[12] ? 'expanded' : ''}`}>
           <div className="accordion-header" onClick={() => toggleSection(12)}>
@@ -2241,8 +2228,6 @@ export default function NewIncidentPage() {
             </div>
           )}
         </div>
-        </>
-        )}
         </div>
 
           {/* Right Column: Sticky Navigation Panel */}
@@ -2263,7 +2248,7 @@ export default function NewIncidentPage() {
                   { id: 10, label: '10. Attachments' },
                   { id: 11, label: '11. Responder Assignment' },
                   { id: 12, label: '12. Summary & Closure' }
-                ].filter(sec => !isMinimalForm || [1, 2, 11].includes(sec.id)).map(sec => (
+                ].map(sec => (
                   <li 
                     key={sec.id} 
                     onClick={() => scrollToSection(sec.id)}
