@@ -53,7 +53,9 @@
       "Bash(grep -c \"SEN/TA/20260705/007\" src/lib/db.json)",
       "Bash(git status *)",
       "Bash(git check-ignore *)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(git -C \"D:\\\\Huy Sentosa\" fetch origin main --quiet)",
+      "Bash(git -C \"D:\\\\Huy Sentosa\" status -sb)"
     ],
     "additionalDirectories": [
       "D:\\Huy Sentosa\\.claude\\skills"

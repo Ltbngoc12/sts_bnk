@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Case, Occurrence } from '@/lib/db';
+import { Case, Occurrence, EventRecord } from '@/lib/db';
 import { useRole } from '@/context/RoleContext';
+import EventCreateModal from '@/components/EventCreateModal';
 
 // Roles allowed to access e-Diary per FRD §8.3
 const ALLOWED_ROLES = ['Controller', 'Duty Officer', 'Duty Manager', 'System Administrator', 'Current Ops Administrator'];
@@ -59,6 +60,14 @@ export function EDiaryTab() {
   // Escalate to Incident
   const [escalatingEntry, setEscalatingEntry] = useState<Occurrence | null>(null);
 
+  // Create or Link Event — FRD §9.1.3
+  const [eventLinkingEntry, setEventLinkingEntry] = useState<Occurrence | null>(null);
+  const [showEventCreateModal, setShowEventCreateModal] = useState(false);
+  const [events, setEvents] = useState<EventRecord[]>([]);
+  const [eventSearchText, setEventSearchText] = useState('');
+  const [showEventDropdown, setShowEventDropdown] = useState(false);
+  const [linkingEventId, setLinkingEventId] = useState<string | null>(null);
+
   const canEdit = ALLOWED_ROLES.includes(role);
 
   const fetchOccurrences = useCallback(async () => {
@@ -85,6 +94,20 @@ export function EDiaryTab() {
       .then(setCases)
       .catch(err => console.error('Error fetching cases:', err));
   }, []);
+
+  const fetchEvents = useCallback(async () => {
+    try {
+      const res = await fetch('/api/events');
+      if (res.ok) {
+        const data = await res.json();
+        setEvents(data.events || []);
+      }
+    } catch (err) {
+      console.error('Error fetching events:', err);
+    }
+  }, []);
+
+  useEffect(() => { fetchEvents(); }, [fetchEvents]);
 
   // Guard: roles without access see nothing
   if (!ALLOWED_ROLES.includes(role)) {
@@ -154,6 +177,29 @@ export function EDiaryTab() {
       summary: `Escalated from e-Diary entry ${escalatingEntry.id}: ${escalatingEntry.topic}`,
     });
     router.push(`/incidents/new?${params.toString()}`);
+  };
+
+  // ── Link Existing Event — FRD §9.1.3(a)/(c) ─────────────────────────────────
+  const handleLinkExistingEvent = async () => {
+    if (!eventLinkingEntry || !linkingEventId) return;
+    try {
+      const res = await fetch(`/api/events/${linkingEventId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sourceEDiaryId: eventLinkingEntry.id }),
+      });
+      if (res.ok) {
+        setEventLinkingEntry(null);
+        setLinkingEventId(null);
+        setEventSearchText('');
+        await fetchEvents();
+      } else {
+        const err = await res.json();
+        alert(`Failed to link event: ${err.error}`);
+      }
+    } catch (err) {
+      console.error('Failed to link event:', err);
+    }
   };
 
   const filtersActive = !!(searchTerm || dateStart || dateEnd || userFilter !== 'All');
@@ -338,13 +384,20 @@ export function EDiaryTab() {
                       </td>
                       <td style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{o.user}</td>
                       {canEdit && (
-                        <td onClick={e => e.stopPropagation()}>
+                        <td onClick={e => e.stopPropagation()} style={{ whiteSpace: 'nowrap' }}>
                           <button
                             className="btn"
-                            style={{ fontSize: 11, padding: '3px 10px', background: 'rgba(239,68,68,0.12)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.25)', whiteSpace: 'nowrap' }}
+                            style={{ fontSize: 11, padding: '3px 10px', background: 'rgba(239,68,68,0.12)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.25)', whiteSpace: 'nowrap', marginRight: 6 }}
                             onClick={() => setEscalatingEntry(o)}
                           >
                             🔺 Escalate
+                          </button>
+                          <button
+                            className="btn"
+                            style={{ fontSize: 11, padding: '3px 10px', background: 'var(--color-primary-bg)', color: 'var(--color-primary)', border: '1px solid var(--color-primary-border)', whiteSpace: 'nowrap' }}
+                            onClick={() => setEventLinkingEntry(o)}
+                          >
+                            📅 Event
                           </button>
                         </td>
                       )}
@@ -622,6 +675,100 @@ export function EDiaryTab() {
           </div>
         </div>
       )}
+
+      {/* ── Create or Link Event Modal — FRD §9.1.3 ─────────────────────────────── */}
+      {eventLinkingEntry && !showEventCreateModal && (
+        <div className="modal-backdrop">
+          <div className="create-case-modal glass" style={{ maxWidth: 480 }}>
+            <div className="modal-header">
+              <h2>CREATE OR LINK EVENT</h2>
+              <button className="close-btn" onClick={() => { setEventLinkingEntry(null); setLinkingEventId(null); setEventSearchText(''); }}>✕</button>
+            </div>
+            <div className="modal-form">
+              <div className="modal-scroll-area">
+                <p style={{ fontSize: 12.5, color: 'var(--text-sub)', lineHeight: 1.6 }}>
+                  e-Diary entry <strong>{eventLinkingEntry.id}</strong> — create a new Event in the Events Master List, or link this entry to an existing one. The reference is retained per §8.1.1(c)/§9.1.3(c); this e-Diary entry stays unchanged.
+                </p>
+
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  style={{ width: '100%', marginTop: 14, fontWeight: 600 }}
+                  onClick={() => setShowEventCreateModal(true)}
+                >
+                  ＋ Create New Event
+                </button>
+
+                <div style={{ margin: '18px 0 8px', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Or link an existing event
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <div
+                    onClick={() => setShowEventDropdown(!showEventDropdown)}
+                    className="form-control select-dark search-select-trigger"
+                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '8px 12px', fontSize: 13 }}
+                  >
+                    <span>
+                      {linkingEventId
+                        ? events.find(e => e.id === linkingEventId)?.name || linkingEventId
+                        : 'Select an event…'}
+                    </span>
+                    <span style={{ fontSize: 10, opacity: 0.7 }}>▼</span>
+                  </div>
+                  {showEventDropdown && (
+                    <div className="glass search-select-dropdown" style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, marginTop: 4, border: '1px solid var(--border-color)', borderRadius: 6, maxHeight: 220, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                      <div style={{ padding: 8, borderBottom: '1px solid var(--border-color)' }}>
+                        <input
+                          type="text"
+                          placeholder="Search events…"
+                          value={eventSearchText}
+                          onChange={e => setEventSearchText(e.target.value)}
+                          onClick={e => e.stopPropagation()}
+                          className="form-control"
+                          style={{ fontSize: 12, height: 30, width: '100%', boxSizing: 'border-box' }}
+                          autoFocus
+                        />
+                      </div>
+                      <div style={{ overflowY: 'auto', flex: 1 }}>
+                        {events
+                          .filter(e => !e.sourceEDiaryId)
+                          .filter(e => !eventSearchText.trim() || e.name.toLowerCase().includes(eventSearchText.toLowerCase()) || e.id.toLowerCase().includes(eventSearchText.toLowerCase()))
+                          .map(e => (
+                            <div
+                              key={e.id}
+                              onClick={() => { setLinkingEventId(e.id); setShowEventDropdown(false); setEventSearchText(''); }}
+                              className="search-select-option"
+                              style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 12.5 }}
+                            >
+                              {e.id} - {e.name}
+                            </div>
+                          ))}
+                        {events.filter(e => !e.sourceEDiaryId).length === 0 && (
+                          <div style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>No unlinked events available.</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="modal-actions-bar">
+                <button className="btn btn-secondary" onClick={() => { setEventLinkingEntry(null); setLinkingEventId(null); setEventSearchText(''); }}>Cancel</button>
+                <button className="btn btn-primary" disabled={!linkingEventId} onClick={handleLinkExistingEvent}>Link Event</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <EventCreateModal
+        isOpen={!!eventLinkingEntry && showEventCreateModal}
+        onClose={() => setShowEventCreateModal(false)}
+        onSuccess={() => { setEventLinkingEntry(null); setShowEventCreateModal(false); fetchEvents(); }}
+        username={username}
+        sourceEDiaryId={eventLinkingEntry?.id}
+        prefillName={eventLinkingEntry?.topic}
+        prefillDescription={eventLinkingEntry?.content}
+      />
     </>
   );
 }

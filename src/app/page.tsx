@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { Case, Task, Occurrence, Fault } from '@/lib/db';
+import { Case, Task, Occurrence, Fault, EventRecord } from '@/lib/db';
 import { useRole } from '@/context/RoleContext';
 
 const MapComponent = dynamic(
@@ -17,6 +17,7 @@ export default function DashboardPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [occurrences, setOccurrences] = useState<Occurrence[]>([]);
   const [faults, setFaults] = useState<Fault[]>([]);
+  const [events, setEvents] = useState<EventRecord[]>([]);
   const [eventsToday, setEventsToday] = useState(0);
   const [activeNops, setActiveNops] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -55,6 +56,7 @@ export default function DashboardPage() {
         }
         if (eventsRes.ok) {
           const data = await eventsRes.json();
+          setEvents(data.events ?? []);
           setEventsToday(data.stats?.today ?? 0);
         }
         if (nopsRes.ok) {
@@ -257,7 +259,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* 8. Events Today (mock) */}
+            {/* 8. Events Today — FRD §2.4.2/§2.4.3, from Events Master List */}
             <div className="metric-card glass events-today">
               <div className="metric-info">
                 <h3>Events Today</h3>
@@ -294,7 +296,7 @@ export default function DashboardPage() {
                 <span className="live-dot" />
               </div>
               <div className="map-wrapper">
-                <MapComponent cases={cases} />
+                <MapComponent cases={cases} events={events} />
               </div>
             </div>
 

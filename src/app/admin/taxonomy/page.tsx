@@ -7,7 +7,7 @@ import { TaxonomyItem, DEFAULT_REFERENCE_DATA } from '@/lib/taxonomy';
 
 export default function TaxonomyPage() {
   const { username } = useRole();
-  const [activeTab, setActiveTab] = useState<'Incident' | 'Fault' | 'Priority' | 'eDiary'>('Incident');
+  const [activeTab, setActiveTab] = useState<'Incident' | 'Fault' | 'Priority' | 'eDiary' | 'Event'>('Incident');
   const [items, setItems] = useState<TaxonomyItem[]>([]);
   
   // Modals state
@@ -165,7 +165,7 @@ export default function TaxonomyPage() {
       <div className="admin-header-bar glass" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-card)' }}>
         <div>
           <h1 style={{ fontFamily: 'var(--font-headline)', fontSize: '20px', fontWeight: 700, color: 'var(--text-main)' }}>SYSTEM TAXONOMY</h1>
-          <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginTop: '2px' }}>Configure categorization taxonomy codes, incident classification trees, task priorities, and e-diary topics.</p>
+          <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginTop: '2px' }}>Configure categorization taxonomy codes, incident classification trees, task priorities, e-diary topics, and event types.</p>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
           <button onClick={loadAuditHistory} className="btn btn-secondary" style={{ padding: '8px 16px', borderRadius: '6px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -179,7 +179,7 @@ export default function TaxonomyPage() {
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: '10px', marginTop: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '2px' }}>
-        {(['Incident', 'Fault', 'Priority', 'eDiary'] as const).map(tab => (
+        {(['Incident', 'Fault', 'Priority', 'eDiary', 'Event'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => { setActiveTab(tab); resetForm(); }}
@@ -200,6 +200,7 @@ export default function TaxonomyPage() {
             {tab === 'Fault' && 'Fault Type Taxonomy'}
             {tab === 'Priority' && 'Task Priority Levels'}
             {tab === 'eDiary' && 'e-Diary Topic Categories'}
+            {tab === 'Event' && 'Event Type Taxonomy'}
           </button>
         ))}
       </div>

@@ -352,10 +352,11 @@ export interface EventRecord {
   name: string;
   startDateTime: string;
   endDateTime: string;
-  location: string;
-  boundaryCoordinates?: { lat: number; lng: number }[];
-  type: string;
-  description: string;
+  location: Location;                                    // FRD §8.2(a) — location-hierarchy reference, not free text
+  boundaryCoordinates?: { lat: number; lng: number }[];   // FRD §8.2(c) — optional drawn boundary polygon on 2D map
+  type: string;                                           // Event Type — from Event taxonomy (§8.1.2)
+  description?: string;
+  sourceEDiaryId?: string;                                // FRD §8.1.1(c) / §9.1.3(c) — reference to source e-Diary entry
   createdBy: string;
   createdAt: string;
 }
@@ -933,6 +934,19 @@ export function generateFaultId(db: DbSchema): string {
     if (sequences.length > 0) nextSeq = Math.max(...sequences) + 1;
   }
   return `${prefix}${String(nextSeq).padStart(3, '0')}`;
+}
+
+export function generateEventId(db: DbSchema): string {
+  const year = new Date().getFullYear();
+  const prefix = `EVT-${year}-`;
+
+  const yearEvents = (db.events || []).filter(e => e.id.startsWith(prefix));
+  let nextSeq = 1;
+  if (yearEvents.length > 0) {
+    const sequences = yearEvents.map(e => parseInt(e.id.split('-')[2], 10)).filter(num => !isNaN(num));
+    if (sequences.length > 0) nextSeq = Math.max(...sequences) + 1;
+  }
+  return `${prefix}${String(nextSeq).padStart(4, '0')}`;
 }
 
 export function generateSeriesId(db: DbSchema): string {

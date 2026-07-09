@@ -1,6 +1,6 @@
 export interface TaxonomyItem {
   id: string;
-  category: 'Incident' | 'Fault' | 'Priority' | 'eDiary';
+  category: 'Incident' | 'Fault' | 'Priority' | 'eDiary' | 'Event';
   name: string;
   subTypes?: string[];
   description?: string;
@@ -30,7 +30,14 @@ export const DEFAULT_REFERENCE_DATA: TaxonomyItem[] = [
   { id: 'ed-1', category: 'eDiary', name: 'Routine Patrol', description: 'Standard ranger rounds and logs', status: 'Active' },
   { id: 'ed-2', category: 'eDiary', name: 'Shift Handover', description: 'Incident checklists and shift log handovers', status: 'Active' },
   { id: 'ed-3', category: 'eDiary', name: 'System Test', description: 'Siren drills, radio tests, panic buttons checks', status: 'Active' },
-  { id: 'ed-4', category: 'eDiary', name: 'VIP Visit', description: 'Security detail coordination for state visitors', status: 'Active' }
+  { id: 'ed-4', category: 'eDiary', name: 'VIP Visit', description: 'Security detail coordination for state visitors', status: 'Active' },
+
+  // Event Type Taxonomy — FSD §8.1.2 (dropdown, no sub-types defined in FRD)
+  { id: 'evt-1', category: 'Event', name: 'Sports & Recreation', description: 'Public sporting events, tournaments and recreational activities', status: 'Active' },
+  { id: 'evt-2', category: 'Event', name: 'F&B', description: 'Food and beverage festivals, pop-ups and promotions', status: 'Active' },
+  { id: 'evt-3', category: 'Event', name: 'Works', description: 'Scheduled construction, maintenance or contractor works', status: 'Active' },
+  { id: 'evt-4', category: 'Event', name: 'Internal', description: 'Staff training, drills and internal operations', status: 'Active' },
+  { id: 'evt-5', category: 'Event', name: 'VIP / Dignitary', description: 'VIP visits and dignitary-related events', status: 'Active' },
 ];
 
 export function getFaultTaxonomy(): Record<string, string[]> {
@@ -55,6 +62,21 @@ export function getFaultTaxonomy(): Record<string, string[]> {
     mapping[item.name] = item.subTypes || [];
   });
   return mapping;
+}
+
+export function getEventTaxonomy(): string[] {
+  if (typeof window === 'undefined') {
+    return DEFAULT_REFERENCE_DATA
+      .filter(item => item.category === 'Event' && item.status === 'Active')
+      .map(item => item.name);
+  }
+
+  const stored = localStorage.getItem('admin_reference_data');
+  const items: TaxonomyItem[] = stored ? JSON.parse(stored) : [];
+
+  return (items.length > 0 ? items : DEFAULT_REFERENCE_DATA)
+    .filter(item => item.category === 'Event' && item.status === 'Active')
+    .map(item => item.name);
 }
 
 export function getIncidentTaxonomy(): Record<string, string[]> {

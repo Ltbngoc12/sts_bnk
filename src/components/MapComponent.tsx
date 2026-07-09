@@ -1,16 +1,19 @@
 'use client';
 
 import React, { useEffect, useRef } from 'react';
-import { Case } from '@/lib/db';
+import { Case, EventRecord } from '@/lib/db';
 
 interface MapComponentProps {
   cases: Case[];
+  /** FRD §2.4.3 — Events map layer, surfaced from the Events Master List. */
+  events?: EventRecord[];
 }
 
-const MapComponent: React.FC<MapComponentProps> = ({ cases }) => {
+const MapComponent: React.FC<MapComponentProps> = ({ cases, events = [] }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
+  const eventMarkersRef = useRef<any[]>([]);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -64,6 +67,46 @@ const MapComponent: React.FC<MapComponentProps> = ({ cases }) => {
 
       // Plot active incidents and faults
       updateMarkers(L, createSVGIcon);
+      updateEventMarkers(L, createSVGIcon);
+    };
+
+    const updateEventMarkers = (leafletLib: any, iconFactory: (color: string) => any) => {
+      if (!mapInstance.current) return;
+      eventMarkersRef.current.forEach(marker => marker.remove());
+      eventMarkersRef.current = [];
+
+      const now = new Date();
+      events.forEach(ev => {
+        const { lat, lng, commonName } = ev.location;
+        if (!lat || !lng) return;
+
+        // Only surface upcoming/active events on the live ops map (§2.4.3 "Events Today" scope)
+        const end = new Date(ev.endDateTime);
+        if (end < now) return;
+
+        const marker = leafletLib.marker([lat, lng], {
+          icon: iconFactory('#8B5CF6'), // violet — distinct from incident/fault colors
+        });
+
+        const start = new Date(ev.startDateTime);
+        const popupContent = `
+          <div style="font-family: var(--font-body); padding: 5px;">
+            <div style="font-family: var(--font-title); font-weight: 700; font-size: 15px; margin-bottom: 5px; color: var(--text-main);">📅 ${ev.name}</div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px;">Event ID: ${ev.id}</div>
+            <span class="badge" style="font-size: 9px; padding: 2px 6px; background: rgba(139,92,246,0.08); color: #8B5CF6; border-radius: 4px; border: 1px solid rgba(139,92,246,0.15); font-weight: 700;">${ev.type}</span>
+            <div style="font-size: 12px; color: var(--text-main); margin: 8px 0;">
+              <strong>Location:</strong> ${commonName || ev.location.road || 'Sentosa Island'}<br/>
+              <strong>When:</strong> ${start.toLocaleDateString('en-SG')} – ${end.toLocaleDateString('en-SG')}
+            </div>
+            <a href="/events" style="display: block; text-align: center; background: #8B5CF6; color: #ffffff; padding: 8px 12px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 12px;">
+              Open Events Master List
+            </a>
+          </div>
+        `;
+
+        marker.bindPopup(popupContent).addTo(mapInstance.current);
+        eventMarkersRef.current.push(marker);
+      });
     };
 
     const updateMarkers = (leafletLib: any, iconFactory: (color: string) => any) => {
@@ -141,7 +184,7 @@ const MapComponent: React.FC<MapComponentProps> = ({ cases }) => {
         mapInstance.current = null;
       }
     };
-  }, [cases]);
+  }, [cases, events]);
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
@@ -160,6 +203,10 @@ const MapComponent: React.FC<MapComponentProps> = ({ cases }) => {
           <div className="legend-item">
             <span className="dot dot-warning" />
             <span>Infrastructure Fault</span>
+          </div>
+          <div className="legend-item">
+            <span className="dot" style={{ background: '#8B5CF6', boxShadow: '0 0 6px #8B5CF6' }} />
+            <span>Event (Upcoming/Active)</span>
           </div>
         </div>
       </div>
