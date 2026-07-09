@@ -32,11 +32,10 @@ export function EDiaryTab() {
   const [occurrences, setOccurrences] = useState<Occurrence[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   // Filters
   const [searchTerm, setSearchTerm]   = useState('');
-  const [userFilter, setUserFilter]   = useState('All');
+  const [topicFilter, setTopicFilter] = useState('All');
   const [dateStart, setDateStart]     = useState('');
   const [dateEnd, setDateEnd]         = useState('');
 
@@ -75,7 +74,7 @@ export function EDiaryTab() {
       const params = new URLSearchParams();
       if (dateStart) params.set('dateStart', dateStart);
       if (dateEnd)   params.set('dateEnd', dateEnd);
-      if (userFilter !== 'All') params.set('user', userFilter);
+      if (topicFilter !== 'All') params.set('topic', topicFilter);
       const res = await fetch(`/api/occurrences${params.size ? '?' + params.toString() : ''}`);
       if (res.ok) setOccurrences(await res.json());
     } catch (err) {
@@ -83,10 +82,10 @@ export function EDiaryTab() {
     } finally {
       setLoading(false);
     }
-  }, [dateStart, dateEnd, userFilter]);
+  }, [dateStart, dateEnd, topicFilter]);
 
   useEffect(() => { fetchOccurrences(); }, [fetchOccurrences]);
-  useEffect(() => { setCurrentPage(1); }, [searchTerm, dateStart, dateEnd, userFilter]);
+  useEffect(() => { setCurrentPage(1); }, [searchTerm, dateStart, dateEnd, topicFilter]);
 
   useEffect(() => {
     fetch('/api/cases')
@@ -202,77 +201,59 @@ export function EDiaryTab() {
     }
   };
 
-  const filtersActive = !!(searchTerm || dateStart || dateEnd || userFilter !== 'All');
 
   return (
     <>
-      {/* Filter panel — matches Case Log / Incident Log / Fault Log / Task Board pattern */}
-      <div className="glass" style={{ padding: '20px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '16px', background: 'var(--bg-card)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
+      {/* Filter panel */}
+      <div className="glass" style={{ padding: '20px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
 
-          {/* Left: entry count */}
-          <div style={{ display: 'flex', gap: '4px' }}>
-            <span
-              className="tab-btn active"
-              style={{
-                background: 'transparent',
-                borderBottom: '2px solid var(--color-primary)',
-                color: 'var(--color-primary)',
-                padding: '8px 16px',
-                fontSize: '13px',
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-              }}
-            >
-              All Entries
-              <span style={{
-                fontSize: '11px',
-                fontWeight: 700,
-                background: 'var(--color-primary-bg)',
-                color: 'var(--color-primary)',
-                padding: '2px 8px',
-                borderRadius: '10px',
-                minWidth: '20px',
-                textAlign: 'center',
-              }}>
-                {occurrences.length}
-              </span>
-            </span>
+          {/* Search */}
+          <div style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.04em' }}>Search Entries:</label>
+            <input
+              type="text"
+              placeholder="Search topic or content…"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="form-control"
+              style={{ width: '100%' }}
+            />
           </div>
 
-          {/* Right: filter toggle, search, new entry */}
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', flexGrow: 1, justifyContent: 'flex-end' }}>
+          {/* Date From */}
+          <div style={{ flex: '0 1 150px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.04em' }}>Date From:</label>
+            <input type="date" value={dateStart} max={dateEnd || undefined}
+              onChange={e => setDateStart(e.target.value)} className="form-control" style={{ width: '100%', height: '36px' }} />
+          </div>
 
+          {/* Date To */}
+          <div style={{ flex: '0 1 150px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.04em' }}>Date To:</label>
+            <input type="date" value={dateEnd} min={dateStart || undefined}
+              onChange={e => setDateEnd(e.target.value)} className="form-control" style={{ width: '100%', height: '36px' }} />
+          </div>
+
+          {/* Topic / Subject */}
+          <div style={{ flex: '0 1 180px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.04em' }}>Topic / Subject:</label>
+            <select value={topicFilter} onChange={e => setTopicFilter(e.target.value)} className="form-control select-dark" style={{ width: '100%', height: '36px' }}>
+              <option value="All">All Topics</option>
+              {TOPICS.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+
+          {/* Clear + Create */}
+          <div style={{ display: 'flex', gap: '10px', height: '36px', alignItems: 'center' }}>
             <button
-              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-              className={`btn ${showAdvancedFilters ? 'btn-info' : 'btn-secondary'}`}
-              aria-label="Toggle filters"
-              style={{ padding: '0 10px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--radius-md)' }}
+              type="button"
+              onClick={resetFilters}
+              className="btn btn-secondary"
+              style={{ padding: '0 10px', fontSize: '12px', height: '100%', border: 'none', background: 'transparent', textDecoration: 'underline', whiteSpace: 'nowrap' }}
             >
-              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-              </svg>
+              Clear
             </button>
-
-            <div style={{ position: 'relative', width: '100%', maxWidth: '300px' }}>
-              <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-faint)', display: 'flex', alignItems: 'center' }}>
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="11" cy="11" r="8" />
-                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                </svg>
-              </span>
-              <input
-                type="text"
-                placeholder="Search topic or content…"
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="form-control"
-                style={{ width: '100%', paddingLeft: '36px', height: '36px', fontSize: '13px' }}
-              />
-            </div>
-
             {canEdit && (
               <button
                 type="button"
@@ -287,45 +268,8 @@ export function EDiaryTab() {
               </button>
             )}
           </div>
+
         </div>
-
-        {/* Collapsible Advanced Filters */}
-        {showAdvancedFilters && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '16px', paddingTop: '4px' }}>
-
-            <div className="form-group" style={{ margin: 0 }}>
-              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Date From:</label>
-              <input type="date" value={dateStart} max={dateEnd || undefined}
-                onChange={e => setDateStart(e.target.value)} className="form-control" style={{ width: '100%', height: '36px' }} />
-            </div>
-
-            <div className="form-group" style={{ margin: 0 }}>
-              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Date To:</label>
-              <input type="date" value={dateEnd} min={dateStart || undefined}
-                onChange={e => setDateEnd(e.target.value)} className="form-control" style={{ width: '100%', height: '36px' }} />
-            </div>
-
-            <div className="form-group" style={{ margin: 0 }}>
-              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Logged By:</label>
-              <select value={userFilter} onChange={e => setUserFilter(e.target.value)} className="form-control select-dark" style={{ width: '100%' }}>
-                <option value="All">All Operators</option>
-                {uniqueUsers.map(u => <option key={u} value={u}>{u}</option>)}
-              </select>
-            </div>
-
-            {filtersActive && (
-              <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end' }}>
-                <button
-                  onClick={resetFilters}
-                  className="btn btn-secondary"
-                  style={{ padding: '0 12px', fontSize: '12.5px', height: '34px', border: 'none', background: 'transparent', textDecoration: 'underline', whiteSpace: 'nowrap' }}
-                >
-                  Clear Filters
-                </button>
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Immutability note */}

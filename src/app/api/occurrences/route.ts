@@ -7,6 +7,7 @@ export async function GET(request: Request) {
     const dateStart = searchParams.get('dateStart');
     const dateEnd   = searchParams.get('dateEnd');
     const user      = searchParams.get('user');
+    const topic     = searchParams.get('topic');
     const caseId    = searchParams.get('caseId');
 
     const db = await getDb();
@@ -26,6 +27,9 @@ export async function GET(request: Request) {
     }
     if (user && user !== 'All') {
       results = results.filter(o => o.user === user);
+    }
+    if (topic && topic !== 'All') {
+      results = results.filter(o => o.topic === topic);
     }
 
     results.sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());

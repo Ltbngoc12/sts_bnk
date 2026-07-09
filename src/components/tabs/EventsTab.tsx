@@ -6,6 +6,10 @@ import { useRole } from '@/context/RoleContext';
 import { getEventTaxonomy } from '@/lib/taxonomy';
 import EventCreateModal from '@/components/EventCreateModal';
 import EventScheduleUploadModal from '@/components/EventScheduleUploadModal';
+import { EventTimelineView } from '@/components/EventTimelineView';
+import dynamic from 'next/dynamic';
+
+const MapComponent = dynamic(() => import('@/components/MapComponent'), { ssr: false, loading: () => <div style={{height:'100%', display:'flex', alignItems:'center', justifyContent:'center'}}>Loading Map...</div> });
 
 // FRD §3.3.4 Events Management role matrix is blank in the FRD itself — using the
 // placeholder from QnA_FSD_v0.5_EventsMasterList.md item 1 (mirrors e-Diary §3.3.3)
@@ -25,7 +29,7 @@ export function EventsTab() {
   const canCreateEdit = CREATE_EDIT_ROLES.includes(role);
   const canDelete = DELETE_ROLES.includes(role);
 
-  const [view, setView] = useState<'list' | 'calendar'>('list');
+  const [view, setView] = useState<'timeline' | 'list'>('timeline');
   const [events, setEvents] = useState<EventRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [eventTypes, setEventTypes] = useState<string[]>([]);
@@ -42,8 +46,7 @@ export function EventsTab() {
   const [editingEvent, setEditingEvent] = useState<EventRecord | null>(null);
   const [deletingEvent, setDeletingEvent] = useState<EventRecord | null>(null);
 
-  // Calendar state — §8.4(a)
-  const [calendarMonth, setCalendarMonth] = useState(() => { const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return d; });
+  const [timelineDate, setTimelineDate] = useState(() => new Date());
 
   useEffect(() => {
     setEventTypes(getEventTaxonomy());
@@ -88,7 +91,7 @@ export function EventsTab() {
   const paginated = filtered.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   const resetFilters = () => {
-    setSearchTerm(''); setFilterType(''); setDateStart(''); setDateEnd('');
+    setSearchTerm(''); setFilterType(''); setDateStart(''); setDateEnd(''); setTimelineDate(new Date());
   };
   const filtersActive = !!(searchTerm || filterType || dateStart || dateEnd);
 
@@ -108,225 +111,218 @@ export function EventsTab() {
     }
   };
 
-  // ── Calendar grid computation ────────────────────────────────────────────────
-  const calendarCells = useMemo(() => {
-    const year = calendarMonth.getFullYear();
-    const month = calendarMonth.getMonth();
-    const firstOfMonth = new Date(year, month, 1);
-    const startOffset = firstOfMonth.getDay(); // 0=Sun
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-    const monthStart = new Date(year, month, 1, 0, 0, 0);
-    const monthEnd = new Date(year, month + 1, 0, 23, 59, 59);
-    const monthEvents = events.filter(e => {
-      if (filterType && e.type !== filterType) return false;
-      const s = new Date(e.startDateTime);
-      const en = new Date(e.endDateTime);
-      return s <= monthEnd && en >= monthStart;
-    });
-
-    const cells: { date: Date | null; events: EventRecord[] }[] = [];
-    for (let i = 0; i < startOffset; i++) cells.push({ date: null, events: [] });
-    for (let day = 1; day <= daysInMonth; day++) {
-      const date = new Date(year, month, day);
-      const dayEnd = new Date(year, month, day, 23, 59, 59);
-      const dayEvents = monthEvents.filter(e => new Date(e.startDateTime) <= dayEnd && new Date(e.endDateTime) >= date);
-      cells.push({ date, events: dayEvents });
-    }
-    return cells;
-  }, [calendarMonth, events, filterType]);
-
-  const today = new Date();
-  const isSameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-
   return (
     <>
-      {/* Filter panel */}
-      <div className="glass" style={{ padding: '20px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '16px', background: 'var(--bg-card)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-
-          {/* View toggle */}
-          <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-inset)', padding: 3, borderRadius: 8 }}>
-            <button
-              type="button"
-              onClick={() => setView('list')}
-              className="btn"
-              style={{ padding: '6px 14px', fontSize: 12, fontWeight: 600, borderRadius: 6, border: 'none', background: view === 'list' ? 'var(--bg-card)' : 'transparent', color: view === 'list' ? 'var(--color-primary)' : 'var(--text-muted)', boxShadow: view === 'list' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none' }}
-            >
-              📋 List
-            </button>
-            <button
-              type="button"
-              onClick={() => setView('calendar')}
-              className="btn"
-              style={{ padding: '6px 14px', fontSize: 12, fontWeight: 600, borderRadius: 6, border: 'none', background: view === 'calendar' ? 'var(--bg-card)' : 'transparent', color: view === 'calendar' ? 'var(--color-primary)' : 'var(--text-muted)', boxShadow: view === 'calendar' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none' }}
-            >
-              📅 Calendar
-            </button>
-          </div>
-
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            {canCreateEdit && (
-              <button type="button" className="btn btn-secondary" onClick={() => setShowUploadModal(true)} style={{ fontSize: '12.5px', height: '36px', padding: '0 14px', fontWeight: 600 }}>
-                ⬆ Bulk Import
-              </button>
-            )}
-            {canCreateEdit && (
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => { setEditingEvent(null); setShowCreateModal(true); }}
-                style={{ fontSize: '12.5px', height: '36px', padding: '0 14px', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}
-              >
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: 13, height: 13 }}>
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-                </svg>
-                NEW EVENT
-              </button>
-            )}
-          </div>
+      <div className="page-header-bar glass" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="title-section">
+          <h1 style={{ fontSize: '15px', textTransform: 'uppercase' }}>Event Management</h1>
+          <p>Master list of all island events, schedules, and spatial boundaries</p>
         </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '16px' }}>
-          <div className="form-group" style={{ margin: 0 }}>
-            <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Search:</label>
-            <input type="text" placeholder="Event ID, name, location…" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="form-control" style={{ width: '100%' }} />
-          </div>
-          <div className="form-group" style={{ margin: 0 }}>
-            <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Event Type:</label>
-            <select value={filterType} onChange={e => setFilterType(e.target.value)} className="form-control select-dark" style={{ width: '100%' }}>
+        
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', paddingRight: '20px' }}>
+          {canCreateEdit && (
+            <button type="button" className="btn btn-secondary" onClick={() => setShowUploadModal(true)} style={{ fontSize: '12.5px', height: '36px', padding: '0 14px', fontWeight: 600 }}>
+              ⬆ Bulk Import
+            </button>
+          )}
+          {canCreateEdit && (
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => { setEditingEvent(null); setShowCreateModal(true); }}
+              style={{ fontSize: '13px', height: '36px', padding: '0 16px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600, borderRadius: 'var(--radius-md)', boxShadow: '0 2px 8px rgba(255,130,0,0.25)' }}
+            >
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: 14, height: 14 }}>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
+              </svg>
+              NEW EVENT
+            </button>
+          )}
+        </div>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '16px' }}>
+      
+      {/* ── Top Action Bar (Glassmorphic) ── */}
+      <div className="glass" style={{ 
+        padding: '20px', 
+        borderRadius: 'var(--radius-lg)', 
+        background: 'var(--bg-card)', 
+        display: 'flex', 
+        justifyContent: 'space-between',
+        alignItems: 'flex-end',
+        flexWrap: 'wrap', 
+        gap: '16px',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.03)'
+      }}>
+        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'flex-end', flex: 1 }}>
+          <div className="form-group" style={{ margin: 0, width: '200px' }}>
+            <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>Event Type</label>
+            <select value={filterType} onChange={e => setFilterType(e.target.value)} className="form-control select-dark" style={{ width: '100%', height: '40px' }}>
               <option value="">All Types</option>
               {eventTypes.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
-          {view === 'list' && (
-            <>
-              <div className="form-group" style={{ margin: 0 }}>
-                <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Date From:</label>
-                <input type="date" value={dateStart} max={dateEnd || undefined} onChange={e => setDateStart(e.target.value)} className="form-control" style={{ width: '100%' }} />
+          
+          {view === 'timeline' && (
+            <div className="form-group" style={{ margin: 0, width: '200px' }}>
+              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>Timeline Date</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button className="btn btn-secondary" style={{ padding: '0 8px', height: '40px' }} onClick={() => { const d = new Date(timelineDate); d.setDate(d.getDate() - 1); setTimelineDate(d); }}>‹</button>
+                <input type="date" value={timelineDate.toISOString().split('T')[0]} onChange={e => setTimelineDate(new Date(e.target.value))} className="form-control" style={{ flex: 1, height: '40px', padding: '0 8px' }} />
+                <button className="btn btn-secondary" style={{ padding: '0 8px', height: '40px' }} onClick={() => { const d = new Date(timelineDate); d.setDate(d.getDate() + 1); setTimelineDate(d); }}>›</button>
               </div>
-              <div className="form-group" style={{ margin: 0 }}>
-                <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Date To:</label>
-                <input type="date" value={dateEnd} min={dateStart || undefined} onChange={e => setDateEnd(e.target.value)} className="form-control" style={{ width: '100%' }} />
-              </div>
-            </>
+            </div>
           )}
+
+          {view === 'list' && (
+             <>
+               <div className="form-group" style={{ margin: 0, width: '150px' }}>
+                 <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Date From</label>
+                 <input type="date" value={dateStart} max={dateEnd || undefined} onChange={e => setDateStart(e.target.value)} className="form-control" style={{ width: '100%', height: '40px' }} />
+               </div>
+               <div className="form-group" style={{ margin: 0, width: '150px' }}>
+                 <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Date To</label>
+                 <input type="date" value={dateEnd} min={dateStart || undefined} onChange={e => setDateEnd(e.target.value)} className="form-control" style={{ width: '100%', height: '40px' }} />
+               </div>
+             </>
+          )}
+
+          <div className="form-group" style={{ margin: 0, flex: 1, minWidth: '200px' }}>
+            <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>Search</label>
+            <input type="text" placeholder="Search events..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="form-control" style={{ width: '100%', height: '40px' }} />
+          </div>
+
           {filtersActive && (
-            <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-              <button onClick={resetFilters} className="btn btn-secondary" style={{ padding: '0 12px', fontSize: '12.5px', height: '34px', border: 'none', background: 'transparent', textDecoration: 'underline' }}>
-                Clear Filters
-              </button>
+            <button onClick={resetFilters} className="btn btn-secondary" style={{ height: '40px', border: 'none', background: 'transparent', textDecoration: 'underline' }}>
+              Clear
+            </button>
+          )}
+        </div>
+
+        {/* Switch Mode Segmented Control */}
+        <div style={{ display: 'flex', gap: '6px', background: 'var(--bg-inset)', padding: '6px', borderRadius: '12px', height: '48px', alignItems: 'center', border: '1px solid var(--border-color)', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)' }}>
+          <button
+            type="button"
+            onClick={() => setView('timeline')}
+            className="btn"
+            style={{ padding: '0 20px', fontSize: 13.5, fontWeight: 700, borderRadius: '8px', border: 'none', background: view === 'timeline' ? 'var(--color-primary)' : 'transparent', color: view === 'timeline' ? '#FFF' : 'var(--text-muted)', boxShadow: view === 'timeline' ? '0 4px 12px rgba(255, 130, 0, 0.3)' : 'none', transition: 'all 0.25s ease', height: '100%', display: 'flex', alignItems: 'center', gap: '8px', opacity: view === 'timeline' ? 1 : 0.8 }}
+          >
+            <span style={{ filter: view === 'timeline' ? 'none' : 'grayscale(100%) opacity(0.7)' }}>⏱️</span> Timeline
+          </button>
+          <button
+            type="button"
+            onClick={() => setView('list')}
+            className="btn"
+            style={{ padding: '0 20px', fontSize: 13.5, fontWeight: 700, borderRadius: '8px', border: 'none', background: view === 'list' ? 'var(--color-primary)' : 'transparent', color: view === 'list' ? '#FFF' : 'var(--text-muted)', boxShadow: view === 'list' ? '0 4px 12px rgba(255, 130, 0, 0.3)' : 'none', transition: 'all 0.25s ease', height: '100%', display: 'flex', alignItems: 'center', gap: '8px', opacity: view === 'list' ? 1 : 0.8 }}
+          >
+            <span style={{ filter: view === 'list' ? 'none' : 'grayscale(100%) opacity(0.7)' }}>📋</span> List
+          </button>
+        </div>
+      </div>
+
+      {/* ── Split Layout Content ── */}
+      <div style={{ display: 'flex', gap: '16px', flex: 1, minHeight: '600px', alignItems: 'stretch' }}>
+        
+        {/* Left Side: Map */}
+        {view === 'timeline' && (
+          <div style={{ 
+            flex: '0 0 35%', 
+            background: 'var(--bg-card)', 
+            borderRadius: 'var(--radius-lg)', 
+            overflow: 'hidden', 
+            border: '1px solid var(--border-color)', 
+            boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
+            display: 'flex',
+            flexDirection: 'column'
+          }}>
+            <div style={{ padding: '16px', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-inset)', fontWeight: 600, fontSize: '14px', color: 'var(--text-main)' }}>
+              📍 Event Locations
+            </div>
+            <div style={{ flex: 1, position: 'relative' }}>
+               {/* MapComponent takes 100% of its container usually */}
+               <MapComponent cases={[]} events={filtered} />
+            </div>
+          </div>
+        )}
+
+        {/* Right Side: Content */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+          {view === 'timeline' && (
+             <EventTimelineView 
+                events={filtered} 
+                currentDate={timelineDate} 
+                onEventClick={ev => {
+                  if(canCreateEdit) {
+                    setEditingEvent(ev);
+                    setShowCreateModal(true);
+                  }
+                }}
+             />
+          )}
+
+          {view === 'list' && (
+            <div className="glass" style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+              {loading ? (
+                <div className="loading-container" style={{ padding: '40px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></div>
+              ) : filtered.length === 0 ? (
+                <div className="empty-state" style={{ padding: '60px', textAlign: 'center', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>No events found matching your filters.</div>
+              ) : (
+                <>
+                  <div className="table-container" style={{ flex: 1, overflowY: 'auto' }}>
+                    <table className="custom-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead style={{ position: 'sticky', top: 0, background: 'var(--bg-card)', zIndex: 1 }}>
+                        <tr>
+                          <th>Event ID</th>
+                          <th>Name</th>
+                          <th>Start</th>
+                          <th>End</th>
+                          <th>Location</th>
+                          <th>Type</th>
+                          <th>Linked e-Diary</th>
+                          {canCreateEdit && <th>Actions</th>}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {paginated.map(ev => (
+                          <tr key={ev.id} style={{ cursor: canCreateEdit ? 'pointer' : 'default', borderBottom: '1px solid var(--border-color)', transition: 'background 0.2s' }} onClick={() => canCreateEdit && (setEditingEvent(ev), setShowCreateModal(true))} onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                            <td style={{ padding: '14px 16px' }}><span className="mono-id" style={{ color: 'var(--color-primary)', background: 'var(--color-primary-bg)', borderColor: 'var(--color-primary-border)', fontSize: '12px' }}>{ev.id}</span></td>
+                            <td style={{ padding: '14px 16px', fontWeight: 600, fontSize: '13px' }}>{ev.name}</td>
+                            <td style={{ padding: '14px 16px', fontSize: '12px', whiteSpace: 'nowrap' }}>{fmtDateTime(ev.startDateTime)}</td>
+                            <td style={{ padding: '14px 16px', fontSize: '12px', whiteSpace: 'nowrap' }}>{fmtDateTime(ev.endDateTime)}</td>
+                            <td style={{ padding: '14px 16px', fontSize: '12px', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.location.commonName || ev.location.road || '—'}</td>
+                            <td style={{ padding: '14px 16px' }}>
+                               <span className="badge" style={{ fontSize: '11px', background: ev.type === 'Emergency' ? 'var(--color-critical-bg)' : 'var(--color-info-bg)', color: ev.type === 'Emergency' ? 'var(--color-critical)' : 'var(--color-info)' }}>{ev.type}</span>
+                            </td>
+                            <td style={{ padding: '14px 16px', fontSize: '11px', color: 'var(--text-muted)' }}>{ev.sourceEDiaryId || '—'}</td>
+                            {canCreateEdit && (
+                              <td onClick={e => e.stopPropagation()} style={{ padding: '14px 16px', whiteSpace: 'nowrap' }}>
+                                <button className="btn btn-secondary btn-xs" style={{ fontSize: '11px', padding: '4px 10px', marginRight: '6px' }} onClick={() => { setEditingEvent(ev); setShowCreateModal(true); }}>Edit</button>
+                                {canDelete && (
+                                  <button className="btn btn-xs" style={{ fontSize: '11px', padding: '4px 10px', background: 'rgba(239,68,68,0.12)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.25)' }} onClick={() => setDeletingEvent(ev)}>Delete</button>
+                                )}
+                              </td>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="pagination-bar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', borderTop: '1px solid var(--border-color)', background: 'var(--bg-inset)' }}>
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                      Showing <strong>{startIndex + 1}</strong> to <strong>{Math.min(startIndex + ITEMS_PER_PAGE, filtered.length)}</strong> of <strong>{filtered.length}</strong> events
+                    </div>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button className="btn btn-secondary" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} style={{ height: '28px', padding: '0 12px', fontSize: '12px' }}>Prev</button>
+                      <span style={{ fontSize: '12px', color: 'var(--text-main)', fontWeight: 600, display: 'flex', alignItems: 'center', padding: '0 12px' }}>Page {currentPage} of {totalPages}</span>
+                      <button className="btn btn-secondary" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} style={{ height: '28px', padding: '0 12px', fontSize: '12px' }}>Next</button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>
       </div>
-
-      {/* ── List View ─────────────────────────────────────────────────────────── */}
-      {view === 'list' && (
-        <div className="glass" style={{ marginTop: '10px', overflow: 'hidden' }}>
-          {loading ? (
-            <div className="loading-container" style={{ padding: '40px' }}><div className="spinner" /><span>Loading events…</span></div>
-          ) : filtered.length === 0 ? (
-            <div className="empty-state" style={{ padding: '60px', textAlign: 'center' }}>No events found matching your filters.</div>
-          ) : (
-            <>
-              <div className="table-container">
-                <table className="custom-table">
-                  <thead>
-                    <tr>
-                      <th>Event ID</th>
-                      <th>Name</th>
-                      <th>Start</th>
-                      <th>End</th>
-                      <th>Location</th>
-                      <th>Type</th>
-                      <th>Linked e-Diary</th>
-                      <th>Created By</th>
-                      {canCreateEdit && <th>Actions</th>}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paginated.map(ev => (
-                      <tr key={ev.id} style={{ cursor: canCreateEdit ? 'pointer' : 'default' }} onClick={() => canCreateEdit && (setEditingEvent(ev), setShowCreateModal(true))}>
-                        <td><span className="mono-id" style={{ color: 'var(--color-primary)', background: 'var(--color-primary-bg)', borderColor: 'var(--color-primary-border)' }}>{ev.id}</span></td>
-                        <td style={{ fontWeight: 600 }}>{ev.name}</td>
-                        <td style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{fmtDateTime(ev.startDateTime)}</td>
-                        <td style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{fmtDateTime(ev.endDateTime)}</td>
-                        <td style={{ fontSize: 12, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.location.commonName || ev.location.road || '—'}</td>
-                        <td><span className="badge badge-closed" style={{ fontSize: 11 }}>{ev.type}</span></td>
-                        <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>{ev.sourceEDiaryId || '—'}</td>
-                        <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>{ev.createdBy}</td>
-                        {canCreateEdit && (
-                          <td onClick={e => e.stopPropagation()} style={{ whiteSpace: 'nowrap' }}>
-                            <button className="btn btn-secondary btn-xs" style={{ fontSize: 10.5, padding: '3px 8px', marginRight: 6 }} onClick={() => { setEditingEvent(ev); setShowCreateModal(true); }}>Edit</button>
-                            {canDelete && (
-                              <button className="btn" style={{ fontSize: 10.5, padding: '3px 8px', background: 'rgba(239,68,68,0.12)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.25)' }} onClick={() => setDeletingEvent(ev)}>Delete</button>
-                            )}
-                          </td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="pagination-bar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderTop: '1px solid var(--border-color)' }}>
-                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                  Showing <strong>{startIndex + 1}</strong> to <strong>{Math.min(startIndex + ITEMS_PER_PAGE, filtered.length)}</strong> of <strong>{filtered.length}</strong> events
-                </div>
-                <div style={{ display: 'flex', gap: '4px' }}>
-                  <button className="btn btn-secondary" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} style={{ height: '28px', padding: '0 8px', fontSize: '12px' }}>Prev</button>
-                  <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', padding: '0 8px' }}>Page {currentPage} of {totalPages}</span>
-                  <button className="btn btn-secondary" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} style={{ height: '28px', padding: '0 8px', fontSize: '12px' }}>Next</button>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* ── Calendar View — FRD §8.4(a) ──────────────────────────────────────── */}
-      {view === 'calendar' && (
-        <div className="glass" style={{ marginTop: '10px', padding: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <button className="btn btn-secondary btn-xs" onClick={() => setCalendarMonth(d => { const n = new Date(d); n.setMonth(n.getMonth() - 1); return n; })}>‹ Prev</button>
-            <h3 style={{ fontFamily: 'var(--font-headline)', fontSize: 16, fontWeight: 700 }}>
-              {calendarMonth.toLocaleDateString('en-SG', { month: 'long', year: 'numeric' })}
-            </h3>
-            <button className="btn btn-secondary btn-xs" onClick={() => setCalendarMonth(d => { const n = new Date(d); n.setMonth(n.getMonth() + 1); return n; })}>Next ›</button>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 1, background: 'var(--border-color)', border: '1px solid var(--border-color)', borderRadius: 8, overflow: 'hidden' }}>
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-              <div key={d} style={{ background: 'var(--bg-inset)', padding: '8px', fontSize: 11, fontWeight: 700, textAlign: 'center', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{d}</div>
-            ))}
-            {calendarCells.map((cell, i) => (
-              <div key={i} style={{ background: 'var(--bg-card)', minHeight: 90, padding: 6, display: 'flex', flexDirection: 'column', gap: 3 }}>
-                {cell.date && (
-                  <>
-                    <span style={{ fontSize: 11, fontWeight: 600, color: isSameDay(cell.date, today) ? 'var(--color-primary)' : 'var(--text-muted)' }}>
-                      {cell.date.getDate()}
-                    </span>
-                    {cell.events.slice(0, 3).map(ev => (
-                      <div
-                        key={ev.id}
-                        onClick={() => canCreateEdit && (setEditingEvent(ev), setShowCreateModal(true))}
-                        title={`${ev.name} · ${ev.type}`}
-                        style={{ fontSize: 10, padding: '2px 5px', borderRadius: 4, background: 'var(--color-primary-bg)', color: 'var(--color-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: canCreateEdit ? 'pointer' : 'default' }}
-                      >
-                        {ev.name}
-                      </div>
-                    ))}
-                    {cell.events.length > 3 && (
-                      <span style={{ fontSize: 9.5, color: 'var(--text-faint)' }}>+{cell.events.length - 3} more</span>
-                    )}
-                  </>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       <EventCreateModal
         isOpen={showCreateModal}
@@ -350,7 +346,7 @@ export function EventsTab() {
             <div className="modal-header"><h2>DELETE EVENT</h2><button className="close-btn" onClick={() => setDeletingEvent(null)}>✕</button></div>
             <div className="modal-form">
               <div className="modal-scroll-area">
-                <p style={{ fontSize: 13, color: 'var(--text-sub)' }}>
+                <p style={{ fontSize: '13px', color: 'var(--text-sub)' }}>
                   Delete <strong>{deletingEvent.id} — {deletingEvent.name}</strong>? This cannot be undone.
                 </p>
               </div>
@@ -362,6 +358,7 @@ export function EventsTab() {
           </div>
         </div>
       )}
+    </div>
     </>
   );
 }
