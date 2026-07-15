@@ -116,23 +116,6 @@ export default function RoutingMatrixPage() {
     resetForm();
   };
 
-  const handleToggleStatus = (rule: RoutingRule) => {
-    const newStatus = rule.status === 'Active' ? 'Disabled' : 'Active';
-    const updated = rules.map(r => {
-      if (r.id === rule.id) {
-        return { ...r, status: newStatus as 'Active' | 'Disabled' };
-      }
-      return r;
-    });
-    logAudit(
-      newStatus === 'Active' ? 'Enable Routing Rule' : 'Disable Routing Rule',
-      rule,
-      { ...rule, status: newStatus },
-      `${newStatus === 'Active' ? 'Enabled' : 'Disabled'} ${rule.category} routing rule: ${rule.condition}`
-    );
-    saveRulesState(updated);
-  };
-
   const openCreate = () => {
     setSelectedRule(null);
     resetForm();
@@ -238,13 +221,6 @@ export default function RoutingMatrixPage() {
                         <button onClick={() => openEdit(rule)} className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '11.5px', borderRadius: '4px' }}>
                           Edit
                         </button>
-                        <button
-                          onClick={() => handleToggleStatus(rule)}
-                          className={`btn ${rule.status === 'Active' ? 'btn-danger' : 'btn-success'}`}
-                          style={{ padding: '4px 8px', fontSize: '11.5px', borderRadius: '4px' }}
-                        >
-                          {rule.status === 'Active' ? 'Disable' : 'Enable'}
-                        </button>
                       </div>
                     </td>
                   </tr>
@@ -302,7 +278,7 @@ export default function RoutingMatrixPage() {
                   </select>
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '5px', textTransform: 'uppercase' }}>Initial Status</label>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '5px', textTransform: 'uppercase' }}>Status</label>
                   <select
                     value={formStatus}
                     onChange={e => setFormStatus(e.target.value as any)}

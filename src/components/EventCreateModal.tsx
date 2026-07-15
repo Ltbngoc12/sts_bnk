@@ -17,6 +17,10 @@ interface Props {
   sourceEDiaryId?: string;
   prefillName?: string;
   prefillDescription?: string;
+  /** Whether the current user may switch from View to Edit mode. Default true. */
+  canEdit?: boolean;
+  /** Whether the current user may delete this event from within the modal. Default false. */
+  canDelete?: boolean;
 }
 
 // FRD §8.1 Events Creation + §8.1.2 Event Field Design.
@@ -29,8 +33,16 @@ export default function EventCreateModal({
   sourceEDiaryId,
   prefillName,
   prefillDescription,
+  canEdit = true,
+  canDelete = false,
 }: Props) {
   const isEdit = !!editingEvent;
+
+  // Opening an existing event defaults to a read-only View; opening for create goes
+  // straight to the form. "Edit" in View mode switches this to 'form'.
+  const [mode, setMode] = useState<'view' | 'form'>(isEdit ? 'view' : 'form');
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const [eventTypes, setEventTypes] = useState<string[]>([]);
   const [name, setName] = useState('');
@@ -65,6 +77,9 @@ export default function EventCreateModal({
       return;
     }
     setError(null);
+    setConfirmDeleteOpen(false);
+    setDeleting(false);
+    setMode(editingEvent ? 'view' : 'form');
     if (editingEvent) {
       setName(editingEvent.name);
       setType(editingEvent.type);
@@ -94,6 +109,13 @@ export default function EventCreateModal({
     const d = new Date(iso);
     const pad = (n: number) => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  function fmtDisplay(localOrIso: string) {
+    if (!localOrIso) return '—';
+    const d = new Date(localOrIso);
+    if (isNaN(d.getTime())) return '—';
+    return `${d.toLocaleDateString('en-SG', { day: '2-digit', month: 'short', year: 'numeric' })} ${d.toLocaleTimeString('en-SG', { hour: '2-digit', minute: '2-digit', hour12: false })}`;
   }
 
   function resetForm() {
@@ -178,6 +200,41 @@ export default function EventCreateModal({
     }
   };
 
+  // Cancel out of the form: if we got here by pressing Edit from View mode, go back
+  // to View instead of closing outright. Creating fresh (no editingEvent) still closes.
+  const handleCancelForm = () => {
+    if (editingEvent) {
+      setMode('view');
+      setError(null);
+    } else {
+      onClose();
+      resetForm();
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!editingEvent || deleting) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/events/${editingEvent.id}`, { method: 'DELETE' });
+      if (res.ok) {
+        onSuccess();
+        onClose();
+      } else {
+        const err = await res.json();
+        setError(err.error || 'Failed to delete event.');
+        setConfirmDeleteOpen(false);
+      }
+    } catch (err) {
+      console.error('Failed to delete event:', err);
+      setError('Failed to delete event.');
+      setConfirmDeleteOpen(false);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -186,7 +243,7 @@ export default function EventCreateModal({
         <div className="modal-header" style={{ padding: '16px 20px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <h2 style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text-main)' }}>
-              {isEdit ? 'EDIT EVENT' : 'NEW EVENT'}
+              {mode === 'view' ? 'EVENT DETAILS' : isEdit ? 'EDIT EVENT' : 'NEW EVENT'}
             </h2>
             <p style={{ fontSize: 11, color: 'var(--text-faint)', margin: 0 }}>
               {sourceEDiaryId ? `Created from e-Diary entry ${sourceEDiaryId} — reference will be retained (§9.1.3c).` : 'FRD §8.1 — Events Master List record. Does not affect Case status or closure.'}
@@ -199,6 +256,104 @@ export default function EventCreateModal({
           </button>
         </div>
 
+        {mode === 'view' && editingEvent ? (
+          <div className="modal-form">
+            <div className="modal-scroll-area" style={{ gap: 0, padding: 0 }}>
+
+              {/* Section 1: Event Details */}
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
+                  Event Details
+                </div>
+                <ViewField label="Event ID" value={editingEvent.id} mono />
+                <ViewField label="Event Name" value={editingEvent.name} />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <ViewField label="Start Date & Time" value={fmtDisplay(editingEvent.startDateTime)} />
+                  <ViewField label="End Date & Time" value={fmtDisplay(editingEvent.endDateTime)} />
+                </div>
+                <ViewField label="Event Type" value={editingEvent.type} />
+              </div>
+
+              {/* Section 2: Location */}
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
+                  Event Location
+                </div>
+                <ViewField
+                  label="Location"
+                  value={[editingEvent.location.commonName, editingEvent.location.building, editingEvent.location.road, editingEvent.location.levelSpace].filter(Boolean).join(' — ') || '—'}
+                />
+                {editingEvent.boundaryCoordinates && editingEvent.boundaryCoordinates.length >= 3 ? (
+                  <div style={{ marginTop: 14 }}>
+                    <BoundaryMapDrawer
+                      center={{ lat: editingEvent.location.lat, lng: editingEvent.location.lng }}
+                      initialBoundary={editingEvent.boundaryCoordinates}
+                      onBoundaryChange={() => {}}
+                      readOnly
+                    />
+                  </div>
+                ) : (
+                  <p style={{ fontSize: 11.5, color: 'var(--text-faint)', marginTop: 10 }}>No boundary drawn for this event.</p>
+                )}
+              </div>
+
+              {/* Section 3: Description */}
+              {editingEvent.description && (
+                <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)' }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
+                    Description
+                  </div>
+                  <p style={{ fontSize: 13, color: 'var(--text-sub)', margin: 0, whiteSpace: 'pre-wrap' }}>{editingEvent.description}</p>
+                </div>
+              )}
+
+              {editingEvent.sourceEDiaryId && (
+                <div style={{ padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                    Linked e-Diary: <strong className="mono-id" style={{ marginLeft: 4 }}>{editingEvent.sourceEDiaryId}</strong>
+                  </span>
+                </div>
+              )}
+
+              <div style={{ padding: '12px 20px', fontSize: 11, color: 'var(--text-faint)' }}>
+                Created by {editingEvent.createdBy} on {fmtDisplay(editingEvent.createdAt)}
+              </div>
+
+              {error && (
+                <div style={{ padding: '10px 20px', fontSize: 12, color: '#EF4444', fontWeight: 600 }}>{error}</div>
+              )}
+            </div>
+
+            <div className="modal-actions-bar">
+              {confirmDeleteOpen ? (
+                <>
+                  <span style={{ fontSize: 12, color: '#EF4444', fontWeight: 600, flex: 1 }}>Delete this event? This cannot be undone.</span>
+                  <button type="button" className="btn btn-secondary" onClick={() => setConfirmDeleteOpen(false)} disabled={deleting}>Cancel</button>
+                  <button type="button" className="btn btn-primary" onClick={handleDelete} disabled={deleting} style={{ background: '#EF4444', borderColor: '#EF4444' }}>
+                    {deleting ? 'Deleting…' : 'Confirm Delete'}
+                  </button>
+                </>
+              ) : (
+                <>
+                  {canDelete && (
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={() => setConfirmDeleteOpen(true)}
+                      style={{ marginRight: 'auto', background: 'rgba(239,68,68,0.12)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.25)' }}
+                    >
+                      Delete
+                    </button>
+                  )}
+                  <button type="button" className="btn btn-secondary" onClick={() => { onClose(); resetForm(); }}>Close</button>
+                  {canEdit && (
+                    <button type="button" className="btn btn-primary" onClick={() => setMode('form')} style={{ minWidth: 100 }}>Edit</button>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        ) : (
         <form onSubmit={handleSubmit} className="modal-form">
           <div className="modal-scroll-area" style={{ gap: 0, padding: 0 }}>
 
@@ -288,13 +443,27 @@ export default function EventCreateModal({
           </div>
 
           <div className="modal-actions-bar">
-            <button type="button" className="btn btn-secondary" onClick={() => { onClose(); resetForm(); }}>Cancel</button>
+            <button type="button" className="btn btn-secondary" onClick={handleCancelForm}>Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={submitting || !name.trim() || !type} style={{ minWidth: 140 }}>
               {submitting ? 'Saving…' : isEdit ? 'SAVE CHANGES' : 'CREATE EVENT'}
             </button>
           </div>
         </form>
+        )}
       </div>
+    </div>
+  );
+}
+
+function ViewField({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="form-group" style={{ margin: 0, marginBottom: 12 }}>
+      <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 4 }}>{label}</label>
+      {mono ? (
+        <span className="mono-id" style={{ color: 'var(--color-primary)', background: 'var(--color-primary-bg)', borderColor: 'var(--color-primary-border)', fontSize: 12 }}>{value}</span>
+      ) : (
+        <p style={{ fontSize: 13.5, color: 'var(--text-main)', fontWeight: 500, margin: 0 }}>{value}</p>
+      )}
     </div>
   );
 }

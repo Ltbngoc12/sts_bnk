@@ -13,6 +13,7 @@ import {
   getAssignableGroups,
 } from '@/lib/taskHelpers';
 import { getUsers } from '@/lib/users';
+import { getTaskPriorityTaxonomy } from '@/lib/taxonomy';
 
 export default function TaskDetailPage() {
   const params = useParams();
@@ -41,6 +42,7 @@ export default function TaskDetailPage() {
   const [eTitle, setETitle] = useState('');
   const [eDesc, setEDesc] = useState('');
   const [ePriority, setEPriority] = useState('Normal');
+  const [priorityOptions, setPriorityOptions] = useState<string[]>(['Normal', 'High']);
   const [eDue, setEDue] = useState('');
   const [eChecklist, setEChecklist] = useState<TaskChecklistItem[]>([]);
   const [eChkInput, setEChkInput] = useState('');
@@ -78,6 +80,10 @@ export default function TaskDetailPage() {
   }, [taskId]);
 
   useEffect(() => { fetchTask(); }, [fetchTask]);
+
+  useEffect(() => {
+    setPriorityOptions(getTaskPriorityTaxonomy());
+  }, []);
 
   const canControl = isControllerPlus(role);
   const isAssignee =
@@ -414,8 +420,9 @@ export default function TaskDetailPage() {
                   <div>
                     <label>Priority</label>
                     <select className="form-control select-dark" value={ePriority} onChange={e => setEPriority(e.target.value)}>
-                      <option value="Normal">Normal</option>
-                      <option value="High">High</option>
+                      {priorityOptions.map(p => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
                     </select>
                   </div>
                   <div>
@@ -763,14 +770,6 @@ export default function TaskDetailPage() {
                 </strong></div>
                 <div className="td-meta-item"><span>Lead time</span><strong>{task.recurrence.leadTimeDays} days</strong></div>
               </div>
-              {task.seriesId && !task.recurrenceCancelled && (
-                <div className="td-next" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <Link href={`/series/${task.seriesId}`} className="btn btn-secondary btn-sm">View series &amp; occurrences</Link>
-                  {canControl && (
-                    <Link href={`/series/${task.seriesId}`} className="btn btn-primary btn-sm">Edit template</Link>
-                  )}
-                </div>
-              )}
             </div>
           )}
 

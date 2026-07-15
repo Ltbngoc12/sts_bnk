@@ -21,6 +21,8 @@ interface BoundaryMapDrawerProps {
    */
   maxRadiusMeters?: number;
   disabled?: boolean;
+  /** Read-only preview — renders the map + drawn polygon (if any) with no draw toolbar, no editing. Used in the Event detail View mode. */
+  readOnly?: boolean;
 }
 
 // FRD §8.2 — mark an Event's boundary on the 2D island map, constrained to the
@@ -33,6 +35,7 @@ export default function BoundaryMapDrawer({
   onBoundaryChange,
   maxRadiusMeters = 300,
   disabled = false,
+  readOnly = false,
 }: BoundaryMapDrawerProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
@@ -72,17 +75,6 @@ export default function BoundaryMapDrawer({
         maxZoom: 19,
       }).addTo(map);
 
-      // Allowed-area indicator (§8.2d) — dashed circle standing in for "the
-      // selected Location Hierarchy area" (see prop doc above for why a radius).
-      allowedCircleRef.current = L.circle([center.lat, center.lng], {
-        radius: maxRadiusMeters,
-        color: '#008c95',
-        weight: 1.5,
-        dashArray: '6,6',
-        fillOpacity: 0.05,
-      }).addTo(map);
-      map.fitBounds(allowedCircleRef.current.getBounds(), { padding: [20, 20] });
-
       const drawnItems = new (L as any).FeatureGroup();
       drawnItemsRef.current = drawnItems;
       map.addLayer(drawnItems);
@@ -94,6 +86,27 @@ export default function BoundaryMapDrawer({
         drawnItems.addLayer(poly);
         setHasShape(true);
       }
+
+      if (readOnly) {
+        // View mode — just frame the drawn shape (or the center point if there's none), no draw toolbar.
+        if (initialBoundary && initialBoundary.length >= 3) {
+          map.fitBounds(L.polygon(initialBoundary.map(p => [p.lat, p.lng] as [number, number])).getBounds(), { padding: [20, 20] });
+        } else {
+          map.setView([center.lat, center.lng], 17);
+        }
+        return;
+      }
+
+      // Allowed-area indicator (§8.2d) — dashed circle standing in for "the
+      // selected Location Hierarchy area" (see prop doc above for why a radius).
+      allowedCircleRef.current = L.circle([center.lat, center.lng], {
+        radius: maxRadiusMeters,
+        color: '#008c95',
+        weight: 1.5,
+        dashArray: '6,6',
+        fillOpacity: 0.05,
+      }).addTo(map);
+      map.fitBounds(allowedCircleRef.current.getBounds(), { padding: [20, 20] });
 
       const drawControl = new (L as any).Control.Draw({
         draw: {
@@ -172,7 +185,7 @@ export default function BoundaryMapDrawer({
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [disabled, center.lat, center.lng]);
+  }, [disabled, readOnly, center.lat, center.lng]);
 
   const handleClear = () => {
     if (drawnItemsRef.current) {
@@ -195,18 +208,20 @@ export default function BoundaryMapDrawer({
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
         <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-          Event Area Boundary <span style={{ fontWeight: 400, textTransform: 'none', color: 'var(--text-faint)' }}>(optional — §8.2)</span>
+          Event Area Boundary {!readOnly && <span style={{ fontWeight: 400, textTransform: 'none', color: 'var(--text-faint)' }}>(optional — §8.2)</span>}
         </label>
-        {hasShape && (
+        {!readOnly && hasShape && (
           <button type="button" onClick={handleClear} className="btn btn-secondary btn-xs" style={{ fontSize: 11, padding: '2px 8px' }}>
             Clear boundary
           </button>
         )}
       </div>
-      <div ref={mapRef} style={{ height: 260, borderRadius: 8, border: '1px solid var(--border-color)', overflow: 'hidden' }} />
-      <p style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 6, lineHeight: 1.5 }}>
-        Use the polygon tool (top-right of the map) to draw the event area within the dashed circle. Leave blank if the event doesn&apos;t cover a specific area.
-      </p>
+      <div ref={mapRef} style={{ height: readOnly ? 200 : 260, borderRadius: 8, border: '1px solid var(--border-color)', overflow: 'hidden' }} />
+      {!readOnly && (
+        <p style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 6, lineHeight: 1.5 }}>
+          Use the polygon tool (top-right of the map) to draw the event area within the dashed circle. Leave blank if the event doesn&apos;t cover a specific area.
+        </p>
+      )}
       {error && (
         <p style={{ fontSize: 11.5, color: '#EF4444', marginTop: 4, fontWeight: 600 }}>{error}</p>
       )}

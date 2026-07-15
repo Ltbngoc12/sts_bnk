@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Case, Task, Fault, RecurrenceConfig } from '@/lib/db';
 import { useRole } from '@/context/RoleContext';
-import { getIncidentTaxonomy } from '@/lib/taxonomy';
+import { getIncidentTaxonomy, getTaskPriorityTaxonomy } from '@/lib/taxonomy';
 import { INCIDENT_CATEGORIES, DEFAULT_INCIDENT_CATEGORY } from '@/lib/incidentCategory';
 import FaultCreateModal from '@/components/FaultCreateModal';
 import { RecurrenceScheduleField, recurrenceSummary } from '@/components/RecurrenceScheduleField';
@@ -225,9 +225,11 @@ export default function CaseDetailsPage() {
   const [cmmsStatusMap, setCmmsStatusMap] = useState<Record<string, string>>({});
 
   const [taxonomy, setTaxonomy] = useState<Record<string, string[]>>({});
+  const [taskPriorityOptions, setTaskPriorityOptions] = useState<string[]>(['Normal', 'High']);
 
   useEffect(() => {
     setTaxonomy(getIncidentTaxonomy());
+    setTaskPriorityOptions(getTaskPriorityTaxonomy());
   }, []);
 
   useEffect(() => {
@@ -886,8 +888,9 @@ export default function CaseDetailsPage() {
                   <div className="form-group">
                     <label>Priority</label>
                     <select value={taskPriority} onChange={e => setTaskPriority(e.target.value)} className="form-control select-dark">
-                      <option value="Normal">Normal</option>
-                      <option value="High">High</option>
+                      {taskPriorityOptions.map(p => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
                     </select>
                   </div>
                   <div className="form-group">

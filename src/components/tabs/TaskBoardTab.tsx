@@ -16,6 +16,8 @@ import {
   internalGroupMembers,
 } from '@/lib/taskHelpers';
 import { getUsers } from '@/lib/users';
+import { getTaskPriorityTaxonomy } from '@/lib/taxonomy';
+import { ChecklistTemplate, getActiveChecklistTemplates } from '@/lib/checklistTemplates';
 
 interface ChecklistDraft { id: string; text: string; }
 
@@ -53,12 +55,15 @@ export function TaskBoardTab() {
   const [assignType, setAssignType] = useState<'user' | 'group'>('user');
   const [taskAssignee, setTaskAssignee] = useState('');
   const [taskPriority, setTaskPriority] = useState('Normal');
+  const [priorityOptions, setPriorityOptions] = useState<string[]>(['Normal', 'High']);
   const [taskDueDate, setTaskDueDate] = useState('');
   const [recurrence, setRecurrence] = useState<RecurrenceConfig | null>(null);
   const [checklist, setChecklist] = useState<ChecklistDraft[]>([]);
   const [checklistInput, setChecklistInput] = useState('');
   const [attachments, setAttachments] = useState<string[]>([]);
   const [createError, setCreateError] = useState('');
+  const [templates, setTemplates] = useState<ChecklistTemplate[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
 
   // Searchable case dropdown states
   const [caseSearchText, setCaseSearchText] = useState('');
@@ -87,6 +92,8 @@ export function TaskBoardTab() {
 
   useEffect(() => { fetchTasksAndCases(); }, []);
   useEffect(() => { if (isRanger) setTab('mine'); }, [isRanger]);
+  useEffect(() => { setPriorityOptions(getTaskPriorityTaxonomy()); }, []);
+  useEffect(() => { setTemplates(getActiveChecklistTemplates()); }, []);
 
   const isMine = (t: Task) =>
     t.assignee === username ||
@@ -157,13 +164,26 @@ export function TaskBoardTab() {
     setTaskTitle(''); setTaskDesc(''); setTaskDueDate('');
     setRecurrence(null); setChecklist([]); setChecklistInput('');
     setAttachments([]); setTaskAssignee(''); setAssignType('user');
-    setTaskPriority('Normal'); setCreateError('');
-    
+    setTaskPriority('Normal'); setCreateError(''); setSelectedTemplateId('');
+
     // Default to create new case for List screen
     setTaskCaseId('new-case');
     setSelectedCase({ id: 'NEW CASE', title: 'Auto-create new case' });
     setCaseSearchText('');
     setShowCaseDropdown(false);
+  };
+
+  // FRD 13.2 — applying a template prefills Description/Priority/Checklist only.
+  // Title, Due Date and Assignee stay manual, and every prefilled field remains
+  // editable afterwards (this just sets initial state, nothing is locked).
+  const applyTemplate = (templateId: string) => {
+    setSelectedTemplateId(templateId);
+    if (!templateId) return;
+    const tpl = templates.find(t => t.id === templateId);
+    if (!tpl) return;
+    setTaskDesc(tpl.description || '');
+    setTaskPriority(tpl.priority || 'Normal');
+    setChecklist(tpl.checklist.map((c, i) => ({ id: `chk-${Date.now()}-${i}`, text: c.text })));
   };
 
   const notifyNewAssignee = (name: string, type: 'user' | 'group', title: string) => {
@@ -377,8 +397,9 @@ export function TaskBoardTab() {
               <label style={labelStyle}>Priority:</label>
               <select value={filterPriority} onChange={(e) => { setFilterPriority(e.target.value); setCurrentPage(1); }} className="form-control select-dark" style={{ width: '100%' }}>
                 <option value="All">All Priorities</option>
-                <option value="High">High</option>
-                <option value="Normal">Normal</option>
+                {priorityOptions.map(p => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
               </select>
             </div>
 
@@ -448,11 +469,23 @@ export function TaskBoardTab() {
                     </td>
                     <td className="case-title-cell" style={{ fontWeight: 500 }}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', width: '100%' }}>
-                        {t.priority === 'High' ? (
+                        {t.priority === 'Critical' ? (
+                          /* Triple chevron up — Critical */
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Critical" style={{ flexShrink: 0 }}>
+                            <path d="M3 6L8 1L13 6" stroke="#C53030" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M3 10L8 5L13 10" stroke="#C53030" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M3 14L8 9L13 14" stroke="#C53030" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        ) : t.priority === 'High' ? (
                           /* Double chevron up — High */
                           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="High" style={{ flexShrink: 0 }}>
                             <path d="M3 10L8 5L13 10" stroke="#E53E3E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                             <path d="M3 14L8 9L13 14" stroke="#E53E3E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        ) : t.priority === 'Low' ? (
+                          /* Single chevron down — Low */
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Low" style={{ flexShrink: 0 }}>
+                            <path d="M3 6L8 11L13 6" stroke="#718096" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                           </svg>
                         ) : (
                           /* Equals sign — Normal */
@@ -660,6 +693,23 @@ export function TaskBoardTab() {
                   )}
                 </div>
 
+                {templates.length > 0 && (
+                  <div className="form-group">
+                    <label>Use Template (optional)</label>
+                    <select
+                      value={selectedTemplateId}
+                      onChange={e => applyTemplate(e.target.value)}
+                      className="form-control select-dark"
+                    >
+                      <option value="">-- No template --</option>
+                      {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                    <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                      Prefills Description, Priority and Checklist below — still editable before you dispatch.
+                    </p>
+                  </div>
+                )}
+
                 <div className="form-group">
                   <label>Task Title *</label>
                   <input type="text" placeholder="e.g. Escort contractor to substation" value={taskTitle} onChange={e => setTaskTitle(e.target.value)} required className="form-control" />
@@ -718,8 +768,9 @@ export function TaskBoardTab() {
                   <div className="form-group">
                     <label>Priority</label>
                     <select value={taskPriority} onChange={e => setTaskPriority(e.target.value)} className="form-control select-dark">
-                      <option value="Normal">Normal</option>
-                      <option value="High">High</option>
+                      {priorityOptions.map(p => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
                     </select>
                   </div>
                   <div className="form-group">

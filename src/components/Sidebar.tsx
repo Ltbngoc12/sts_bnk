@@ -49,6 +49,7 @@ const ADMIN_ITEMS = [
   { name: 'User Management', path: '/admin/users' },
   { name: 'Role Management', path: '/admin/roles' },
   { name: 'Taxonomy', path: '/admin/taxonomy' },
+  { name: 'Task Checklist Templates', path: '/admin/task-templates' },
   { name: 'Location Hierarchy', path: '/admin/location-hierarchy' },
   { name: 'Routing Matrix', path: '/admin/routing-matrix' },
   { name: 'Broadcast Configuration', path: '/admin/broadcast-config' },

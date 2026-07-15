@@ -67,8 +67,10 @@ enum TaskStatus {
 }
 
 enum Priority {
+  LOW
   NORMAL
   HIGH
+  CRITICAL
 }
 
 enum GuestType {

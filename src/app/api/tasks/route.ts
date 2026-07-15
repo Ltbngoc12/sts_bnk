@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getDb, saveDb, generateTaskId, generateCaseId, generateSeriesId, Task, TaskChecklistItem, TaskAudit, RecurrenceSeries } from '@/lib/db';
+import { getDb, saveDb, generateTaskId, generateCaseId, generateSeriesId, Task, TaskChecklistItem, TaskAudit, RecurrenceSeries, normalizeTaskPriority } from '@/lib/db';
 import { validateRecurrence } from '@/lib/recurrence';
 import { advanceSeries } from '@/lib/seriesEngine';
 
@@ -85,7 +85,7 @@ export async function POST(request: Request) {
         description: body.description || '',
         assignee: hasAssignee ? body.assignee : 'Unassigned',
         assigneeType: body.assigneeType === 'group' ? 'group' : 'user',
-        priority: body.priority === 'High' ? 'High' : 'Normal',
+        priority: normalizeTaskPriority(body.priority),
         dueDate: body.dueDate || '',
         // If an assignee is provided at creation, the task starts in Assigned (FRD 7.2)
         status: hasAssignee ? 'Assigned' : 'Created',
@@ -124,7 +124,7 @@ export async function POST(request: Request) {
           taskTemplate: {
             title: newTask.title,
             description: newTask.description,
-            priority: newTask.priority === 'High' ? 'High' : 'Normal',
+            priority: normalizeTaskPriority(newTask.priority),
             assignee: newTask.assignee,
             assigneeType: newTask.assigneeType,
             checklist,

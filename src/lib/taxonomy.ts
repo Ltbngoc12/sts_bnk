@@ -79,6 +79,21 @@ export function getEventTaxonomy(): string[] {
     .map(item => item.name);
 }
 
+export function getTaskPriorityTaxonomy(): string[] {
+  if (typeof window === 'undefined') {
+    return DEFAULT_REFERENCE_DATA
+      .filter(item => item.category === 'Priority' && item.status === 'Active')
+      .map(item => item.name);
+  }
+
+  const stored = localStorage.getItem('admin_reference_data');
+  const items: TaxonomyItem[] = stored ? JSON.parse(stored) : [];
+
+  return (items.length > 0 ? items : DEFAULT_REFERENCE_DATA)
+    .filter(item => item.category === 'Priority' && item.status === 'Active')
+    .map(item => item.name);
+}
+
 export function getIncidentTaxonomy(): Record<string, string[]> {
   if (typeof window === 'undefined') {
     // Return default mapping if server-side rendered

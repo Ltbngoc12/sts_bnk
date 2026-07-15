@@ -3,7 +3,7 @@
 // db.ts so the pure date math (recurrence.ts) and the persistence layer stay
 // decoupled.
 
-import { DbSchema, RecurrenceSeries, Task, TaskAudit, TaskChecklistItem, generateTaskId } from './db';
+import { DbSchema, RecurrenceSeries, Task, TaskAudit, TaskChecklistItem, generateTaskId, normalizeTaskPriority } from './db';
 import { occurrenceDatesToGenerate, addDaysISO, todayStr, isSeriesExhausted } from './recurrence';
 
 const rid = () => Math.random().toString(36).substring(2, 9);
@@ -51,7 +51,7 @@ export function generateOccurrencesForSeries(
       description: tmpl.description || '',
       assignee: hasAssignee ? tmpl.assignee : 'Unassigned',
       assigneeType: tmpl.assigneeType === 'group' ? 'group' : 'user',
-      priority: tmpl.priority === 'High' ? 'High' : 'Normal',
+      priority: normalizeTaskPriority(tmpl.priority),
       dueDate: `${date}T${dueTime}`,
       status: hasAssignee ? 'Assigned' : 'Created',
       completed: false,

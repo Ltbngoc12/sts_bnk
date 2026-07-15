@@ -95,26 +95,6 @@ export default function DistributionGroupsPage() {
     resetGroupForm();
   };
 
-  const handleToggleStatus = (group: DistributionGroup) => {
-    const newStatus = group.status === 'Active' ? 'Deactivated' : 'Active';
-    const updated = groups.map(g => {
-      if (g.id === group.id) {
-        return { ...g, status: newStatus as 'Active' | 'Deactivated' };
-      }
-      return g;
-    });
-    logAudit(
-      newStatus === 'Active' ? 'Reactivate Group' : 'Deactivate Group',
-      group,
-      { ...group, status: newStatus },
-      `${newStatus === 'Active' ? 'Reactivated' : 'Deactivated'} distribution group: ${group.name}`
-    );
-    saveGroupsState(updated);
-    if (selectedGroup?.id === group.id) {
-      setSelectedGroup({ ...selectedGroup, status: newStatus });
-    }
-  };
-
   const handleAddMember = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedGroup) return;
@@ -248,13 +228,6 @@ export default function DistributionGroupsPage() {
                           <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                             <button onClick={() => openEditGroup(group)} className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '11.5px', borderRadius: '4px' }}>
                               Edit
-                            </button>
-                            <button
-                              onClick={() => handleToggleStatus(group)}
-                              className={`btn ${group.status === 'Active' ? 'btn-danger' : 'btn-success'}`}
-                              style={{ padding: '4px 8px', fontSize: '11.5px', borderRadius: '4px' }}
-                            >
-                              {group.status === 'Active' ? 'Deactivate' : 'Reactivate'}
                             </button>
                           </div>
                         </td>

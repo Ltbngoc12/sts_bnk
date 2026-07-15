@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useRole } from '@/context/RoleContext';
 
-import { getIncidentTaxonomy } from '@/lib/taxonomy';
+import { getIncidentTaxonomy, getTaskPriorityTaxonomy } from '@/lib/taxonomy';
 
 export default function NewCasePage() {
   const router = useRouter();
@@ -50,9 +50,11 @@ export default function NewCasePage() {
   const [ediaryContent, setEdiaryContent] = useState('');
 
   const [taxonomy, setTaxonomy] = useState<Record<string, string[]>>({});
+  const [taskPriorityOptions, setTaskPriorityOptions] = useState<string[]>(['Normal', 'High']);
 
   useEffect(() => {
     setTaxonomy(getIncidentTaxonomy());
+    setTaskPriorityOptions(getTaskPriorityTaxonomy());
   }, []);
 
   useEffect(() => {
@@ -448,8 +450,9 @@ export default function NewCasePage() {
                     onChange={(e) => setTaskPriority(e.target.value)}
                     className="form-control select-dark"
                   >
-                    <option value="High">High</option>
-                    <option value="Normal">Normal</option>
+                    {taskPriorityOptions.map(p => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
                   </select>
                 </div>
               </div>

@@ -273,6 +273,20 @@ export interface RecurrenceConfig {
   leadTimeDays: number;        // generate-ahead window (default 14)
 }
 
+// Task Priority Levels — kept in sync with the 'Priority' category in
+// src/lib/taxonomy.ts (Admin > Taxonomy > Task Priority Levels). Server-side
+// code can't read the browser's localStorage taxonomy overrides, so this is
+// the canonical fallback list used to validate/normalize incoming priority
+// values on task create/edit/recurrence endpoints.
+export const TASK_PRIORITIES = ['Low', 'Normal', 'High', 'Critical'] as const;
+export type TaskPriority = typeof TASK_PRIORITIES[number];
+
+export function normalizeTaskPriority(value: unknown, fallback: TaskPriority = 'Normal'): TaskPriority {
+  return (TASK_PRIORITIES as readonly string[]).includes(value as string)
+    ? (value as TaskPriority)
+    : fallback;
+}
+
 // The recurrence template as a first-class entity (Model A source of truth).
 // Occurrences link back via Task.seriesId; the config here is what the
 // generation engine reads. Editing a series reconciles its future occurrences.
@@ -290,7 +304,7 @@ export interface RecurrenceSeries {
   taskTemplate: {
     title: string;
     description?: string;
-    priority: 'High' | 'Normal';
+    priority: TaskPriority;
     assignee: string;
     assigneeType?: 'user' | 'group';
     checklist?: TaskChecklistItem[];
@@ -305,7 +319,7 @@ export interface Task {
   description: string;
   assignee: string; // User name or Group name
   assigneeType?: 'user' | 'group'; // FRD 7.2 — individual or pre-configured group
-  priority: string; // "Normal" | "High"
+  priority: string; // "Low" | "Normal" | "High" | "Critical" — see TASK_PRIORITIES
   dueDate: string;
   status: string; // TaskStatus — Created, Assigned, Acknowledged, In Progress, Pending Further Action, Pending Closure, Closed
   closeReason?: string; // Mandatory when closed without Assignee completion (FRD 7.3)

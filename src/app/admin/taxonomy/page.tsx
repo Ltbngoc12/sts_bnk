@@ -19,6 +19,7 @@ export default function TaxonomyPage() {
   const [formDesc, setFormDesc] = useState('');
   const [subTypeInput, setSubTypeInput] = useState('');
   const [formSubTypes, setFormSubTypes] = useState<string[]>([]);
+  const [formStatus, setFormStatus] = useState<'Active' | 'Deactivated'>('Active');
   
   // Audit drawer state
   const [isAuditDrawerOpen, setIsAuditDrawerOpen] = useState(false);
@@ -83,7 +84,8 @@ export default function TaxonomyPage() {
             ...item,
             name: formName,
             description: formDesc,
-            subTypes: activeTab === 'Incident' || activeTab === 'Fault' ? formSubTypes : undefined
+            subTypes: activeTab === 'Incident' || activeTab === 'Fault' ? formSubTypes : undefined,
+            status: formStatus
           };
         }
         return item;
@@ -108,23 +110,6 @@ export default function TaxonomyPage() {
     resetForm();
   };
 
-  const handleToggleStatus = (item: TaxonomyItem) => {
-    const newStatus = item.status === 'Active' ? 'Deactivated' : 'Active';
-    const updated = items.map(i => {
-      if (i.id === item.id) {
-        return { ...i, status: newStatus as 'Active' | 'Deactivated' };
-      }
-      return i;
-    });
-    logAudit(
-      newStatus === 'Active' ? 'Reactivate Taxonomy' : 'Deactivate Taxonomy',
-      item,
-      { ...item, status: newStatus },
-      `${newStatus === 'Active' ? 'Reactivated' : 'Deactivated'} ${item.category} item: ${item.name}`
-    );
-    saveReferenceState(updated);
-  };
-
   const openCreate = () => {
     setSelectedItem(null);
     resetForm();
@@ -137,6 +122,7 @@ export default function TaxonomyPage() {
     setFormDesc(item.description || '');
     setFormSubTypes(item.subTypes || []);
     setSubTypeInput('');
+    setFormStatus(item.status);
     setIsModalOpen(true);
   };
 
@@ -145,6 +131,7 @@ export default function TaxonomyPage() {
     setFormDesc('');
     setSubTypeInput('');
     setFormSubTypes([]);
+    setFormStatus('Active');
   };
 
   const addSubType = () => {
@@ -254,13 +241,6 @@ export default function TaxonomyPage() {
                         <button onClick={() => openEdit(item)} className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '11.5px', borderRadius: '4px' }}>
                           Edit
                         </button>
-                        <button
-                          onClick={() => handleToggleStatus(item)}
-                          className={`btn ${item.status === 'Active' ? 'btn-danger' : 'btn-success'}`}
-                          style={{ padding: '4px 8px', fontSize: '11.5px', borderRadius: '4px' }}
-                        >
-                          {item.status === 'Active' ? 'Deactivate' : 'Reactivate'}
-                        </button>
                       </div>
                     </td>
                   </tr>
@@ -324,6 +304,20 @@ export default function TaxonomyPage() {
                     onChange={e => setFormDesc(e.target.value)}
                     style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '13px', resize: 'vertical' }}
                   />
+                </div>
+              )}
+
+              {selectedItem && (
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '5px', textTransform: 'uppercase' }}>Status</label>
+                  <select
+                    value={formStatus}
+                    onChange={e => setFormStatus(e.target.value as 'Active' | 'Deactivated')}
+                    style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '13px' }}
+                  >
+                    <option value="Active">Active</option>
+                    <option value="Deactivated">Deactivated</option>
+                  </select>
                 </div>
               )}
 

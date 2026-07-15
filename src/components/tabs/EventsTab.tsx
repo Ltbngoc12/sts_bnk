@@ -44,7 +44,6 @@ export function EventsTab() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState<EventRecord | null>(null);
-  const [deletingEvent, setDeletingEvent] = useState<EventRecord | null>(null);
 
   const [timelineDate, setTimelineDate] = useState(() => new Date());
 
@@ -95,20 +94,9 @@ export function EventsTab() {
   };
   const filtersActive = !!(searchTerm || filterType || dateStart || dateEnd);
 
-  const handleDelete = async () => {
-    if (!deletingEvent) return;
-    try {
-      const res = await fetch(`/api/events/${deletingEvent.id}`, { method: 'DELETE' });
-      if (res.ok) {
-        setDeletingEvent(null);
-        await fetchEvents();
-      } else {
-        const err = await res.json();
-        alert(`Failed to delete event: ${err.error}`);
-      }
-    } catch (err) {
-      console.error('Failed to delete event:', err);
-    }
+  const openEvent = (ev: EventRecord) => {
+    setEditingEvent(ev);
+    setShowCreateModal(true);
   };
 
   return (
@@ -118,7 +106,7 @@ export function EventsTab() {
           <h1 style={{ fontSize: '15px', textTransform: 'uppercase' }}>Event Management</h1>
           <p>Master list of all island events, schedules, and spatial boundaries</p>
         </div>
-        
+
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', paddingRight: '20px' }}>
           {canCreateEdit && (
             <button type="button" className="btn btn-secondary" onClick={() => setShowUploadModal(true)} style={{ fontSize: '12.5px', height: '36px', padding: '0 14px', fontWeight: 600 }}>
@@ -141,16 +129,16 @@ export function EventsTab() {
         </div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '16px' }}>
-      
+
       {/* ── Top Action Bar (Glassmorphic) ── */}
-      <div className="glass" style={{ 
-        padding: '20px', 
-        borderRadius: 'var(--radius-lg)', 
-        background: 'var(--bg-card)', 
-        display: 'flex', 
+      <div className="glass" style={{
+        padding: '20px',
+        borderRadius: 'var(--radius-lg)',
+        background: 'var(--bg-card)',
+        display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'flex-end',
-        flexWrap: 'wrap', 
+        flexWrap: 'wrap',
         gap: '16px',
         boxShadow: '0 4px 12px rgba(0,0,0,0.03)'
       }}>
@@ -162,7 +150,7 @@ export function EventsTab() {
               {eventTypes.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
-          
+
           {view === 'timeline' && (
             <div className="form-group" style={{ margin: 0, width: '200px' }}>
               <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>Timeline Date</label>
@@ -222,15 +210,15 @@ export function EventsTab() {
 
       {/* ── Split Layout Content ── */}
       <div style={{ display: 'flex', gap: '16px', flex: 1, minHeight: '600px', alignItems: 'stretch' }}>
-        
+
         {/* Left Side: Map */}
         {view === 'timeline' && (
-          <div style={{ 
-            flex: '0 0 35%', 
-            background: 'var(--bg-card)', 
-            borderRadius: 'var(--radius-lg)', 
-            overflow: 'hidden', 
-            border: '1px solid var(--border-color)', 
+          <div style={{
+            flex: '0 0 35%',
+            background: 'var(--bg-card)',
+            borderRadius: 'var(--radius-lg)',
+            overflow: 'hidden',
+            border: '1px solid var(--border-color)',
             boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
             display: 'flex',
             flexDirection: 'column'
@@ -248,15 +236,10 @@ export function EventsTab() {
         {/* Right Side: Content */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           {view === 'timeline' && (
-             <EventTimelineView 
-                events={filtered} 
-                currentDate={timelineDate} 
-                onEventClick={ev => {
-                  if(canCreateEdit) {
-                    setEditingEvent(ev);
-                    setShowCreateModal(true);
-                  }
-                }}
+             <EventTimelineView
+                events={filtered}
+                currentDate={timelineDate}
+                onEventClick={openEvent}
              />
           )}
 
@@ -279,12 +262,11 @@ export function EventsTab() {
                           <th>Location</th>
                           <th>Type</th>
                           <th>Linked e-Diary</th>
-                          {canCreateEdit && <th>Actions</th>}
                         </tr>
                       </thead>
                       <tbody>
                         {paginated.map(ev => (
-                          <tr key={ev.id} style={{ cursor: canCreateEdit ? 'pointer' : 'default', borderBottom: '1px solid var(--border-color)', transition: 'background 0.2s' }} onClick={() => canCreateEdit && (setEditingEvent(ev), setShowCreateModal(true))} onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                          <tr key={ev.id} style={{ cursor: 'pointer', borderBottom: '1px solid var(--border-color)', transition: 'background 0.2s' }} onClick={() => openEvent(ev)} onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                             <td style={{ padding: '14px 16px' }}><span className="mono-id" style={{ color: 'var(--color-primary)', background: 'var(--color-primary-bg)', borderColor: 'var(--color-primary-border)', fontSize: '12px' }}>{ev.id}</span></td>
                             <td style={{ padding: '14px 16px', fontWeight: 600, fontSize: '13px' }}>{ev.name}</td>
                             <td style={{ padding: '14px 16px', fontSize: '12px', whiteSpace: 'nowrap' }}>{fmtDateTime(ev.startDateTime)}</td>
@@ -294,14 +276,6 @@ export function EventsTab() {
                                <span className="badge" style={{ fontSize: '11px', background: ev.type === 'Emergency' ? 'var(--color-critical-bg)' : 'var(--color-info-bg)', color: ev.type === 'Emergency' ? 'var(--color-critical)' : 'var(--color-info)' }}>{ev.type}</span>
                             </td>
                             <td style={{ padding: '14px 16px', fontSize: '11px', color: 'var(--text-muted)' }}>{ev.sourceEDiaryId || '—'}</td>
-                            {canCreateEdit && (
-                              <td onClick={e => e.stopPropagation()} style={{ padding: '14px 16px', whiteSpace: 'nowrap' }}>
-                                <button className="btn btn-secondary btn-xs" style={{ fontSize: '11px', padding: '4px 10px', marginRight: '6px' }} onClick={() => { setEditingEvent(ev); setShowCreateModal(true); }}>Edit</button>
-                                {canDelete && (
-                                  <button className="btn btn-xs" style={{ fontSize: '11px', padding: '4px 10px', background: 'rgba(239,68,68,0.12)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.25)' }} onClick={() => setDeletingEvent(ev)}>Delete</button>
-                                )}
-                              </td>
-                            )}
                           </tr>
                         ))}
                       </tbody>
@@ -330,6 +304,8 @@ export function EventsTab() {
         onSuccess={fetchEvents}
         username={username}
         editingEvent={editingEvent}
+        canEdit={canCreateEdit}
+        canDelete={canDelete}
       />
 
       <EventScheduleUploadModal
@@ -338,26 +314,6 @@ export function EventsTab() {
         onSuccess={fetchEvents}
         username={username}
       />
-
-      {/* Delete confirm */}
-      {deletingEvent && (
-        <div className="modal-backdrop">
-          <div className="create-case-modal glass" style={{ maxWidth: 420 }}>
-            <div className="modal-header"><h2>DELETE EVENT</h2><button className="close-btn" onClick={() => setDeletingEvent(null)}>✕</button></div>
-            <div className="modal-form">
-              <div className="modal-scroll-area">
-                <p style={{ fontSize: '13px', color: 'var(--text-sub)' }}>
-                  Delete <strong>{deletingEvent.id} — {deletingEvent.name}</strong>? This cannot be undone.
-                </p>
-              </div>
-              <div className="modal-actions-bar">
-                <button className="btn btn-secondary" onClick={() => setDeletingEvent(null)}>Cancel</button>
-                <button className="btn btn-primary" onClick={handleDelete} style={{ background: '#EF4444', borderColor: '#EF4444' }}>Delete</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
     </>
   );

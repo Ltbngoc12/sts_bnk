@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getDb, saveDb, Task, TaskAudit, TaskChecklistItem, TaskComment } from '@/lib/db';
+import { getDb, saveDb, Task, TaskAudit, TaskChecklistItem, TaskComment, TASK_PRIORITIES } from '@/lib/db';
 import { tryAutoCloseCase } from '@/lib/autoclose';
 
 const CONTROLLER_PLUS = [
@@ -285,7 +285,7 @@ export async function PUT(
         if (task.status === 'Closed') return invalid('Cannot edit a closed task.');
         if (typeof body.title === 'string' && body.title.trim()) task.title = body.title.trim();
         if (typeof body.description === 'string') task.description = body.description;
-        if (body.priority === 'High' || body.priority === 'Normal') task.priority = body.priority;
+        if ((TASK_PRIORITIES as readonly string[]).includes(body.priority)) task.priority = body.priority;
         if (typeof body.dueDate === 'string') task.dueDate = body.dueDate;
         // FRD 7.1.2: checklist may be (re)defined by Controller during editing
         if (Array.isArray(body.checklist)) {

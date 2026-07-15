@@ -109,65 +109,6 @@ export function validateRecurrence(cfg: RecurrenceConfig): string | null {
   return null;
 }
 
-// ─── Reconcile plan (edit template) ─────────────────────────────────────────
-// Pure planning function. Given the series' current occurrences and the NEW
-// config, it decides — around an Effective Date of today+1 — which occurrences
-// to soft-delete, which to keep, and which dates to newly generate.
-//
-// Rules (all approved with BA):
-//   • occurrence date  < effectiveDate           → frozen, untouched (kept).
-//   • occurrence date >= effectiveDate:
-//        - status in {Assigned, Returned}        → soft-delete & regenerate.
-//        - any other status (has action)         → protected, kept.
-//   • new dates in [effectiveDate, today+lead] that don't already have a kept
-//     occurrence are generated fresh from the new config.
-
-export interface ReconcileOccurrenceInput {
-  id: string;
-  occurrenceDate?: string;
-  status: string;
-  deleted?: boolean;
-}
-
-export interface ReconcilePlan {
-  effectiveDate: string;
-  toSoftDelete: string[];   // occurrence task ids to soft-delete
-  keptDates: string[];      // dates that already have a surviving occurrence
-  datesToGenerate: string[]; // new dates to create tasks for
-}
-
-export function planReconcile(
-  newCfg: RecurrenceConfig,
-  occurrences: ReconcileOccurrenceInput[],
-  todayISO: string
-): ReconcilePlan {
-  const effectiveDate = addDaysISO(todayISO, 1);
-  const active = occurrences.filter(o => !o.deleted);
-
-  const toSoftDelete: string[] = [];
-  const keptDates = new Set<string>();
-
-  for (const o of active) {
-    const d = o.occurrenceDate;
-    if (!d || d < effectiveDate) {
-      if (d) keptDates.add(d); // frozen — before effective date
-      continue;
-    }
-    // d >= effectiveDate
-    if (o.status === 'Assigned' || o.status === 'Returned') {
-      toSoftDelete.push(o.id);
-    } else {
-      keptDates.add(d); // protected — already has action
-    }
-  }
-
-  const toISO = addDaysISO(todayISO, newCfg.leadTimeDays || 0);
-  const datesToGenerate = occurrenceDatesToGenerate(newCfg, effectiveDate, toISO)
-    .filter(d => !keptDates.has(d));
-
-  return { effectiveDate, toSoftDelete, keptDates: [...keptDates], datesToGenerate };
-}
-
 // Whether a config's end-condition has been fully consumed as of `todayISO`
 // (so the series can be marked Ended after an edit).
 export function isSeriesExhausted(cfg: RecurrenceConfig, todayISO: string): boolean {
