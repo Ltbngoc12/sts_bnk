@@ -44,6 +44,41 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+// ─── OpEventField — standardized label:value field for Operation Event cards ──
+// Renders "—" for empty values; uses the native `title` attribute so hovering
+// a truncated value shows the full text (see CASE_DETAIL_OPERATION_EVENTS_CARD_PLAN.md).
+function OpEventField({ label, value, full }: { label: string; value: React.ReactNode; full?: boolean }) {
+  const isString = typeof value === 'string';
+  return (
+    <div className={`oe-field${full ? ' oe-field--full' : ''}`}>
+      <span className="oe-field-label">{label}:</span>
+      <span className="oe-field-value" title={isString && value ? value : undefined}>
+        {value || <span style={{ color: 'var(--text-faint)' }}>—</span>}
+      </span>
+    </div>
+  );
+}
+
+// ─── EmptyStateIcon — inbox glyph shown above the message when an Operation Event card has no linked records ──
+function EmptyStateIcon() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--text-faint)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.6 }}>
+      <path d="M22 12h-6l-2 3h-4l-2-3H2" />
+      <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11Z" />
+    </svg>
+  );
+}
+
+// ─── formatFullDateTime — "16 Jul 2026 10:56" (matches EDiaryTab's e-Diary Log table) ──
+function formatFullDateTime(iso?: string) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const datePart = d.toLocaleDateString('en-SG', { day: '2-digit', month: 'short', year: 'numeric' });
+  const timePart = d.toLocaleTimeString('en-SG', { hour: '2-digit', minute: '2-digit', hour12: false });
+  return `${datePart} ${timePart}`;
+}
+
 // ─── RespondersAvatars Helper Component (Assignee Circles) ──────────────────
 function RespondersAvatars({ names }: { names: string | string[] }) {
   const list = (Array.isArray(names) ? names : [names])
@@ -149,6 +184,7 @@ export default function CaseDetailsPage() {
   // Case Title editing states
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editTitleText, setEditTitleText] = useState('');
+  const [showAuditLogModal, setShowAuditLogModal] = useState(false);
 
   // Attach Incident Report Modal States
   const [showAttachIncidentModal, setShowAttachIncidentModal] = useState(false);
@@ -439,11 +475,6 @@ export default function CaseDetailsPage() {
             <Link href="/case-management?tab=cases" style={{ color: 'var(--text-faint)', fontSize: 12, textDecoration: 'none' }}>← Case Log</Link>
             <span className="mono-id">{caseData.id}</span>
             <span className={caseBadgeClass(caseData.status)}>{caseData.status}</span>
-            {caseData.linkedIncidentId && (
-              <Link href={`/incidents/${caseData.linkedIncidentId}`} style={{ color: 'var(--color-primary)', fontSize: 12, fontWeight: 600, textDecoration: 'none', marginLeft: 6, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                🔗 Raised from Incident: {caseData.linkedIncidentId}
-              </Link>
-            )}
             {saving && <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>Saving…</span>}
           </div>
 
@@ -454,7 +485,7 @@ export default function CaseDetailsPage() {
                 className="form-control"
                 value={editTitleText}
                 onChange={e => setEditTitleText(e.target.value)}
-                style={{ fontFamily: 'var(--font-title), serif', fontSize: 16, fontWeight: 700, height: 36, width: '320px', padding: '0 8px' }}
+                style={{ fontFamily: 'var(--font-headline)', fontSize: 16, fontWeight: 700, height: 36, width: '320px', padding: '0 8px' }}
                 autoFocus
               />
               <button className="btn btn-success btn-xs" onClick={async () => {
@@ -469,7 +500,7 @@ export default function CaseDetailsPage() {
               }}>Cancel</button>
             </div>
           ) : (
-            <h1 style={{ fontFamily: 'var(--font-title), serif', fontSize: 18, fontWeight: 700, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <h1 style={{ fontFamily: 'var(--font-headline)', fontSize: 18, fontWeight: 700, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
               {caseData.title}
               {!isClosed && (
                 <button 
@@ -490,6 +521,9 @@ export default function CaseDetailsPage() {
 
         {/* Case Actions — closure is system-managed; manual status update to No Action Required is permitted for controller */}
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+          <button className="btn btn-secondary btn-sm" onClick={() => setShowAuditLogModal(true)}>
+            🕘 Audit Log
+          </button>
           {isCtrl && caseData.status === 'Pending Triage' && (
             <button className="btn btn-warning btn-sm" onClick={() => caseUpdate({ status: 'No Action Required' })}>No Action Required</button>
           )}
@@ -498,11 +532,11 @@ export default function CaseDetailsPage() {
 
       {/* Main Layout Grid */}
       <div className="case-content-grid" style={{ marginTop: '1rem' }}>
-        
+
         {/* Left Main Dashboard Cards */}
         <div className="case-main-col">
           <div className="component-card-grid">
-            
+
             {/* 1. Incident Summary Card */}
             <div className="glass comp-card">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -513,18 +547,24 @@ export default function CaseDetailsPage() {
               <div className="comp-card-body">
                 {inc ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)' }}>{inc.title}</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px', fontSize: '12px', color: 'var(--text-muted)' }}>
-                      <div><strong>Incident ID:</strong> <span className="mono-id" style={{ fontSize: '10px', padding: '1px 5px', color: 'var(--color-critical)', background: 'var(--color-critical-bg)', borderColor: 'var(--color-critical-border)' }}>{inc.id}</span></div>
-                      <div><strong>Priority:</strong> {inc.priority}</div>
-                      <div><strong>Classification:</strong> {inc.type} &bull; {inc.subType}</div>
-                      <div><strong>Location:</strong> {inc.location.commonName || inc.location.road || 'TBD'}</div>
-                      <div><strong>Assigned Ranger:</strong> {inc.assignedTo || <span style={{ color: 'var(--text-faint)' }}>Unassigned</span>}</div>
+                    <div className="oe-title" style={{ fontSize: 13 }}>{inc.title}</div>
+                    <div className="oe-field-grid" style={{ fontSize: 12 }}>
+                      <div className="oe-field">
+                        <span className="oe-field-label">Incident ID:</span>
+                        <span className="mono-id" style={{ fontSize: '10px', padding: '1px 5px', color: 'var(--color-critical)', background: 'var(--color-critical-bg)', borderColor: 'var(--color-critical-border)' }}>{inc.id}</span>
+                      </div>
+                      <OpEventField label="Priority" value={inc.priority} />
+                      <OpEventField label="Type" value={inc.type} />
+                      <OpEventField label="Sub Type" value={inc.subType} />
+                      <OpEventField label="Date of Incident" value={formatFullDateTime(inc.dateTime)} />
+                      <OpEventField label="Assigned Ranger" value={inc.assignedTo && inc.assignedTo.length > 0 ? inc.assignedTo.join(', ') : undefined} />
+                      <OpEventField label="Location" value={inc.location.commonName || inc.location.road || 'TBD'} />
                     </div>
                   </div>
                 ) : (
-                  <div className="empty-comp-state" style={{ padding: '20px 0', minHeight: '120px' }}>
-                    <p style={{ fontSize: '12px', color: 'var(--text-faint)' }}>No security or safety incident report is linked to this case container.</p>
+                  <div className="empty-comp-state" style={{ padding: '20px 0', minHeight: '120px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                    <EmptyStateIcon />
+                    <p style={{ fontSize: '12px', color: 'var(--text-faint)', margin: 0, textAlign: 'center' }}>No security or safety incident report is linked to this case container.</p>
                   </div>
                 )}
               </div>
@@ -551,22 +591,28 @@ export default function CaseDetailsPage() {
                 <span className="count-badge">{tasks.length}</span>
               </div>
 
-              <div className="comp-card-body" style={{ maxHeight: '220px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div className="comp-card-body" style={{ maxHeight: '280px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {tasks.length === 0 ? (
-                  <div className="empty-comp-state" style={{ padding: '24px 0', minHeight: '100px' }}>
-                    <p style={{ fontSize: '12px', color: 'var(--text-faint)' }}>No operational tasks have been dispatched.</p>
+                  <div className="empty-comp-state" style={{ padding: '24px 0', minHeight: '100px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                    <EmptyStateIcon />
+                    <p style={{ fontSize: '12px', color: 'var(--text-faint)', margin: 0, textAlign: 'center' }}>No operational tasks have been dispatched.</p>
                   </div>
                 ) : (
                   tasks.map(t => (
-                    <div key={t.id} className="active-case-item" style={{ padding: '6px 10px', borderRadius: 4, cursor: 'pointer', background: 'var(--bg-inset)' }}
+                    <div key={t.id} className="oe-task-item"
                       onClick={() => router.push(`/tasks/${t.id}`)}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                        <span style={{ fontSize: '12px', fontWeight: 600, maxWidth: '60%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
+                      <div className="oe-id-status-row">
+                        <span className="mono-id" style={{ fontSize: '10px', padding: '1px 5px', color: 'var(--color-active)', background: 'var(--color-active-bg)', borderColor: 'var(--color-active-border)' }}>{t.id}</span>
                         <span className={t.status === 'Closed' ? 'badge badge-closed' : t.status === 'In Progress' ? 'badge badge-onsite' : 'badge badge-ack'} style={{ fontSize: '9px', padding: '1px 6px' }}>{t.status}</span>
                       </div>
-                      <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                      <div className="oe-task-title">{t.title}</div>
+                      <div className="oe-field-grid">
+                        <OpEventField label="Priority" value={t.priority} />
+                        <OpEventField label="Due Date" value={formatFullDateTime(t.dueDate)} />
+                      </div>
+                      <div className="oe-field" style={{ marginTop: 6, alignItems: 'center' }}>
+                        <span className="oe-field-label">Assignee:</span>
                         <RespondersAvatars names={t.assignee} />
-                        <span>Priority: {t.priority}</span>
                       </div>
                     </div>
                   ))
@@ -594,19 +640,25 @@ export default function CaseDetailsPage() {
 
               <div className="comp-card-body" style={{ maxHeight: '220px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {caseFaults.length === 0 ? (
-                  <div className="empty-comp-state" style={{ padding: '24px 0', minHeight: '100px' }}>
-                    <p style={{ fontSize: '12px', color: 'var(--text-faint)' }}>No infrastructure faults logged for this case.</p>
+                  <div className="empty-comp-state" style={{ padding: '24px 0', minHeight: '100px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                    <EmptyStateIcon />
+                    <p style={{ fontSize: '12px', color: 'var(--text-faint)', margin: 0, textAlign: 'center' }}>No infrastructure faults logged for this case.</p>
                   </div>
                 ) : (
                   caseFaults.map(f => (
                     <div key={f.id} style={{ padding: '6px 10px', background: 'var(--bg-inset)', border: '1px solid var(--border-color)', borderRadius: 5 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                      <div className="oe-id-status-row">
                         <Link href={`/faults/${f.id}`} style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, color: 'var(--color-primary)', textDecoration: 'none' }}>{f.id}</Link>
                         <span className={`badge ${f.status === 'Closed' ? 'badge-closed' : f.status === 'Pending Submission' ? 'badge-ack' : 'badge-live'}`} style={{ fontSize: '9px', padding: '1px 5px' }}>
                           {f.status}
                         </span>
                       </div>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{f.faultType} — {f.faultSubType}</div>
+                      <div className="oe-title" style={{ fontSize: 12 }}>{f.faultType} — {f.faultSubType}</div>
+                      <div className="oe-field-grid">
+                        <OpEventField label="Priority" value={undefined} />
+                        <OpEventField label="Fault Type" value={f.faultType} />
+                        <OpEventField label="Fault Sub-type" value={f.faultSubType} />
+                      </div>
                       {f.cmmsTicketId && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
                           <code style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--color-info)' }}>{f.cmmsTicketId}</code>
@@ -646,17 +698,19 @@ export default function CaseDetailsPage() {
 
               <div className="comp-card-body" style={{ maxHeight: '220px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {ediaryLogs.length === 0 ? (
-                  <div className="empty-comp-state" style={{ padding: '24px 0', minHeight: '100px' }}>
-                    <p style={{ fontSize: '12px', color: 'var(--text-faint)' }}>No occurrence diary entries logged for this case.</p>
+                  <div className="empty-comp-state" style={{ padding: '24px 0', minHeight: '100px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                    <EmptyStateIcon />
+                    <p style={{ fontSize: '12px', color: 'var(--text-faint)', margin: 0, textAlign: 'center' }}>No occurrence diary entries logged for this case.</p>
                   </div>
                 ) : (
                   ediaryLogs.slice(-2).reverse().map(log => (
                     <div key={log.id} style={{ padding: '6px 10px', border: '1px solid var(--border-color)', borderRadius: '4px', background: 'var(--bg-inset)', fontSize: '11px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, marginBottom: '2px', color: 'var(--color-active)' }}>
-                        <span>{log.topic}</span>
-                        <span style={{ fontSize: '9.5px', color: 'var(--text-faint)' }}>{new Date(log.dateTime).toLocaleTimeString('en-SG', { hour: '2-digit', minute: '2-digit', hour12: false })}</span>
+                      <span className="mono-id" style={{ fontSize: '10px', padding: '1px 5px', color: 'var(--color-review)', background: 'var(--color-review-bg)', borderColor: 'var(--color-review-border)' }}>{log.id}</span>
+                      <div className="oe-title" style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-active)', marginTop: 4 }}>{log.topic}</div>
+                      <div className="oe-field-grid">
+                        <OpEventField label="Date & Time" value={formatFullDateTime(log.dateTime)} />
+                        <OpEventField label="Narrative" value={log.content} full />
                       </div>
-                      <p style={{ color: 'var(--text-sub)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', margin: 0 }}>{log.content}</p>
                     </div>
                   ))
                 )}
@@ -677,42 +731,48 @@ export default function CaseDetailsPage() {
           </div>
         </div>
 
-        {/* Right Sidebar */}
-        <div className="case-side-col">
-          {/* Case Audit Trail */}
-          <div className="glass" style={{ padding: '14px 16px' }}>
-            <h3 className="section-title">Case Audit Trail</h3>
-            <div className="timeline" style={{ maxHeight: 480, overflowY: 'auto' }}>
-              {caseData.closedAt && (
-                <div className="timeline-item">
-                  <div className="timeline-dot" style={{ background: 'var(--color-closed)' }} />
-                  <div className="timeline-header"><span>{new Date(caseData.closedAt).toLocaleDateString('en-SG')}</span></div>
-                  <div className="timeline-desc" style={{ fontSize: 11, padding: '6px 10px' }}>
-                    {caseData.status === 'No Action Required'
-                      ? 'Case closed — No Action Required (System).'
-                      : 'Case container closed automatically by System.'}
+      </div>
+
+      {/* ─── MODALS ──────────────────────────────────────────────────────────── */}
+
+      {/* Case Audit Trail Modal */}
+      {showAuditLogModal && (
+        <div className="modal-backdrop">
+          <div className="create-case-modal glass" style={{ maxWidth: 560 }}>
+            <div className="modal-header">
+              <h2>CASE AUDIT TRAIL</h2>
+              <button className="close-btn" onClick={() => setShowAuditLogModal(false)}>✕</button>
+            </div>
+            <div className="modal-scroll-area" style={{ padding: '18px 22px' }}>
+              <div className="timeline">
+                {caseData.closedAt && (
+                  <div className="timeline-item">
+                    <div className="timeline-dot" style={{ background: 'var(--color-closed)' }} />
+                    <div className="timeline-header"><span>{new Date(caseData.closedAt).toLocaleDateString('en-SG')}</span></div>
+                    <div className="timeline-desc">
+                      {caseData.status === 'No Action Required'
+                        ? 'Case closed — No Action Required (System).'
+                        : 'Case container closed automatically by System.'}
+                    </div>
                   </div>
+                )}
+                {inc?.log && [...inc.log].reverse().map(entry => (
+                  <div className="timeline-item" key={entry.eventNumber}>
+                    <div className="timeline-dot" />
+                    <div className="timeline-header"><span>{entry.date} {entry.time}</span></div>
+                    <div className="timeline-desc">{entry.description}</div>
+                  </div>
+                ))}
+                <div className="timeline-item">
+                  <div className="timeline-dot" style={{ background: 'var(--color-primary)' }} />
+                  <div className="timeline-header"><span>{new Date(caseData.createdAt).toLocaleDateString('en-SG')}</span></div>
+                  <div className="timeline-desc">Case container established.</div>
                 </div>
-              )}
-              {inc?.log && [...inc.log].reverse().slice(0, 5).map(entry => (
-                <div className="timeline-item" key={entry.eventNumber}>
-                  <div className="timeline-dot" />
-                  <div className="timeline-header"><span>{entry.date} {entry.time}</span></div>
-                  <div className="timeline-desc" style={{ fontSize: 11, padding: '6px 10px' }}>{entry.description}</div>
-                </div>
-              ))}
-              <div className="timeline-item">
-                <div className="timeline-dot" style={{ background: 'var(--color-primary)' }} />
-                <div className="timeline-header"><span>{new Date(caseData.createdAt).toLocaleDateString('en-SG')}</span></div>
-                <div className="timeline-desc" style={{ fontSize: 11, padding: '6px 10px' }}>Case container established.</div>
               </div>
             </div>
           </div>
         </div>
-
-      </div>
-
-      {/* ─── MODALS ──────────────────────────────────────────────────────────── */}
+      )}
 
       {/* Attach Incident Report Modal */}
       {showAttachIncidentModal && (
@@ -993,20 +1053,27 @@ export default function CaseDetailsPage() {
 
       <style jsx>{`
         /* ── Case detail layout ───────────────────────────────────────── */
+        /* No more right sidebar (Audit Trail moved into a header modal) — full-width single column. */
         .case-content-grid {
           display: grid;
-          grid-template-columns: 1fr 300px;
+          grid-template-columns: 1fr;
           gap: 16px;
           align-items: start;
         }
         .case-main-col { display: flex; flex-direction: column; gap: 14px; }
-        .case-side-col { display: flex; flex-direction: column; gap: 12px; }
 
         /* ── Component Cards grid ────────────────────────────────────── */
+        /* Fixed 2x2 layout: row 1 = Incident | Task, row 2 = Fault | e-Diary (DOM order).
+           Only collapses to 1 column below 900px so it never squishes into a cramped 3-up row. */
         .component-card-grid {
           display: grid;
           grid-template-columns: 1fr 1fr;
           gap: 16px;
+        }
+        @media (max-width: 900px) {
+          .component-card-grid {
+            grid-template-columns: 1fr;
+          }
         }
         .comp-card {
           display: flex;
@@ -1061,6 +1128,45 @@ export default function CaseDetailsPage() {
           align-items: center;
           justify-content: center;
           gap: 8px;
+        }
+
+        /* ── Operation Event card fields (standardized ID/Title/Priority/Status layout) ── */
+        .oe-id-status-row {
+          display: flex; justify-content: space-between; align-items: center;
+          margin-bottom: 4px;
+        }
+        .oe-title {
+          font-size: 12.5px; font-weight: 600; color: var(--text-main);
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+          margin-bottom: 6px; cursor: default; display: block;
+        }
+        .oe-field-grid {
+          display: grid; grid-template-columns: 1fr 1fr;
+          gap: 4px 12px; font-size: 11px; color: var(--text-muted);
+        }
+        .oe-field { display: flex; gap: 4px; overflow: hidden; cursor: default; }
+        .oe-field--full { grid-column: 1 / -1; }
+        .oe-field-label { flex-shrink: 0; font-weight: 600; color: var(--text-muted); }
+        .oe-field-value {
+          color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+
+        /* ── Task card item (dedicated class — NOT .active-case-item, which is a
+           shared flex-row class also used by the Dashboard active-cases list and
+           would squash these stacked rows onto one line) ──────────────────── */
+        .oe-task-item {
+          display: flex; flex-direction: column; gap: 5px;
+          padding: 10px 12px;
+          border-radius: 6px;
+          border: 1px solid var(--border-color);
+          background: var(--bg-inset);
+          cursor: pointer;
+          transition: background 0.12s ease, border-color 0.12s ease;
+        }
+        .oe-task-item:hover { background: var(--bg-hover); border-color: var(--border-color-hover); }
+        .oe-task-title {
+          font-size: 12.5px; font-weight: 600; color: var(--text-main);
+          white-space: normal; word-break: break-word; line-height: 1.4;
         }
 
         /* ── Side info rows ──────────────────────────────────────────── */

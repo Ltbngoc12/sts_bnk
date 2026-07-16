@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import LocationSelector from '@/components/LocationSelector';
 import { getFaultTaxonomy } from '@/lib/taxonomy';
+import { Case } from '@/lib/db';
 
 interface PrefillLocation {
   road?: string;
@@ -56,9 +57,24 @@ export default function FaultCreateModal({
   // locationReady ensures LocationSelector only mounts after location state is populated
   const [locationReady, setLocationReady] = useState(false);
 
+  // Link-to-case dropdown (standalone faults only — linked faults already know their case)
+  const [cases, setCases] = useState<Case[]>([]);
+  const [selectedCaseId, setSelectedCaseId] = useState('new-case');
+  const [selectedCase, setSelectedCase] = useState<{ id: string; title: string }>({ id: 'NEW CASE', title: 'Auto-create new case' });
+  const [caseSearchText, setCaseSearchText] = useState('');
+  const [showCaseDropdown, setShowCaseDropdown] = useState(false);
+
   useEffect(() => {
     setFaultTaxonomy(getFaultTaxonomy());
   }, []);
+
+  useEffect(() => {
+    if (!isOpen || linkedIncidentId || linkedCaseId) return;
+    fetch('/api/cases')
+      .then(res => (res.ok ? res.json() : []))
+      .then((data: Case[]) => setCases(data))
+      .catch(() => {});
+  }, [isOpen, linkedIncidentId, linkedCaseId]);
 
   useEffect(() => {
     setFormFaultSubType('');
@@ -101,12 +117,17 @@ export default function FaultCreateModal({
     setAttachments([]);
     setFormDescription('');
     setSubmitResult(null);
+    setSelectedCaseId('new-case');
+    setSelectedCase({ id: 'NEW CASE', title: 'Auto-create new case' });
+    setCaseSearchText('');
+    setShowCaseDropdown(false);
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formFaultType || !formFaultSubType || !formDescription.trim() || submitting) return;
     setSubmitting(true);
+    const resolvedCaseId = linkedCaseId || (selectedCaseId !== 'new-case' ? selectedCaseId : undefined);
     try {
       const res = await fetch('/api/faults', {
         method: 'POST',
@@ -129,7 +150,7 @@ export default function FaultCreateModal({
           attachments: attachments.map(f => f.name),
           username,
           ...(linkedIncidentId && { linkedIncidentId }),
-          ...(linkedCaseId && { caseId: linkedCaseId }),
+          ...(resolvedCaseId && { caseId: resolvedCaseId }),
         }),
       });
 
@@ -155,9 +176,25 @@ export default function FaultCreateModal({
   if (!isOpen) return null;
 
   const isLinked = !!(linkedIncidentId || linkedCaseId);
+  const secCaseLink = isLinked ? 0 : 1;
+  const secClassification = secCaseLink + 1;
+  const secLocation = secClassification + 1;
+  const secDescription = secLocation + 1;
+  const secAttachments = secDescription + 1;
+
+  const activeCases = cases.filter(c => c.status !== 'Closed');
+  const filteredCases = activeCases.filter(c => {
+    if (!caseSearchText.trim()) return true;
+    const q = caseSearchText.toLowerCase();
+    return c.id.toLowerCase().includes(q) || c.title.toLowerCase().includes(q);
+  });
 
   return (
     <div className="modal-backdrop">
+      <style jsx global>{`
+        .search-select-option:hover { background: var(--bg-hover) !important; }
+        .create-new-opt:hover { background: var(--color-primary-bg) !important; color: var(--color-primary-dark) !important; }
+      `}</style>
       <div className="create-case-modal glass" style={{ maxWidth: 700, width: '100%' }}>
 
         {/* Header */}
@@ -200,10 +237,137 @@ export default function FaultCreateModal({
           <form onSubmit={handleSubmit} className="modal-form">
             <div className="modal-scroll-area" style={{ gap: 0, padding: 0 }}>
 
-              {/* Section 1: Fault Classification */}
+              {/* Section: Link to Case (standalone faults only) */}
+              {!isLinked && (
+                <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)' }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
+                    {secCaseLink} — Link to Case
+                  </div>
+                  <div className="form-group" style={{ margin: 0, position: 'relative' }}>
+                    <label>Link to Parent Case *</label>
+
+                    {/* Select Trigger Box */}
+                    <div
+                      onClick={() => setShowCaseDropdown(!showCaseDropdown)}
+                      className="form-control select-dark search-select-trigger"
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        cursor: 'pointer',
+                        background: 'var(--bg-card)',
+                        border: '1px solid var(--border-color)',
+                        padding: '8px 12px',
+                        borderRadius: 'var(--radius-md)',
+                        fontSize: '13px',
+                      }}
+                    >
+                      <span>{selectedCase.id} - {selectedCase.title}</span>
+                      <span style={{ fontSize: '10px', opacity: 0.7 }}>▼</span>
+                    </div>
+
+                    {/* Dropdown Menu */}
+                    {showCaseDropdown && (
+                      <div
+                        className="glass search-select-dropdown"
+                        style={{
+                          position: 'absolute',
+                          top: '100%',
+                          left: 0,
+                          right: 0,
+                          zIndex: 100,
+                          marginTop: '4px',
+                          background: 'var(--bg-card)',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: 'var(--radius-md)',
+                          boxShadow: '0 8px 30px rgba(0,0,0,0.15)',
+                          maxHeight: '260px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {/* Search Input field */}
+                        <div style={{ padding: '8px', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-inset)' }}>
+                          <input
+                            type="text"
+                            placeholder="Search case ID or title..."
+                            value={caseSearchText}
+                            onChange={e => setCaseSearchText(e.target.value)}
+                            onClick={e => e.stopPropagation()}
+                            className="form-control"
+                            style={{ fontSize: '12px', height: '30px', padding: '4px 8px', width: '100%', boxSizing: 'border-box' }}
+                            autoFocus
+                          />
+                        </div>
+
+                        {/* Options list */}
+                        <div style={{ overflowY: 'auto', flex: 1, maxHeight: '200px' }}>
+                          {/* Option: Auto-create new case */}
+                          <div
+                            onClick={() => {
+                              setSelectedCaseId('new-case');
+                              setSelectedCase({ id: 'NEW CASE', title: 'Auto-create new case' });
+                              setShowCaseDropdown(false);
+                              setCaseSearchText('');
+                            }}
+                            className="search-select-option create-new-opt"
+                            style={{
+                              padding: '8px 12px',
+                              cursor: 'pointer',
+                              fontSize: '12.5px',
+                              color: 'var(--color-primary)',
+                              fontWeight: 600,
+                              borderBottom: '1px solid var(--border-color)',
+                              background: selectedCaseId === 'new-case' ? 'var(--bg-hover)' : 'transparent',
+                            }}
+                          >
+                            ➕ Auto-create new case
+                          </div>
+
+                          {/* Filtered Active Cases */}
+                          {filteredCases.map(c => {
+                            const isSelected = selectedCaseId === c.id;
+                            return (
+                              <div
+                                key={c.id}
+                                onClick={() => {
+                                  setSelectedCaseId(c.id);
+                                  setSelectedCase(c);
+                                  setShowCaseDropdown(false);
+                                  setCaseSearchText('');
+                                }}
+                                className="search-select-option"
+                                style={{
+                                  padding: '8px 12px',
+                                  cursor: 'pointer',
+                                  fontSize: '12.5px',
+                                  color: isSelected ? 'var(--color-primary)' : 'var(--text-main)',
+                                  background: isSelected ? 'var(--bg-hover)' : 'transparent',
+                                }}
+                              >
+                                {c.id} - {c.title}
+                              </div>
+                            );
+                          })}
+
+                          {/* Empty results */}
+                          {filteredCases.length === 0 && (
+                            <div style={{ padding: '8px 12px', fontSize: '12.5px', color: 'var(--text-muted)', textAlign: 'center' }}>
+                              No cases found
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Section: Fault Classification */}
               <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
-                  1 — Fault Classification
+                  {secClassification} — Fault Classification
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div className="form-group" style={{ margin: 0 }}>
@@ -238,10 +402,10 @@ export default function FaultCreateModal({
                 </div>
               </div>
 
-              {/* Section 2: Location */}
+              {/* Section: Location */}
               <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
-                  2 — Location
+                  {secLocation} — Location
                 </div>
                 {locationReady && (
                   <LocationSelector
@@ -324,10 +488,10 @@ export default function FaultCreateModal({
                 </div>
               </div>
 
-              {/* Section 3: Description */}
+              {/* Section: Description */}
               <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
-                  3 — Fault Description
+                  {secDescription} — Fault Description
                 </div>
                 <div className="form-group" style={{ margin: 0 }}>
                   <label>Description *</label>
@@ -342,10 +506,10 @@ export default function FaultCreateModal({
                 </div>
               </div>
 
-              {/* Section 4: Attachments */}
+              {/* Section: Attachments */}
               <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
-                  4 — Attachments <span style={{ fontWeight: 400, color: 'var(--text-faint)', fontSize: 10, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
+                  {secAttachments} — Attachments <span style={{ fontWeight: 400, color: 'var(--text-faint)', fontSize: 10, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
                 </div>
                 <div
                   style={{ border: '2px dashed var(--border-color)', borderRadius: 8, padding: '20px 16px', textAlign: 'center', cursor: 'pointer', background: 'var(--bg-inset)', transition: 'border-color 0.15s, background 0.15s' }}
@@ -398,7 +562,9 @@ export default function FaultCreateModal({
                 <span style={{ fontSize: 11, color: 'var(--text-faint)', lineHeight: 1.5 }}>
                   {isLinked
                     ? <>Fault will be linked to incident <strong>{linkedIncidentId}</strong>. After saving, use <strong>Submit to CMMS</strong> in the fault list to send to IFM CMMS.</>
-                    : <>A new Case will be auto-created to house this fault. After saving, use the <strong>Submit to CMMS</strong> action in the fault list or fault detail page to send it to IFM CMMS.</>
+                    : selectedCaseId !== 'new-case'
+                      ? <>Fault will be linked to case <strong>{selectedCaseId}</strong>. After saving, use the <strong>Submit to CMMS</strong> action in the fault list or fault detail page to send it to IFM CMMS.</>
+                      : <>A new Case will be auto-created to house this fault. After saving, use the <strong>Submit to CMMS</strong> action in the fault list or fault detail page to send it to IFM CMMS.</>
                   }
                 </span>
               </div>

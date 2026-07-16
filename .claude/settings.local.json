@@ -55,7 +55,8 @@
       "Bash(git check-ignore *)",
       "Bash(npm run *)",
       "Bash(git -C \"D:\\\\Huy Sentosa\" fetch origin main --quiet)",
-      "Bash(git -C \"D:\\\\Huy Sentosa\" status -sb)"
+      "Bash(git -C \"D:\\\\Huy Sentosa\" status -sb)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/faults --max-time 10)"
     ],
     "additionalDirectories": [
       "D:\\Huy Sentosa\\.claude\\skills"
