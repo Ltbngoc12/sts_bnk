@@ -56,7 +56,20 @@
       "Bash(npm run *)",
       "Bash(git -C \"D:\\\\Huy Sentosa\" fetch origin main --quiet)",
       "Bash(git -C \"D:\\\\Huy Sentosa\" status -sb)",
-      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/faults --max-time 10)"
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/faults --max-time 10)",
+      "PowerShell(Get-Process -Id 11892 -ErrorAction SilentlyContinue)",
+      "PowerShell($out = \"C:\\\\Users\\\\HUY~1.DUO\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-huy-duong-OneDrive---BnK-Solutions-JSC-Project-Sentosa-CODE\\\\4232ad79-a799-421c-92ab-795f5e1b488d\\\\tasks\\\\bnq5gjqmg.output\"; $end = \\(Get-Date\\).AddSeconds\\(15\\); do { Start-Sleep -Seconds 2; $content = Get-Content $out -Raw 2>$null; if \\($content -match \"Ready|started server|localhost:3000|error|Error\"\\) { break } } while \\(\\(Get-Date\\) -lt $end\\); Get-Content $out -Tail 20)",
+      "PowerShell(npm run dev)",
+      "PowerShell($out = \"C:\\\\Users\\\\HUY~1.DUO\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-huy-duong-OneDrive---BnK-Solutions-JSC-Project-Sentosa-CODE\\\\4232ad79-a799-421c-92ab-795f5e1b488d\\\\tasks\\\\bcnzn76q3.output\"; $end = \\(Get-Date\\).AddSeconds\\(20\\); do { Start-Sleep -Seconds 2; $content = Get-Content $out -Raw 2>$null; if \\($content -match \"Ready|started server|localhost:3000|error|Error\"\\) { break } } while \\(\\(Get-Date\\) -lt $end\\); Get-Content $out -Tail 20)",
+      "PowerShell(git pull origin main 2>&1)",
+      "PowerShell($out = \"C:\\\\Users\\\\HUY~1.DUO\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-huy-duong-OneDrive---BnK-Solutions-JSC-Project-Sentosa-CODE\\\\4232ad79-a799-421c-92ab-795f5e1b488d\\\\tasks\\\\bxoeqs747.output\"; $end = \\(Get-Date\\).AddSeconds\\(20\\); do { Start-Sleep -Seconds 2; $content = Get-Content $out -Raw 2>$null; if \\($content -match \"Ready|Error\"\\) { break } } while \\(\\(Get-Date\\) -lt $end\\); Get-Content $out -Tail 10)",
+      "PowerShell(Start-Process -FilePath \"npm\" -ArgumentList \"run\", \"dev\" -WorkingDirectory \"C:\\\\Users\\\\huy.duong\\\\OneDrive - BnK Solutions JSC\\\\Project\\\\Sentosa\\\\CODE\" -WindowStyle Hidden -PassThru)",
+      "PowerShell(git fetch origin main --timeout=30 2>&1)",
+      "PowerShell(Get-Process -Name \"node\" -ErrorAction SilentlyContinue)",
+      "PowerShell(Stop-Process -Force)",
+      "PowerShell(git add \"src/app/incidents/[...id]/page.tsx\")",
+      "PowerShell(git push origin main 2>&1)",
+      "Bash(git pull *)"
     ],
     "additionalDirectories": [
       "D:\\Huy Sentosa\\.claude\\skills"

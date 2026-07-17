@@ -93,9 +93,6 @@ export function RecurrenceScheduleField({ value, onChange }: Props) {
           <div className="form-group">
             <label>Ends</label>
             <div className="recur-radio">
-              <label><input type="radio" name="recur-end" checked={cfg.endType === 'never'} onChange={() => set({ endType: 'never' })} /> Never</label>
-            </div>
-            <div className="recur-radio">
               <label><input type="radio" name="recur-end" checked={cfg.endType === 'onDate'} onChange={() => set({ endType: 'onDate' })} /> On date</label>
               <input type="date" value={cfg.endDate || ''} disabled={cfg.endType !== 'onDate'}
                 onChange={e => set({ endDate: e.target.value })} className="form-control" style={{ maxWidth: 170 }} />

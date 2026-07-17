@@ -19,7 +19,7 @@ export function addDaysISO(dateISO: string, days: number): string {
 }
 
 export function defaultRecurrence(): RecurrenceConfig {
-  return { frequency: 'Daily', weekdays: [], monthlyDay: 15, startDate: todayStr(), dueTime: '09:00', endType: 'never', leadTimeDays: 14 };
+  return { frequency: 'Daily', weekdays: [], monthlyDay: 15, startDate: todayStr(), dueTime: '09:00', endType: 'afterCount', occurrenceCount: 10, leadTimeDays: 14 };
 }
 
 // Every occurrence date-string the series would ever produce, from its start
