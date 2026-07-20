@@ -4,6 +4,7 @@ import { RoleProvider } from "@/context/RoleContext";
 import { Sidebar } from "@/components/Sidebar";
 import { NotificationProvider } from "@/context/NotificationContext";
 import { NotificationWidget } from "@/components/NotificationWidget";
+import { UnsavedChangesProvider } from "@/context/UnsavedChangesContext";
 
 export const metadata: Metadata = {
   title: "Sentosa ISS Case Management System",
@@ -28,13 +29,15 @@ export default function RootLayout({
       <body>
         <RoleProvider>
           <NotificationProvider>
-            <div className="app-container">
-              <Sidebar />
-              <main className="main-content">
-                {children}
-              </main>
-              <NotificationWidget />
-            </div>
+            <UnsavedChangesProvider>
+              <div className="app-container">
+                <Sidebar />
+                <main className="main-content">
+                  {children}
+                </main>
+                <NotificationWidget />
+              </div>
+            </UnsavedChangesProvider>
           </NotificationProvider>
         </RoleProvider>
       </body>

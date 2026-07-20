@@ -150,7 +150,7 @@ export function IncidentLogTab() {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   // Filter States
-  const [activeTab, setActiveTab] = useState<string>('All');
+  const [activeTab, setActiveTab] = useState<string>('Pending Endorsement');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [filterStatus, setFilterStatus] = useState<string>('All');
   const [filterType, setFilterType] = useState<string>('All');
@@ -202,7 +202,7 @@ export function IncidentLogTab() {
     setFilterController('All');
     setFilterDateStart('');
     setFilterDateEnd('');
-    setActiveTab('All');
+    setActiveTab('Pending Endorsement');
   };
 
   // Filter only cases containing incidents
@@ -331,10 +331,17 @@ export function IncidentLogTab() {
     return true;
   });
 
+  // Default sort: Date Logged descending (latest on top)
+  const sortedIncidents = [...filteredIncidents].sort((a, b) => {
+    const da = a.incident?.dateTime ? new Date(a.incident.dateTime).getTime() : 0;
+    const db = b.incident?.dateTime ? new Date(b.incident.dateTime).getTime() : 0;
+    return db - da;
+  });
+
   // Pagination Calculations
-  const totalPages = Math.ceil(filteredIncidents.length / itemsPerPage);
+  const totalPages = Math.ceil(sortedIncidents.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedIncidents = filteredIncidents.slice(startIndex, startIndex + itemsPerPage);
+  const paginatedIncidents = sortedIncidents.slice(startIndex, startIndex + itemsPerPage);
 
   const isController = role === 'Controller' || role === 'Duty Manager' || role === 'Duty Officer' || role === 'System Administrator' || role === 'Current Ops Administrator';
 
@@ -568,29 +575,29 @@ export function IncidentLogTab() {
       `}</style>
 
       {/* Metrics Bar */}
-      <div className="metrics-grid mb-6" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-        <div className="metric-card glass total-incidents">
+      <div className="metrics-grid mb-4" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+        <div className="metric-card glass total-incidents" style={{ padding: '10px 16px' }}>
           <div className="metric-info">
             <h3>Total Incidents</h3>
-            <div className="metric-value text-info">{totalIncidentsCount}</div>
+            <div className="metric-value text-info" style={{ fontSize: '20px' }}>{totalIncidentsCount}</div>
           </div>
-          <div className="metric-icon" style={{ fontSize: '20px' }}>📊</div>
+          <div className="metric-icon" style={{ width: '28px', height: '28px', fontSize: '15px' }}>📊</div>
         </div>
-        
-        <div className="metric-card glass active-incidents">
+
+        <div className="metric-card glass active-incidents" style={{ padding: '10px 16px' }}>
           <div className="metric-info">
             <h3>Active Incidents</h3>
-            <div className="metric-value text-danger">{activeIncidentsCount}</div>
+            <div className="metric-value text-danger" style={{ fontSize: '20px' }}>{activeIncidentsCount}</div>
           </div>
-          <div className="metric-icon" style={{ fontSize: '20px' }}>🚨</div>
+          <div className="metric-icon" style={{ width: '28px', height: '28px', fontSize: '15px' }}>🚨</div>
         </div>
-        
-        <div className="metric-card glass pending-endorsement">
+
+        <div className="metric-card glass pending-endorsement" style={{ padding: '10px 16px' }}>
           <div className="metric-info">
             <h3>Pending Endorsement</h3>
-            <div className="metric-value text-warning">{pendingReviewCount}</div>
+            <div className="metric-value text-warning" style={{ fontSize: '20px' }}>{pendingReviewCount}</div>
           </div>
-          <div className="metric-icon" style={{ fontSize: '20px' }}>📝</div>
+          <div className="metric-icon" style={{ width: '28px', height: '28px', fontSize: '15px' }}>📝</div>
         </div>
 
       </div>
@@ -603,38 +610,6 @@ export function IncidentLogTab() {
           
           {/* Left Side: Tabs */}
           <div style={{ display: 'flex', gap: '4px' }}>
-            <button
-              onClick={() => { setActiveTab('All'); setCurrentPage(1); }}
-              className={`tab-btn ${activeTab === 'All' ? 'active' : ''}`}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                borderBottom: activeTab === 'All' ? '2px solid var(--color-primary)' : '2px solid transparent',
-                color: activeTab === 'All' ? 'var(--color-primary)' : 'var(--text-muted)',
-                padding: '8px 16px',
-                fontSize: '13px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              All Reports
-              <span style={{
-                fontSize: '11px',
-                fontWeight: 700,
-                background: activeTab === 'All' ? 'var(--color-primary-bg)' : 'var(--bg-inset)',
-                color: activeTab === 'All' ? 'var(--color-primary)' : 'var(--text-muted)',
-                padding: '2px 8px',
-                borderRadius: '10px',
-                minWidth: '20px',
-                textAlign: 'center'
-              }}>
-                {allReportsCount}
-              </span>
-            </button>
             <button
               onClick={() => { setActiveTab('Pending Endorsement'); setCurrentPage(1); }}
               className={`tab-btn ${activeTab === 'Pending Endorsement' ? 'active' : ''}`}
@@ -653,7 +628,7 @@ export function IncidentLogTab() {
                 transition: 'all 0.15s ease'
               }}
             >
-              My Pending Reports
+              Pending Incidents
               <span style={{
                 fontSize: '11px',
                 fontWeight: 700,
@@ -665,6 +640,38 @@ export function IncidentLogTab() {
                 textAlign: 'center'
               }}>
                 {pendingReportsCount}
+              </span>
+            </button>
+            <button
+              onClick={() => { setActiveTab('All'); setCurrentPage(1); setShowAdvancedFilters(true); }}
+              className={`tab-btn ${activeTab === 'All' ? 'active' : ''}`}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                borderBottom: activeTab === 'All' ? '2px solid var(--color-primary)' : '2px solid transparent',
+                color: activeTab === 'All' ? 'var(--color-primary)' : 'var(--text-muted)',
+                padding: '8px 16px',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              All Incidents
+              <span style={{
+                fontSize: '11px',
+                fontWeight: 700,
+                background: activeTab === 'All' ? 'var(--color-primary-bg)' : 'var(--bg-inset)',
+                color: activeTab === 'All' ? 'var(--color-primary)' : 'var(--text-muted)',
+                padding: '2px 8px',
+                borderRadius: '10px',
+                minWidth: '20px',
+                textAlign: 'center'
+              }}>
+                {allReportsCount}
               </span>
             </button>
           </div>
@@ -853,7 +860,7 @@ export function IncidentLogTab() {
 
 
             {/* Clear Filters — inside panel */}
-            {(searchTerm || filterStatus !== 'All' || filterType !== 'All' || filterSubType !== 'All' || filterCategory !== 'All' || filterCrisisLevel !== 'All' || filterSource !== 'All' || filterController !== 'All' || filterDateStart || filterDateEnd || activeTab !== 'All') && (
+            {(searchTerm || filterStatus !== 'All' || filterType !== 'All' || filterSubType !== 'All' || filterCategory !== 'All' || filterCrisisLevel !== 'All' || filterSource !== 'All' || filterController !== 'All' || filterDateStart || filterDateEnd || activeTab !== 'Pending Endorsement') && (
               <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end' }}>
                 <button
                   onClick={resetFilters}
@@ -880,7 +887,7 @@ export function IncidentLogTab() {
             <table className="custom-table">
               <thead>
                 <tr>
-                  <th>Case ID</th>
+                  <th>Date Logged</th>
                   <th>Incident ID</th>
                   <th>Incident Title</th>
                   <th>Category</th>
@@ -890,7 +897,6 @@ export function IncidentLogTab() {
                   <th>Location (Common Name)</th>
                   <th>Assigned Responder</th>
                   <th>Incident Status</th>
-                  <th>Date Logged</th>
                 </tr>
               </thead>
               <tbody>
@@ -900,12 +906,8 @@ export function IncidentLogTab() {
                     <tr key={c.id} onClick={() => {
                       window.location.href = `/incidents/${inc.id}`;
                     }}>
-                      <td>
-                        <span className="mono-id">
-                          <Link href={`/cases/${c.id}`} style={{ textDecoration: 'none', color: 'inherit' }} onClick={(e) => e.stopPropagation()}>
-                            {c.id}
-                          </Link>
-                        </span>
+                      <td className="date-cell">
+                        {new Date(inc.dateTime).toLocaleDateString('en-US')} {new Date(inc.dateTime).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })}
                       </td>
                       <td>
                         <span className="mono-id" style={{ color: 'var(--color-critical)', background: 'var(--color-critical-bg)', borderColor: 'var(--color-critical-border)' }}>
@@ -967,9 +969,6 @@ export function IncidentLogTab() {
                         <span className={`badge ${getStatusBadgeClass(inc.status)}`}>
                           {inc.status === 'Live (Assigned)' ? 'Assigned' : inc.status}
                         </span>
-                      </td>
-                      <td className="date-cell">
-                        {new Date(inc.dateTime).toLocaleDateString('en-US')} {new Date(inc.dateTime).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })}
                       </td>
                     </tr>
                   );

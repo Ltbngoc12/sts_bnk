@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getDb, saveDb, generateCaseId } from '@/lib/db';
+import { getDb, saveDb, generateCaseId, ResponderLifecycleStatus } from '@/lib/db';
 import { tryAutoCloseCase } from '@/lib/autoclose';
 import { isValidIncidentCategory } from '@/lib/incidentCategory';
 
@@ -213,7 +213,7 @@ export async function POST(
     let queryId = id.join('/');
 
     const knownActions = [
-      'assign', 'acknowledge', 'on-site', 'notify-complete', 'close', 'return',
+      'assign', 'acknowledge', 'on-site', 'notify-complete', 'set-responder-status', 'close', 'return',
       'return-to-responder', 'submit-review', 'submit-endorsement', 'log',
       'update-fields', 'reopen', 'mark-false-alarm', 'link-duplicate',
       'edit-log', 'delete-log'
@@ -364,6 +364,56 @@ export async function POST(
         target.pendingReviewAt = new Date().toISOString();
         incident.log.push(makeLogEntry(incident,
           `Responder ${target.responderId} has notified completion of ground activities — awaiting Controller review.`
+        ));
+        break;
+      }
+
+      // ── Controller manually sets a Responder's status (per-Responder dropdown) ───
+      // Lets the Controller jump a Responder directly to any of the "in-progress" states
+      // (forward-skip or backward-correct) instead of only clicking one next-step button
+      // at a time. Deliberately does NOT cover Live (Incomplete) (use return-to-responder,
+      // which requires remarks) or Completed (use submit-endorsement, which is a bulk
+      // lock) — see RESPONDER_STATUS_DROPDOWN_PLAN.md §2 (confirmed with Kyle, 2026-07-20).
+      case 'set-responder-status': {
+        if (body.role !== 'Controller' && body.role !== 'System Administrator') {
+          return NextResponse.json({ error: 'Only a Controller can set Responder status directly.' }, { status: 403 });
+        }
+        if (!['Live', 'Live (Assigned)'].includes(incident.status)) {
+          return NextResponse.json({ error: `Cannot change Responder status: current status is "${incident.status}"` }, { status: 409 });
+        }
+        const ORDER: ResponderLifecycleStatus[] = ['Assigned', 'Acknowledged', 'On-Site', 'Pending Controller Review'];
+        const activeResponders = (incident.responders || []).filter(r => r.status === 'Active');
+        const target = activeResponders.find(r => r.responderId === body.responderId);
+        if (!target) {
+          return NextResponse.json({ error: 'responderId is required and must be an active Responder.' }, { status: 400 });
+        }
+        if (!ORDER.includes(target.lifecycleStatus)) {
+          return NextResponse.json({ error: `Responder ${target.responderId} is "${target.lifecycleStatus}" — use Return to Responder or Submit for Endorsement instead.` }, { status: 409 });
+        }
+        if (!ORDER.includes(body.status)) {
+          return NextResponse.json({ error: `status must be one of: ${ORDER.join(', ')}` }, { status: 400 });
+        }
+        const fromIdx = ORDER.indexOf(target.lifecycleStatus);
+        const toIdx = ORDER.indexOf(body.status);
+        if (toIdx === fromIdx) {
+          return NextResponse.json({ error: `Responder ${target.responderId} is already "${body.status}".` }, { status: 400 });
+        }
+        const now = new Date().toISOString();
+        const skipped = ORDER.slice(Math.min(fromIdx, toIdx) + 1, Math.max(fromIdx, toIdx));
+        if (toIdx > fromIdx) {
+          // Moving forward — backfill timestamps for every stage crossed so downstream
+          // reporting doesn't show gaps for stages that were skipped, not just unreached.
+          if (toIdx >= ORDER.indexOf('Acknowledged') && !target.acknowledgedAt) target.acknowledgedAt = now;
+          if (toIdx >= ORDER.indexOf('On-Site') && !target.onSiteAt) target.onSiteAt = now;
+          if (toIdx >= ORDER.indexOf('Pending Controller Review')) target.pendingReviewAt = now;
+        }
+        // Moving backward: intentionally leave prior timestamps in place — a correction
+        // shouldn't erase the history of what already happened, only the current status.
+        const fromStatus = target.lifecycleStatus;
+        target.lifecycleStatus = body.status;
+        incident.log.push(makeLogEntry(incident,
+          `Controller ${actor} manually set Responder ${target.responderId} status: ${fromStatus} → ${body.status}` +
+          (skipped.length ? ` (skipped: ${skipped.join(', ')})` : '')
         ));
         break;
       }

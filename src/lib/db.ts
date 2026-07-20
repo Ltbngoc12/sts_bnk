@@ -292,7 +292,7 @@ export function normalizeTaskPriority(value: unknown, fallback: TaskPriority = '
 // generation engine reads. Editing a series reconciles its future occurrences.
 export interface RecurrenceSeries {
   id: string;                       // SEN/RS/YYYYMMDD/NNN
-  caseId: string;                   // Case the series (and its occurrences) belong to
+  caseId: string;                   // Case of the anchor/template task (holds the series card). Each generated occurrence gets its own separate Case — see seriesEngine.ts.
   config: RecurrenceConfig;         // current template
   status: 'Active' | 'Ended' | 'Cancelled';
   templateTaskId?: string;          // the task that created the series (holds the card)

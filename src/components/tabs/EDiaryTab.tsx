@@ -293,10 +293,9 @@ export function EDiaryTab() {
               <table className="custom-table">
                 <thead>
                   <tr>
-                    <th>Case ID</th>
+                    <th>Date &amp; Time</th>
                     <th>e-Diary ID</th>
                     <th>Topic</th>
-                    <th>Date &amp; Time</th>
                     <th>Narrative</th>
                     <th>Logged By</th>
                     {canEdit && <th>Actions</th>}
@@ -309,8 +308,9 @@ export function EDiaryTab() {
                       onClick={() => { if (o.caseId) window.location.href = `/cases/${o.caseId}`; }}
                       style={{ cursor: o.caseId ? 'pointer' : 'default' }}
                     >
-                      <td>
-                        {o.caseId ? <span className="mono-id">{o.caseId}</span> : <span style={{ color: 'var(--text-faint)' }}>—</span>}
+                      <td style={{ whiteSpace: 'nowrap', fontSize: '12px', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>
+                        {new Date(o.dateTime).toLocaleDateString('en-SG', { day: '2-digit', month: 'short', year: 'numeric' })}{' '}
+                        {new Date(o.dateTime).toLocaleTimeString('en-SG', { hour: '2-digit', minute: '2-digit', hour12: false })}
                       </td>
                       <td>
                         <span className="mono-id" style={{ color: 'var(--color-critical)', background: 'var(--color-critical-bg)', borderColor: 'var(--color-critical-border)' }}>
@@ -318,10 +318,6 @@ export function EDiaryTab() {
                         </span>
                       </td>
                       <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{o.topic}</td>
-                      <td style={{ whiteSpace: 'nowrap', fontSize: '12px', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>
-                        {new Date(o.dateTime).toLocaleDateString('en-SG', { day: '2-digit', month: 'short', year: 'numeric' })}{' '}
-                        {new Date(o.dateTime).toLocaleTimeString('en-SG', { hour: '2-digit', minute: '2-digit', hour12: false })}
-                      </td>
                       <td style={{ maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-sub)' }} title={o.content}>
                         {o.content}
                       </td>

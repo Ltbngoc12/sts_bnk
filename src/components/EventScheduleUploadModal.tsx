@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import { getEventTaxonomy } from '@/lib/taxonomy';
 import { DEFAULT_NODES, LocationNode } from '@/components/LocationSelector';
+import { useUnsavedChanges } from '@/context/UnsavedChangesContext';
 
 interface Props {
   isOpen: boolean;
@@ -76,9 +77,21 @@ export default function EventScheduleUploadModal({ isOpen, onClose, onSuccess, u
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<{ succeeded: number; failed: { row: ParsedRow; error: string }[] } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { setDirty, requestLeave } = useUnsavedChanges();
 
   const eventTypes = getEventTaxonomy();
   const locationNodes = getLocationNodes();
+
+  // A parsed-but-not-yet-imported batch is exactly the state that would be
+  // lost if the modal is closed — re-derive `isDirty` straight from `step`
+  // rather than instrumenting every row edit individually.
+  useEffect(() => {
+    setDirty(step === 'review');
+  }, [step, setDirty]);
+
+  useEffect(() => {
+    if (!isOpen) setDirty(false);
+  }, [isOpen, setDirty]);
 
   const reset = () => {
     setStep('upload');
@@ -242,7 +255,7 @@ export default function EventScheduleUploadModal({ isOpen, onClose, onSuccess, u
       <div className="create-case-modal glass" style={{ maxWidth: step === 'review' ? 960 : 560, width: '100%' }}>
         <div className="modal-header" style={{ padding: '16px 20px' }}>
           <h2 style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.06em' }}>EVENTS SCHEDULE FILE UPLOAD</h2>
-          <button className="close-btn" onClick={() => { onClose(); reset(); }}>
+          <button className="close-btn" onClick={() => requestLeave(() => { onClose(); reset(); })}>
             <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
@@ -328,10 +341,10 @@ export default function EventScheduleUploadModal({ isOpen, onClose, onSuccess, u
           </div>
 
           <div className="modal-actions-bar">
-            {step === 'upload' && <button type="button" className="btn btn-secondary" onClick={() => { onClose(); reset(); }}>Cancel</button>}
+            {step === 'upload' && <button type="button" className="btn btn-secondary" onClick={() => requestLeave(() => { onClose(); reset(); })}>Cancel</button>}
             {step === 'review' && (
               <>
-                <button type="button" className="btn btn-secondary" onClick={reset}>Start Over</button>
+                <button type="button" className="btn btn-secondary" onClick={() => requestLeave(reset)}>Start Over</button>
                 <button type="button" className="btn btn-primary" disabled={flaggedCount > 0 || importing} onClick={handleConfirmImport} style={{ minWidth: 160 }}>
                   {importing ? 'Importing…' : `Confirm Import (${rows.length})`}
                 </button>

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useRole, UserRole } from '@/context/RoleContext';
+import { useUnsavedChanges } from '@/context/UnsavedChangesContext';
 
 // Icons as SVG components
 const Icon = ({ d, d2 }: { d: string; d2?: string }) => (
@@ -61,6 +62,7 @@ const ADMIN_ITEMS = [
 export const Sidebar: React.FC = () => {
   const pathname = usePathname();
   const { role, username, setRole } = useRole();
+  const { hideNav } = useUnsavedChanges();
   const [isCollapsed, setIsCollapsed] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('sidebar_collapsed') === 'true';
@@ -81,6 +83,20 @@ export const Sidebar: React.FC = () => {
     }
   }, [isCollapsed]);
 
+  // While a full-page create/edit form is active (hideNav === true), collapse
+  // the reserved layout space to 0 so `.main-content` reclaims the width —
+  // same mechanism the collapse toggle above already uses.
+  useEffect(() => {
+    if (hideNav) {
+      document.body.classList.add('nav-hidden');
+    } else {
+      document.body.classList.remove('nav-hidden');
+    }
+    return () => {
+      document.body.classList.remove('nav-hidden');
+    };
+  }, [hideNav]);
+
   const roles: UserRole[] = [
     'Controller', 'Duty Manager', 'Duty Officer',
     'Current Ops Administrator', 'Responder (Ranger)', 'System Administrator', 'Stakeholder'
@@ -92,6 +108,10 @@ export const Sidebar: React.FC = () => {
     if (path === '/case-management') return CASE_MGMT_PATHS.some(p => pathname?.startsWith(p));
     return pathname?.startsWith(path);
   };
+
+  // Fully hidden while the user is filling out a full-page create/edit form
+  // (feedback: force exit via Cancel/Save only, no menu navigation away).
+  if (hideNav) return null;
 
   return (
     <div className={`sidebar-container ${isCollapsed ? 'collapsed' : ''}`}>

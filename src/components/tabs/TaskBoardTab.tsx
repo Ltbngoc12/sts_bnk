@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Task, Case, RecurrenceConfig } from '@/lib/db';
 import { RecurrenceScheduleField, recurrenceSummary } from '@/components/RecurrenceScheduleField';
@@ -34,7 +33,7 @@ export function TaskBoardTab() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [cases, setCases] = useState<Case[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<'all' | 'mine'>(isRanger ? 'mine' : 'all');
+  const [tab, setTab] = useState<'all' | 'mine'>('mine');
 
   // Search & filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -271,27 +270,27 @@ export function TaskBoardTab() {
       `}</style>
 
       {/* Metrics Bar */}
-      <div className="metrics-grid mb-6" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-        <div className="metric-card glass tasks-total">
+      <div className="metrics-grid mb-4" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+        <div className="metric-card glass tasks-total" style={{ padding: '10px 16px' }}>
           <div className="metric-info">
             <h3>Total Tasks</h3>
-            <div className="metric-value text-info">{totalCount}</div>
+            <div className="metric-value text-info" style={{ fontSize: '20px' }}>{totalCount}</div>
           </div>
-          <div className="metric-icon" style={{ fontSize: '20px' }}>📋</div>
+          <div className="metric-icon" style={{ width: '28px', height: '28px', fontSize: '15px' }}>📋</div>
         </div>
-        <div className="metric-card glass tasks-active">
+        <div className="metric-card glass tasks-active" style={{ padding: '10px 16px' }}>
           <div className="metric-info">
             <h3>Active Tasks</h3>
-            <div className="metric-value" style={{ color: 'var(--color-active)' }}>{activeCount}</div>
+            <div className="metric-value" style={{ color: 'var(--color-active)', fontSize: '20px' }}>{activeCount}</div>
           </div>
-          <div className="metric-icon" style={{ fontSize: '20px' }}>⚙️</div>
+          <div className="metric-icon" style={{ width: '28px', height: '28px', fontSize: '15px' }}>⚙️</div>
         </div>
-        <div className="metric-card glass tasks-overdue">
+        <div className="metric-card glass tasks-overdue" style={{ padding: '10px 16px' }}>
           <div className="metric-info">
             <h3>Overdue Tasks</h3>
-            <div className="metric-value text-danger">{overdueCount}</div>
+            <div className="metric-value text-danger" style={{ fontSize: '20px' }}>{overdueCount}</div>
           </div>
-          <div className="metric-icon" style={{ fontSize: '20px' }}>⏰</div>
+          <div className="metric-icon" style={{ width: '28px', height: '28px', fontSize: '15px' }}>⏰</div>
         </div>
       </div>
 
@@ -302,10 +301,10 @@ export function TaskBoardTab() {
           {/* Tabs */}
           {!isRanger ? (
             <div style={{ display: 'flex', gap: '4px' }}>
-              {(['all', 'mine'] as const).map(tk => (
+              {(['mine', 'all'] as const).map(tk => (
                 <button
                   key={tk}
-                  onClick={() => { setTab(tk); setCurrentPage(1); }}
+                  onClick={() => { setTab(tk); setCurrentPage(1); if (tk === 'all') setShowAdvancedFilters(true); }}
                   className={`tab-btn ${tab === tk ? 'active' : ''}`}
                   style={{
                     background: 'transparent', border: 'none',
@@ -443,24 +442,19 @@ export function TaskBoardTab() {
             <table className="custom-table">
               <thead>
                 <tr>
-                  <th>Case ID</th>
+                  <th>Date Logged</th>
                   <th>Task ID</th>
                   <th>Task Title</th>
                   <th>Assignee</th>
                   <th>Status</th>
                   <th>Due Date</th>
-                  <th>Created Date</th>
                 </tr>
               </thead>
               <tbody>
                 {paginatedTasks.map((t) => (
                   <tr key={t.id} onClick={() => router.push(`/tasks/${t.id}`)}>
-                    <td>
-                      <span className="mono-id">
-                        <Link href={`/cases/${t.caseId}`} style={{ textDecoration: 'none', color: 'inherit' }} onClick={(e) => e.stopPropagation()}>
-                          {t.caseId}
-                        </Link>
-                      </span>
+                    <td className="date-cell">
+                      {t.createdDate ? `${new Date(t.createdDate).toLocaleDateString('en-US')} ${new Date(t.createdDate).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })}` : '—'}
                     </td>
                     <td>
                       <span className="mono-id" style={{ color: 'var(--color-critical)', background: 'var(--color-critical-bg)', borderColor: 'var(--color-critical-border)' }}>
@@ -505,9 +499,6 @@ export function TaskBoardTab() {
                     </td>
                     <td className="date-cell" style={{ color: isOverdue(t) ? 'var(--color-critical)' : undefined, fontWeight: isOverdue(t) ? 600 : undefined }}>
                       {t.dueDate ? `${new Date(t.dueDate).toLocaleDateString('en-US')} ${new Date(t.dueDate).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })}` : '—'}
-                    </td>
-                    <td className="date-cell">
-                      {t.createdDate ? `${new Date(t.createdDate).toLocaleDateString('en-US')} ${new Date(t.createdDate).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })}` : '—'}
                     </td>
                   </tr>
                 ))}

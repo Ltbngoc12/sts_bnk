@@ -14,6 +14,7 @@ import {
   Occurrence
 } from '@/lib/db';
 import { useRole } from '@/context/RoleContext';
+import { useUnsavedChanges } from '@/context/UnsavedChangesContext';
 import { getIncidentTaxonomy } from '@/lib/taxonomy';
 import { INCIDENT_CATEGORIES, DEFAULT_INCIDENT_CATEGORY } from '@/lib/incidentCategory';
 import dynamic from 'next/dynamic';
@@ -78,6 +79,26 @@ function responderBadgeClass(status?: string) {
   }
 }
 
+// Statuses the Controller can jump a Responder directly between via the status dropdown in
+// the Responder Assignment card (forward-skip or backward-correct, both directions).
+// Deliberately excludes 'Live (Incomplete)' (kept behind the existing "Notify Completion"
+// resubmission button) and 'Completed' (kept behind bulk Submit for Endorsement) — see
+// RESPONDER_STATUS_DROPDOWN_PLAN.md §2 (confirmed with Kyle, 2026-07-20).
+const RESPONDER_STATUS_DROPDOWN_ORDER: string[] = ['Assigned', 'Acknowledged', 'On-Site', 'Pending Controller Review'];
+
+// Helper: lifecycle status → dropdown tone modifier class (see .responder-status-select--*
+// in globals.css). Tints the select to match the badge next to it instead of rendering as
+// a plain native dropdown.
+function responderSelectTone(status?: string): string {
+  switch (status) {
+    case 'Assigned': return 'assigned';
+    case 'Acknowledged': return 'acknowledged';
+    case 'On-Site': return 'onsite';
+    case 'Pending Controller Review': return 'pending-review';
+    default: return 'assigned';
+  }
+}
+
 // Helper: display-only "Responder Progress" aggregation (e.g. "2/3 On-Site").
 // UI aggregation only — does not participate in the workflow state machine or gating.
 function computeResponderProgress(responders?: { status: string; lifecycleStatus?: string }[]): string | null {
@@ -97,6 +118,7 @@ export default function IncidentDetailsPage() {
   const params = useParams();
   const router = useRouter();
   const { role, username } = useRole();
+  const { setDirty, setHideNav, requestLeave } = useUnsavedChanges();
 
   const idArray = params?.id as string[] || [];
   const incidentId = idArray.join('/');
@@ -285,10 +307,22 @@ export default function IncidentDetailsPage() {
     setIsEditingInfo(true);
   };
 
+  // Hide the left nav while the inline "Edit Incident Details" panel is
+  // open, and clear the dirty flag whenever it closes (Cancel/Save both
+  // route through here eventually via setIsEditingInfo(false)).
+  useEffect(() => {
+    setHideNav(isEditingInfo);
+    if (!isEditingInfo) setDirty(false);
+    return () => setHideNav(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditingInfo]);
+
   const handleCancelAll = () => {
-    setPendingResponders(null);
-    setAssignmentError('');
-    setIsEditingInfo(false);
+    requestLeave(() => {
+      setPendingResponders(null);
+      setAssignmentError('');
+      setIsEditingInfo(false);
+    });
   };
 
   const handleSaveAll = async () => {
@@ -1942,7 +1976,7 @@ export default function IncidentDetailsPage() {
           (Responder Assignment), each with its own header and edit action. */}
       <div className="incident-top-grid">
       {/* Card A: Incident Particulars & Location */}
-      <div className="glass incident-particulars-card">
+      <div className="glass incident-particulars-card" onChangeCapture={() => isEditingInfo && setDirty(true)}>
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px dashed var(--border-color)', paddingBottom: '10px', marginBottom: '10px' }}>
           <h2 style={{ fontSize: '13px', fontWeight: 700, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-primary-dark)', borderLeft: '3px solid var(--color-primary)', paddingLeft: '8px' }}>Incident Particulars & Location</h2>
@@ -2193,23 +2227,44 @@ export default function IncidentDetailsPage() {
                           {r.lifecycleStatus}
                         </span>
                       </div>
-                      {/* Controller can advance any Responder's lifecycle on their behalf — applies
-                          to every category (confirmed with BA, same standard lifecycle throughout). */}
+                      {/* Controller can advance (or correct) any Responder's lifecycle on their
+                          behalf — applies to every category (confirmed with BA, same standard
+                          lifecycle throughout). Status dropdown lets the Controller jump straight
+                          to a target state instead of clicking through one step at a time; see
+                          RESPONDER_STATUS_DROPDOWN_PLAN.md. */}
                       {isCtrl && !isLocked && (
-                        <div style={{ display: 'flex', gap: 4 }}>
-                          {r.lifecycleStatus === 'Assigned' && (
-                            <button className="btn btn-secondary btn-sm" style={{ fontSize: '10.5px', padding: '2px 6px' }}
-                              onClick={() => performAction('acknowledge', { responderId: r.responderId })} disabled={saving}>
-                              Acknowledge
-                            </button>
+                        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                          {RESPONDER_STATUS_DROPDOWN_ORDER.includes(r.lifecycleStatus) && (
+                            <select
+                              className={`responder-status-select responder-status-select--${responderSelectTone(r.lifecycleStatus)}`}
+                              value={r.lifecycleStatus}
+                              disabled={saving}
+                              onChange={(e) => {
+                                const newStatus = e.target.value;
+                                if (newStatus === r.lifecycleStatus) return;
+                                const fromIdx = RESPONDER_STATUS_DROPDOWN_ORDER.indexOf(r.lifecycleStatus);
+                                const toIdx = RESPONDER_STATUS_DROPDOWN_ORDER.indexOf(newStatus);
+                                const skipped = RESPONDER_STATUS_DROPDOWN_ORDER.slice(
+                                  Math.min(fromIdx, toIdx) + 1, Math.max(fromIdx, toIdx)
+                                );
+                                const isSingleForwardStep = toIdx === fromIdx + 1;
+                                if (!isSingleForwardStep) {
+                                  const direction = toIdx > fromIdx ? 'forward' : 'backward';
+                                  const skipNote = skipped.length ? ` This will skip: ${skipped.join(', ')}.` : '';
+                                  const confirmed = confirm(
+                                    `Move ${r.responderId} ${direction} from "${r.lifecycleStatus}" to "${newStatus}"?${skipNote}`
+                                  );
+                                  if (!confirmed) return;
+                                }
+                                performAction('set-responder-status', { responderId: r.responderId, status: newStatus });
+                              }}
+                            >
+                              {RESPONDER_STATUS_DROPDOWN_ORDER.map(s => (
+                                <option key={s} value={s}>{s}</option>
+                              ))}
+                            </select>
                           )}
-                          {r.lifecycleStatus === 'Acknowledged' && (
-                            <button className="btn btn-secondary btn-sm" style={{ fontSize: '10.5px', padding: '2px 6px' }}
-                              onClick={() => performAction('on-site', { responderId: r.responderId })} disabled={saving}>
-                              On-Site
-                            </button>
-                          )}
-                          {['On-Site', 'Live (Incomplete)'].includes(r.lifecycleStatus) && (
+                          {r.lifecycleStatus === 'Live (Incomplete)' && (
                             <button className="btn btn-secondary btn-sm" style={{ fontSize: '10.5px', padding: '2px 6px' }}
                               onClick={() => performAction('notify-complete', { responderId: r.responderId })} disabled={saving}>
                               Notify Completion

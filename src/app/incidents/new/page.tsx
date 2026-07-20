@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useRole } from '@/context/RoleContext';
-import Link from 'next/link';
+import { useUnsavedChanges } from '@/context/UnsavedChangesContext';
 import LocationSelector, { DEFAULT_NODES, type LocationNode } from '@/components/LocationSelector';
 import MultiResponderSelect from '@/components/MultiResponderSelect';
 
@@ -11,9 +11,27 @@ import { getIncidentTaxonomy } from '@/lib/taxonomy';
 import { INCIDENT_CATEGORIES, DEFAULT_INCIDENT_CATEGORY, INCIDENT_CATEGORY_HELP } from '@/lib/incidentCategory';
 import { Case } from '@/lib/db';
 
+const INCIDENTS_CANCEL_HREF = '/case-management?tab=incidents';
+
 export default function NewIncidentPage() {
   const router = useRouter();
   const { username } = useRole();
+  const { setDirty, setHideNav, setLeaveHref, requestLeave } = useUnsavedChanges();
+
+  // Hide the left nav for the duration this full-page form is mounted, and
+  // register where Cancel / the browser Back guard should send the user.
+  // Cleanup restores normal nav + clears any dirty flag if the user
+  // navigates away via an unguarded path (e.g. hot reload in dev).
+  useEffect(() => {
+    setHideNav(true);
+    setLeaveHref(INCIDENTS_CANCEL_HREF);
+    return () => {
+      setHideNav(false);
+      setLeaveHref(null);
+      setDirty(false);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Simulation Setting state
   const [simulatedOffset, setSimulatedOffset] = useState<'now' | '45m' | '12d' | '15d'>('now');
@@ -139,6 +157,7 @@ export default function NewIncidentPage() {
     lng: number;
     tags: string[];
   }) => {
+    setDirty(true);
     setRoad(details.road);
     setBuilding(details.building);
     setLevelSpace(details.levelSpace);
@@ -422,6 +441,7 @@ export default function NewIncidentPage() {
 
       if (res.ok) {
         const data = await res.json();
+        setDirty(false); // saved — no longer at risk of losing changes
         setGeneratedCaseId(data.id);
         setGeneratedIncidentId(data.incident.id);
         setSuccessModal(true);
@@ -736,9 +756,14 @@ export default function NewIncidentPage() {
           <p>Complete the required sections below to log the incident — remaining details can be updated from the incident detail page later.</p>
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <Link href="/case-management?tab=incidents" className="btn btn-secondary btn-sm" style={{ display: 'inline-flex', alignItems: 'center', height: '32px' }}>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            style={{ display: 'inline-flex', alignItems: 'center', height: '32px' }}
+            onClick={() => requestLeave(() => router.push(INCIDENTS_CANCEL_HREF))}
+          >
             Cancel
-          </Link>
+          </button>
           <button type="submit" form="new-incident-form" className="btn btn-info" style={{ color: '#FFF', padding: '8px 18px', fontSize: '13px', height: '38px' }}>
             Log Incident
           </button>
@@ -817,7 +842,11 @@ export default function NewIncidentPage() {
       </div>
 
       {/* Accordion Form */}
-      <form id="new-incident-form" onSubmit={handleFormSubmit}>
+      <form
+        id="new-incident-form"
+        onSubmit={handleFormSubmit}
+        onChangeCapture={() => setDirty(true)}
+      >
         <div className="form-columns-container" style={{ display: 'flex', gap: '24px', alignItems: 'flex-start' }}>
           {/* Left Column: Form Sections */}
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -2184,7 +2213,7 @@ export default function NewIncidentPage() {
               <div style={{ maxWidth: '450px' }}>
                 <MultiResponderSelect
                   value={assignedResponders}
-                  onChange={setAssignedResponders}
+                  onChange={(updated) => { setDirty(true); setAssignedResponders(updated); }}
                   label="Select Responder(s) (Responder / Ranger Staff)"
                 />
               </div>

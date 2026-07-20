@@ -69,7 +69,10 @@
       "PowerShell(Stop-Process -Force)",
       "PowerShell(git add \"src/app/incidents/[...id]/page.tsx\")",
       "PowerShell(git push origin main 2>&1)",
-      "Bash(git pull *)"
+      "Bash(git pull *)",
+      "Bash(git -C \"D:\\\\Huy Sentosa\" diff)",
+      "Bash(git -C \"D:\\\\Huy Sentosa\" log --oneline -10)",
+      "Bash(git -C \"D:\\\\Huy Sentosa\" add -A)"
     ],
     "additionalDirectories": [
       "D:\\Huy Sentosa\\.claude\\skills"

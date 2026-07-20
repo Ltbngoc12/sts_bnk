@@ -119,6 +119,12 @@ body.sidebar-collapsed {
   --sidebar-width: 64px;
 }
 
+/* Full-page create/edit forms hide the sidebar entirely while active
+   (see UnsavedChangesContext `hideNav`) — reclaim the reserved width. */
+body.nav-hidden {
+  --sidebar-width: 0px;
+}
+
 /* ─── Resets ───────────────────────────────────────────────────── */
 *, *::before, *::after {
   margin: 0; padding: 0; box-sizing: border-box;
@@ -1058,4 +1064,54 @@ select.form-control, .select-dark {
   background-repeat: no-repeat;
   background-position: right 10px center;
   padding-right: 30px;
+}
+
+/* ─── Responder status dropdown (Controller-driven per-Responder status jump,
+   Responder Assignment card) — tinted per lifecycle stage so the control reads
+   like the badge next to it instead of a plain native select. Colors mirror
+   .badge-assigned/.badge-ack (--color-high), .badge-onsite (--color-active),
+   and .badge-pending-ctrl. ─────────────────────────────────────────────── */
+.responder-status-select {
+  cursor: pointer;
+  appearance: none;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 11px;
+  min-width: 152px;
+  padding: 4px 26px 4px 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-card);
+  color: var(--text-main);
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 11px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+.responder-status-select:hover:not(:disabled) { border-color: var(--border-color-hover); }
+.responder-status-select:focus {
+  outline: none;
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px rgba(255, 130, 0, 0.15);
+}
+.responder-status-select:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.responder-status-select--assigned,
+.responder-status-select--acknowledged {
+  background-color: var(--color-high-bg);
+  border-color: var(--color-high-border);
+  color: var(--color-high);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23F97316' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+}
+.responder-status-select--onsite {
+  background-color: var(--color-active-bg);
+  border-color: var(--color-active-border);
+  color: var(--color-active);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2310B981' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+}
+.responder-status-select--pending-review {
+  background-color: #FFF7ED;
+  border-color: #FED7AA;
+  color: #C2410C;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23C2410C' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
 }

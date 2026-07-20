@@ -3,12 +3,27 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useRole } from '@/context/RoleContext';
+import { useUnsavedChanges } from '@/context/UnsavedChangesContext';
 
 import { getIncidentTaxonomy, getTaskPriorityTaxonomy } from '@/lib/taxonomy';
+
+const NEW_CASE_CANCEL_HREF = '/case-management?tab=cases';
 
 export default function NewCasePage() {
   const router = useRouter();
   const { username } = useRole();
+  const { setDirty, setHideNav, setLeaveHref, requestLeave } = useUnsavedChanges();
+
+  useEffect(() => {
+    setHideNav(true);
+    setLeaveHref(NEW_CASE_CANCEL_HREF);
+    return () => {
+      setHideNav(false);
+      setLeaveHref(null);
+      setDirty(false);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // General Case Metadata
   const [caseTitle, setCaseTitle] = useState('');
@@ -194,6 +209,7 @@ export default function NewCasePage() {
       }
 
       // 3. Redirect back to Cases Registry Log
+      setDirty(false);
       router.push(`/cases/${caseId}`);
 
     } catch (err: any) {
@@ -213,7 +229,7 @@ export default function NewCasePage() {
       </div>
 
       <div className="glass" style={{ padding: '2rem', marginTop: '1rem' }}>
-        <form onSubmit={handleSubmit} className="modal-form">
+        <form onSubmit={handleSubmit} className="modal-form" onChangeCapture={() => setDirty(true)}>
           <h3 className="section-title">Case Metadata</h3>
           <div className="form-grid">
             <div className="form-group colspan-2">
@@ -579,7 +595,7 @@ export default function NewCasePage() {
             <button
               type="button"
               className="btn btn-secondary"
-              onClick={() => router.push('/case-management?tab=cases')}
+              onClick={() => requestLeave(() => router.push(NEW_CASE_CANCEL_HREF))}
               disabled={submitting}
             >
               Cancel

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import LocationSelector from '@/components/LocationSelector';
 import { getFaultTaxonomy } from '@/lib/taxonomy';
 import { Case } from '@/lib/db';
+import { useUnsavedChanges } from '@/context/UnsavedChangesContext';
 
 interface PrefillLocation {
   road?: string;
@@ -63,6 +64,7 @@ export default function FaultCreateModal({
   const [selectedCase, setSelectedCase] = useState<{ id: string; title: string }>({ id: 'NEW CASE', title: 'Auto-create new case' });
   const [caseSearchText, setCaseSearchText] = useState('');
   const [showCaseDropdown, setShowCaseDropdown] = useState(false);
+  const { setDirty, requestLeave } = useUnsavedChanges();
 
   useEffect(() => {
     setFaultTaxonomy(getFaultTaxonomy());
@@ -86,6 +88,7 @@ export default function FaultCreateModal({
       return;
     }
     resetForm();
+    setDirty(false);
     if (prefillLocation) {
       setLocRoad(prefillLocation.road || '');
       setLocBuilding(prefillLocation.building || '');
@@ -156,6 +159,7 @@ export default function FaultCreateModal({
 
       if (res.ok) {
         const data = await res.json();
+        setDirty(false);
         setSubmitResult({ faultId: data.fault?.id });
         setTimeout(() => {
           onSuccess();
@@ -209,7 +213,7 @@ export default function FaultCreateModal({
                 : 'Fault saved as draft. Submit to IFM CMMS separately from the fault list.'}
             </p>
           </div>
-          <button className="close-btn" onClick={() => { onClose(); resetForm(); }}>
+          <button className="close-btn" onClick={() => requestLeave(() => { onClose(); resetForm(); })}>
             <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -234,7 +238,7 @@ export default function FaultCreateModal({
             </div>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="modal-form">
+          <form onSubmit={handleSubmit} className="modal-form" onChangeCapture={() => setDirty(true)}>
             <div className="modal-scroll-area" style={{ gap: 0, padding: 0 }}>
 
               {/* Section: Link to Case (standalone faults only) */}
@@ -306,6 +310,7 @@ export default function FaultCreateModal({
                           {/* Option: Auto-create new case */}
                           <div
                             onClick={() => {
+                              setDirty(true);
                               setSelectedCaseId('new-case');
                               setSelectedCase({ id: 'NEW CASE', title: 'Auto-create new case' });
                               setShowCaseDropdown(false);
@@ -332,6 +337,7 @@ export default function FaultCreateModal({
                               <div
                                 key={c.id}
                                 onClick={() => {
+                                  setDirty(true);
                                   setSelectedCaseId(c.id);
                                   setSelectedCase(c);
                                   setShowCaseDropdown(false);
@@ -410,6 +416,7 @@ export default function FaultCreateModal({
                 {locationReady && (
                   <LocationSelector
                     onLocationSelect={details => {
+                      setDirty(true);
                       setLocRoad(details.road);
                       setLocBuilding(details.building);
                       setLocLevelSpace(details.levelSpace);
@@ -470,6 +477,7 @@ export default function FaultCreateModal({
                       type="button"
                       className="btn btn-secondary btn-xs"
                       onClick={() => {
+                        setDirty(true);
                         if (!locManualPin) {
                           setLocManualPin(true);
                           setLocLat(1.2562);
@@ -519,6 +527,7 @@ export default function FaultCreateModal({
                   onDrop={e => {
                     e.preventDefault();
                     (e.currentTarget as HTMLElement).style.borderColor = '';
+                    setDirty(true);
                     setAttachments(prev => [...prev, ...Array.from(e.dataTransfer.files)]);
                   }}
                 >
@@ -546,7 +555,7 @@ export default function FaultCreateModal({
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '85%', color: 'var(--text-sub)' }}>
                           📎 {f.name} <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>({(f.size / 1024).toFixed(0)} KB)</span>
                         </span>
-                        <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', fontSize: 14, padding: '0 4px', lineHeight: 1 }} onClick={() => setAttachments(prev => prev.filter((_, idx) => idx !== i))}>✕</button>
+                        <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', fontSize: 14, padding: '0 4px', lineHeight: 1 }} onClick={() => { setDirty(true); setAttachments(prev => prev.filter((_, idx) => idx !== i)); }}>✕</button>
                       </div>
                     ))}
                   </div>
@@ -572,7 +581,7 @@ export default function FaultCreateModal({
 
             {/* Sticky footer */}
             <div className="modal-actions-bar">
-              <button type="button" className="btn btn-secondary" onClick={() => { onClose(); resetForm(); }}>Cancel</button>
+              <button type="button" className="btn btn-secondary" onClick={() => requestLeave(() => { onClose(); resetForm(); })}>Cancel</button>
               <button
                 type="submit"
                 className="btn btn-primary"

@@ -3,7 +3,7 @@
 // db.ts so the pure date math (recurrence.ts) and the persistence layer stay
 // decoupled.
 
-import { DbSchema, RecurrenceSeries, Task, TaskAudit, TaskChecklistItem, generateTaskId, normalizeTaskPriority } from './db';
+import { DbSchema, RecurrenceSeries, Task, TaskAudit, TaskChecklistItem, generateTaskId, generateCaseId, normalizeTaskPriority } from './db';
 import { occurrenceDatesToGenerate, addDaysISO, todayStr, isSeriesExhausted } from './recurrence';
 
 const rid = () => Math.random().toString(36).substring(2, 9);
@@ -44,9 +44,25 @@ export function generateOccurrencesForSeries(
 
   for (const date of wanted) {
     if (existing.has(date)) continue;
+
+    // Feedback: occurrences should not pile up under one shared Case — every
+    // generated occurrence gets its own fresh Case (Model A, taken literally).
+    const occCaseId = generateCaseId(db);
+    db.cases.push({
+      id: occCaseId,
+      title: `Case for Task: ${tmpl.title} (${date})`,
+      status: 'Active',
+      createdAt: new Date().toISOString(),
+      closedAt: null,
+      closedBy: null,
+      createdBy: series.createdBy,
+      cmmsTickets: [],
+      incident: null,
+    });
+
     const task: Task = {
       id: generateTaskId(db),
-      caseId: series.caseId,
+      caseId: occCaseId,
       title: tmpl.title,
       description: tmpl.description || '',
       assignee: hasAssignee ? tmpl.assignee : 'Unassigned',
@@ -63,7 +79,7 @@ export function generateOccurrencesForSeries(
       attachments: [],
       createdBy: series.createdBy,
       createdDate: new Date().toISOString(),
-      audits: [audit('System', 'Generated', `Occurrence for ${date} generated from recurrence series ${series.id}.`)],
+      audits: [audit('System', 'Generated', `Occurrence for ${date} generated from recurrence series ${series.id} under new Case ${occCaseId}.`)],
     };
     db.tasks.push(task);
     existing.add(date);

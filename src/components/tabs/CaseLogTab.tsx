@@ -31,7 +31,7 @@ export function CaseLogTab() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   // Filter States
-  const [activeTab, setActiveTab] = useState<'All' | 'Active'>('All');
+  const [activeTab, setActiveTab] = useState<'All' | 'Active'>('Active');
   const [filterStatus, setFilterStatus] = useState('All');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -136,7 +136,7 @@ export function CaseLogTab() {
     setHasFaults(false);
     setHasEDiary(false);
     setShowLinkedDropdown(false);
-    setActiveTab('All');
+    setActiveTab('Active');
     setPage(1);
   };
 
@@ -157,38 +157,6 @@ export function CaseLogTab() {
           
           {/* Left Side: Tabs */}
           <div style={{ display: 'flex', gap: '4px' }}>
-            <button
-              onClick={() => { setActiveTab('All'); setPage(1); }}
-              className={`tab-btn ${activeTab === 'All' ? 'active' : ''}`}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                borderBottom: activeTab === 'All' ? '2px solid var(--color-primary)' : '2px solid transparent',
-                color: activeTab === 'All' ? 'var(--color-primary)' : 'var(--text-muted)',
-                padding: '8px 16px',
-                fontSize: '13px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              All Cases
-              <span style={{
-                fontSize: '11px',
-                fontWeight: 700,
-                background: activeTab === 'All' ? 'var(--color-primary-bg)' : 'var(--bg-inset)',
-                color: activeTab === 'All' ? 'var(--color-primary)' : 'var(--text-muted)',
-                padding: '2px 8px',
-                borderRadius: '10px',
-                minWidth: '20px',
-                textAlign: 'center'
-              }}>
-                {stats.total}
-              </span>
-            </button>
             <button
               onClick={() => { setActiveTab('Active'); setPage(1); }}
               className={`tab-btn ${activeTab === 'Active' ? 'active' : ''}`}
@@ -219,6 +187,38 @@ export function CaseLogTab() {
                 textAlign: 'center'
               }}>
                 {stats.active}
+              </span>
+            </button>
+            <button
+              onClick={() => { setActiveTab('All'); setPage(1); }}
+              className={`tab-btn ${activeTab === 'All' ? 'active' : ''}`}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                borderBottom: activeTab === 'All' ? '2px solid var(--color-primary)' : '2px solid transparent',
+                color: activeTab === 'All' ? 'var(--color-primary)' : 'var(--text-muted)',
+                padding: '8px 16px',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              All Cases
+              <span style={{
+                fontSize: '11px',
+                fontWeight: 700,
+                background: activeTab === 'All' ? 'var(--color-primary-bg)' : 'var(--bg-inset)',
+                color: activeTab === 'All' ? 'var(--color-primary)' : 'var(--text-muted)',
+                padding: '2px 8px',
+                borderRadius: '10px',
+                minWidth: '20px',
+                textAlign: 'center'
+              }}>
+                {stats.total}
               </span>
             </button>
           </div>
@@ -374,7 +374,7 @@ export function CaseLogTab() {
 
 
             {/* Clear Filters — inside panel */}
-            {(searchTerm || filterStatus !== 'All' || startDate || endDate || createdBy || hasIncident || hasTasks || hasFaults || hasEDiary || activeTab !== 'All') && (
+            {(searchTerm || filterStatus !== 'All' || startDate || endDate || createdBy || hasIncident || hasTasks || hasFaults || hasEDiary || activeTab !== 'Active') && (
               <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end' }}>
                 <button
                   onClick={handleResetFilters}
@@ -406,6 +406,9 @@ export function CaseLogTab() {
               <table className="custom-table">
                 <thead>
                   <tr>
+                    <th onClick={() => handleSort('createdAt')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                      Date Logged {sortBy === 'createdAt' && (sortOrder === 'asc' ? '▲' : '▼')}
+                    </th>
                     <th onClick={() => handleSort('id')} style={{ cursor: 'pointer', userSelect: 'none' }}>
                       Case ID {sortBy === 'id' && (sortOrder === 'asc' ? '▲' : '▼')}
                     </th>
@@ -419,9 +422,6 @@ export function CaseLogTab() {
                     <th onClick={() => handleSort('createdBy')} style={{ cursor: 'pointer', userSelect: 'none' }}>
                       Created By {sortBy === 'createdBy' && (sortOrder === 'asc' ? '▲' : '▼')}
                     </th>
-                    <th onClick={() => handleSort('createdAt')} style={{ cursor: 'pointer', userSelect: 'none' }}>
-                      Date Logged {sortBy === 'createdAt' && (sortOrder === 'asc' ? '▲' : '▼')}
-                    </th>
                     <th onClick={() => handleSort('closedAt')} style={{ cursor: 'pointer', userSelect: 'none' }}>
                       Closed At {sortBy === 'closedAt' && (sortOrder === 'asc' ? '▲' : '▼')}
                     </th>
@@ -430,6 +430,10 @@ export function CaseLogTab() {
                 <tbody>
                   {cases.map(c => (
                     <tr key={c.id} onClick={() => window.location.href = `/cases/${c.id}`} style={{ cursor: 'pointer' }}>
+                      <td style={{ whiteSpace: 'nowrap', fontSize: '12px', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>
+                        {new Date(c.createdAt).toLocaleDateString('en-SG')}{' '}
+                        {new Date(c.createdAt).toLocaleTimeString('en-SG', { hour12: false, hour: '2-digit', minute: '2-digit' })}
+                      </td>
                       <td>
                         <span className="mono-id">{c.id}</span>
                       </td>
@@ -457,9 +461,9 @@ export function CaseLogTab() {
                               📝 e-Diary ({c.occurrenceCount})
                             </span>
                           )}
-                          {!c.incident && 
-                           !(c.faultCount ?? c.cmmsTickets?.length ?? 0) && 
-                           !(c.taskCount ?? 0) && 
+                          {!c.incident &&
+                           !(c.faultCount ?? c.cmmsTickets?.length ?? 0) &&
+                           !(c.taskCount ?? 0) &&
                            !(c.occurrenceCount ?? 0) && (
                             <span style={{ color: 'var(--text-faint)' }}>—</span>
                           )}
@@ -467,10 +471,6 @@ export function CaseLogTab() {
                       </td>
                       <td style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                         {c.createdBy}
-                      </td>
-                      <td style={{ whiteSpace: 'nowrap', fontSize: '12px', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>
-                        {new Date(c.createdAt).toLocaleDateString('en-SG')}{' '}
-                        {new Date(c.createdAt).toLocaleTimeString('en-SG', { hour12: false, hour: '2-digit', minute: '2-digit' })}
                       </td>
                       <td style={{ whiteSpace: 'nowrap', fontSize: '12px', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>
                         {c.closedAt ? (

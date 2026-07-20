@@ -203,7 +203,6 @@ export function FaultLogTab() {
             <table className="custom-table">
               <thead>
                 <tr>
-                  <th>Case ID</th>
                   <th>Fault ID</th>
                   <th>Fault Type</th>
                   <th>Sub-type</th>
@@ -220,22 +219,6 @@ export function FaultLogTab() {
                 {paginatedFaults.map(f => (
                   <tr key={f.id} onClick={() => window.location.href = `/faults/${f.id}`} style={{ cursor: 'pointer' }}>
                     <td>
-                      <span className="mono-id">
-                        <Link
-                          href={`/cases/${f.caseId}`}
-                          onClick={e => e.stopPropagation()}
-                          style={{ textDecoration: 'none', color: 'inherit' }}
-                        >
-                          {f.caseId}
-                        </Link>
-                      </span>
-                      {f.linkedIncidentId && (
-                        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
-                          via {f.linkedIncidentId}
-                        </div>
-                      )}
-                    </td>
-                    <td>
                       <span className="mono-id" style={{ color: 'var(--color-primary)', background: 'var(--color-primary-bg)', borderColor: 'var(--color-primary-border)' }}>
                         <Link
                           href={`/faults/${f.id}`}
@@ -245,6 +228,11 @@ export function FaultLogTab() {
                           {f.id}
                         </Link>
                       </span>
+                      {f.linkedIncidentId && (
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
+                          via {f.linkedIncidentId}
+                        </div>
+                      )}
                     </td>
                     <td style={{ fontWeight: 600, fontSize: 12 }}>{f.faultType}</td>
                     <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{f.faultSubType}</td>

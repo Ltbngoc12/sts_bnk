@@ -5,6 +5,7 @@ import LocationSelector from '@/components/LocationSelector';
 import BoundaryMapDrawer, { BoundaryPoint } from '@/components/BoundaryMapDrawer';
 import { getEventTaxonomy } from '@/lib/taxonomy';
 import { EventRecord } from '@/lib/db';
+import { useUnsavedChanges } from '@/context/UnsavedChangesContext';
 
 interface Props {
   isOpen: boolean;
@@ -37,6 +38,7 @@ export default function EventCreateModal({
   canDelete = false,
 }: Props) {
   const isEdit = !!editingEvent;
+  const { setDirty, requestLeave } = useUnsavedChanges();
 
   // Opening an existing event defaults to a read-only View; opening for create goes
   // straight to the form. "Edit" in View mode switches this to 'form'.
@@ -79,6 +81,7 @@ export default function EventCreateModal({
     setError(null);
     setConfirmDeleteOpen(false);
     setDeleting(false);
+    setDirty(false);
     setMode(editingEvent ? 'view' : 'form');
     if (editingEvent) {
       setName(editingEvent.name);
@@ -185,6 +188,7 @@ export default function EventCreateModal({
           });
 
       if (res.ok) {
+        setDirty(false);
         onSuccess();
         onClose();
         resetForm();
@@ -203,13 +207,16 @@ export default function EventCreateModal({
   // Cancel out of the form: if we got here by pressing Edit from View mode, go back
   // to View instead of closing outright. Creating fresh (no editingEvent) still closes.
   const handleCancelForm = () => {
-    if (editingEvent) {
-      setMode('view');
-      setError(null);
-    } else {
-      onClose();
-      resetForm();
-    }
+    requestLeave(() => {
+      if (editingEvent) {
+        setMode('view');
+        setError(null);
+        setDirty(false);
+      } else {
+        onClose();
+        resetForm();
+      }
+    });
   };
 
   const handleDelete = async () => {
@@ -249,7 +256,7 @@ export default function EventCreateModal({
               {sourceEDiaryId ? `Created from e-Diary entry ${sourceEDiaryId} — reference will be retained (§9.1.3c).` : 'FRD §8.1 — Events Master List record. Does not affect Case status or closure.'}
             </p>
           </div>
-          <button className="close-btn" onClick={() => { onClose(); resetForm(); }}>
+          <button className="close-btn" onClick={() => requestLeave(() => { onClose(); resetForm(); })}>
             <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -354,7 +361,7 @@ export default function EventCreateModal({
             </div>
           </div>
         ) : (
-        <form onSubmit={handleSubmit} className="modal-form">
+        <form onSubmit={handleSubmit} className="modal-form" onChangeCapture={() => setDirty(true)}>
           <div className="modal-scroll-area" style={{ gap: 0, padding: 0 }}>
 
             {/* Section 1: Event Details */}
@@ -393,6 +400,7 @@ export default function EventCreateModal({
               {locationReady && (
                 <LocationSelector
                   onLocationSelect={details => {
+                    setDirty(true);
                     setLocRoad(details.road);
                     setLocBuilding(details.building);
                     setLocLevelSpace(details.levelSpace);
@@ -415,7 +423,7 @@ export default function EventCreateModal({
                 <BoundaryMapDrawer
                   center={{ lat: locLat, lng: locLng }}
                   initialBoundary={editingEvent?.boundaryCoordinates}
-                  onBoundaryChange={setBoundary}
+                  onBoundaryChange={(pts) => { setDirty(true); setBoundary(pts); }}
                   disabled={!locationSelected}
                 />
               </div>
