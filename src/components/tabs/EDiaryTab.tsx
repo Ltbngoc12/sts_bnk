@@ -1,29 +1,32 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Case, Occurrence, EventRecord } from '@/lib/db';
+import { Occurrence, EventRecord } from '@/lib/db';
+import { getEDiaryTaxonomy } from '@/lib/taxonomy';
 import { useRole } from '@/context/RoleContext';
 import EventCreateModal from '@/components/EventCreateModal';
+import FaultCreateModal from '@/components/FaultCreateModal';
+import TaskCreateModal from '@/components/TaskCreateModal';
 
 // Roles allowed to access e-Diary per FRD §8.3
 const ALLOWED_ROLES = ['Controller', 'Duty Officer', 'Duty Manager', 'System Administrator', 'Current Ops Administrator'];
 
-// Predefined occurrence topics
+// Occurrence topics — the 5 physical logbooks the client digitised (2026-07-21 feedback),
+// see EDIARY_MODULE_UPDATE_PLAN.md §8. "Others" kept as an escape hatch for anything
+// that doesn't fit those 5 categories.
 export const TOPICS = [
-  'VIP Visit Advisory',
-  'Dignitary Visit Notification',
-  'Routine Siren Testing',
-  'Ranger Shift Handover',
-  'General Public Interaction',
-  'Coordinated Drill / Exercise',
-  'Information Dissemination',
-  'Lost and Found Report',
-  'Contractor Access Granted',
+  'General Occurrence',
+  'Carpark Barrier',
+  'Asset Book — Radio/BWC',
+  'Asset Book — Keys',
+  'Lost & Found',
   'Others',
 ];
 
 const ITEMS_PER_PAGE = 10;
+
+const labelStyle: React.CSSProperties = { fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.04em', display: 'block', marginBottom: 4 };
 
 export function EDiaryTab() {
   const { role, username } = useRole();
@@ -32,29 +35,43 @@ export function EDiaryTab() {
   const [occurrences, setOccurrences] = useState<Occurrence[]>([]);
   const [loading, setLoading] = useState(true);
 
-
   // Filters
   const [searchTerm, setSearchTerm]   = useState('');
   const [topicFilter, setTopicFilter] = useState('All');
   const [dateStart, setDateStart]     = useState('');
   const [dateEnd, setDateEnd]         = useState('');
+  // Search & filter panel — collapsed by default, client feedback 2026-07-21 (was an always-open
+  // box that felt empty/disconnected from the table); toggled via the "Search & filter" button.
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Create entry states
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [topic, setTopic]       = useState('');
-  const [customTopic, setCustomTopic] = useState('');
-  const [content, setContent]   = useState('');
-  const [dateTime, setDateTime] = useState('');
-  const [caseIdInput, setCaseIdInput] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  // Quick-add bar — replaces the old "New Entry" modal (client feedback: no more
+  // pop-up/case-picker, just Type + narrative inline above the list). Every quick-add
+  // always auto-creates its own dedicated Case (client feedback: never merge).
+  const [quickTopic, setQuickTopic] = useState('');
+  const [quickContent, setQuickContent] = useState('');
+  const [quickDateTime, setQuickDateTime] = useState('');
+  const [showMore, setShowMore] = useState(false);
+  const [quickSubmitting, setQuickSubmitting] = useState(false);
 
-  // Link to Existing Case — searchable dropdown (mirrors the Task Board's case selector)
-  const [cases, setCases] = useState<Case[]>([]);
-  const [showCaseDropdown, setShowCaseDropdown] = useState(false);
-  const [caseSearchText, setCaseSearchText] = useState('');
+  // e-Diary ID link picker — replaces the old free-text Ref No field (client feedback
+  // 2026-07-21: link straight to an existing entry's real e-Diary ID instead of typing
+  // a Ref No by hand). Same search+select UX as the "Link Existing Event" picker below.
+  const [quickLinkedId, setQuickLinkedId] = useState('');
+  const [quickLinkSearchText, setQuickLinkSearchText] = useState('');
+  const [quickLinkDropdownOpen, setQuickLinkDropdownOpen] = useState(false);
+  const quickLinkBoxRef = useRef<HTMLDivElement>(null);
+
+  // Topic combobox — fuzzy-search against Taxonomy's "eDiary" category, free text if it
+  // doesn't exist there (client feedback 2026-07-21: Topic managed in Taxonomy admin now).
+  const [topicOptions, setTopicOptions] = useState<string[]>([]);
+  const [topicDropdownOpen, setTopicDropdownOpen] = useState(false);
+  const topicBoxRef = useRef<HTMLDivElement>(null);
+
+  // View popup — replaces navigating straight to the Case detail page on row click.
+  const [viewingEntry, setViewingEntry] = useState<Occurrence | null>(null);
 
   // Escalate to Incident
   const [escalatingEntry, setEscalatingEntry] = useState<Occurrence | null>(null);
@@ -66,6 +83,10 @@ export function EDiaryTab() {
   const [eventSearchText, setEventSearchText] = useState('');
   const [showEventDropdown, setShowEventDropdown] = useState(false);
   const [linkingEventId, setLinkingEventId] = useState<string | null>(null);
+
+  // Create Fault / Task from a combined Actions menu (client feedback: gộp Incident/Fault/Task/Event)
+  const [faultLinkingEntry, setFaultLinkingEntry] = useState<Occurrence | null>(null);
+  const [taskLinkingEntry, setTaskLinkingEntry] = useState<Occurrence | null>(null);
 
   const canEdit = ALLOWED_ROLES.includes(role);
 
@@ -87,13 +108,6 @@ export function EDiaryTab() {
   useEffect(() => { fetchOccurrences(); }, [fetchOccurrences]);
   useEffect(() => { setCurrentPage(1); }, [searchTerm, dateStart, dateEnd, topicFilter]);
 
-  useEffect(() => {
-    fetch('/api/cases')
-      .then(res => res.ok ? res.json() : [])
-      .then(setCases)
-      .catch(err => console.error('Error fetching cases:', err));
-  }, []);
-
   const fetchEvents = useCallback(async () => {
     try {
       const res = await fetch('/api/events');
@@ -107,6 +121,33 @@ export function EDiaryTab() {
   }, []);
 
   useEffect(() => { fetchEvents(); }, [fetchEvents]);
+  useEffect(() => { setTopicOptions(getEDiaryTaxonomy()); }, []);
+
+  // Close Topic dropdown on genuine outside clicks only — a full-screen click-catcher
+  // (used elsewhere for menus) doesn't work here because it would sit on top of the
+  // input itself and swallow clicks meant to reposition the cursor / retype.
+  useEffect(() => {
+    if (!topicDropdownOpen) return;
+    const onPointerDown = (e: MouseEvent) => {
+      if (topicBoxRef.current && !topicBoxRef.current.contains(e.target as Node)) {
+        setTopicDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    return () => document.removeEventListener('mousedown', onPointerDown);
+  }, [topicDropdownOpen]);
+
+  // Close the e-Diary ID link-picker dropdown on outside clicks — same pattern as Topic above.
+  useEffect(() => {
+    if (!quickLinkDropdownOpen) return;
+    const onPointerDown = (e: MouseEvent) => {
+      if (quickLinkBoxRef.current && !quickLinkBoxRef.current.contains(e.target as Node)) {
+        setQuickLinkDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    return () => document.removeEventListener('mousedown', onPointerDown);
+  }, [quickLinkDropdownOpen]);
 
   // Guard: roles without access see nothing
   if (!ALLOWED_ROLES.includes(role)) {
@@ -119,11 +160,17 @@ export function EDiaryTab() {
     );
   }
 
-
   const filtered = occurrences.filter(o => {
     const q = searchTerm.toLowerCase();
     return o.topic.toLowerCase().includes(q) || o.content.toLowerCase().includes(q);
   });
+
+  const activeFilterCount = [
+    searchTerm.trim() !== '',
+    dateStart !== '',
+    dateEnd !== '',
+    topicFilter !== 'All',
+  ].filter(Boolean).length;
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -136,12 +183,11 @@ export function EDiaryTab() {
     setTopicFilter('All');
   };
 
-  // ── Create ──────────────────────────────────────────────────────────────────
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const finalTopic = topic === 'Others' ? customTopic.trim() : topic;
-    if (!finalTopic || !content.trim()) return;
-    setSubmitting(true);
+  // ── Quick-add ──────────────────────────────────────────────────────────────
+  const handleQuickLog = async () => {
+    const finalTopic = quickTopic.trim();
+    if (!finalTopic || !quickContent.trim() || quickSubmitting) return;
+    setQuickSubmitting(true);
     try {
       const res = await fetch('/api/occurrences', {
         method: 'POST',
@@ -149,19 +195,18 @@ export function EDiaryTab() {
         body: JSON.stringify({
           username,
           topic: finalTopic,
-          content: content.trim(),
-          dateTime: dateTime ? new Date(dateTime).toISOString() : undefined,
-          caseId: caseIdInput.trim() || undefined,
+          content: quickContent.trim(),
+          dateTime: quickDateTime ? new Date(quickDateTime).toISOString() : undefined,
+          refNo: quickLinkedId || undefined,
         }),
       });
       if (res.ok) {
-        setShowCreateForm(false);
-        setTopic(''); setCustomTopic(''); setContent(''); setDateTime(''); setCaseIdInput('');
-        setCaseSearchText(''); setShowCaseDropdown(false);
+        setQuickTopic(''); setQuickContent('');
+        setQuickLinkedId(''); setQuickLinkSearchText(''); setQuickDateTime(''); setShowMore(false);
         await fetchOccurrences();
       }
     } finally {
-      setSubmitting(false);
+      setQuickSubmitting(false);
     }
   };
 
@@ -200,84 +245,268 @@ export function EDiaryTab() {
     }
   };
 
+  const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('en-SG', { day: '2-digit', month: 'short', year: 'numeric' });
+  const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString('en-SG', { hour: '2-digit', minute: '2-digit', hour12: false });
+  const fmtDateTime = (iso: string) => `${fmtDate(iso)} ${fmtTime(iso)}`;
 
   return (
     <>
-      {/* Filter panel */}
-      <div className="glass" style={{ padding: '20px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-
-          {/* Search */}
-          <div style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.04em' }}>Search Entries:</label>
-            <input
-              type="text"
-              placeholder="Search topic or content…"
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              className="form-control"
-              style={{ width: '100%' }}
-            />
+      {/* Quick-add bar — Type + narrative, one click to log. "More" reveals the e-Diary ID
+          link picker / backdating. Header strip added for visual hierarchy (client feedback
+          2026-07-21: felt too plain/floating without it) — no entry count shown per client's call. */}
+      {canEdit && (
+        <div className="glass" style={{ borderRadius: '0 12px 12px 0', borderLeft: '3px solid var(--color-primary)' }}>
+          {/* No overflow:hidden here — it was clipping the Topic dropdown below, since the
+              dropdown renders past this header's bottom edge. borderTopRightRadius on the
+              header instead handles the corner (header has its own bg fill, unlike the plain
+              content area below which inherits the card's own rounded white background). */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '12px 20px', borderBottom: '1px solid var(--border-color)', background: 'var(--color-primary-bg)', borderTopRightRadius: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 15 }}>📝</span>
+              <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-main)' }}>Quick log entry</span>
+              <span style={{ fontSize: 11.5, color: 'var(--text-faint)' }}>— logs straight into the diary below</span>
+            </div>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'right' }}>
+              <strong style={{ color: 'var(--text-sub)' }}>FRD §8.2 —</strong> Once submitted, an entry is immutable and cannot be edited or deleted. To correct a mistake, log a new entry referencing this Occurrence ID.
+            </span>
           </div>
 
-          {/* Date From */}
-          <div style={{ flex: '0 1 150px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.04em' }}>Date From:</label>
-            <input type="date" value={dateStart} max={dateEnd || undefined}
-              onChange={e => setDateStart(e.target.value)} className="form-control" style={{ width: '100%', height: '36px' }} />
-          </div>
-
-          {/* Date To */}
-          <div style={{ flex: '0 1 150px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.04em' }}>Date To:</label>
-            <input type="date" value={dateEnd} min={dateStart || undefined}
-              onChange={e => setDateEnd(e.target.value)} className="form-control" style={{ width: '100%', height: '36px' }} />
-          </div>
-
-          {/* Topic / Subject */}
-          <div style={{ flex: '0 1 180px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.04em' }}>Topic / Subject:</label>
-            <select value={topicFilter} onChange={e => setTopicFilter(e.target.value)} className="form-control select-dark" style={{ width: '100%', height: '36px' }}>
-              <option value="All">All Topics</option>
-              {TOPICS.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-          </div>
-
-          {/* Clear + Create */}
-          <div style={{ display: 'flex', gap: '10px', height: '36px', alignItems: 'center' }}>
-            <button
-              type="button"
-              onClick={resetFilters}
-              className="btn btn-secondary"
-              style={{ padding: '0 10px', fontSize: '12px', height: '100%', border: 'none', background: 'transparent', textDecoration: 'underline', whiteSpace: 'nowrap' }}
-            >
-              Clear
-            </button>
-            {canEdit && (
+          <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
+                <label style={labelStyle}>Topic</label>
+                <div ref={topicBoxRef} style={{ position: 'relative' }}>
+                  <span style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', fontSize: 12, color: 'var(--text-faint)', pointerEvents: 'none' }}>🏷</span>
+                  <input
+                    type="text"
+                    value={quickTopic}
+                    onChange={e => { setQuickTopic(e.target.value); setTopicDropdownOpen(true); }}
+                    onFocus={() => setTopicDropdownOpen(true)}
+                    placeholder="Type or pick a topic…"
+                    className="form-control"
+                    autoComplete="off"
+                    style={{ width: 210, height: 36, fontSize: 13, paddingLeft: 26 }}
+                  />
+                  {topicDropdownOpen && (() => {
+                    const q = quickTopic.trim().toLowerCase();
+                    const matches = topicOptions.filter(t => !q || t.toLowerCase().includes(q));
+                    const exactMatch = topicOptions.some(t => t.toLowerCase() === q);
+                    return (
+                      <div className="glass search-select-dropdown" style={{ position: 'absolute', top: '100%', left: 0, width: 210, zIndex: 100, marginTop: 4, border: '1px solid var(--border-color)', borderRadius: 8, maxHeight: 200, overflowY: 'auto' }}>
+                          {matches.map(t => (
+                            <div
+                              key={t}
+                              onClick={() => { setQuickTopic(t); setTopicDropdownOpen(false); }}
+                              className="search-select-option"
+                              style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 12.5 }}
+                            >
+                              {t}
+                            </div>
+                          ))}
+                          {q && !exactMatch && (
+                            <div
+                              onClick={() => setTopicDropdownOpen(false)}
+                              className="search-select-option"
+                              style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 12.5, color: 'var(--color-primary)', fontWeight: 600, borderTop: matches.length ? '1px solid var(--border-color)' : 'none' }}
+                            >
+                              Use "{quickTopic.trim()}" as new topic
+                            </div>
+                          )}
+                          {matches.length === 0 && !q && (
+                            <div style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-muted)' }}>Type to add a topic…</div>
+                          )}
+                        </div>
+                    );
+                  })()}
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 280px' }}>
+                <label style={labelStyle}>Narrative <span style={{ fontWeight: 400, textTransform: 'none' }}>(Ctrl+Enter to log)</span></label>
+                <textarea
+                  placeholder="What happened…"
+                  value={quickContent}
+                  onChange={e => setQuickContent(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); handleQuickLog(); } }}
+                  className="form-control"
+                  rows={1}
+                  style={{ width: '100%', minHeight: 36, fontSize: 13, resize: 'vertical', lineHeight: 1.4, paddingTop: 8, paddingBottom: 8, fontFamily: 'inherit' }}
+                />
+              </div>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setShowMore(m => !m)}
+                style={{ height: 36, padding: '0 12px', fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}
+              >
+                More <span style={{ fontSize: 9, display: 'inline-block', transform: showMore ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>▾</span>
+              </button>
               <button
                 type="button"
                 className="btn btn-primary"
-                onClick={() => setShowCreateForm(true)}
-                style={{ fontSize: '12.5px', height: '36px', padding: '0 14px', display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap', fontWeight: 600 }}
+                onClick={handleQuickLog}
+                disabled={!quickTopic.trim() || !quickContent.trim() || quickSubmitting}
+                style={{ height: 36, padding: '0 18px', fontSize: 12.5, fontWeight: 700, whiteSpace: 'nowrap' }}
               >
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: 13, height: 13 }}>
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-                </svg>
-                NEW ENTRY
+                {quickSubmitting ? 'Logging…' : '+ Log'}
               </button>
+            </div>
+
+            {showMore && (
+              <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', paddingTop: 8, borderTop: '1px solid var(--border-color)' }}>
+                <div style={{ flex: '0 1 260px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <label style={labelStyle}>e-Diary ID <span style={{ fontWeight: 400, textTransform: 'none' }}>(optional — link to a related entry)</span></label>
+                  <div ref={quickLinkBoxRef} style={{ position: 'relative' }}>
+                    <div
+                      onClick={() => setQuickLinkDropdownOpen(o => !o)}
+                      className="form-control select-dark search-select-trigger"
+                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', height: 34, padding: '0 10px', fontSize: 13 }}
+                    >
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: quickLinkedId ? 'var(--text-main)' : 'var(--text-faint)' }}>
+                        {quickLinkedId || 'Search e-Diary ID or topic…'}
+                      </span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                        {quickLinkedId && (
+                          <span
+                            onClick={e => { e.stopPropagation(); setQuickLinkedId(''); setQuickLinkSearchText(''); }}
+                            style={{ fontSize: 11, color: 'var(--text-faint)' }}
+                            title="Clear link"
+                          >
+                            ✕
+                          </span>
+                        )}
+                        <span style={{ fontSize: 10, opacity: 0.7 }}>▼</span>
+                      </span>
+                    </div>
+                    {quickLinkDropdownOpen && (() => {
+                      const q = quickLinkSearchText.trim().toLowerCase();
+                      const matches = occurrences
+                        .filter(o => !q || o.id.toLowerCase().includes(q) || o.topic.toLowerCase().includes(q))
+                        .slice(0, 30);
+                      return (
+                        <div className="glass search-select-dropdown" style={{ position: 'absolute', top: '100%', left: 0, width: 280, zIndex: 100, marginTop: 4, border: '1px solid var(--border-color)', borderRadius: 8, maxHeight: 220, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                          <div style={{ padding: 8, borderBottom: '1px solid var(--border-color)' }}>
+                            <input
+                              type="text"
+                              placeholder="Search e-Diary ID or topic…"
+                              value={quickLinkSearchText}
+                              onChange={e => setQuickLinkSearchText(e.target.value)}
+                              onClick={e => e.stopPropagation()}
+                              className="form-control"
+                              style={{ fontSize: 12, height: 30, width: '100%', boxSizing: 'border-box' }}
+                              autoFocus
+                            />
+                          </div>
+                          <div style={{ overflowY: 'auto', flex: 1 }}>
+                            {matches.map(o => (
+                              <div
+                                key={o.id}
+                                onClick={() => { setQuickLinkedId(o.id); setQuickLinkDropdownOpen(false); setQuickLinkSearchText(''); }}
+                                className="search-select-option"
+                                style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 12.5 }}
+                              >
+                                <div style={{ fontWeight: 600 }}>{o.id}</div>
+                                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{o.topic}</div>
+                              </div>
+                            ))}
+                            {matches.length === 0 && (
+                              <div style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>No matching entries.</div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+                <div style={{ flex: '0 1 240px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <label style={labelStyle}>Time <span style={{ fontWeight: 400, textTransform: 'none' }}>(defaults to now)</span></label>
+                  <input type="datetime-local" value={quickDateTime} onChange={e => setQuickDateTime(e.target.value)} className="form-control" style={{ height: 34, fontSize: 13 }} />
+                </div>
+              </div>
             )}
           </div>
-
         </div>
-      </div>
+      )}
 
-      {/* Immutability note */}
-      <div style={{ marginTop: 10, padding: '6px 14px', background: 'rgba(255,255,255,0.03)', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-        <strong style={{ color: 'var(--text-sub)' }}>FRD §8.2 —</strong> Once submitted, an entry is immutable and cannot be edited or deleted. To correct a mistake, log a new entry referencing this Occurrence ID.
-      </div>
+      {/* Table & Content — search/filter lives as a collapsed toggle in the header row now
+          (client feedback 2026-07-21: standalone box felt empty/disconnected from the table) */}
+      <div className="glass" style={{ marginTop: 10, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
 
-      {/* Table & Content */}
-      <div className="glass" style={{ marginTop: '10px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '1px solid var(--border-color)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-main)' }}>
+            Entries <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>({filtered.length})</span>
+          </span>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => setFiltersOpen(o => !o)}
+            style={{ height: 32, padding: '0 12px', fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}
+          >
+            Search &amp; filter
+            {activeFilterCount > 0 && (
+              <span style={{ background: 'var(--color-primary)', color: '#FFF', fontSize: 10, fontWeight: 700, borderRadius: 8, padding: '1px 6px', lineHeight: 1.4 }}>
+                {activeFilterCount}
+              </span>
+            )}
+            <span style={{ fontSize: 9, display: 'inline-block', transform: filtersOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>▾</span>
+          </button>
+        </div>
+
+        {filtersOpen && (
+          <div style={{ padding: '16px 20px', background: 'var(--bg-inset)', borderBottom: '1px solid var(--border-color)' }}>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+
+              {/* Search */}
+              <div style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={labelStyle}>Search Entries:</label>
+                <input
+                  type="text"
+                  placeholder="Search topic or content…"
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  className="form-control"
+                  style={{ width: '100%' }}
+                />
+              </div>
+
+              {/* Date From */}
+              <div style={{ flex: '0 1 150px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={labelStyle}>Date From:</label>
+                <input type="date" value={dateStart} max={dateEnd || undefined}
+                  onChange={e => setDateStart(e.target.value)} className="form-control" style={{ width: '100%', height: '36px' }} />
+              </div>
+
+              {/* Date To */}
+              <div style={{ flex: '0 1 150px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={labelStyle}>Date To:</label>
+                <input type="date" value={dateEnd} min={dateStart || undefined}
+                  onChange={e => setDateEnd(e.target.value)} className="form-control" style={{ width: '100%', height: '36px' }} />
+              </div>
+
+              {/* Topic / Subject */}
+              <div style={{ flex: '0 1 200px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={labelStyle}>Topic / Subject:</label>
+                <select value={topicFilter} onChange={e => setTopicFilter(e.target.value)} className="form-control select-dark" style={{ width: '100%', height: '36px' }}>
+                  <option value="All">All Topics</option>
+                  {topicOptions.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+
+              {/* Clear */}
+              <div style={{ display: 'flex', gap: '10px', height: '36px', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="btn btn-secondary"
+                  style={{ padding: '0 10px', fontSize: '12px', height: '100%', border: 'none', background: 'transparent', textDecoration: 'underline', whiteSpace: 'nowrap' }}
+                >
+                  Clear
+                </button>
+              </div>
+
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <div className="loading-container" style={{ padding: '40px' }}>
             <div className="spinner" />
@@ -290,54 +519,54 @@ export function EDiaryTab() {
         ) : (
           <>
             <div className="table-container">
-              <table className="custom-table">
+              <table className="custom-table" style={{ tableLayout: 'fixed', width: '100%' }}>
                 <thead>
                   <tr>
-                    <th>Date &amp; Time</th>
-                    <th>e-Diary ID</th>
-                    <th>Topic</th>
-                    <th>Narrative</th>
-                    <th>Logged By</th>
-                    {canEdit && <th>Actions</th>}
+                    <th style={{ width: 96 }}>Date &amp; Time</th>
+                    <th style={{ width: 168 }}>e-Diary ID</th>
+                    <th style={{ width: 160 }}>Topic</th>
+                    <th style={{ width: 384 }}>Narrative</th>
+                    <th style={{ width: 96 }}>Logged By</th>
+                    {canEdit && <th style={{ width: 90 }}>Actions</th>}
                   </tr>
                 </thead>
                 <tbody>
                   {paginated.map(o => (
                     <tr
                       key={o.id}
-                      onClick={() => { if (o.caseId) window.location.href = `/cases/${o.caseId}`; }}
-                      style={{ cursor: o.caseId ? 'pointer' : 'default' }}
+                      onClick={() => setViewingEntry(o)}
+                      style={{ cursor: 'pointer' }}
                     >
-                      <td style={{ whiteSpace: 'nowrap', fontSize: '12px', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>
-                        {new Date(o.dateTime).toLocaleDateString('en-SG', { day: '2-digit', month: 'short', year: 'numeric' })}{' '}
-                        {new Date(o.dateTime).toLocaleTimeString('en-SG', { hour: '2-digit', minute: '2-digit', hour12: false })}
+                      <td style={{ verticalAlign: 'top', paddingTop: 20, paddingBottom: 20, fontSize: '11px', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums', lineHeight: 1.4 }}>
+                        <div style={{ whiteSpace: 'nowrap' }}>{fmtDate(o.dateTime)}</div>
+                        <div style={{ whiteSpace: 'nowrap', opacity: 0.8 }}>{fmtTime(o.dateTime)}</div>
                       </td>
-                      <td>
-                        <span className="mono-id" style={{ color: 'var(--color-critical)', background: 'var(--color-critical-bg)', borderColor: 'var(--color-critical-border)' }}>
+                      <td style={{ verticalAlign: 'top', paddingTop: 20, paddingBottom: 20, whiteSpace: 'nowrap' }} title={o.id}>
+                        <span className="mono-id" style={{ color: 'var(--color-critical)', background: 'var(--color-critical-bg)', borderColor: 'var(--color-critical-border)', fontSize: 10.5 }}>
                           {o.id}
                         </span>
+                        {o.refNo && <div style={{ fontSize: 9.5, fontWeight: 500, color: 'var(--text-faint)', marginTop: 3 }} title={`Refers to ${o.refNo}`}>🔗 {o.refNo}</div>}
                       </td>
-                      <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{o.topic}</td>
-                      <td style={{ maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-sub)' }} title={o.content}>
-                        {o.content}
+                      <td style={{ verticalAlign: 'top', paddingTop: 20, paddingBottom: 20, fontWeight: 600, whiteSpace: 'normal', minWidth: 130 }}>{o.topic}</td>
+                      <td style={{ verticalAlign: 'top', paddingTop: 20, paddingBottom: 20, color: 'var(--text-sub)' }} title={o.content}>
+                        <div style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                          {o.content}
+                        </div>
                       </td>
-                      <td style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{o.user}</td>
+                      <td style={{ verticalAlign: 'top', paddingTop: 20, paddingBottom: 20, fontSize: '12px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <UserAvatar name={o.user} />
+                          {o.user}
+                        </div>
+                      </td>
                       {canEdit && (
-                        <td onClick={e => e.stopPropagation()} style={{ whiteSpace: 'nowrap' }}>
-                          <button
-                            className="btn"
-                            style={{ fontSize: 11, padding: '3px 10px', background: 'rgba(239,68,68,0.12)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.25)', whiteSpace: 'nowrap', marginRight: 6 }}
-                            onClick={() => setEscalatingEntry(o)}
-                          >
-                            🔺 Escalate
-                          </button>
-                          <button
-                            className="btn"
-                            style={{ fontSize: 11, padding: '3px 10px', background: 'var(--color-primary-bg)', color: 'var(--color-primary)', border: '1px solid var(--color-primary-border)', whiteSpace: 'nowrap' }}
-                            onClick={() => setEventLinkingEntry(o)}
-                          >
-                            📅 Event
-                          </button>
+                        <td onClick={e => e.stopPropagation()} style={{ verticalAlign: 'top', paddingTop: 16, paddingBottom: 16, whiteSpace: 'nowrap' }}>
+                          <EDiaryActionsMenu
+                            onIncident={() => setEscalatingEntry(o)}
+                            onFault={() => setFaultLinkingEntry(o)}
+                            onTask={() => setTaskLinkingEntry(o)}
+                            onEvent={() => setEventLinkingEntry(o)}
+                          />
                         </td>
                       )}
                     </tr>
@@ -379,204 +608,80 @@ export function EDiaryTab() {
         )}
       </div>
 
-      {/* ── Create Modal ───────────────────────────────────────────────────────── */}
-      {showCreateForm && (
+      {/* ── View Entry Popup — Date Time, e-Diary ID, Ref, Case ID, Topic, Narrative, Logged By, Actions ── */}
+      {viewingEntry && (
         <div className="modal-backdrop">
-          <div className="create-case-modal glass" style={{ maxWidth: 560 }}>
+          <div className="create-case-modal glass" style={{ maxWidth: 520 }}>
             <div className="modal-header">
-              <h2>NEW E-DIARY ENTRY</h2>
-              <button className="close-btn" onClick={() => setShowCreateForm(false)}>✕</button>
+              <h2>E-DIARY ENTRY</h2>
+              <button className="close-btn" onClick={() => setViewingEntry(null)}>✕</button>
             </div>
-            <form onSubmit={handleCreate} className="modal-form">
+            <div className="modal-form">
               <div className="modal-scroll-area">
 
-                <div className="form-group">
-                  <label>Topic / Subject *</label>
-                  <select value={topic} onChange={e => setTopic(e.target.value)} required className="form-control select-dark">
-                    <option value="">— Select topic —</option>
-                    {TOPICS.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+                  <div>
+                    <label style={labelStyle}>Date &amp; Time</label>
+                    <p style={{ fontSize: 13, margin: 0, color: 'var(--text-main)', fontVariantNumeric: 'tabular-nums' }}>{fmtDateTime(viewingEntry.dateTime)}</p>
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Logged By</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                      <UserAvatar name={viewingEntry.user} />
+                      <p style={{ fontSize: 13, margin: 0, color: 'var(--text-main)' }}>{viewingEntry.user}</p>
+                    </div>
+                  </div>
                 </div>
 
-                {topic === 'Others' && (
-                  <div className="form-group">
-                    <label>Custom Topic *</label>
-                    <input type="text" placeholder="e.g. Unusual weather advisory"
-                      value={customTopic} onChange={e => setCustomTopic(e.target.value)}
-                      required className="form-control" />
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid var(--border-color)' }}>
+                  <span className="mono-id" style={{ color: 'var(--color-critical)', background: 'var(--color-critical-bg)', borderColor: 'var(--color-critical-border)' }}>
+                    {viewingEntry.id}
+                  </span>
+                  {viewingEntry.refNo && (
+                    <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-faint)' }} title={`Refers to ${viewingEntry.refNo}`}>
+                      🔗 {viewingEntry.refNo}
+                    </span>
+                  )}
+                  {viewingEntry.caseId && (
+                    <span
+                      className="mono-id"
+                      style={{ cursor: 'pointer', color: 'var(--color-primary)', background: 'var(--color-primary-bg)', borderColor: 'var(--color-primary-border)' }}
+                      onClick={() => { window.location.href = `/cases/${viewingEntry.caseId}`; }}
+                      title="Open Case detail"
+                    >
+                      {viewingEntry.caseId} ↗
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ marginBottom: 14 }}>
+                  <label style={labelStyle}>Topic</label>
+                  <p style={{ fontSize: 15.5, fontWeight: 700, margin: '3px 0 0', color: 'var(--text-main)' }}>{viewingEntry.topic}</p>
+                </div>
+
+                <div style={{ marginBottom: canEdit ? 16 : 0, padding: '12px 14px', background: 'var(--bg-inset)', borderRadius: 8, border: '1px solid var(--border-color)' }}>
+                  <label style={labelStyle}>Narrative</label>
+                  <p style={{ fontSize: 13.5, margin: '5px 0 0', color: 'var(--text-sub)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{viewingEntry.content}</p>
+                </div>
+
+                {canEdit && (
+                  <div>
+                    <label style={labelStyle}>Actions</label>
+                    <div style={{ marginTop: 4 }}>
+                      <EDiaryActionsMenu
+                        onIncident={() => { setEscalatingEntry(viewingEntry); setViewingEntry(null); }}
+                        onFault={() => { setFaultLinkingEntry(viewingEntry); setViewingEntry(null); }}
+                        onTask={() => { setTaskLinkingEntry(viewingEntry); setViewingEntry(null); }}
+                        onEvent={() => { setEventLinkingEntry(viewingEntry); setViewingEntry(null); }}
+                      />
+                    </div>
                   </div>
                 )}
-
-                <div className="form-group">
-                  <label>Date &amp; Time of Occurrence</label>
-                  <input type="datetime-local" value={dateTime}
-                    onChange={e => setDateTime(e.target.value)} className="form-control" />
-                  <p className="sub-desc">Defaults to now. Backdating is permitted.</p>
-                </div>
-
-                <div className="form-group" style={{ position: 'relative' }}>
-                  <label>Link to Existing Case ID <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
-
-                  {/* Select Trigger Box */}
-                  <div
-                    onClick={() => setShowCaseDropdown(!showCaseDropdown)}
-                    className="form-control select-dark search-select-trigger"
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      cursor: 'pointer',
-                      background: 'var(--bg-card)',
-                      border: '1px solid var(--border-color)',
-                      padding: '8px 12px',
-                      borderRadius: 'var(--radius-md)',
-                      fontSize: '13px'
-                    }}
-                  >
-                    <span>
-                      {caseIdInput
-                        ? `${caseIdInput}${cases.find(c => c.id === caseIdInput) ? ' - ' + cases.find(c => c.id === caseIdInput)!.title : ''}`
-                        : 'Auto-create new case'}
-                    </span>
-                    <span style={{ fontSize: '10px', opacity: 0.7 }}>▼</span>
-                  </div>
-
-                  {/* Dropdown Menu */}
-                  {showCaseDropdown && (
-                    <div
-                      className="glass search-select-dropdown"
-                      style={{
-                        position: 'absolute',
-                        top: '100%',
-                        left: 0,
-                        right: 0,
-                        zIndex: 100,
-                        marginTop: '4px',
-                        background: 'var(--bg-card)',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: 'var(--radius-md)',
-                        boxShadow: '0 8px 30px rgba(0,0,0,0.15)',
-                        maxHeight: '260px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        overflow: 'hidden'
-                      }}
-                    >
-                      {/* Search Input field */}
-                      <div style={{ padding: '8px', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-inset)' }}>
-                        <input
-                          type="text"
-                          placeholder="Search case ID or title..."
-                          value={caseSearchText}
-                          onChange={e => setCaseSearchText(e.target.value)}
-                          onClick={e => e.stopPropagation()}
-                          className="form-control"
-                          style={{
-                            fontSize: '12px',
-                            height: '30px',
-                            padding: '4px 8px',
-                            width: '100%',
-                            boxSizing: 'border-box'
-                          }}
-                          autoFocus
-                        />
-                      </div>
-
-                      {/* Options list */}
-                      <div style={{ overflowY: 'auto', flex: 1, maxHeight: '200px' }}>
-                        {/* Option: Auto-create new case */}
-                        <div
-                          onClick={() => {
-                            setCaseIdInput('');
-                            setShowCaseDropdown(false);
-                            setCaseSearchText('');
-                          }}
-                          className="search-select-option create-new-opt"
-                          style={{
-                            padding: '8px 12px',
-                            cursor: 'pointer',
-                            fontSize: '12.5px',
-                            color: 'var(--color-primary)',
-                            fontWeight: '600',
-                            borderBottom: '1px solid var(--border-color)',
-                            background: !caseIdInput ? 'var(--bg-hover)' : 'transparent'
-                          }}
-                        >
-                          ➕ Auto-create new case
-                        </div>
-
-                        {/* Filtered Active Cases */}
-                        {cases
-                          .filter(c => c.status !== 'Closed')
-                          .filter(c => {
-                            if (!caseSearchText.trim()) return true;
-                            const query = caseSearchText.toLowerCase();
-                            return (
-                              c.id.toLowerCase().includes(query) ||
-                              c.title.toLowerCase().includes(query)
-                            );
-                          })
-                          .map(c => {
-                            const isSelected = caseIdInput === c.id;
-                            return (
-                              <div
-                                key={c.id}
-                                onClick={() => {
-                                  setCaseIdInput(c.id);
-                                  setShowCaseDropdown(false);
-                                  setCaseSearchText('');
-                                }}
-                                className="search-select-option"
-                                style={{
-                                  padding: '8px 12px',
-                                  cursor: 'pointer',
-                                  fontSize: '12.5px',
-                                  color: isSelected ? 'var(--color-primary)' : 'var(--text-main)',
-                                  background: isSelected ? 'var(--bg-hover)' : 'transparent'
-                                }}
-                              >
-                                {c.id} - {c.title}
-                              </div>
-                            );
-                          })}
-
-                        {/* Empty results */}
-                        {cases
-                          .filter(c => c.status !== 'Closed')
-                          .filter(c => {
-                            if (!caseSearchText.trim()) return true;
-                            const query = caseSearchText.toLowerCase();
-                            return (
-                              c.id.toLowerCase().includes(query) ||
-                              c.title.toLowerCase().includes(query)
-                            );
-                          }).length === 0 && (
-                          <div style={{ padding: '8px 12px', fontSize: '12.5px', color: 'var(--text-muted)', textAlign: 'center' }}>
-                            No cases found
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  <p className="sub-desc">If left blank, a Case will be auto-created and linked to this entry.</p>
-                </div>
-
-                <div className="form-group">
-                  <label>Narrative *</label>
-                  <textarea placeholder="Describe the occurrence, interaction, or advisory…"
-                    value={content} onChange={e => setContent(e.target.value)}
-                    required className="form-control" rows={5} />
-                </div>
-
               </div>
               <div className="modal-actions-bar">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowCreateForm(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={submitting}>
-                  {submitting ? 'Submitting…' : 'SUBMIT ENTRY'}
-                </button>
+                <button className="btn btn-secondary" onClick={() => setViewingEntry(null)}>Close</button>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       )}
@@ -708,6 +813,110 @@ export function EDiaryTab() {
         prefillName={eventLinkingEntry?.topic}
         prefillDescription={eventLinkingEntry?.content}
       />
+
+      {/* ── Create Fault from e-Diary — combined Actions menu ───────────────────── */}
+      <FaultCreateModal
+        isOpen={!!faultLinkingEntry}
+        onClose={() => setFaultLinkingEntry(null)}
+        onSuccess={() => setFaultLinkingEntry(null)}
+        linkedCaseId={faultLinkingEntry?.caseId}
+        sourceEDiaryId={faultLinkingEntry?.id}
+        prefillDescription={faultLinkingEntry?.content}
+        username={username}
+      />
+
+      {/* ── Create Task from e-Diary — combined Actions menu ────────────────────── */}
+      <TaskCreateModal
+        isOpen={!!taskLinkingEntry}
+        onClose={() => setTaskLinkingEntry(null)}
+        onSuccess={() => setTaskLinkingEntry(null)}
+        caseId={taskLinkingEntry?.caseId}
+        sourceEDiaryId={taskLinkingEntry?.id}
+        prefillTitle={taskLinkingEntry?.topic}
+        prefillDescription={taskLinkingEntry?.content}
+        username={username}
+      />
     </>
+  );
+}
+
+// Logged-by avatar — same 20px initials-circle + color-hash convention as RespondersAvatars
+// in TaskBoardTab.tsx, duplicated here (not extracted to a shared component per Kyle's call)
+// so it must be kept visually in sync with that file if the color list ever changes there.
+function UserAvatar({ name }: { name?: string }) {
+  if (!name) return null;
+  const colors = ['#10B981', '#3B82F6', '#EC4899', '#8B5CF6', '#F97316', '#0D9488', '#6366F1'];
+  const color = colors[(name.charCodeAt(0) || 65) % colors.length];
+  return (
+    <span
+      title={name}
+      style={{
+        width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
+        background: color, color: '#FFF', fontSize: 10, fontWeight: 700,
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        border: '1.5px solid #FFF', boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
+      }}
+    >
+      {name.trim().charAt(0).toUpperCase()}
+    </span>
+  );
+}
+
+// Combined "+ Create" button — client feedback 2026-07-21: one button, opens a small
+// menu to choose Incident / Fault / Task / Event instead of separate buttons per type.
+function EDiaryActionsMenu({
+  onIncident,
+  onFault,
+  onTask,
+  onEvent,
+}: {
+  onIncident: () => void;
+  onFault: () => void;
+  onTask: () => void;
+  onEvent: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const items: { label: string; action: () => void }[] = [
+    { label: '🔺 Incident', action: onIncident },
+    { label: '🔧 Fault', action: onFault },
+    { label: '✅ Task', action: onTask },
+    { label: '📅 Event', action: onEvent },
+  ];
+
+  return (
+    <div style={{ position: 'relative', display: 'inline-block' }}>
+      <button
+        type="button"
+        className="btn"
+        style={{ fontSize: 11, padding: '3px 10px', background: 'var(--color-primary-bg)', color: 'var(--color-primary)', border: '1px solid var(--color-primary-border)', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 600 }}
+        onClick={() => setOpen(o => !o)}
+      >
+        + Create <span style={{ fontSize: 9 }}>▾</span>
+      </button>
+      {open && (
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 99 }} />
+          <div
+            className="glass eda-actions-menu"
+            style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, zIndex: 100, border: '1px solid var(--border-color)', borderRadius: 6, minWidth: 130, overflow: 'hidden', boxShadow: '0 8px 30px rgba(0,0,0,0.15)' }}
+          >
+            {items.map(item => (
+              <div
+                key={item.label}
+                onClick={() => { item.action(); setOpen(false); }}
+                className="eda-actions-item"
+                style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 12.5, whiteSpace: 'nowrap' }}
+              >
+                {item.label}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+      <style jsx>{`
+        .eda-actions-item:hover { background: var(--bg-hover); }
+      `}</style>
+    </div>
   );
 }

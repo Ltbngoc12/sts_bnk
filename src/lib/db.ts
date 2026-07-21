@@ -220,6 +220,7 @@ export interface Fault {
   closedBy?: string;
   closedAt?: string;
   linkedIncidentId?: string;
+  sourceEDiaryId?: string; // Set when created from an e-Diary entry via the combined Actions menu
 }
 
 export interface TaskChecklistItem {
@@ -315,6 +316,7 @@ export interface Task {
   id: string; // SEN/TA/YYYYMMDD/NNN
   caseId: string;
   linkedIncidentId?: string; // Optional: incident this task runs alongside
+  sourceEDiaryId?: string; // Set when created from an e-Diary entry via the combined Actions menu
   title: string;
   description: string;
   assignee: string; // User name or Group name
@@ -353,6 +355,7 @@ export interface Task {
 
 export interface Occurrence {
   id: string; // SEN/ED/YYYYMMDD/NNN
+  refNo?: string; // Optional pointer to another entry's e-Diary ID, linking two related occurrences (client feedback 2026-07-21: link picker replaces the old free-text Ref No / serialNo)
   caseId?: string;
   user: string;
   dateTime: string;

@@ -705,11 +705,14 @@ export default function CaseDetailsPage() {
                 ) : (
                   ediaryLogs.slice(-2).reverse().map(log => (
                     <div key={log.id} style={{ padding: '6px 10px', border: '1px solid var(--border-color)', borderRadius: '4px', background: 'var(--bg-inset)', fontSize: '11px' }}>
-                      <span className="mono-id" style={{ fontSize: '10px', padding: '1px 5px', color: 'var(--color-review)', background: 'var(--color-review-bg)', borderColor: 'var(--color-review-border)' }}>{log.id}</span>
-                      <div className="oe-title" style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-active)', marginTop: 4 }}>{log.topic}</div>
-                      <div className="oe-field-grid">
-                        <OpEventField label="Date & Time" value={formatFullDateTime(log.dateTime)} />
-                        <OpEventField label="Narrative" value={log.content} full />
+                      <div className="oe-id-status-row">
+                        <span className="mono-id" style={{ fontSize: '10px', padding: '1px 5px', color: 'var(--color-review)', background: 'var(--color-review-bg)', borderColor: 'var(--color-review-border)' }}>{log.id}</span>
+                        <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>{formatFullDateTime(log.dateTime)}</span>
+                      </div>
+                      <div className="oe-title" style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-active)' }}>{log.topic}</div>
+                      <div className="oe-field" style={{ marginTop: 4, alignItems: 'flex-start' }}>
+                        <span className="oe-field-label">Narrative:</span>
+                        <span style={{ color: '#000', whiteSpace: 'normal', overflow: 'visible', textOverflow: 'clip', lineHeight: 1.45 }}>{log.content}</span>
                       </div>
                     </div>
                   ))

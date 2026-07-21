@@ -203,6 +203,7 @@ export function FaultLogTab() {
             <table className="custom-table">
               <thead>
                 <tr>
+                  <th>Date Logged</th>
                   <th>Fault ID</th>
                   <th>Fault Type</th>
                   <th>Sub-type</th>
@@ -211,13 +212,16 @@ export function FaultLogTab() {
                   <th>CMMS Ticket</th>
                   <th>Status</th>
                   <th>Logged By</th>
-                  <th>Date Logged</th>
                   {isController && <th></th>}
                 </tr>
               </thead>
               <tbody>
                 {paginatedFaults.map(f => (
                   <tr key={f.id} onClick={() => window.location.href = `/faults/${f.id}`} style={{ cursor: 'pointer' }}>
+                    <td className="date-cell">
+                      {new Date(f.createdAt).toLocaleDateString('en-SG')}{' '}
+                      {new Date(f.createdAt).toLocaleTimeString('en-SG', { hour12: false, hour: '2-digit', minute: '2-digit' })}
+                    </td>
                     <td>
                       <span className="mono-id" style={{ color: 'var(--color-primary)', background: 'var(--color-primary-bg)', borderColor: 'var(--color-primary-border)' }}>
                         <Link
@@ -260,10 +264,6 @@ export function FaultLogTab() {
                       <span className={faultStatusBadge(f.status)}>{f.status}</span>
                     </td>
                     <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>{f.createdBy}</td>
-                    <td className="date-cell">
-                      {new Date(f.createdAt).toLocaleDateString('en-SG')}{' '}
-                      {new Date(f.createdAt).toLocaleTimeString('en-SG', { hour12: false, hour: '2-digit', minute: '2-digit' })}
-                    </td>
                     {isController && (
                       <td onClick={e => e.stopPropagation()} style={{ whiteSpace: 'nowrap' }}>
                         {f.status === 'Pending Submission' && (

@@ -104,3 +104,40 @@ Bỏ Amend giúp luồng UX gọn hơn đáng kể — ít trạng thái, ít mo
 - **Topic categories**: nên chuyển từ hardcode sang cấu hình System Admin (giống Incident Type/Fault Type) khi màn `/admin` có khung reference-data chung — để sau.
 - **Ranger bị chặn tạo entry** dù seed data có Ranger tạo occurrence và FRD ghi "any authorised user": đã chốt giữ nguyên lần này, nhưng nên revisit nếu SDC review yêu cầu khớp FRD 100%.
 - **Case auto-create mỗi entry** dù FRD ghi occurrence là "standalone": đã chốt giữ nguyên, ghi nhận là sai lệch có chủ đích để tránh nhầm là bug trong review sau.
+
+---
+
+## 8. List Page Redesign — Round 2 client feedback (2026-07-21)
+
+> Bối cảnh: sau khi present prototype, client feedback thêm về màn List của e-Diary (xem thêm `EDiary_FSD_Feedback_Note_to_ShinFeng.md` cho phần gap FRD liên quan). Mục này ghi nhận yêu cầu **đã thảo luận và Kyle confirm**, chưa code — chờ chốt nốt mục còn mở rồi mới bắt tay implement.
+
+### 8.1 Yêu cầu đã chốt
+
+| # | Yêu cầu | Trạng thái |
+|---|---|---|
+| 1 | Bỏ modal "New Entry" pop-up, thay bằng **inline quick-add bar** ngay trên đầu list: chọn Type + nhập nội dung + nút "+ Log". Có nút "More" mở rộng để nhập Ref No (optional) và Time (mặc định = now). | ✅ Confirmed — khớp Option C đã chọn trước đó |
+| 2 | Đổi layout khu filter/search cho phù hợp với thanh quick-add mới (không còn tách rời "New Entry" button ở góc). | ✅ Confirmed |
+| 3 | Click vào 1 row: **không** navigate thẳng sang Case detail nữa → mở **popup view** gồm đủ Date Time, SN, e-Diary ID, Case ID, Topic, Narrative, Logged by, Actions. Topic + Narrative là 2 trường hiển thị chính. Case ID trong popup **click được** → mới navigate sang trang Case detail. | ✅ Confirmed |
+| 4 | Thêm cột **Serial No** (SN01, SN02...) — field **tách riêng**, song song với e-Diary ID hiện có (`SEN/ED/YYYYMMDD/NNN`), đánh số **liên tục toàn hệ thống** (không reset theo ngày). | ✅ Confirmed |
+| 5 | Cột Actions: gộp thành **1 nút** mở tooltip/dropdown cho chọn **Create Incident / Fault / Task / Event**. Task: Kyle xác nhận **build luôn**, không chờ thêm. | ✅ Confirmed |
+| 6 | (chưa có nội dung — bạn để trống, vẫn đang chờ bạn bổ sung) | ⏳ Open |
+
+### 8.2 Việc cần làm mới (gap so với hạ tầng hiện tại)
+
+Rà lại code (`EDiaryTab.tsx`, `db.ts`, `FaultCreateModal.tsx`, `TaskBoardTab.tsx`, `EventCreateModal`), phần #5 kéo theo vài việc nền chưa có sẵn:
+
+- **Incident** — dùng lại luồng Escalate hiện tại, không cần sửa nhiều.
+- **Event** — đã có `EventCreateModal` dùng chung, có sẵn `sourceEDiaryId` để giữ liên kết. Gắn vào nút gộp là đủ.
+- **Fault** — đã có `FaultCreateModal.tsx` dùng lại được (nhận `linkedCaseId`, `username`, prefill location), **nhưng chưa có field liên kết ngược về e-Diary**. Cần: thêm `sourceEDiaryId?: string` vào `interface Fault` (`db.ts`) và prop tương ứng trong `FaultCreateModal`, theo đúng pattern đã làm với Event.
+- **Task** — hiện **không có modal dùng chung**, form tạo Task chỉ nằm inline trong `TaskBoardTab.tsx` (state/handler riêng, không export). Cần tách thành `TaskCreateModal` (tương tự `EventCreateModal`/`FaultCreateModal`) để gọi được từ e-Diary lẫn từ Task Board. Đồng thời thêm `sourceEDiaryId?: string` vào `interface Task`.
+- **Serial No (mục #4)** — cần: (a) thêm field `serialNo: string` vào `interface Occurrence`; (b) cơ chế sinh số tăng dần toàn cục (global counter, không theo ngày) ở API route tạo occurrence; (c) backfill SN cho data seed hiện có để tránh record cũ bị thiếu field.
+- **Popup view (mục #3)** — modal mới thay cho hành vi `window.location.href` hiện tại ở dòng click row; cần quyết định thêm: nút Actions gộp (#5) có lặp lại y hệt bên trong popup này không, hay popup chỉ có nút "View full Case"? (giả định: có, vì #3 liệt Actions là 1 trong các trường hiển thị trong popup — sẽ làm theo hướng này trừ khi bạn nói khác).
+- **Quick-add bar (mục #1)** — Type dropdown trong ảnh mockup dùng 5 loại sổ client yêu cầu (Carpark barrier, v.v.), tức là thay hẳn `TOPICS` hiện tại (10 giá trị generic). Đây là gap #đã nêu trong note gửi Shin Feng ("5 loại sổ có phải Topic categories chính thức?") — vẫn **chưa có xác nhận từ Shin Feng**, nhưng vì client đã nói rõ trực tiếp, đề xuất cứ theo hướng 5 loại sổ, chỉ điều chỉnh lại nếu Shin Feng phản hồi khác.
+
+### 8.3 Phụ thuộc còn mở
+
+- Mục #6 (bạn chưa điền).
+- Xác nhận cách hiển thị Actions trong popup (nêu ở 8.2).
+- Ref No: free text hay lookup chọn từ SN có sẵn? (đã hỏi Shin Feng trong note, chưa có trả lời — nhưng đây là quyết định UI, có thể chốt độc lập với Shin Feng nếu bạn muốn quyết trước).
+
+Sau khi mục #6 + 2 điểm trên được chốt, sẽ viết plan file-by-file + phased execution (giống mục 5–6 ở trên) trước khi đụng code.

@@ -25,6 +25,9 @@ interface Props {
   linkedIncidentId?: string;
   linkedCaseId?: string;
   prefillLocation?: PrefillLocation;
+  /** Set when creating a Fault from an e-Diary entry — reference is retained on the Fault record. */
+  sourceEDiaryId?: string;
+  prefillDescription?: string;
   username: string;
 }
 
@@ -35,6 +38,8 @@ export default function FaultCreateModal({
   linkedIncidentId,
   linkedCaseId,
   prefillLocation,
+  sourceEDiaryId,
+  prefillDescription,
   username,
 }: Props) {
   const [faultTaxonomy, setFaultTaxonomy] = useState<Record<string, string[]>>({});
@@ -89,6 +94,7 @@ export default function FaultCreateModal({
     }
     resetForm();
     setDirty(false);
+    if (prefillDescription) setFormDescription(prefillDescription);
     if (prefillLocation) {
       setLocRoad(prefillLocation.road || '');
       setLocBuilding(prefillLocation.building || '');
@@ -154,6 +160,7 @@ export default function FaultCreateModal({
           username,
           ...(linkedIncidentId && { linkedIncidentId }),
           ...(resolvedCaseId && { caseId: resolvedCaseId }),
+          ...(sourceEDiaryId && { sourceEDiaryId }),
         }),
       });
 
@@ -208,7 +215,9 @@ export default function FaultCreateModal({
               {isLinked ? 'RAISE LINKED INFRASTRUCTURE FAULT' : 'LOG STANDALONE INFRASTRUCTURE FAULT'}
             </h2>
             <p style={{ fontSize: 11, color: 'var(--text-faint)', margin: 0 }}>
-              {isLinked
+              {sourceEDiaryId
+                ? `Created from e-Diary entry ${sourceEDiaryId} — reference will be retained. Fault saved as draft — submit to IFM CMMS from the fault list or fault detail page.`
+                : linkedIncidentId
                 ? 'Location pre-filled from incident. Fault saved as draft — submit to IFM CMMS from the fault list or fault detail page.'
                 : 'Fault saved as draft. Submit to IFM CMMS separately from the fault list.'}
             </p>
@@ -569,11 +578,13 @@ export default function FaultCreateModal({
                   <path strokeLinecap="round" strokeWidth="1.5" d="M12 8v4m0 4h.01"/>
                 </svg>
                 <span style={{ fontSize: 11, color: 'var(--text-faint)', lineHeight: 1.5 }}>
-                  {isLinked
+                  {linkedIncidentId
                     ? <>Fault will be linked to incident <strong>{linkedIncidentId}</strong>. After saving, use <strong>Submit to CMMS</strong> in the fault list to send to IFM CMMS.</>
-                    : selectedCaseId !== 'new-case'
-                      ? <>Fault will be linked to case <strong>{selectedCaseId}</strong>. After saving, use the <strong>Submit to CMMS</strong> action in the fault list or fault detail page to send it to IFM CMMS.</>
-                      : <>A new Case will be auto-created to house this fault. After saving, use the <strong>Submit to CMMS</strong> action in the fault list or fault detail page to send it to IFM CMMS.</>
+                    : linkedCaseId
+                      ? <>Fault will be linked to case <strong>{linkedCaseId}</strong>{sourceEDiaryId ? <> (from e-Diary entry <strong>{sourceEDiaryId}</strong>)</> : null}. After saving, use the <strong>Submit to CMMS</strong> action in the fault list or fault detail page to send it to IFM CMMS.</>
+                      : selectedCaseId !== 'new-case'
+                        ? <>Fault will be linked to case <strong>{selectedCaseId}</strong>. After saving, use the <strong>Submit to CMMS</strong> action in the fault list or fault detail page to send it to IFM CMMS.</>
+                        : <>A new Case will be auto-created to house this fault. After saving, use the <strong>Submit to CMMS</strong> action in the fault list or fault detail page to send it to IFM CMMS.</>
                   }
                 </span>
               </div>

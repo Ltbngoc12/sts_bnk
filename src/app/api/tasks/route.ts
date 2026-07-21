@@ -81,6 +81,7 @@ export async function POST(request: Request) {
         id: taskId,
         caseId: targetCaseId,
         linkedIncidentId: body.linkedIncidentId || undefined,
+        sourceEDiaryId: body.sourceEDiaryId || undefined,
         title: body.title,
         description: body.description || '',
         assignee: hasAssignee ? body.assignee : 'Unassigned',

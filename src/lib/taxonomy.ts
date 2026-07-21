@@ -26,11 +26,16 @@ export const DEFAULT_REFERENCE_DATA: TaxonomyItem[] = [
   { id: 'pri-3', category: 'Priority', name: 'High', description: 'Urgent field tasks requiring dispatch within 30 minutes', status: 'Active' },
   { id: 'pri-4', category: 'Priority', name: 'Critical', description: 'Immediate life-safety issue, dispatcher alert', status: 'Active' },
 
-  // e-Diary Topic Categories
-  { id: 'ed-1', category: 'eDiary', name: 'Routine Patrol', description: 'Standard ranger rounds and logs', status: 'Active' },
-  { id: 'ed-2', category: 'eDiary', name: 'Shift Handover', description: 'Incident checklists and shift log handovers', status: 'Active' },
-  { id: 'ed-3', category: 'eDiary', name: 'System Test', description: 'Siren drills, radio tests, panic buttons checks', status: 'Active' },
-  { id: 'ed-4', category: 'eDiary', name: 'VIP Visit', description: 'Security detail coordination for state visitors', status: 'Active' },
+  // e-Diary Topic Categories — the 5 physical logbooks the client digitised (2026-07-21
+  // feedback, see EDIARY_MODULE_UPDATE_PLAN.md §8). Previously placeholder values (Routine
+  // Patrol/Shift Handover/System Test/VIP Visit); synced to match EDiaryTab.tsx's TOPICS list
+  // now that the Topic field reads from here for fuzzy search (2026-07-21 client feedback:
+  // Topic managed in Taxonomy, fuzzy-search if it exists, free-text if it doesn't).
+  { id: 'ed-1', category: 'eDiary', name: 'General Occurrence', description: 'Default catch-all for anything not covered below', status: 'Active' },
+  { id: 'ed-2', category: 'eDiary', name: 'Carpark Barrier', description: 'Barrier faults, ticketing issues, vehicle incidents', status: 'Active' },
+  { id: 'ed-3', category: 'eDiary', name: 'Asset Book — Radio/BWC', description: 'Radio and body-worn camera issue/return log', status: 'Active' },
+  { id: 'ed-4', category: 'eDiary', name: 'Asset Book — Keys', description: 'Key issue/return log', status: 'Active' },
+  { id: 'ed-5', category: 'eDiary', name: 'Lost & Found', description: 'Lost and found item log', status: 'Active' },
 
   // Event Type Taxonomy — FSD §8.1.2 (dropdown, no sub-types defined in FRD)
   { id: 'evt-1', category: 'Event', name: 'Sports & Recreation', description: 'Public sporting events, tournaments and recreational activities', status: 'Active' },
@@ -76,6 +81,21 @@ export function getEventTaxonomy(): string[] {
 
   return (items.length > 0 ? items : DEFAULT_REFERENCE_DATA)
     .filter(item => item.category === 'Event' && item.status === 'Active')
+    .map(item => item.name);
+}
+
+export function getEDiaryTaxonomy(): string[] {
+  if (typeof window === 'undefined') {
+    return DEFAULT_REFERENCE_DATA
+      .filter(item => item.category === 'eDiary' && item.status === 'Active')
+      .map(item => item.name);
+  }
+
+  const stored = localStorage.getItem('admin_reference_data');
+  const items: TaxonomyItem[] = stored ? JSON.parse(stored) : [];
+
+  return (items.length > 0 ? items : DEFAULT_REFERENCE_DATA)
+    .filter(item => item.category === 'eDiary' && item.status === 'Active')
     .map(item => item.name);
 }
 

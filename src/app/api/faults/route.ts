@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { faultType, faultSubType, location, description, attachments, caseId, linkedIncidentId, username } = body;
+    const { faultType, faultSubType, location, description, attachments, caseId, linkedIncidentId, sourceEDiaryId, username } = body;
 
     if (!faultType || !faultSubType || !description) {
       return NextResponse.json(
@@ -116,6 +116,7 @@ export async function POST(request: NextRequest) {
       createdBy: username || 'system',
       createdAt: now,
       linkedIncidentId: linkedIncidentId || undefined,
+      sourceEDiaryId: sourceEDiaryId || undefined,
     };
 
     if (!db.faults) db.faults = [];

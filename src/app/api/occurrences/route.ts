@@ -77,6 +77,8 @@ export async function POST(request: Request) {
       topic: body.topic || 'General Notice',
       content: body.content,
       attachments: [],
+      // refNo now stores another entry's e-Diary ID, picked via the link picker in Quick log entry
+      ...(body.refNo?.trim() && { refNo: body.refNo.trim() }),
     };
 
     db.occurrences.push(newOccurrence);
