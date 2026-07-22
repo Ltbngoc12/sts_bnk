@@ -2,6 +2,19 @@ import { NextResponse } from 'next/server';
 import { getDb, saveDb, generateCaseId, ResponderLifecycleStatus } from '@/lib/db';
 import { tryAutoCloseCase } from '@/lib/autoclose';
 import { isValidIncidentCategory } from '@/lib/incidentCategory';
+import {
+  getBroadcastConfig,
+  getDistributionGroups,
+  getBroadcastTemplates,
+  getBroadcastMatrix,
+} from '@/lib/broadcastStore';
+import {
+  isClosureBroadcastRequired,
+  resolveClosureBroadcast,
+  initialDeliveryCounts,
+} from '@/lib/broadcast';
+import { hasBroadcastPermission } from '@/lib/permissions';
+import { sendEmailMockBatch } from '@/lib/emailMock';
 
 // Helper: build a timestamped log entry
 function makeLogEntry(db_incident: any, description: string) {
@@ -480,36 +493,52 @@ export async function POST(
           `Incident approved and closed by ${actor} (${closingRole}).${body.closureRemarks ? ` Closure remarks: ${body.closureRemarks}` : ''} Record is now read-only.`
         ));
 
-        // ── Queue Closure Broadcast for Controller review (FSD §5.3.11) ────────
-        // Broadcast is PENDING — not dispatched until Controller reviews and confirms
-        if (!db.broadcasts) db.broadcasts = [];
-        const broadcastSeq = db.broadcasts.filter(b => b.caseId === caseId).length + 1;
-        const broadcastId = `${caseId}-BC${String(broadcastSeq).padStart(3, '0')}`;
-        db.broadcasts.push({
-          id: broadcastId,
-          caseId,
-          incidentId: incident.id,
-          type: 'Closure',
-          recipients: [],
-          templateUsed: 'Closure Broadcast Template',
-          contentDispatched: [
-            'INCIDENT CLOSURE NOTICE',
-            `Case ID: ${caseId}`,
-            `Incident ID: ${incident.id}`,
-            `Title: ${incident.title}`,
-            `Type: ${incident.type} — ${incident.subType}`,
-            `Location: ${incident.location?.commonName || 'N/A'}`,
-            `Closed At: ${incident.closedAt}`,
-            `Closed By: ${actor}`,
-            `Closure Remarks: ${body.closureRemarks || 'N/A'}`,
-          ].join('\n'),
-          sentAt: null as any,
-          sentBy: actor,
-          status: 'PENDING',
-          deliveryAttempts: 0
-        });
-        incident.closureBroadcastStatus = 'pending';
-        incident.closureBroadcastId = broadcastId;
+        // ── Queue Closure Broadcast for Controller review (FSD §5.11.1 / §5.1.2) ──
+        // C1 gate: a closure broadcast is only queued where REQUIRED under the
+        // configured broadcast rules (driven by Incident Category). Where required,
+        // the record is PENDING — recipients + template are pre-filled from the
+        // Broadcast Matrix (snapshot per §10.3d) and the Controller reviews and
+        // dispatches it via the 'dispatch-broadcast' action.
+        {
+          const bcConfig = await getBroadcastConfig();
+          if (isClosureBroadcastRequired(incident.category, bcConfig)) {
+            if (!db.broadcasts) db.broadcasts = [];
+            const [groups, templates, matrix] = await Promise.all([
+              getDistributionGroups(),
+              getBroadcastTemplates(),
+              getBroadcastMatrix(),
+            ]);
+            const resolved = resolveClosureBroadcast({ incident, caseId, groups, templates, matrix });
+            const broadcastSeq = db.broadcasts.filter(b => b.caseId === caseId).length + 1;
+            const broadcastId = `${caseId}-BC${String(broadcastSeq).padStart(3, '0')}`;
+            db.broadcasts.push({
+              id: broadcastId,
+              caseId,
+              incidentId: incident.id,
+              type: 'Closure',
+              recipients: resolved.recipients,
+              templateUsed: resolved.templateUsed,
+              contentDispatched: resolved.content,
+              channels: resolved.channels,
+              sensitiveFields: resolved.sensitiveFields,
+              sentAt: null as any,
+              sentBy: actor,
+              status: 'PENDING',
+              deliveryAttempts: 0,
+            });
+            incident.closureBroadcastStatus = 'pending';
+            incident.closureBroadcastId = broadcastId;
+            incident.log.push(makeLogEntry(incident,
+              `Closure broadcast ${broadcastId} queued for Controller review — ${resolved.recipients.length} recipient(s) pre-filled from "${resolved.recipientGroup || 'no matched group'}".`
+            ));
+          } else {
+            // Informational/Exercise & Backdated: FSD §5.1.2 — no broadcast handling by default.
+            incident.closureBroadcastStatus = 'not_required';
+            incident.log.push(makeLogEntry(incident,
+              `Closure broadcast not required for category "${incident.category}".`
+            ));
+          }
+        }
         break;
       }
 
@@ -754,6 +783,82 @@ export async function POST(
         }
         if (body.reportingSource !== undefined) incident.reportingSource = body.reportingSource;
         incident.log.push(makeLogEntry(incident, `Ancillary fields updated by ${actor}.`));
+        break;
+      }
+
+      // ── Controller dispatches a PENDING Closure Broadcast (FSD §5.11.1b / §10.1) ──
+      // Controller reviews the pre-filled recipients/content, then dispatches. Moves
+      // the BroadcastRecord PENDING → SENT and stamps the incident as 'dispatched'.
+      case 'dispatch-broadcast': {
+        // RBAC (FSD §3 / §13.1) — broadcast.dispatch required.
+        if (body.role && !hasBroadcastPermission(body.role, 'broadcast.dispatch')) {
+          return NextResponse.json({ error: 'You do not have permission to dispatch broadcasts.' }, { status: 403 });
+        }
+        if (!db.broadcasts) db.broadcasts = [];
+        const bcId = body.broadcastId || incident.closureBroadcastId;
+        const bc = db.broadcasts.find(b => b.id === bcId && b.incidentId === incident.id);
+        if (!bc) {
+          return NextResponse.json({ error: 'Broadcast not found for this incident.' }, { status: 404 });
+        }
+        if (bc.status !== 'PENDING') {
+          return NextResponse.json({ error: `Broadcast ${bc.id} is already ${bc.status}.` }, { status: 409 });
+        }
+        const recipients: string[] = Array.isArray(body.recipients) ? body.recipients : bc.recipients;
+        if (!recipients || recipients.length === 0) {
+          return NextResponse.json({ error: 'Cannot dispatch: recipient list is empty.' }, { status: 400 });
+        }
+        // §10.4d — including fields beyond the default (sensitive) needs explicit confirmation.
+        if (body.includeSensitive && !body.confirmSensitive) {
+          return NextResponse.json({
+            error: 'Including sensitive fields requires explicit Duty Manager confirmation.',
+            requiresSensitiveConfirmation: true,
+          }, { status: 409 });
+        }
+        const now = new Date().toISOString();
+        const before = JSON.stringify({ status: bc.status, recipients: bc.recipients.length });
+        bc.recipients = recipients;
+        if (typeof body.content === 'string' && body.content.length > 0) bc.contentDispatched = body.content;
+        bc.status = 'SENT';
+        bc.sentAt = now;
+        bc.sentBy = actor;
+        bc.dispatchedBy = actor;
+        bc.dispatchedAt = now;
+        bc.deliveryAttempts = (bc.deliveryAttempts || 0) + 1;
+        bc.deliveryCounts = initialDeliveryCounts(recipients.length);
+        if (body.includeSensitive && body.confirmSensitive) bc.sensitiveFieldsIncluded = true;
+        if (bc.type === 'Closure') {
+          incident.closureBroadcastStatus = 'dispatched';
+          incident.closureBroadcastId = bc.id;
+        }
+        incident.log.push(makeLogEntry(incident,
+          `Broadcast ${bc.id} dispatched by ${actor} to ${recipients.length} recipient(s).`
+          + (bc.sensitiveFieldsIncluded ? ' Includes sensitive fields — Duty Manager confirmed.' : '')
+        ));
+        // Mock Email gateway — fire the actual send for the Email channel (§10.1a/§10.2).
+        // Fire-and-forget: broadcast dispatch is not blocked on gateway latency.
+        if (!bc.channels || bc.channels.includes('Email')) {
+          sendEmailMockBatch({
+            recipients,
+            subject: `[SDC] ${bc.type} Broadcast — ${bc.id}`,
+            body: bc.contentDispatched,
+            caseId: bc.caseId,
+            broadcastId: bc.id,
+          }).catch(() => {});
+        }
+        // Audit trail (FSD §13.5) — recorded server-side alongside the dispatch.
+        if (!db.auditLogs) db.auditLogs = [];
+        db.auditLogs.push({
+          id: `AUD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          timestamp: now,
+          user: actor,
+          module: 'Broadcast',
+          action: 'Dispatch Broadcast',
+          details: `Dispatched ${bc.type} broadcast ${bc.id} for incident ${incident.id} to ${recipients.length} recipient(s).`,
+          beforeSnapshot: before,
+          afterSnapshot: JSON.stringify({ status: 'SENT', recipients: recipients.length }),
+          correlationId: `CORR-${Date.now()}`,
+          ipAddress: '127.0.0.1',
+        });
         break;
       }
 

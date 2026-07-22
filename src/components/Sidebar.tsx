@@ -36,6 +36,7 @@ const NAV_GROUPS = [
     label: 'Communications',
     items: [
       { name: 'Broadcasts',      path: '/broadcasts',   d: 'M15.05 5A5 5 0 0 1 19 8.95M15.05 1A9 9 0 0 1 23 8.94m-1 7.98v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.72 9.5a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.63 1h3.18a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 8.91a16 16 0 0 0 5.86 5.86l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 15.92z' },
+      { name: 'End-of-Day Review', path: '/broadcasts/eod-review', d: 'M12 8v4l3 3M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z' },
     ]
   },
   {
@@ -106,6 +107,9 @@ export const Sidebar: React.FC = () => {
   const isActive = (path: string) => {
     if (path === '/') return pathname === '/';
     if (path === '/case-management') return CASE_MGMT_PATHS.some(p => pathname?.startsWith(p));
+    // '/broadcasts' has a nested '/broadcasts/eod-review' sibling route — don't let
+    // the parent item light up when the sub-route is active.
+    if (path === '/broadcasts') return pathname === '/broadcasts';
     return pathname?.startsWith(path);
   };
 

@@ -17,6 +17,7 @@ import { useRole } from '@/context/RoleContext';
 import { useUnsavedChanges } from '@/context/UnsavedChangesContext';
 import { getIncidentTaxonomy } from '@/lib/taxonomy';
 import { INCIDENT_CATEGORIES, DEFAULT_INCIDENT_CATEGORY } from '@/lib/incidentCategory';
+import { hasBroadcastPermission } from '@/lib/permissions';
 import dynamic from 'next/dynamic';
 import MultiResponderSelect from '@/components/MultiResponderSelect';
 const IncidentMap = dynamic(() => import('@/components/IncidentMap'), { ssr: false });
@@ -156,6 +157,13 @@ export default function IncidentDetailsPage() {
   const [showResponderManager, setShowResponderManager] = useState(false);
   const [mapExpanded, setMapExpanded] = useState(false);
   const [reviewRemarks, setReviewRemarks] = useState('');
+
+  // Closure Broadcast compose/dispatch (FSD §5.11.1b / §10.1)
+  const [showBroadcastModal, setShowBroadcastModal] = useState(false);
+  const [broadcastRecipients, setBroadcastRecipients] = useState('');
+  const [broadcastContent, setBroadcastContent] = useState('');
+  const [broadcastSensitiveFields, setBroadcastSensitiveFields] = useState<string[]>([]);
+  const [broadcastIncludeSensitive, setBroadcastIncludeSensitive] = useState(false);
 
   // Timeline & Refactoring States
   const [activeTimelineTab, setActiveTimelineTab] = useState<'log' | 'system' | 'faults' | 'duplicates'>('log'); // 'faults' = Faults & e-Diary tab
@@ -659,6 +667,31 @@ export default function IncidentDetailsPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  // ── Closure Broadcast: open compose modal pre-filled from the PENDING record ───
+  function openClosureBroadcastModal() {
+    const list = incident?.relatedBroadcasts || [];
+    const bc = list.find(b => b.id === (incident as any)?.closureBroadcastId)
+      || list.find(b => b.status === 'PENDING');
+    setBroadcastRecipients((bc?.recipients || []).join(', '));
+    setBroadcastContent(bc?.contentDispatched || '');
+    setBroadcastSensitiveFields((bc as any)?.sensitiveFields || []);
+    setBroadcastIncludeSensitive(false);
+    setShowBroadcastModal(true);
+  }
+
+  async function submitClosureBroadcast() {
+    const recipients = broadcastRecipients.split(',').map(s => s.trim()).filter(Boolean);
+    if (recipients.length === 0) { alert('Recipient list cannot be empty.'); return; }
+    const ok = await performAction('dispatch-broadcast', {
+      broadcastId: (incident as any)?.closureBroadcastId,
+      recipients,
+      content: broadcastContent,
+      includeSensitive: broadcastIncludeSensitive,
+      confirmSensitive: broadcastIncludeSensitive,
+    });
+    if (ok) setShowBroadcastModal(false);
   }
 
   const handleSaveEdit = async (eventNumber: number, description: string, date: string, time: string, attachments: string[]) => {
@@ -1877,7 +1910,17 @@ export default function IncidentDetailsPage() {
                   className="btn btn-success btn-sm"
                   onClick={async () => {
                     if (confirm('Notify Controller that your ground activities are complete?')) {
-                      await performAction('notify-complete', { responderId: username });
+                      const ok = await performAction('notify-complete', { responderId: username });
+                      // FSD §10.5 — Responder marks Incident input complete → Controller.
+                      if (ok) {
+                        addNotification({
+                          title: '✅ Responder Marked Input Complete',
+                          message: `${username} has notified completion of ground activities on Incident ${incident?.id} — awaiting your review.`,
+                          role: 'Controller',
+                          type: 'incident',
+                          link: `/incidents/${incident?.id}`,
+                        });
+                      }
                     }
                   }}
                   disabled={saving}
@@ -2266,7 +2309,20 @@ export default function IncidentDetailsPage() {
                           )}
                           {r.lifecycleStatus === 'Live (Incomplete)' && (
                             <button className="btn btn-secondary btn-sm" style={{ fontSize: '10.5px', padding: '2px 6px' }}
-                              onClick={() => performAction('notify-complete', { responderId: r.responderId })} disabled={saving}>
+                              onClick={async () => {
+                                const ok = await performAction('notify-complete', { responderId: r.responderId });
+                                // FSD §10.5 — Responder marks Incident input complete → Controller.
+                                if (ok) {
+                                  addNotification({
+                                    title: '✅ Responder Marked Input Complete',
+                                    message: `${r.responderId} has notified completion of ground activities on Incident ${incident?.id} — awaiting your review.`,
+                                    role: 'Controller',
+                                    type: 'incident',
+                                    link: `/incidents/${incident?.id}`,
+                                  });
+                                }
+                              }}
+                              disabled={saving}>
                               Notify Completion
                             </button>
                           )}
@@ -2450,7 +2506,12 @@ export default function IncidentDetailsPage() {
                       <span className="cd-info-label">Closure Broadcast</span>
                       <span className="cd-info-value">
                         {(incident as any).closureBroadcastStatus === 'pending' && (
-                          <span className="badge" style={{ background: 'var(--color-high-bg)', color: 'var(--color-high)', borderColor: 'var(--color-high-border)', fontSize: 10 }}>⏳ Pending Dispatch</span>
+                          <>
+                            <span className="badge" style={{ background: 'var(--color-high-bg)', color: 'var(--color-high)', borderColor: 'var(--color-high-border)', fontSize: 10 }}>⏳ Pending Dispatch</span>
+                            {hasBroadcastPermission(role, 'broadcast.dispatch') && (
+                              <button className="btn btn-primary btn-sm" style={{ marginLeft: 8 }} onClick={openClosureBroadcastModal} disabled={saving}>Review &amp; Dispatch</button>
+                            )}
+                          </>
                         )}
                         {(incident as any).closureBroadcastStatus === 'dispatched' && (
                           <span className="badge badge-closed" style={{ fontSize: 10 }}>✓ Dispatched</span>
@@ -2467,6 +2528,44 @@ export default function IncidentDetailsPage() {
                 )}
               </div>
             </div>
+
+            {/* Closure Broadcast compose/dispatch modal (FSD §5.11.1b / §10.1) */}
+            {showBroadcastModal && (
+              <div onClick={() => setShowBroadcastModal(false)}
+                style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
+                <div onClick={(e) => e.stopPropagation()} className="glass"
+                  style={{ width: 'min(560px, 94vw)', maxHeight: '88vh', overflowY: 'auto', padding: 24 }}>
+                  <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700 }}>Perform Closure Broadcast</h3>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
+                    Review the pre-filled recipients and content, then dispatch. Broadcast ID: {(incident as any)?.closureBroadcastId || '—'}
+                  </div>
+                  <label style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Recipients (comma-separated emails)</label>
+                  <textarea value={broadcastRecipients} onChange={(e) => setBroadcastRecipients(e.target.value)}
+                    rows={3} style={{ width: '100%', margin: '4px 0 14px', padding: 10, borderRadius: 8, border: '1px solid var(--border)', fontSize: 13, fontFamily: 'inherit' }} />
+                  <label style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Content</label>
+                  <textarea value={broadcastContent} onChange={(e) => setBroadcastContent(e.target.value)}
+                    rows={10} style={{ width: '100%', margin: '4px 0 16px', padding: 10, borderRadius: 8, border: '1px solid var(--border)', fontSize: 13, fontFamily: 'monospace' }} />
+                  {broadcastSensitiveFields.length > 0 && (
+                    <div style={{ background: 'var(--color-high-bg)', border: '1px solid var(--color-high-border)', borderRadius: 8, padding: '10px 12px', marginBottom: 16 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-high)', marginBottom: 4 }}>
+                        Excluded by default (§10.4c): {broadcastSensitiveFields.join(', ')}
+                      </div>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}>
+                        <input type="checkbox" checked={broadcastIncludeSensitive}
+                          onChange={(e) => setBroadcastIncludeSensitive(e.target.checked)} />
+                        I confirm (Duty Manager) this dispatch knowingly includes sensitive field content added to the text above.
+                      </label>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                    <button className="btn btn-secondary btn-sm" onClick={() => setShowBroadcastModal(false)} disabled={saving}>Cancel</button>
+                    <button className="btn btn-primary btn-sm" onClick={submitClosureBroadcast} disabled={saving}>
+                      {saving ? 'Dispatching…' : 'Dispatch Broadcast'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Accordion: Emergency Services */}
             <div className="accordion-item">
@@ -2587,7 +2686,28 @@ export default function IncidentDetailsPage() {
                 <div className="accordion-content">
                   <label className="checkbox-row" style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: 12 }}>
                     <input type="checkbox" checked={incident.mediaInvolvement.mediaAtScene}
-                      onChange={e => updateFields({ mediaInvolvement: { ...incident.mediaInvolvement, mediaAtScene: e.target.checked } })}
+                      onChange={async e => {
+                        const flaggedNow = e.target.checked && !incident.mediaInvolvement.mediaAtScene;
+                        await updateFields({ mediaInvolvement: { ...incident.mediaInvolvement, mediaAtScene: e.target.checked } });
+                        // FSD §10.8 — media presence at scene triggers an SDC Communications
+                        // Team notification; Duty Manager reviews and assigns to Controller.
+                        if (flaggedNow) {
+                          addNotification({
+                            title: '📷 Media Presence — Communications Action Required',
+                            message: `Media reported at scene for Incident ${incident.id}. Notify the SDC Communications Team and assign follow-up.`,
+                            role: 'Duty Manager',
+                            type: 'incident',
+                            link: `/incidents/${incident.id}`,
+                          });
+                          addNotification({
+                            title: '📷 Media Presence — Communications Action Required',
+                            message: `Media reported at scene for Incident ${incident.id}. Coordinate with the SDC Communications Team.`,
+                            role: 'Controller',
+                            type: 'incident',
+                            link: `/incidents/${incident.id}`,
+                          });
+                        }
+                      }}
                       disabled={isLocked} />
                     Press/Media present at scene
                   </label>
@@ -3961,6 +4081,21 @@ export default function IncidentDetailsPage() {
                   const ok = await performAction('close', { closureRemarks: modalRemarks.trim() });
                   if (ok) {
                     setShowApproveModal(false);
+                    // FSD §10.5 — prompt the Controller to perform the closure broadcast.
+                    // performAction() re-fetches the incident on success, so read the
+                    // server-computed C1 gate result directly instead of guessing from
+                    // category client-side (fixes a prior proxy that missed config changes).
+                    const res = await fetch(`/api/incidents/${incidentId}`);
+                    const fresh = await res.json().catch(() => null);
+                    if (fresh?.closureBroadcastStatus === 'pending') {
+                      addNotification({
+                        title: '📡 Closure Broadcast Pending',
+                        message: `Incident ${incident?.id} was closed and requires a closure broadcast. Review and dispatch it.`,
+                        role: 'Controller',
+                        type: 'broadcast',
+                        link: `/incidents/${incident?.id}`,
+                      });
+                    }
                   }
                 }}
                 disabled={saving}

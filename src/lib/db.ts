@@ -394,15 +394,30 @@ export interface BroadcastRecord {
   id: string; // [Case ID]-BC[3-digit sequence]
   caseId: string;
   incidentId: string;
-  type: string; // "Closure" | "End-of-Day"
+  type: string; // "Closure" | "End-of-Day" | "Weather Advisory" | "Manual"
   recipients: string[];
   templateUsed: string;
   contentDispatched: string;
   sentAt: string;
   sentBy: string;
-  status: string; // "SENT" | "FAILED"
+  status: string; // "PENDING" | "SENT" | "FAILED" | "REJECTED"
   deliveryAttempts: number;
   lastErrorMessage?: string;
+  // FSD §10.9d-e — per-status delivery breakdown + acknowledgement counts.
+  // Optional: only populated once a broadcast has been dispatched.
+  deliveryCounts?: { sent: number; delivered: number; failed: number; pending: number };
+  acknowledgedCount?: number;
+  // Audit fields for the compose/dispatch step (FSD §5.11.1b).
+  dispatchedBy?: string;
+  dispatchedAt?: string;
+  // §10.2/§13.3 — delivery channels resolved from the Broadcast Matrix at creation
+  // (snapshot, same rationale as recipients — §10.3d).
+  channels?: string[];
+  // §10.4c-d — field names excluded from the default template content. Shown to the
+  // dispatcher so they can knowingly override with explicit confirmation.
+  sensitiveFields?: string[];
+  // Set true once a dispatch has gone out with sensitiveFields knowingly included.
+  sensitiveFieldsIncluded?: boolean;
 }
 
 export interface AuditLog {

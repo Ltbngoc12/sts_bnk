@@ -1,0 +1,140 @@
+// Server-side persistence for Broadcast configuration + notifications.
+//
+// Uses the same MongoDB client (`sentosa-cms` database) and the same upsert-by-`id`
+// convention as db.ts's saveCollection(), but is kept separate from the big
+// getDb()/saveDb() hydrate/dehydrate pipeline because these collections carry no
+// derived fields. Each collection seeds its FSD-aligned defaults on first read.
+//
+// SERVER ONLY — imports the Mongo client. Do not import from client components.
+
+import { Db } from 'mongodb';
+import clientPromise from './mongodb';
+import { DistributionGroup, DEFAULT_GROUPS } from './groups';
+import {
+  BroadcastTemplate,
+  BroadcastMatrixRule,
+  BroadcastChannel,
+  BroadcastConfig,
+  NotificationRecord,
+  DEFAULT_BROADCAST_TEMPLATES,
+  DEFAULT_BROADCAST_MATRIX,
+  DEFAULT_BROADCAST_CHANNELS,
+  DEFAULT_BROADCAST_CONFIG,
+} from './broadcastConfig';
+
+async function mdb(): Promise<Db> {
+  const client = await clientPromise;
+  return client.db('sentosa-cms');
+}
+
+// Read a collection; if empty, seed it with the provided defaults and return those.
+async function readOrSeed<T extends { id: string }>(name: string, defaults: T[]): Promise<T[]> {
+  const db = await mdb();
+  const col = db.collection(name);
+  const docs = await col.find({}, { projection: { _id: 0 } }).toArray();
+  if (docs.length === 0 && defaults.length > 0) {
+    await col.insertMany(defaults.map((d) => ({ ...d })) as any[]);
+    return defaults;
+  }
+  return docs as unknown as T[];
+}
+
+// Replace the entire collection with `docs` (upsert-by-id, prune removed).
+async function replaceAll<T extends { id: string }>(name: string, docs: T[]): Promise<void> {
+  const db = await mdb();
+  const col = db.collection(name);
+  if (docs.length === 0) {
+    await col.deleteMany({});
+    return;
+  }
+  await col.bulkWrite(
+    docs.map((doc) => ({
+      replaceOne: { filter: { id: doc.id }, replacement: { ...doc }, upsert: true },
+    })) as any[]
+  );
+  await col.deleteMany({ id: { $nin: docs.map((d) => d.id) } });
+}
+
+// ── Distribution Groups (FSD §10.3) ────────────────────────────────────────────
+export const getDistributionGroups = () =>
+  readOrSeed<DistributionGroup>('distributionGroups', DEFAULT_GROUPS);
+export const saveDistributionGroups = (g: DistributionGroup[]) =>
+  replaceAll('distributionGroups', g);
+
+// ── Broadcast Templates (FSD §10.4) ────────────────────────────────────────────
+export const getBroadcastTemplates = () =>
+  readOrSeed<BroadcastTemplate>('broadcastTemplates', DEFAULT_BROADCAST_TEMPLATES);
+export const saveBroadcastTemplates = (t: BroadcastTemplate[]) =>
+  replaceAll('broadcastTemplates', t);
+
+// ── Broadcast Matrix (FSD §10.6) ───────────────────────────────────────────────
+export const getBroadcastMatrix = () =>
+  readOrSeed<BroadcastMatrixRule>('broadcastMatrixRules', DEFAULT_BROADCAST_MATRIX);
+export const saveBroadcastMatrix = (m: BroadcastMatrixRule[]) =>
+  replaceAll('broadcastMatrixRules', m);
+
+// ── Delivery Channels (FSD §10.2) ──────────────────────────────────────────────
+export const getBroadcastChannels = () =>
+  readOrSeed<BroadcastChannel>('broadcastChannels', DEFAULT_BROADCAST_CHANNELS);
+export const saveBroadcastChannels = (c: BroadcastChannel[]) =>
+  replaceAll('broadcastChannels', c);
+
+// ── Broadcast-level config: EOD timing + closure-required categories (§13.3) ────
+export async function getBroadcastConfig(): Promise<BroadcastConfig> {
+  const rows = await readOrSeed<BroadcastConfig>('broadcastConfig', [DEFAULT_BROADCAST_CONFIG]);
+  return rows[0] || DEFAULT_BROADCAST_CONFIG;
+}
+export const saveBroadcastConfig = (cfg: BroadcastConfig) =>
+  replaceAll('broadcastConfig', [{ ...cfg, id: 'singleton' as const }]);
+
+// ── Notifications mailbox (server-side; FSD §10.5) ─────────────────────────────
+export async function getNotifications(): Promise<NotificationRecord[]> {
+  const db = await mdb();
+  const docs = await db
+    .collection('notifications')
+    .find({}, { projection: { _id: 0 } })
+    .toArray();
+  return docs as unknown as NotificationRecord[];
+}
+
+export async function addNotification(n: Omit<NotificationRecord, 'id' | 'timestamp' | 'read'> & { read?: boolean }): Promise<NotificationRecord> {
+  const db = await mdb();
+  const rec: NotificationRecord = {
+    id: `NTF-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    timestamp: new Date().toISOString(),
+    read: n.read ?? false,
+    userId: n.userId,
+    recipientRole: n.recipientRole,
+    type: n.type,
+    title: n.title,
+    message: n.message,
+    link: n.link,
+  };
+  await db.collection('notifications').insertOne({ ...rec } as any);
+  return rec;
+}
+
+export async function markNotificationRead(id: string, read = true): Promise<void> {
+  const db = await mdb();
+  await db.collection('notifications').updateOne({ id }, { $set: { read } });
+}
+
+export async function markAllNotificationsRead(recipientRole?: string): Promise<void> {
+  const db = await mdb();
+  const filter = recipientRole ? { $or: [{ recipientRole }, { recipientRole: 'All' }] } : {};
+  await db.collection('notifications').updateMany(filter as any, { $set: { read: true } });
+}
+
+// Bulk-insert seed/records (used once to seed the mailbox on first read).
+export async function insertNotifications(records: NotificationRecord[]): Promise<void> {
+  if (records.length === 0) return;
+  const db = await mdb();
+  await db.collection('notifications').insertMany(records.map((r) => ({ ...r })) as any[]);
+}
+
+// Clear notifications for a role (and 'All'); no role = clear everything.
+export async function clearNotifications(recipientRole?: string): Promise<void> {
+  const db = await mdb();
+  const filter = recipientRole ? { $or: [{ recipientRole }, { recipientRole: 'All' }] } : {};
+  await db.collection('notifications').deleteMany(filter as any);
+}

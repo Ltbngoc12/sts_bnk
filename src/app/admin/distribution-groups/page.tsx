@@ -25,19 +25,37 @@ export default function DistributionGroupsPage() {
   const [formMemberEmail, setFormMemberEmail] = useState('');
   const [formMemberPhone, setFormMemberPhone] = useState('');
 
+  // Load from the server-backed store (FSD §10.3 / §13.3). Falls back to localStorage
+  // then seeded defaults if the API is unavailable. Mirrors the result into
+  // localStorage so the Task module's synchronous group picker stays in sync.
   useEffect(() => {
-    const stored = localStorage.getItem(GROUPS_STORAGE_KEY);
-    if (stored) {
-      setGroups(JSON.parse(stored));
-    } else {
-      setGroups(DEFAULT_GROUPS);
-      localStorage.setItem(GROUPS_STORAGE_KEY, JSON.stringify(DEFAULT_GROUPS));
-    }
+    (async () => {
+      try {
+        const res = await fetch('/api/admin/distribution-groups');
+        if (res.ok) {
+          const data = await res.json();
+          const groups: DistributionGroup[] = Array.isArray(data) && data.length > 0 ? data : DEFAULT_GROUPS;
+          setGroups(groups);
+          localStorage.setItem(GROUPS_STORAGE_KEY, JSON.stringify(groups));
+          return;
+        }
+      } catch { /* fall through to local cache */ }
+      const stored = localStorage.getItem(GROUPS_STORAGE_KEY);
+      if (stored) setGroups(JSON.parse(stored));
+      else { setGroups(DEFAULT_GROUPS); localStorage.setItem(GROUPS_STORAGE_KEY, JSON.stringify(DEFAULT_GROUPS)); }
+    })();
   }, []);
 
+  // Persist to the server (source of truth for broadcast dispatch) and mirror to
+  // localStorage for the Task module's synchronous consumers.
   const saveGroupsState = (updated: DistributionGroup[]) => {
     setGroups(updated);
     localStorage.setItem(GROUPS_STORAGE_KEY, JSON.stringify(updated));
+    fetch('/api/admin/distribution-groups', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updated),
+    }).catch(() => { /* offline — localStorage mirror retains the edit */ });
   };
 
   const logAudit = async (action: string, before: any, after: any, details: string) => {
