@@ -9,6 +9,15 @@ export interface GroupMember {
   type: 'Internal' | 'External';
   email: string;
   phone: string;
+  // Present when this member was added by selecting an existing CMS user
+  // account (src/lib/users.ts) rather than entered as a free-text external
+  // contact. Values are copied in at add-time (no live sync back to the
+  // user record) since groups.ts and users.ts are independent stores.
+  userId?: string;
+  // Free-text note, only used for External Contact members (no Member Type
+  // picker for that path — the admin can jot context here instead, e.g.
+  // "Cove north gate duty desk, staffed 24/7").
+  remark?: string;
 }
 
 export interface DistributionGroup {

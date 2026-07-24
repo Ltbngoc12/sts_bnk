@@ -162,13 +162,18 @@ export default function FaultDetailPage() {
         body: JSON.stringify({ action: 'submit', username }),
       });
       if (res.ok) {
+        const data = await res.json();
         await loadFault();
+        if (!data.cmmsTicketId) {
+          alert(`IFM CMMS did not confirm a ticket${data.cmmsError ? ` (${data.cmmsError})` : ''}. The fault remains "Pending Submission" — please try submitting again.`);
+        }
       } else {
         const err = await res.json();
         alert(`Failed to submit to CMMS: ${err.error}`);
       }
     } catch (err) {
       console.error('Submit to CMMS failed:', err);
+      alert('Failed to submit to CMMS: network error. Please try again.');
     } finally {
       setSubmittingToCmms(false);
     }

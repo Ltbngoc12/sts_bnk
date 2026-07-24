@@ -1,25 +1,5 @@
 import { NextResponse } from 'next/server';
-
-const CONTRACTORS = [
-  'Wilson Fire Services',
-  'KES Building Services',
-  'Premas Facilities Mgmt',
-  'Certis Facilities',
-];
-const CMMS_STATUSES = ['Open', 'Assigned', 'In Progress', 'Pending Materials', 'Completed', 'Closed'];
-
-// Simulates the external IFM CMMS ticket registry (in-memory for prototype)
-type CmmsTicket = {
-  ticketId: string;
-  location: string;
-  description: string;
-  severity: string;
-  status: string;
-  assignedTo: string;
-  createdAt: string;
-  updatedAt: string;
-};
-const ticketRegistry = new Map<string, CmmsTicket>();
+import { ticketRegistry, createCmmsTicket, CMMS_STATUSES } from '@/lib/cmmsMock';
 
 /** POST /api/cmms-mock  — Create a new CMMS work order ticket */
 export async function POST(request: Request) {
@@ -30,34 +10,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'location and description are required' }, { status: 400 });
     }
 
-    const today = new Date();
-    const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
-    const randNum = Math.floor(10000 + Math.random() * 90000);
-    const ticketId = `CMMS-${dateStr}-${randNum}`;
-    const contractor = CONTRACTORS[Math.floor(Math.random() * CONTRACTORS.length)];
-
-    const ticket: CmmsTicket = {
-      ticketId,
-      location: body.location,
-      description: body.description,
-      severity: body.severity || 'Medium',
-      status: 'Open',
-      assignedTo: contractor,
-      createdAt: today.toISOString(),
-      updatedAt: today.toISOString(),
-    };
-
-    // Simulate 600ms integration latency
-    await new Promise(resolve => setTimeout(resolve, 600));
-
-    ticketRegistry.set(ticketId, ticket);
+    const ticket = await createCmmsTicket(body);
 
     return NextResponse.json({
       success: true,
-      ticketId,
-      assignedTo: contractor,
-      status: 'Open',
-      message: `CMMS ticket raised for [${body.location}]. Assigned to: ${contractor}.`,
+      ticketId: ticket.ticketId,
+      assignedTo: ticket.assignedTo,
+      status: ticket.status,
+      message: `CMMS ticket raised for [${body.location}]. Assigned to: ${ticket.assignedTo}.`,
     });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Unknown error';

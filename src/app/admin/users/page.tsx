@@ -34,6 +34,7 @@ export default function UserManagementPage() {
   // Form fields
   const [formName, setFormName] = useState('');
   const [formEmail, setFormEmail] = useState('');
+  const [formPhone, setFormPhone] = useState('');
   const [formDept, setFormDept] = useState('');
   const [formOrg, setFormOrg] = useState('');
   const [formAuth, setFormAuth] = useState<'WOG SSO' | 'Non-SSO'>('WOG SSO');
@@ -79,6 +80,7 @@ export default function UserManagementPage() {
             ...u,
             name: formName,
             email: formEmail,
+            phone: formPhone,
             department: formDept,
             orgUnit: formOrg,
             authSource: formAuth,
@@ -97,6 +99,7 @@ export default function UserManagementPage() {
         id: String(Date.now()),
         name: formName,
         email: formEmail,
+        phone: formPhone,
         department: formDept,
         orgUnit: formOrg,
         authSource: formAuth,
@@ -132,6 +135,7 @@ export default function UserManagementPage() {
     setSelectedUser(user);
     setFormName(user.name);
     setFormEmail(user.email);
+    setFormPhone(user.phone);
     setFormDept(user.department);
     setFormOrg(user.orgUnit);
     setFormAuth(user.authSource);
@@ -149,6 +153,7 @@ export default function UserManagementPage() {
   const resetForm = () => {
     setFormName('');
     setFormEmail('');
+    setFormPhone('');
     setFormDept('');
     setFormOrg('');
     setFormAuth('WOG SSO');
@@ -233,8 +238,8 @@ export default function UserManagementPage() {
               <tr style={{ background: 'var(--bg-inset)', borderBottom: '1px solid var(--border-color)' }}>
                 <th style={{ padding: '12px 16px', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Name</th>
                 <th style={{ padding: '12px 16px', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Email</th>
+                <th style={{ padding: '12px 16px', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Phone</th>
                 <th style={{ padding: '12px 16px', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Department</th>
-                <th style={{ padding: '12px 16px', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Org Unit</th>
                 <th style={{ padding: '12px 16px', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Auth</th>
                 <th style={{ padding: '12px 16px', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Role</th>
                 <th style={{ padding: '12px 16px', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Status</th>
@@ -252,8 +257,8 @@ export default function UserManagementPage() {
                   <tr key={user.id} style={{ borderBottom: '1px solid var(--border-color)', background: 'var(--bg-card)' }}>
                     <td style={{ padding: '12px 16px', fontWeight: 600 }}>{user.name}</td>
                     <td style={{ padding: '12px 16px', color: 'var(--text-sub)' }}>{user.email}</td>
+                    <td style={{ padding: '12px 16px', fontSize: '12.5px', color: 'var(--text-sub)' }}>{user.phone}</td>
                     <td style={{ padding: '12px 16px', fontSize: '12.5px' }}>{user.department}</td>
-                    <td style={{ padding: '12px 16px', fontSize: '12.5px', color: 'var(--text-muted)' }}>{user.orgUnit}</td>
                     <td style={{ padding: '12px 16px', fontSize: '12px' }}>
                       <span className={`badge ${user.authSource === 'WOG SSO' ? 'badge-onsite' : 'badge-closed'}`} style={{ padding: '2px 6px', borderRadius: '4px' }}>
                         {user.authSource}
@@ -315,22 +320,23 @@ export default function UserManagementPage() {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
                 <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '5px', textTransform: 'uppercase' }}>Mobile Phone</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. +65 9123 4567"
+                    value={formPhone}
+                    onChange={e => setFormPhone(e.target.value)}
+                    style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '13px' }}
+                  />
+                </div>
+                <div>
                   <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '5px', textTransform: 'uppercase' }}>Department</label>
                   <input
                     type="text"
                     required
                     value={formDept}
                     onChange={e => setFormDept(e.target.value)}
-                    style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '13px' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '5px', textTransform: 'uppercase' }}>Organisation Unit</label>
-                  <input
-                    type="text"
-                    required
-                    value={formOrg}
-                    onChange={e => setFormOrg(e.target.value)}
                     style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '13px' }}
                   />
                 </div>

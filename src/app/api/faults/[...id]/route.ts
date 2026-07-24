@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, saveDb } from '@/lib/db';
 import { tryAutoCloseCase } from '@/lib/autoclose';
+import { createCmmsTicket } from '@/lib/cmmsMock';
 
 export async function GET(
   _request: NextRequest,
@@ -51,32 +52,20 @@ export async function PATCH(
       db.faults![idx] = fault;
       await saveDb(db);
 
-      // Call CMMS API — on success, auto-close (FRD §6.3.1)
+      // Call CMMS — on success, auto-close (FRD §6.3.1)
       let cmmsTicketId: string | undefined;
       let cmmsAssignedTo: string | undefined;
+      let cmmsError: string | undefined;
       try {
-        const cmmsRes = await fetch(
-          `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/cmms-mock`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              faultId,
-              caseId: fault.caseId,
-              faultType: fault.faultType,
-              faultSubType: fault.faultSubType,
-              location: fault.location?.commonName || 'Sentosa Island',
-              description: fault.description,
-            }),
-          }
-        );
-        if (cmmsRes.ok) {
-          const cmmsData = await cmmsRes.json();
-          cmmsTicketId = cmmsData.ticketId;
-          cmmsAssignedTo = cmmsData.assignedTo;
-        }
-      } catch (_) {
+        const ticket = await createCmmsTicket({
+          location: fault.location?.commonName || 'Sentosa Island',
+          description: fault.description,
+        });
+        cmmsTicketId = ticket.ticketId;
+        cmmsAssignedTo = ticket.assignedTo;
+      } catch (err: any) {
         // CMMS unreachable — fault stays at "Pending Submission", submittedAt recorded
+        cmmsError = err?.message || 'CMMS unreachable';
       }
 
       // Auto-close on receipt of CMMS Fault ID (FRD §6.3.1, §6.5)
@@ -96,7 +85,7 @@ export async function PATCH(
         await saveDb(db);
       }
 
-      return NextResponse.json({ fault, cmmsTicketId, cmmsAssignedTo });
+      return NextResponse.json({ fault, cmmsTicketId, cmmsAssignedTo, cmmsError });
     }
 
     // Manual field updates (fallback)
