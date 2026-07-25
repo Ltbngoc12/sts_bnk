@@ -49,7 +49,6 @@ async function run() {
       templateUsed: resolved.templateUsed,
       contentDispatched: resolved.content,
       channels: resolved.channels,
-      sensitiveFields: resolved.sensitiveFields,
       sentAt: null as any,
       sentBy: 'system',
       status: 'PENDING',

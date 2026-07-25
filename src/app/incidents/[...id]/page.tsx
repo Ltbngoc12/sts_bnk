@@ -162,8 +162,12 @@ export default function IncidentDetailsPage() {
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
   const [broadcastRecipients, setBroadcastRecipients] = useState('');
   const [broadcastContent, setBroadcastContent] = useState('');
-  const [broadcastSensitiveFields, setBroadcastSensitiveFields] = useState<string[]>([]);
-  const [broadcastIncludeSensitive, setBroadcastIncludeSensitive] = useState(false);
+  // Auto-filled default content at the time the modal was opened — diffed against
+  // the (possibly edited) broadcastContent to decide whether the "content edited
+  // beyond default" confirmation is required (2026-07-25 content-diff gate,
+  // replaces the old per-field sensitiveFields checklist).
+  const [broadcastOriginalContent, setBroadcastOriginalContent] = useState('');
+  const [broadcastConfirmContentChange, setBroadcastConfirmContentChange] = useState(false);
 
   // Timeline & Refactoring States
   const [activeTimelineTab, setActiveTimelineTab] = useState<'log' | 'system' | 'faults' | 'duplicates'>('log'); // 'faults' = Faults & e-Diary tab
@@ -676,8 +680,8 @@ export default function IncidentDetailsPage() {
       || list.find(b => b.status === 'PENDING');
     setBroadcastRecipients((bc?.recipients || []).join(', '));
     setBroadcastContent(bc?.contentDispatched || '');
-    setBroadcastSensitiveFields((bc as any)?.sensitiveFields || []);
-    setBroadcastIncludeSensitive(false);
+    setBroadcastOriginalContent(bc?.contentDispatched || '');
+    setBroadcastConfirmContentChange(false);
     setShowBroadcastModal(true);
   }
 
@@ -688,8 +692,7 @@ export default function IncidentDetailsPage() {
       broadcastId: (incident as any)?.closureBroadcastId,
       recipients,
       content: broadcastContent,
-      includeSensitive: broadcastIncludeSensitive,
-      confirmSensitive: broadcastIncludeSensitive,
+      confirmContentChange: broadcastConfirmContentChange,
     });
     if (ok) setShowBroadcastModal(false);
   }
@@ -2545,15 +2548,15 @@ export default function IncidentDetailsPage() {
                   <label style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Content</label>
                   <textarea value={broadcastContent} onChange={(e) => setBroadcastContent(e.target.value)}
                     rows={10} style={{ width: '100%', margin: '4px 0 16px', padding: 10, borderRadius: 8, border: '1px solid var(--border)', fontSize: 13, fontFamily: 'monospace' }} />
-                  {broadcastSensitiveFields.length > 0 && (
+                  {broadcastContent !== broadcastOriginalContent && (
                     <div style={{ background: 'var(--color-high-bg)', border: '1px solid var(--color-high-border)', borderRadius: 8, padding: '10px 12px', marginBottom: 16 }}>
                       <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-high)', marginBottom: 4 }}>
-                        Excluded by default (§10.4c): {broadcastSensitiveFields.join(', ')}
+                        Content edited beyond the auto-filled default (§10.4d)
                       </div>
                       <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}>
-                        <input type="checkbox" checked={broadcastIncludeSensitive}
-                          onChange={(e) => setBroadcastIncludeSensitive(e.target.checked)} />
-                        I confirm (Duty Manager) this dispatch knowingly includes sensitive field content added to the text above.
+                        <input type="checkbox" checked={broadcastConfirmContentChange}
+                          onChange={(e) => setBroadcastConfirmContentChange(e.target.checked)} />
+                        I confirm (Duty Manager) this edited content does not include operationally sensitive, under-investigation, or restricted information beyond the standard template — or I am authorised to include it.
                       </label>
                     </div>
                   )}

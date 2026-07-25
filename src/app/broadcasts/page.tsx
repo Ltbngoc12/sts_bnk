@@ -23,8 +23,7 @@ interface BroadcastRecord {
   dispatchedBy?: string;
   dispatchedAt?: string;
   channels?: string[];
-  sensitiveFields?: string[];
-  sensitiveFieldsIncluded?: boolean;
+  contentEditConfirmed?: boolean;
 }
 
 const STATUS_BADGE: Record<string, string> = {
@@ -49,7 +48,11 @@ export default function BroadcastsPage() {
   // Detail panel editable recipients (for dispatching a PENDING record).
   const [drawerRecipients, setDrawerRecipients] = useState('');
   const [drawerContent, setDrawerContent] = useState('');
-  const [drawerIncludeSensitive, setDrawerIncludeSensitive] = useState(false);
+  // Auto-filled default content when the drawer opened — diffed against drawerContent
+  // to decide whether the "content edited beyond default" confirmation is required
+  // (2026-07-25 content-diff gate — see BroadcastTemplate comment in broadcastConfig.ts).
+  const [drawerOriginalContent, setDrawerOriginalContent] = useState('');
+  const [drawerConfirmContentChange, setDrawerConfirmContentChange] = useState(false);
 
   // New (manual) broadcast modal — FSD §10.1(d).
   const [showNew, setShowNew] = useState(false);
@@ -74,7 +77,8 @@ export default function BroadcastsPage() {
     setSelected(b);
     setDrawerRecipients((b.recipients || []).join(', '));
     setDrawerContent(b.contentDispatched || '');
-    setDrawerIncludeSensitive(false);
+    setDrawerOriginalContent(b.contentDispatched || '');
+    setDrawerConfirmContentChange(false);
   };
 
   const shown = broadcasts.filter((b) => (filter === 'All' ? true : b.status === filter));
@@ -105,8 +109,7 @@ export default function BroadcastsPage() {
         body: JSON.stringify({
           action, recipients, role, user: username,
           content: drawerContent,
-          includeSensitive: drawerIncludeSensitive,
-          confirmSensitive: drawerIncludeSensitive,
+          confirmContentChange: drawerConfirmContentChange,
         }),
       });
       if (!res.ok) { const e = await res.json(); alert(`Failed: ${e.error}`); return; }
@@ -294,14 +297,14 @@ export default function BroadcastsPage() {
                   <label>Content</label>
                   <textarea value={drawerContent} onChange={(e) => setDrawerContent(e.target.value)} rows={6} className="form-control" style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }} />
                 </div>
-                {(selected.sensitiveFields || []).length > 0 && (
+                {drawerContent !== drawerOriginalContent && (
                   <div style={{ background: 'var(--color-high-bg)', border: '1px solid var(--color-high-border)', borderRadius: 'var(--radius-md)', padding: '10px 12px', marginBottom: '10px' }}>
                     <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-high)', marginBottom: '4px' }}>
-                      Excluded by default (§10.4c): {selected.sensitiveFields!.join(', ')}
+                      Content edited beyond the auto-filled default (§10.4d)
                     </div>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', cursor: 'pointer' }}>
-                      <input type="checkbox" checked={drawerIncludeSensitive} onChange={(e) => setDrawerIncludeSensitive(e.target.checked)} />
-                      I confirm (Duty Manager) this dispatch knowingly includes sensitive field content added above.
+                      <input type="checkbox" checked={drawerConfirmContentChange} onChange={(e) => setDrawerConfirmContentChange(e.target.checked)} />
+                      I confirm (Duty Manager) this edited content does not include operationally sensitive, under-investigation, or restricted information beyond the standard template — or I am authorised to include it.
                     </label>
                   </div>
                 )}

@@ -121,7 +121,6 @@ export interface ResolvedBroadcast {
   content: string;
   recipientGroups: string[];
   channels: string[];
-  sensitiveFields: string[];
 }
 
 export function resolveClosureBroadcast(input: {
@@ -178,7 +177,6 @@ export function resolveClosureBroadcast(input: {
     content,
     recipientGroups: rule?.recipientGroups || [],
     channels: rule?.deliveryChannels || ['Email'],
-    sensitiveFields: template?.sensitiveFields || [],
   };
 }
 
@@ -244,7 +242,6 @@ export function resolveEodBroadcast(input: {
     content,
     recipientGroups: rule?.recipientGroups || [],
     channels: rule?.deliveryChannels || ['Email'],
-    sensitiveFields: template?.sensitiveFields || [],
   };
 }
 

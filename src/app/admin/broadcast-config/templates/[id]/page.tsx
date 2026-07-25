@@ -84,7 +84,6 @@ export default function TemplateDetailPage() {
             name: 'New Template',
             subject: '',
             body: '',
-            sensitiveFields: [],
             status: 'Active',
           });
         } else {
@@ -213,13 +212,6 @@ export default function TemplateDetailPage() {
     }
   };
 
-  const toggleSensitiveField = (key: string) => {
-    if (!draft) return;
-    const current = draft.sensitiveFields || [];
-    const next = current.includes(key) ? current.filter((k) => k !== key) : [...current, key];
-    setDraft({ ...draft, sensitiveFields: next });
-  };
-
   const fieldCatalog = getFieldsForBroadcastType(draft?.category);
   const usageRules = draft ? matrix.filter((r) => r.templateId === draft.id) : [];
 
@@ -339,20 +331,8 @@ export default function TemplateDetailPage() {
             </div>
           </div>
 
-          <div style={{ marginTop: '14px' }}>
-            <label style={labelStyle}>Sensitive Fields (excluded by default — Duty Manager confirmation required to include at dispatch)</label>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '6px' }}>
-              {fieldCatalog.map((f) => (
-                <label key={f.key} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: 'var(--text-sub)' }}>
-                  <input
-                    type="checkbox"
-                    checked={(draft.sensitiveFields || []).includes(f.key)}
-                    onChange={() => toggleSensitiveField(f.key)}
-                  />
-                  {f.label}
-                </label>
-              ))}
-            </div>
+          <div style={{ background: 'var(--bg-inset)', padding: '10px 12px', borderRadius: '8px', fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '14px', lineHeight: 1.5 }}>
+            Don&apos;t write operationally sensitive, under-investigation, or restricted detail into the default content above — the reviewer will be asked to confirm at dispatch only if they edit the content beyond what this template auto-fills.
           </div>
 
           <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px' }}>

@@ -522,7 +522,6 @@ export async function POST(
               templateUsed: resolved.templateUsed,
               contentDispatched: resolved.content,
               channels: resolved.channels,
-              sensitiveFields: resolved.sensitiveFields,
               sentAt: null as any,
               sentBy: actor,
               status: 'PENDING',
@@ -829,11 +828,17 @@ export async function POST(
         if (!recipients || recipients.length === 0) {
           return NextResponse.json({ error: 'Cannot dispatch: recipient list is empty.' }, { status: 400 });
         }
-        // §10.4d — including fields beyond the default (sensitive) needs explicit confirmation.
-        if (body.includeSensitive && !body.confirmSensitive) {
+        // §10.4d — content edited BEYOND the auto-filled default needs explicit
+        // confirmation (2026-07-25: content-diff gate, replaces the old per-field
+        // sensitiveFields checklist — see BroadcastTemplate comment in
+        // broadcastConfig.ts). Diff against contentDispatched as it stands right
+        // now, i.e. still the untouched auto-fill from queue time — must be
+        // computed BEFORE it gets overwritten below.
+        const contentChanged = typeof body.content === 'string' && body.content.trim() !== (bc.contentDispatched || '').trim();
+        if (contentChanged && !body.confirmContentChange) {
           return NextResponse.json({
-            error: 'Including sensitive fields requires explicit Duty Manager confirmation.',
-            requiresSensitiveConfirmation: true,
+            error: 'Content has been edited from the auto-filled default — explicit confirmation is required before dispatch.',
+            requiresContentConfirmation: true,
           }, { status: 409 });
         }
         const now = new Date().toISOString();
@@ -847,14 +852,14 @@ export async function POST(
         bc.dispatchedAt = now;
         bc.deliveryAttempts = (bc.deliveryAttempts || 0) + 1;
         bc.deliveryCounts = initialDeliveryCounts(recipients.length);
-        if (body.includeSensitive && body.confirmSensitive) bc.sensitiveFieldsIncluded = true;
+        if (contentChanged && body.confirmContentChange) bc.contentEditConfirmed = true;
         if (bc.type === 'Closure') {
           incident.closureBroadcastStatus = 'dispatched';
           incident.closureBroadcastId = bc.id;
         }
         incident.log.push(makeLogEntry(incident,
           `Broadcast ${bc.id} dispatched by ${actor} to ${recipients.length} recipient(s).`
-          + (bc.sensitiveFieldsIncluded ? ' Includes sensitive fields — Duty Manager confirmed.' : '')
+          + (bc.contentEditConfirmed ? ' Content edited from default — Duty Manager confirmed.' : '')
         ));
         // Mock Email gateway — fire the actual send for the Email channel (§10.1a/§10.2).
         // Fire-and-forget: broadcast dispatch is not blocked on gateway latency.

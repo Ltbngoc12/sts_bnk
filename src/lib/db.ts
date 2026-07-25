@@ -413,11 +413,13 @@ export interface BroadcastRecord {
   // §10.2/§13.3 — delivery channels resolved from the Broadcast Matrix at creation
   // (snapshot, same rationale as recipients — §10.3d).
   channels?: string[];
-  // §10.4c-d — field names excluded from the default template content. Shown to the
-  // dispatcher so they can knowingly override with explicit confirmation.
-  sensitiveFields?: string[];
-  // Set true once a dispatch has gone out with sensitiveFields knowingly included.
-  sensitiveFieldsIncluded?: boolean;
+  // §10.4c-d — set true once a dispatch has gone out whose content was edited away
+  // from the auto-filled template default, with explicit Duty Manager/Controller
+  // confirmation (2026-07-25: replaced the old per-field sensitiveFields checklist
+  // with this content-diff gate — see BroadcastTemplate comment in broadcastConfig.ts
+  // for why). The gate itself is computed server-side at dispatch time by comparing
+  // the submitted content against contentDispatched as it stood before this call.
+  contentEditConfirmed?: boolean;
 }
 
 export interface AuditLog {

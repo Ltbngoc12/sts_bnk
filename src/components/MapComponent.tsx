@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Case, EventRecord } from '@/lib/db';
 
 interface MapComponentProps {
@@ -12,20 +12,22 @@ interface MapComponentProps {
 const MapComponent: React.FC<MapComponentProps> = ({ cases, events = [] }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
+  const leafletRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
   const eventMarkersRef = useRef<any[]>([]);
+  const [mapReady, setMapReady] = useState<boolean>(false);
 
+  // 1. Initialize Map ONCE
   useEffect(() => {
-    if (!mapRef.current) return;
+    if (!mapRef.current || mapInstance.current) return;
 
-    // Load Leaflet dynamically to avoid SSR error
     let isMounted = true;
-    let L: any;
 
     const initMap = async () => {
-      L = await import('leaflet');
-      
-      if (!isMounted) return;
+      const L = await import('leaflet');
+      leafletRef.current = L;
+
+      if (!isMounted || !mapRef.current) return;
 
       // Sentosa bounds: roughly 1.23 to 1.27 Lat, 103.79 to 103.86 Lng
       const southWest = L.latLng(1.2300, 103.7900);
@@ -42,137 +44,14 @@ const MapComponent: React.FC<MapComponentProps> = ({ cases, events = [] }) => {
         maxBoundsViscosity: 0.8
       });
 
-      // CartoDB Voyager tiles — crisp, neutral style that contrasts well with warm UI
+      // CartoDB Voyager tiles
       L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',
         subdomains: 'abcd',
         maxZoom: 19
       }).addTo(mapInstance.current);
 
-      // Custom SVG markers function
-      const createSVGIcon = (color: string) => {
-        return L.divIcon({
-          html: `
-            <svg width="30" height="42" viewBox="0 0 30 42" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M15 0C6.71573 0 0 6.71573 0 15C0 26.25 15 42 15 42C15 42 30 26.25 30 15C30 6.71573 23.2843 0 15 0Z" fill="${color}"/>
-              <circle cx="15" cy="15" r="6" fill="#ffffff" />
-            </svg>
-          `,
-          iconSize: [30, 42],
-          iconAnchor: [15, 42],
-          popupAnchor: [0, -40],
-          className: 'custom-map-marker'
-        });
-      };
-
-      // Plot active incidents and faults
-      updateMarkers(L, createSVGIcon);
-      updateEventMarkers(L, createSVGIcon);
-    };
-
-    const updateEventMarkers = (leafletLib: any, iconFactory: (color: string) => any) => {
-      if (!mapInstance.current) return;
-      eventMarkersRef.current.forEach(marker => marker.remove());
-      eventMarkersRef.current = [];
-
-      const now = new Date();
-      events.forEach(ev => {
-        const { lat, lng, commonName } = ev.location;
-        if (!lat || !lng) return;
-
-        // Only surface upcoming/active events on the live ops map (§2.4.3 "Events Today" scope)
-        const end = new Date(ev.endDateTime);
-        if (end < now) return;
-
-        const marker = leafletLib.marker([lat, lng], {
-          icon: iconFactory('#8B5CF6'), // violet — distinct from incident/fault colors
-        });
-
-        const start = new Date(ev.startDateTime);
-        const popupContent = `
-          <div style="font-family: var(--font-body); padding: 5px;">
-            <div style="font-family: var(--font-title); font-weight: 700; font-size: 15px; margin-bottom: 5px; color: var(--text-main);">📅 ${ev.name}</div>
-            <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px;">Event ID: ${ev.id}</div>
-            <span class="badge" style="font-size: 9px; padding: 2px 6px; background: rgba(139,92,246,0.08); color: #8B5CF6; border-radius: 4px; border: 1px solid rgba(139,92,246,0.15); font-weight: 700;">${ev.type}</span>
-            <div style="font-size: 12px; color: var(--text-main); margin: 8px 0;">
-              <strong>Location:</strong> ${commonName || ev.location.road || 'Sentosa Island'}<br/>
-              <strong>When:</strong> ${start.toLocaleDateString('en-SG')} – ${end.toLocaleDateString('en-SG')}
-            </div>
-            <a href="/events" style="display: block; text-align: center; background: #8B5CF6; color: #ffffff; padding: 8px 12px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 12px;">
-              Open Events Master List
-            </a>
-          </div>
-        `;
-
-        marker.bindPopup(popupContent).addTo(mapInstance.current);
-        eventMarkersRef.current.push(marker);
-      });
-    };
-
-    const updateMarkers = (leafletLib: any, iconFactory: (color: string) => any) => {
-      if (!mapInstance.current) return;
-
-      // Clear existing markers
-      markersRef.current.forEach(marker => marker.remove());
-      markersRef.current = [];
-
-      cases.forEach(c => {
-        if (!c.incident || c.status === 'Closed') return;
-        
-        const { lat, lng, commonName } = c.incident.location;
-        if (!lat || !lng) return;
-
-        // Color based on priority or type matching the Resort-Luxury style
-        let color = '#008c95'; // Ocean Teal for standard incidents
-        if (c.incident.priority === 'High') {
-          color = '#ff8200'; // Radiant Orange for high-priority incidents
-        }
-        
-        // If it's a fault linkage or a fault case, change color
-        const isFault = c.cmmsTickets.length > 0;
-        if (isFault) {
-          color = '#6d3500'; // Chestnut Brown for infrastructure faults
-        }
-
-        const marker = leafletLib.marker([lat, lng], {
-          icon: iconFactory(color)
-        });
-
-        const popupContent = `
-          <div style="font-family: var(--font-body); padding: 5px;">
-            <div style="font-family: var(--font-title); font-weight: 700; font-size: 15px; margin-bottom: 5px; color: var(--text-main);">${c.title}</div>
-            <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px;">Case ID: ${c.id}</div>
-            <div style="display: flex; gap: 5px; margin-bottom: 8px;">
-              <span class="badge" style="font-size: 9px; padding: 2px 6px; background: rgba(0,140,149,0.08); color: #008c95; border-radius: 4px; border: 1px solid rgba(0,140,149,0.15); font-weight: 700;">
-                ${c.incident.type}
-              </span>
-              <span class="badge" style="font-size: 9px; padding: 2px 6px; background: ${c.incident.priority === 'High' ? 'rgba(255,130,0,0.08)' : 'rgba(0,140,149,0.08)'}; color: ${c.incident.priority === 'High' ? '#ff8200' : '#008c95'}; border-radius: 4px; border: 1px solid ${c.incident.priority === 'High' ? 'rgba(255,130,0,0.15)' : 'rgba(0,140,149,0.15)'}; font-weight: 700;">
-                ${c.incident.priority}
-              </span>
-            </div>
-            <div style="font-size: 12px; color: var(--text-main); margin-bottom: 10px;">
-              <strong>Location:</strong> ${commonName || c.incident.location.road}
-            </div>
-            <a href="/cases/${c.id}" style="
-              display: block; 
-              text-align: center; 
-              background: var(--color-primary); 
-              color: #ffffff; 
-              padding: 8px 12px; 
-              border-radius: 6px; 
-              text-decoration: none; 
-              font-weight: 600; 
-              font-size: 12px;
-              transition: opacity 0.2s;
-            " onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
-              Open Case Details
-            </a>
-          </div>
-        `;
-
-        marker.bindPopup(popupContent).addTo(mapInstance.current);
-        markersRef.current.push(marker);
-      });
+      setMapReady(true);
     };
 
     initMap();
@@ -184,7 +63,144 @@ const MapComponent: React.FC<MapComponentProps> = ({ cases, events = [] }) => {
         mapInstance.current = null;
       }
     };
-  }, [cases, events]);
+  }, []);
+
+  // 2. Update markers whenever events or cases change
+  useEffect(() => {
+    if (!mapReady || !mapInstance.current || !leafletRef.current) return;
+    const L = leafletRef.current;
+
+    // Custom SVG markers function
+    const createSVGIcon = (color: string) => {
+      return L.divIcon({
+        html: `
+          <svg width="30" height="42" viewBox="0 0 30 42" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M15 0C6.71573 0 0 6.71573 0 15C0 26.25 15 42 15 42C15 42 30 26.25 30 15C30 6.71573 23.2843 0 15 0Z" fill="${color}"/>
+            <circle cx="15" cy="15" r="6" fill="#ffffff" />
+          </svg>
+        `,
+        iconSize: [30, 42],
+        iconAnchor: [15, 42],
+        popupAnchor: [0, -40],
+        className: 'custom-map-marker'
+      });
+    };
+
+    // Clear existing case markers
+    markersRef.current.forEach(marker => marker.remove());
+    markersRef.current = [];
+
+    cases.forEach(c => {
+      if (!c.incident || c.status === 'Closed') return;
+      
+      const { lat, lng, commonName } = c.incident.location;
+      if (!lat || !lng) return;
+
+      let color = '#008c95'; // Ocean Teal for standard incidents
+      if (c.incident.priority === 'High') {
+        color = '#ff8200'; // Radiant Orange for high-priority incidents
+      }
+      
+      const isFault = c.cmmsTickets.length > 0;
+      if (isFault) {
+        color = '#6d3500'; // Chestnut Brown for infrastructure faults
+      }
+
+      const marker = L.marker([lat, lng], {
+        icon: createSVGIcon(color)
+      });
+
+      const popupContent = `
+        <div style="font-family: var(--font-body); padding: 5px;">
+          <div style="font-family: var(--font-title); font-weight: 700; font-size: 15px; margin-bottom: 5px; color: var(--text-main);">${c.title}</div>
+          <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px;">Case ID: ${c.id}</div>
+          <div style="display: flex; gap: 5px; margin-bottom: 8px;">
+            <span class="badge" style="font-size: 9px; padding: 2px 6px; background: rgba(0,140,149,0.08); color: #008c95; border-radius: 4px; border: 1px solid rgba(0,140,149,0.15); font-weight: 700;">
+              ${c.incident.type}
+            </span>
+            <span class="badge" style="font-size: 9px; padding: 2px 6px; background: ${c.incident.priority === 'High' ? 'rgba(255,130,0,0.08)' : 'rgba(0,140,149,0.08)'}; color: ${c.incident.priority === 'High' ? '#ff8200' : '#008c95'}; border-radius: 4px; border: 1px solid ${c.incident.priority === 'High' ? 'rgba(255,130,0,0.15)' : 'rgba(0,140,149,0.15)'}; font-weight: 700;">
+              ${c.incident.priority}
+            </span>
+          </div>
+          <div style="font-size: 12px; color: var(--text-main); margin-bottom: 10px;">
+            <strong>Location:</strong> ${commonName || c.incident.location.road}
+          </div>
+          <a href="/cases/${c.id}" style="
+            display: block; 
+            text-align: center; 
+            background: var(--color-primary); 
+            color: #ffffff; 
+            padding: 8px 12px; 
+            border-radius: 6px; 
+            text-decoration: none; 
+            font-weight: 600; 
+            font-size: 12px;
+            transition: opacity 0.2s;
+          " onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
+            Open Case Details
+          </a>
+        </div>
+      `;
+
+      marker.bindPopup(popupContent).addTo(mapInstance.current);
+      markersRef.current.push(marker);
+    });
+
+    // Clear existing event markers
+    eventMarkersRef.current.forEach(marker => marker.remove());
+    eventMarkersRef.current = [];
+
+    // Track coordinates to add spiral micro-offsets for overlapping event pins
+    const coordCounts: Record<string, number> = {};
+
+    events.forEach(ev => {
+      let { lat, lng, commonName } = ev.location;
+      if (!lat || !lng) return;
+
+      // Track duplicate coordinates
+      const key = `${lat.toFixed(4)},${lng.toFixed(4)}`;
+      const count = coordCounts[key] || 0;
+      coordCounts[key] = count + 1;
+
+      if (count > 0) {
+        // Offset slightly in a spiral pattern so pins don't overlap completely
+        const angle = count * (Math.PI / 3);
+        const distance = 0.00025 * count;
+        lat = lat + distance * Math.cos(angle);
+        lng = lng + distance * Math.sin(angle);
+      }
+
+      const marker = L.marker([lat, lng], {
+        icon: createSVGIcon('#8B5CF6') // violet — distinct for events
+      });
+
+      const start = new Date(ev.startDateTime);
+      const end = new Date(ev.endDateTime);
+      const popupContent = `
+        <div style="font-family: var(--font-body); padding: 5px;">
+          <div style="font-family: var(--font-title); font-weight: 700; font-size: 15px; margin-bottom: 5px; color: var(--text-main);">📅 ${ev.name}</div>
+          <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px;">Event ID: ${ev.id}</div>
+          <span class="badge" style="font-size: 9px; padding: 2px 6px; background: rgba(139,92,246,0.08); color: #8B5CF6; border-radius: 4px; border: 1px solid rgba(139,92,246,0.15); font-weight: 700;">${ev.type}</span>
+          <div style="font-size: 12px; color: var(--text-main); margin: 8px 0;">
+            <strong>Location:</strong> ${commonName || ev.location.road || 'Sentosa Island'}<br/>
+            <strong>When:</strong> ${start.toLocaleTimeString('en-SG', { hour: '2-digit', minute: '2-digit' })} – ${end.toLocaleTimeString('en-SG', { hour: '2-digit', minute: '2-digit' })}
+          </div>
+        </div>
+      `;
+
+      marker.bindPopup(popupContent).addTo(mapInstance.current);
+      eventMarkersRef.current.push(marker);
+    });
+
+    // Auto-fit map bounds if markers are present
+    const allMarkers = [...markersRef.current, ...eventMarkersRef.current];
+    if (allMarkers.length > 0) {
+      const group = L.featureGroup(allMarkers);
+      if (group.getBounds().isValid()) {
+        mapInstance.current.fitBounds(group.getBounds().pad(0.2), { maxZoom: 15 });
+      }
+    }
+  }, [cases, events, mapReady]);
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>

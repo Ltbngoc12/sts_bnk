@@ -24,10 +24,10 @@ export const CRISIS_LEVELS = ['Level 1', 'Level 2', 'Level 3', 'Level 4', 'Level
 export type CrisisLevel = (typeof CRISIS_LEVELS)[number];
 
 // ── Broadcast Template (FSD §10.4 / §13.3) ─────────────────────────────────────
-// Templates are pure content (subject/body/sensitive-field policy) scoped only to
-// a Broadcast Type. Multiple templates per Broadcast Type are expected and
-// supported (e.g. two different Closure Broadcast templates) — the admin UI lists
-// them all and a Routing Matrix Rule picks the exact one to use.
+// Templates are pure content, scoped only to a Broadcast Type. Multiple templates
+// per Broadcast Type are expected and supported (e.g. two different Closure
+// Broadcast templates) — the admin UI lists them all and a Routing Matrix Rule
+// picks the exact one to use.
 //
 // incidentType/incidentSubType/crisisLevel were REMOVED from this model
 // (2026-07-25, Kyle — see BROADCAST_CONFIG_PAGE_REDESIGN_PLAN.md discussion log).
@@ -40,15 +40,28 @@ export type CrisisLevel = (typeof CRISIS_LEVELS)[number];
 // SOLE place that decides when a template applies; the Template itself just holds
 // content. (This also removes the old category+incidentType "auto-select" fallback
 // — see resolveTemplate() in broadcast.ts.)
+//
+// `sensitiveFields` (a per-field checklist) was ALSO removed (2026-07-25, Kyle —
+// simplification pass). §10.4c-d only requires: (a) default templates exclude
+// sensitive content, (b) including anything BEYOND the default needs explicit Duty
+// Manager confirmation at dispatch. The checklist implementation satisfied this by
+// flagging a static, template-level list of field names — which triggered the
+// confirmation banner regardless of whether that field's token was actually present
+// in the rendered content (a real false-positive risk, and arguably not what §10.4d
+// asks for — it says "fields beyond the default", i.e. an actual deviation).
+// Replaced by a content-diff gate: the confirmation is now required exactly when
+// the reviewer's submitted content differs from the auto-filled default (see
+// resolveClosureBroadcast/resolveEodBroadcast's `content`, and the dispatch-time
+// diff against Broadcast.contentDispatched in incidents/[...id]/route.ts and
+// broadcasts/[...id]/route.ts). Admin's remaining responsibility: don't write
+// sensitive detail into a default template body in the first place — same as
+// before, this was never content-enforced either way.
 export interface BroadcastTemplate {
   id: string;
   category: string;            // BroadcastType (kept as string for forward-compat)
   name: string;
   subject: string;
   body: string;
-  // §10.4c-d — fields excluded from the default template; may only be added at
-  // dispatch with explicit Duty Manager confirmation.
-  sensitiveFields?: string[];
   // Admin config redesign (2026-07-25): multiple templates per broadcast type are
   // supported; status lets an admin retire/reinstate a template WITHOUT deleting
   // it. resolveTemplateById() filters to 'Active' only.
@@ -126,8 +139,6 @@ export const DEFAULT_BROADCAST_TEMPLATES: BroadcastTemplate[] = [
     subject: '[SDC] Incident Closed: {incident_title}',
     body:
       'INCIDENT CLOSURE NOTICE\n\nCase ID: {case_id}\nIncident ID: {incident_id}\nTitle: {incident_title}\nClassification: {incident_type} — {incident_subtype}\nLocation: {location}\nCrisis Level: {crisis_level}\nClosed At: {closed_at}\nClosed By: {closed_by}\n\nSummary: {summary}\n\nThis is an automated closure dispatch from the Sentosa CMS.',
-    // Excluded by default per §10.4c — operationally sensitive fields.
-    sensitiveFields: ['emergency_services', 'casualty_details', 'investigation_notes', 'media_involvement'],
     status: 'Active',
   },
   {
@@ -137,7 +148,6 @@ export const DEFAULT_BROADCAST_TEMPLATES: BroadcastTemplate[] = [
     subject: '[SDC] End-of-Day Interim Update: {incident_title}',
     body:
       'END-OF-DAY INTERIM UPDATE\n\nCase ID: {case_id}\nIncident ID: {incident_id}\nTitle: {incident_title}\nClassification: {incident_type} — {incident_subtype}\nLocation: {location}\nCrisis Level: {crisis_level}\nCurrent Status: {status}\n\nSummary of progress to date: {summary}\n\nThis incident remains open and under management. Issued by the Duty Manager on duty.',
-    sensitiveFields: ['emergency_services', 'casualty_details', 'investigation_notes'],
     status: 'Active',
   },
   {
@@ -147,7 +157,6 @@ export const DEFAULT_BROADCAST_TEMPLATES: BroadcastTemplate[] = [
     subject: '[SDC] Weather Advisory: {incident_title}',
     body:
       'WEATHER ADVISORY\n\n{summary}\n\nLocation(s) affected: {location}\nIssued At: {time}\n\nPlease take appropriate precautions. Issued by the authorised Duty Officer.',
-    sensitiveFields: [],
     status: 'Active',
   },
 ];

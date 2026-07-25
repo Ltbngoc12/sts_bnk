@@ -53,7 +53,6 @@ const ADMIN_ITEMS = [
   { name: 'Taxonomy', path: '/admin/taxonomy' },
   { name: 'Task Checklist Templates', path: '/admin/task-templates' },
   { name: 'Location Hierarchy', path: '/admin/location-hierarchy' },
-  { name: 'Routing Matrix', path: '/admin/routing-matrix' },
   { name: 'Broadcast Configuration', path: '/admin/broadcast-config' },
   { name: 'Distribution Groups', path: '/admin/distribution-groups' },
   { name: 'Audit Log', path: '/admin/audit-log' },

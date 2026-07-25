@@ -61,11 +61,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (!recipients || recipients.length === 0) {
       return NextResponse.json({ error: 'Cannot dispatch: recipient list is empty.' }, { status: 400 });
     }
-    // §10.4d — including fields beyond the default (sensitive) needs explicit confirmation.
-    if (body.includeSensitive && !body.confirmSensitive) {
+    // §10.4d — content edited BEYOND the auto-filled default needs explicit
+    // confirmation (2026-07-25: content-diff gate, replaces the old per-field
+    // sensitiveFields checklist — see BroadcastTemplate comment in
+    // broadcastConfig.ts). Diff BEFORE contentDispatched gets overwritten below.
+    const contentChanged = typeof body.content === 'string' && body.content.trim() !== (bc.contentDispatched || '').trim();
+    if (contentChanged && !body.confirmContentChange) {
       return NextResponse.json({
-        error: 'Including sensitive fields requires explicit Duty Manager confirmation.',
-        requiresSensitiveConfirmation: true,
+        error: 'Content has been edited from the auto-filled default — explicit confirmation is required before dispatch.',
+        requiresContentConfirmation: true,
       }, { status: 409 });
     }
     bc.recipients = recipients;
@@ -77,7 +81,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     bc.dispatchedAt = now;
     bc.deliveryAttempts = (bc.deliveryAttempts || 0) + 1;
     bc.deliveryCounts = initialDeliveryCounts(recipients.length);
-    if (body.includeSensitive && body.confirmSensitive) bc.sensitiveFieldsIncluded = true;
+    if (contentChanged && body.confirmContentChange) bc.contentEditConfirmed = true;
     if (bc.type === 'Closure' && linkedCase?.incident) {
       (linkedCase.incident as any).closureBroadcastStatus = 'dispatched';
       (linkedCase.incident as any).closureBroadcastId = bc.id;
@@ -102,7 +106,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       module: 'Broadcast',
       action: 'Dispatch Broadcast',
       details: `Dispatched ${bc.type} broadcast ${bc.id} to ${recipients.length} recipient(s).`
-        + (bc.sensitiveFieldsIncluded ? ' Includes sensitive fields — confirmed.' : ''),
+        + (bc.contentEditConfirmed ? ' Content edited from default — confirmed.' : ''),
       beforeSnapshot: JSON.stringify({ status: 'PENDING' }),
       afterSnapshot: JSON.stringify({ status: 'SENT', recipients: recipients.length }),
       correlationId: `CORR-${Date.now()}`,

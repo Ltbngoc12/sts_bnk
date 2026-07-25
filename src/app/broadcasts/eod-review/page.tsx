@@ -20,8 +20,7 @@ interface BroadcastRecord {
   contentDispatched: string;
   status: string;
   channels?: string[];
-  sensitiveFields?: string[];
-  sensitiveFieldsIncluded?: boolean;
+  contentEditConfirmed?: boolean;
 }
 
 export default function EodReviewPage() {
@@ -32,7 +31,9 @@ export default function EodReviewPage() {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
-  const [drafts, setDrafts] = useState<Record<string, { recipients: string; content: string; includeSensitive: boolean }>>({});
+  // confirmChange: acknowledges content was edited beyond the auto-filled default
+  // (2026-07-25 content-diff gate — see BroadcastTemplate comment in broadcastConfig.ts).
+  const [drafts, setDrafts] = useState<Record<string, { recipients: string; content: string; confirmChange: boolean }>>({});
   const [lastRun, setLastRun] = useState<{ queued: number } | null>(null);
 
   const load = async () => {
@@ -46,7 +47,7 @@ export default function EodReviewPage() {
         const next = { ...prev };
         list.forEach((b) => {
           if (!next[b.id]) {
-            next[b.id] = { recipients: (b.recipients || []).join(', '), content: b.contentDispatched, includeSensitive: false };
+            next[b.id] = { recipients: (b.recipients || []).join(', '), content: b.contentDispatched, confirmChange: false };
           }
         });
         return next;
@@ -76,10 +77,6 @@ export default function EodReviewPage() {
     const draft = drafts[b.id];
     const recipients = (draft?.recipients || '').split(',').map((s) => s.trim()).filter(Boolean);
     if (action === 'dispatch' && recipients.length === 0) { alert('Recipient list cannot be empty.'); return; }
-    const hasSensitive = (b.sensitiveFields || []).length > 0;
-    if (action === 'dispatch' && hasSensitive && draft?.includeSensitive === undefined) {
-      // no-op guard: default is false, handled below
-    }
     setBusyId(b.id);
     try {
       const res = await fetch(`/api/broadcasts/${b.id}`, {
@@ -91,8 +88,7 @@ export default function EodReviewPage() {
           content: draft?.content,
           role,
           user: username,
-          includeSensitive: draft?.includeSensitive || false,
-          confirmSensitive: draft?.includeSensitive || false,
+          confirmContentChange: draft?.confirmChange || false,
         }),
       });
       if (!res.ok) {
@@ -144,8 +140,8 @@ export default function EodReviewPage() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {items.map((b) => {
-            const draft = drafts[b.id] || { recipients: '', content: b.contentDispatched, includeSensitive: false };
-            const hasSensitive = (b.sensitiveFields || []).length > 0;
+            const draft = drafts[b.id] || { recipients: '', content: b.contentDispatched, confirmChange: false };
+            const contentChanged = draft.content !== b.contentDispatched;
             const busy = busyId === b.id;
             return (
               <div key={b.id} className="glass" style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -181,18 +177,18 @@ export default function EodReviewPage() {
                   />
                 </div>
 
-                {hasSensitive && (
+                {contentChanged && (
                   <div style={{ background: 'var(--color-high-bg)', border: '1px solid var(--color-high-border)', borderRadius: 'var(--radius-md)', padding: '10px 12px' }}>
                     <div style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--color-high)', marginBottom: '4px' }}>
-                      Excluded by default (§10.4c): {b.sensitiveFields!.join(', ')}
+                      Content edited beyond the auto-filled default (§10.4d)
                     </div>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', cursor: 'pointer' }}>
                       <input
                         type="checkbox"
-                        checked={draft.includeSensitive}
-                        onChange={(e) => setDrafts((p) => ({ ...p, [b.id]: { ...draft, includeSensitive: e.target.checked } }))}
+                        checked={draft.confirmChange}
+                        onChange={(e) => setDrafts((p) => ({ ...p, [b.id]: { ...draft, confirmChange: e.target.checked } }))}
                       />
-                      I confirm (Duty Manager) this dispatch knowingly includes sensitive field content added to the text above.
+                      I confirm (Duty Manager) this edited content does not include operationally sensitive, under-investigation, or restricted information beyond the standard template — or I am authorised to include it.
                     </label>
                   </div>
                 )}

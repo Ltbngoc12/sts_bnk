@@ -17,7 +17,7 @@
 // fetched read-only from /api/admin/broadcast-channels to populate the Delivery
 // Channel checkboxes on the Routing Matrix tab.
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AdminGuard } from '@/components/AdminGuard';
@@ -195,7 +195,7 @@ export default function BroadcastConfigPage() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '10px', marginTop: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '2px' }}>
+      <div style={{ display: 'flex', gap: '10px', marginTop: '12px', borderBottom: '1px solid var(--border-color)', paddingBottom: '2px' }}>
         {([
           ['Template', 'Template'],
           ['Matrix', 'Routing Matrix'],
@@ -307,7 +307,7 @@ function TemplateTab({
   const sortedTemplates = [...templates].sort((a, b) => typeOrder(a.category) - typeOrder(b.category));
 
   return (
-    <div className="glass" style={{ padding: '20px', background: 'var(--bg-card)', marginTop: '20px' }}>
+    <div className="glass" style={{ padding: '20px', background: 'var(--bg-card)', marginTop: '12px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
         <div>
           <h2 style={{ fontFamily: 'var(--font-headline)', fontSize: '14px', color: 'var(--text-main)', margin: 0 }}>BROADCAST TEMPLATES</h2>
@@ -320,7 +320,7 @@ function TemplateTab({
           className="btn btn-primary"
           style={{ padding: '6px 12px', borderRadius: '4px', fontSize: '12px', background: 'var(--color-primary-dark)', border: 'none', color: '#fff' }}
         >
-          + New
+          Add new template
         </button>
       </div>
 
@@ -468,7 +468,7 @@ function MatrixTab({
   const templateOptions = templates.filter((t) => t.category === form?.broadcastType && t.status === 'Active');
 
   return (
-    <div className="glass" style={{ padding: '20px', background: 'var(--bg-card)', marginTop: '20px' }}>
+    <div className="glass" style={{ padding: '20px', background: 'var(--bg-card)', marginTop: '12px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
         <div>
           <h2 style={{ fontFamily: 'var(--font-headline)', fontSize: '14px', color: 'var(--text-main)', margin: 0 }}>BROADCAST ROUTING MATRIX</h2>
@@ -489,7 +489,7 @@ function MatrixTab({
               <th style={thStyle}>Channels</th>
               <th style={thStyle}>Template</th>
               <th style={thStyle}>Status</th>
-              <th style={{ ...thStyle, width: '160px', textAlign: 'right' }}>Actions</th>
+              <th style={{ ...thStyle, width: '100px', textAlign: 'right' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -499,11 +499,62 @@ function MatrixTab({
                 <tr key={rule.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                   <td style={tdStyle}>{rule.broadcastType}</td>
                   <td style={tdStyle}>
-                    {(rule.incidentTypes && rule.incidentTypes.length ? rule.incidentTypes : [ANY]).join(', ')}
-                    {rule.incidentSubTypes && rule.incidentSubTypes.length && !rule.incidentSubTypes.includes(ANY) ? ` / ${rule.incidentSubTypes.join(', ')}` : ''}
+                    <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>
+                      {(rule.incidentTypes && rule.incidentTypes.length ? rule.incidentTypes : [ANY]).join(', ')}
+                    </div>
+                    {rule.incidentSubTypes && rule.incidentSubTypes.length && !rule.incidentSubTypes.includes(ANY) ? (
+                      <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                        {rule.incidentSubTypes.join(', ')}
+                      </div>
+                    ) : null}
                   </td>
-                  <td style={{ ...tdStyle, fontWeight: 600 }}>{rule.crisisLevels.join(', ')}</td>
-                  <td style={{ ...tdStyle, fontWeight: 600, color: 'var(--color-primary-dark)' }}>{rule.recipientGroups.join(', ') || '—'}</td>
+                  <td style={tdStyle}>
+                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                      {rule.crisisLevels.map((lvl) => (
+                        <span
+                          key={lvl}
+                          style={{
+                            padding: '2px 7px',
+                            borderRadius: '4px',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            background: lvl === ANY ? 'var(--bg-inset, #F3F4F6)' : 'rgba(255, 130, 0, 0.1)',
+                            color: lvl === ANY ? 'var(--text-muted)' : 'var(--color-primary-dark, #C2410C)',
+                            border: '1px solid var(--border-color)',
+                          }}
+                        >
+                          {lvl}
+                        </span>
+                      ))}
+                    </div>
+                  </td>
+                  <td style={tdStyle}>
+                    {rule.recipientGroups && rule.recipientGroups.length > 0 ? (
+                      <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', alignItems: 'center' }}>
+                        {rule.recipientGroups.map((g) => (
+                          <span
+                            key={g}
+                            style={{
+                              padding: '3px 9px',
+                              borderRadius: '5px',
+                              fontSize: '11.5px',
+                              fontWeight: 600,
+                              background: 'var(--sidebar-active-bg, #FFF7ED)',
+                              color: 'var(--color-primary-dark, #C2410C)',
+                              border: '1px solid rgba(255, 130, 0, 0.25)',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              lineHeight: '1.2',
+                            }}
+                          >
+                            {g}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span style={{ color: 'var(--text-muted)', fontSize: '11.5px', fontStyle: 'italic' }}>—</span>
+                    )}
+                  </td>
                   <td style={tdStyle}>
                     <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                       {rule.deliveryChannels.map((ch) => (
@@ -516,12 +567,7 @@ function MatrixTab({
                     <span className={`badge ${rule.status === 'Active' ? 'badge-completed' : 'badge-live'}`} style={{ padding: '3px 8px', borderRadius: '4px', fontSize: '11px' }}>{rule.status}</span>
                   </td>
                   <td style={{ ...tdStyle, textAlign: 'right' }}>
-                    <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                      <button onClick={() => openEdit(rule)} className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '11.5px', borderRadius: '4px' }}>Edit</button>
-                      <button onClick={() => handleToggleStatus(rule)} className={`btn ${rule.status === 'Active' ? 'btn-danger' : 'btn-success'}`} style={{ padding: '4px 8px', fontSize: '11.5px', borderRadius: '4px' }}>
-                        {rule.status === 'Active' ? 'Deactivate' : 'Reactivate'}
-                      </button>
-                    </div>
+                    <button onClick={() => openEdit(rule)} className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '11.5px', borderRadius: '4px' }}>Edit</button>
                   </td>
                 </tr>
               );
@@ -553,38 +599,50 @@ function MatrixTab({
               </FormField>
 
               <FormField label="Incident Type (select one or more)">
-                <CheckboxMultiSelect
+                <DropdownMultiSelect
                   options={incidentTypeOptions}
                   selected={form.incidentTypes && form.incidentTypes.length ? form.incidentTypes : [ANY]}
                   onChange={(next) => setForm({ ...form, incidentTypes: next, incidentSubTypes: [ANY] })}
                   anyValue={ANY}
+                  placeholder="Select Incident Types..."
                 />
               </FormField>
 
               <FormField label="Incident Sub-type (select one or more)">
-                <CheckboxMultiSelect
-                  options={subTypeOptionsForMulti(form.incidentTypes)}
+                <DropdownMultiSelect
+                  groupedOptions={(() => {
+                    const sel = form.incidentTypes;
+                    const relevantTypes = (!sel || sel.length === 0 || sel.includes(ANY))
+                      ? Object.keys(taxonomy)
+                      : sel.filter((it) => it !== ANY);
+                    return relevantTypes
+                      .filter((it) => taxonomy[it] && taxonomy[it].length > 0)
+                      .map((it) => ({ groupName: it, options: taxonomy[it] }));
+                  })()}
                   selected={form.incidentSubTypes && form.incidentSubTypes.length ? form.incidentSubTypes : [ANY]}
                   onChange={(next) => setForm({ ...form, incidentSubTypes: next })}
                   anyValue={ANY}
-                  disabled={!form.incidentTypes || form.incidentTypes.length === 0 || form.incidentTypes.includes(ANY)}
+                  disabled={!form.incidentTypes || form.incidentTypes.length === 0}
+                  placeholder="Select Sub-types..."
                 />
               </FormField>
 
               <FormField label="Crisis Level (select one or more)">
-                <CheckboxMultiSelect
+                <DropdownMultiSelect
                   options={[ANY, ...CRISIS_LEVELS]}
                   selected={form.crisisLevels}
                   onChange={(next) => setForm({ ...form, crisisLevels: next })}
                   anyValue={ANY}
+                  placeholder="Select Crisis Levels..."
                 />
               </FormField>
 
               <FormField label="Recipient Group (select one or more)">
-                <CheckboxMultiSelect
+                <DropdownMultiSelect
                   options={activeGroups.map((g) => g.name)}
                   selected={form.recipientGroups}
                   onChange={(next) => setForm({ ...form, recipientGroups: next })}
+                  placeholder="Select Recipient Groups..."
                 />
               </FormField>
 
@@ -614,9 +672,26 @@ function MatrixTab({
               </FormField>
             </div>
 
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '20px' }}>
-              <button type="button" onClick={() => setIsModalOpen(false)} className="btn btn-secondary" style={{ padding: '8px 16px', borderRadius: '6px' }}>Cancel</button>
-              <button type="button" onClick={handleSave} className="btn btn-primary" style={{ padding: '8px 16px', borderRadius: '6px', background: 'var(--color-primary-dark)', border: 'none', color: '#fff' }}>Save Rule</button>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px' }}>
+              <div>
+                {editing && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await handleToggleStatus(form);
+                      setIsModalOpen(false);
+                    }}
+                    className={`btn ${form.status === 'Active' ? 'btn-danger' : 'btn-success'}`}
+                    style={{ padding: '8px 16px', borderRadius: '6px', fontSize: '12.5px' }}
+                  >
+                    {form.status === 'Active' ? 'Deactivate Rule' : 'Reactivate Rule'}
+                  </button>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button type="button" onClick={() => setIsModalOpen(false)} className="btn btn-secondary" style={{ padding: '8px 16px', borderRadius: '6px' }}>Cancel</button>
+                <button type="button" onClick={handleSave} className="btn btn-primary" style={{ padding: '8px 16px', borderRadius: '6px', background: 'var(--color-primary-dark)', border: 'none', color: '#fff' }}>Save Rule</button>
+              </div>
             </div>
           </div>
         </div>
@@ -654,7 +729,7 @@ function EodTimingTab({
   };
 
   return (
-    <div className="glass" style={{ padding: '20px', background: 'var(--bg-card)', marginTop: '20px', maxWidth: '480px' }}>
+    <div className="glass" style={{ padding: '20px', background: 'var(--bg-card)', marginTop: '12px', maxWidth: '480px' }}>
       <h2 style={{ fontFamily: 'var(--font-headline)', fontSize: '14px', marginBottom: '8px', color: 'var(--text-main)', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
         END-OF-DAY BROADCAST TIMING
       </h2>
@@ -741,7 +816,7 @@ function PromptRulesTab({
   };
 
   return (
-    <div className="glass" style={{ padding: '20px', background: 'var(--bg-card)', marginTop: '20px' }}>
+    <div className="glass" style={{ padding: '20px', background: 'var(--bg-card)', marginTop: '12px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
         <div>
           <h2 style={{ fontFamily: 'var(--font-headline)', fontSize: '14px', color: 'var(--text-main)', margin: 0 }}>BROADCAST ACTION PROMPT RULES</h2>
@@ -761,7 +836,7 @@ function PromptRulesTab({
               <th style={thStyle}>Trigger Event</th>
               <th style={thStyle}>Recipient Role</th>
               <th style={thStyle}>Status</th>
-              <th style={{ ...thStyle, width: '160px', textAlign: 'right' }}>Actions</th>
+              <th style={{ ...thStyle, width: '100px', textAlign: 'right' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -772,17 +847,38 @@ function PromptRulesTab({
                   {rule.description && <div style={{ fontWeight: 400, fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>{rule.description}</div>}
                 </td>
                 <td style={tdStyle}>{TRIGGER_LABELS[rule.triggerEvent]}</td>
-                <td style={{ ...tdStyle, fontWeight: 600, color: 'var(--color-primary-dark)' }}>{rule.recipientRoles.join(', ')}</td>
+                <td style={tdStyle}>
+                  {rule.recipientRoles && rule.recipientRoles.length > 0 ? (
+                    <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', alignItems: 'center' }}>
+                      {rule.recipientRoles.map((r) => (
+                        <span
+                          key={r}
+                          style={{
+                            padding: '3px 9px',
+                            borderRadius: '5px',
+                            fontSize: '11.5px',
+                            fontWeight: 600,
+                            background: 'var(--sidebar-active-bg, #FFF7ED)',
+                            color: 'var(--color-primary-dark, #C2410C)',
+                            border: '1px solid rgba(255, 130, 0, 0.25)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            lineHeight: '1.2',
+                          }}
+                        >
+                          {r}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span style={{ color: 'var(--text-muted)', fontSize: '11.5px', fontStyle: 'italic' }}>—</span>
+                  )}
+                </td>
                 <td style={tdStyle}>
                   <span className={`badge ${rule.status === 'Active' ? 'badge-completed' : 'badge-live'}`} style={{ padding: '3px 8px', borderRadius: '4px', fontSize: '11px' }}>{rule.status}</span>
                 </td>
                 <td style={{ ...tdStyle, textAlign: 'right' }}>
-                  <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                    <button onClick={() => openEdit(rule)} className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '11.5px', borderRadius: '4px' }}>Edit</button>
-                    <button onClick={() => handleToggleStatus(rule)} className={`btn ${rule.status === 'Active' ? 'btn-danger' : 'btn-success'}`} style={{ padding: '4px 8px', fontSize: '11.5px', borderRadius: '4px' }}>
-                      {rule.status === 'Active' ? 'Deactivate' : 'Reactivate'}
-                    </button>
-                  </div>
+                  <button onClick={() => openEdit(rule)} className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '11.5px', borderRadius: '4px' }}>Edit</button>
                 </td>
               </tr>
             ))}
@@ -807,19 +903,37 @@ function PromptRulesTab({
                 </select>
               </FormField>
               <FormField label="Recipient Role(s) (select one or more)">
-                <CheckboxMultiSelect
+                <DropdownMultiSelect
                   options={BROADCAST_RECIPIENT_ROLE_OPTIONS}
                   selected={form.recipientRoles}
                   onChange={(next) => setForm({ ...form, recipientRoles: next })}
+                  placeholder="Select Recipient Roles..."
                 />
               </FormField>
               <FormField label="Description (optional)">
                 <textarea rows={3} value={form.description || ''} onChange={(e) => setForm({ ...form, description: e.target.value })} style={{ ...inputStyle, resize: 'vertical' }} />
               </FormField>
             </div>
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '20px' }}>
-              <button type="button" onClick={() => setIsModalOpen(false)} className="btn btn-secondary" style={{ padding: '8px 16px', borderRadius: '6px' }}>Cancel</button>
-              <button type="button" onClick={handleSave} className="btn btn-primary" style={{ padding: '8px 16px', borderRadius: '6px', background: 'var(--color-primary-dark)', border: 'none', color: '#fff' }}>Save Rule</button>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px' }}>
+              <div>
+                {editing && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await handleToggleStatus(form);
+                      setIsModalOpen(false);
+                    }}
+                    className={`btn ${form.status === 'Active' ? 'btn-danger' : 'btn-success'}`}
+                    style={{ padding: '8px 16px', borderRadius: '6px', fontSize: '12.5px' }}
+                  >
+                    {form.status === 'Active' ? 'Deactivate Rule' : 'Reactivate Rule'}
+                  </button>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button type="button" onClick={() => setIsModalOpen(false)} className="btn btn-secondary" style={{ padding: '8px 16px', borderRadius: '6px' }}>Cancel</button>
+                <button type="button" onClick={handleSave} className="btn btn-primary" style={{ padding: '8px 16px', borderRadius: '6px', background: 'var(--color-primary-dark)', border: 'none', color: '#fff' }}>Save Rule</button>
+              </div>
             </div>
           </div>
         </div>
@@ -839,28 +953,43 @@ function FormField({ label, children }: { label: string; children: React.ReactNo
   );
 }
 
-// Multi-select as a checkbox group (2026-07-25, Kyle) — used for Incident Type,
-// Incident Sub-type, Crisis Level and Recipient Group on the Routing Matrix tab,
-// and Recipient Role on the Action Prompt Rules tab. Native <select multiple> is
-// poor UX (requires ctrl/cmd-click, no visible checked state), so this renders a
-// wrapping row of checkboxes instead.
-//
-// `anyValue` (e.g. "Any") is treated as a wildcard that's mutually exclusive with
-// every other option: picking "Any" clears specific selections and vice versa.
-// Fields with no wildcard concept (Recipient Group, Recipient Role) simply omit it.
-function CheckboxMultiSelect({
+export interface DropdownGroup {
+  groupName: string;
+  options: string[];
+}
+
+// Dropdown Multi-Select component with interactive popover menu
+// Supports flat options as well as 2-level grouped options (Level 1: Category/Type, Level 2: Subtype)
+function DropdownMultiSelect({
   options,
+  groupedOptions,
   selected,
   onChange,
   anyValue,
   disabled,
+  placeholder = 'Select options...',
 }: {
-  options: string[];
+  options?: string[];
+  groupedOptions?: DropdownGroup[];
   selected: string[];
   onChange: (next: string[]) => void;
   anyValue?: string;
   disabled?: boolean;
+  placeholder?: string;
 }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const toggle = (val: string) => {
     if (disabled) return;
     if (anyValue && val === anyValue) {
@@ -872,18 +1001,216 @@ function CheckboxMultiSelect({
     onChange(next);
   };
 
-  if (options.length === 0) {
-    return <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0 }}>No options available.</p>;
-  }
+  const toggleGroup = (groupOpts: string[]) => {
+    if (disabled) return;
+    const withoutAny = anyValue ? selected.filter((v) => v !== anyValue) : selected;
+    const allSelected = groupOpts.every((opt) => withoutAny.includes(opt));
+    let next: string[];
+    if (allSelected) {
+      next = withoutAny.filter((v) => !groupOpts.includes(v));
+    } else {
+      const set = new Set([...withoutAny, ...groupOpts]);
+      next = Array.from(set);
+    }
+    onChange(next);
+  };
+
+  const getDisplayText = () => {
+    if (!selected || selected.length === 0) return placeholder;
+    if (selected.length <= 2) return selected.join(', ');
+    return `${selected.slice(0, 2).join(', ')} (+${selected.length - 2} more)`;
+  };
+
+  const hasGroups = groupedOptions && groupedOptions.length > 0;
+  const flatOptions = options || [];
 
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', opacity: disabled ? 0.5 : 1 }}>
-      {options.map((opt) => (
-        <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12.5px', cursor: disabled ? 'not-allowed' : 'pointer' }}>
-          <input type="checkbox" checked={selected.includes(opt)} disabled={disabled} onChange={() => toggle(opt)} />
-          {opt}
-        </label>
-      ))}
+    <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
+      <div
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        style={{
+          ...selectStyle,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          background: 'var(--bg-card, #FFFFFF)',
+          opacity: disabled ? 0.5 : 1,
+          boxShadow: isOpen ? '0 0 0 2px rgba(255, 130, 0, 0.25)' : 'none',
+          borderColor: isOpen ? 'var(--color-primary, #FF8200)' : 'var(--border-color)',
+          userSelect: 'none',
+        }}
+      >
+        <span style={{ color: selected && selected.length > 0 ? 'var(--text-main)' : 'var(--text-muted)', fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {getDisplayText()}
+        </span>
+        <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginLeft: '8px', transition: 'transform 0.2s', transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+          ▼
+        </span>
+      </div>
+
+      {isOpen && !disabled && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 4px)',
+            left: 0,
+            right: 0,
+            zIndex: 1100,
+            background: 'var(--bg-card, #FFFFFF)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '6px',
+            boxShadow: '0 8px 20px rgba(0,0,0,0.15)',
+            maxHeight: '260px',
+            overflowY: 'auto',
+            padding: '4px 0',
+          }}
+        >
+          {/* Wildcard Option (Any) at top if provided */}
+          {anyValue && (
+            <div style={{ borderBottom: hasGroups || flatOptions.length > 0 ? '1px solid var(--border-color)' : 'none', paddingBottom: '2px', marginBottom: '2px' }}>
+              <label
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '8px 12px',
+                  fontSize: '12.5px',
+                  cursor: 'pointer',
+                  background: selected.includes(anyValue) ? 'var(--sidebar-active-bg, #FFF7ED)' : 'transparent',
+                  color: selected.includes(anyValue) ? 'var(--color-primary-dark, #FF8200)' : 'var(--text-main)',
+                  fontWeight: selected.includes(anyValue) ? 600 : 400,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={selected.includes(anyValue)}
+                  onChange={() => toggle(anyValue)}
+                  style={{ accentColor: 'var(--color-primary, #FF8200)', cursor: 'pointer' }}
+                />
+                <span>{anyValue}</span>
+              </label>
+            </div>
+          )}
+
+          {/* Grouped Options (2 Levels: Level 1 = Group Header, Level 2 = Subtype) */}
+          {hasGroups ? (
+            groupedOptions.map((group) => {
+              const allSelected = group.options.length > 0 && group.options.every((opt) => selected.includes(opt));
+              return (
+                <div key={group.groupName} style={{ marginBottom: '4px' }}>
+                  {/* Level 1 Header */}
+                  <div
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleGroup(group.options);
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '6px 12px 4px 12px',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      color: 'var(--color-primary-dark, #FF8200)',
+                      background: 'var(--bg-inset, #F9FAFB)',
+                      borderTop: '1px solid var(--border-color)',
+                      borderBottom: '1px solid var(--border-color)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.04em',
+                      cursor: 'pointer',
+                      userSelect: 'none',
+                    }}
+                  >
+                    <span>{group.groupName}</span>
+                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 500, textTransform: 'none' }}>
+                      {allSelected ? 'Clear group' : 'Select group'}
+                    </span>
+                  </div>
+
+                  {/* Level 2 Subtype items (Indented) */}
+                  {group.options.map((opt) => {
+                    const isChecked = selected.includes(opt);
+                    return (
+                      <label
+                        key={opt}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '7px 12px 7px 24px',
+                          fontSize: '12.5px',
+                          cursor: 'pointer',
+                          background: isChecked ? 'var(--sidebar-active-bg, #FFF7ED)' : 'transparent',
+                          color: isChecked ? 'var(--color-primary-dark, #FF8200)' : 'var(--text-main)',
+                          fontWeight: isChecked ? 600 : 400,
+                          transition: 'background 0.15s',
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isChecked) (e.currentTarget as HTMLElement).style.background = 'var(--bg-inset, #F9FAFB)';
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isChecked) (e.currentTarget as HTMLElement).style.background = 'transparent';
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggle(opt)}
+                          style={{ accentColor: 'var(--color-primary, #FF8200)', cursor: 'pointer' }}
+                        />
+                        <span>{opt}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              );
+            })
+          ) : flatOptions.length === 0 && !anyValue ? (
+            <div style={{ padding: '8px 12px', fontSize: '12px', color: 'var(--text-muted)' }}>No options available.</div>
+          ) : (
+            /* Flat Options (Single Level) */
+            flatOptions.map((opt) => {
+              if (opt === anyValue) return null;
+              const isChecked = selected.includes(opt);
+              return (
+                <label
+                  key={opt}
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 12px',
+                    fontSize: '12.5px',
+                    cursor: 'pointer',
+                    background: isChecked ? 'var(--sidebar-active-bg, #FFF7ED)' : 'transparent',
+                    color: isChecked ? 'var(--color-primary-dark, #FF8200)' : 'var(--text-main)',
+                    fontWeight: isChecked ? 600 : 400,
+                    transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isChecked) (e.currentTarget as HTMLElement).style.background = 'var(--bg-inset, #F9FAFB)';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isChecked) (e.currentTarget as HTMLElement).style.background = 'transparent';
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => toggle(opt)}
+                    style={{ accentColor: 'var(--color-primary, #FF8200)', cursor: 'pointer' }}
+                  />
+                  <span>{opt}</span>
+                </label>
+              );
+            })
+          )}
+        </div>
+      )}
     </div>
   );
 }
