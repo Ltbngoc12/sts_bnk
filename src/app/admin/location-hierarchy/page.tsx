@@ -53,6 +53,7 @@ export default function LocationHierarchyPage() {
   const [selectedNode, setSelectedNode] = useState<LocationNode | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isAddMode, setIsAddMode] = useState(false);
+  const [isAddRootMode, setIsAddRootMode] = useState(false);
   const [addChildType, setAddChildType] = useState<'Building' | 'Level' | 'Space'>('Building');
   
   // Form fields
@@ -111,6 +112,7 @@ export default function LocationHierarchyPage() {
   const handleSelectNode = (node: LocationNode) => {
     setSelectedNode(node);
     setIsAddMode(false);
+    setIsAddRootMode(false);
     setIsEditMode(false);
     setFormName(node.name);
     setFormLat(String(node.lat || '1.25'));
@@ -164,6 +166,24 @@ export default function LocationHierarchyPage() {
     setExpandedNodes(prev => ({ ...prev, [selectedNode.id]: true }));
     setIsAddMode(false);
     setSelectedNode(newChild);
+  };
+
+  const handleAddRoot = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const newRoad: LocationNode = {
+      id: `node-${Date.now()}`,
+      name: formName,
+      type: 'Road',
+      parentId: null,
+      status: 'Active'
+    };
+
+    logAudit('Add Location', null, newRoad, `Added new root Walk/Road: ${formName}`);
+    saveLocationState([...nodes, newRoad]);
+
+    setIsAddRootMode(false);
+    setSelectedNode(newRoad);
   };
 
   const handleToggleStatus = (node: LocationNode) => {
@@ -300,14 +320,27 @@ export default function LocationHierarchyPage() {
       <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '20px', marginTop: '20px', minHeight: '520px', alignItems: 'start' }}>
         {/* Tree Card */}
         <div className="glass" style={{ padding: '20px', background: 'var(--bg-card)', minHeight: '500px', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ marginBottom: '15px' }}>
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
             <input
               type="text"
               placeholder="Search locations..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '13px', outline: 'none' }}
+              style={{ flex: 1, padding: '8px 12px', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '13px', outline: 'none' }}
             />
+            <button
+              onClick={() => {
+                setSelectedNode(null);
+                setIsEditMode(false);
+                setIsAddMode(false);
+                setIsAddRootMode(true);
+                resetForm();
+              }}
+              className="btn btn-primary"
+              style={{ padding: '8px 16px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap', background: 'var(--color-primary-dark)', border: 'none', color: '#fff', cursor: 'pointer' }}
+            >
+              + Add Walk/Road
+            </button>
           </div>
           
           <div style={{ flex: 1, overflowY: 'auto', maxHeight: '420px', paddingRight: '8px' }}>
@@ -546,6 +579,29 @@ export default function LocationHierarchyPage() {
                 </form>
               )}
             </div>
+          ) : isAddRootMode ? (
+            <form onSubmit={handleAddRoot} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+              <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', marginBottom: '8px' }}>
+                <strong style={{ fontSize: '12px', color: 'var(--color-primary-dark)' }}>Add new Walk/Road (top-level)</strong>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '5px', textTransform: 'uppercase' }}>Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Tanjong Beach Walk"
+                  value={formName}
+                  onChange={e => setFormName(e.target.value)}
+                  style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '13px' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '15px' }}>
+                <button type="button" onClick={() => setIsAddRootMode(false)} className="btn btn-secondary" style={{ padding: '8px 16px', borderRadius: '6px' }}>Cancel</button>
+                <button type="submit" className="btn btn-primary" style={{ padding: '8px 16px', borderRadius: '6px', background: 'var(--color-primary-dark)', border: 'none', color: '#fff' }}>Add Walk/Road</button>
+              </div>
+            </form>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', textAlign: 'center', padding: '40px' }}>
               <span style={{ fontSize: '36px', marginBottom: '10px' }}>🌲</span>

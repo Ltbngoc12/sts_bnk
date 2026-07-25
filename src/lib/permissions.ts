@@ -39,3 +39,9 @@ export function broadcastPermissionsForRole(role: string | undefined | null): Br
   if (!role) return [];
   return BROADCAST_ROLE_PERMISSIONS[role] || [];
 }
+
+// Role names that participate in the Broadcast module at all — used to populate
+// the "Recipient Role" dropdown on the Action Prompt Rules tab (admin config
+// redesign, 2026-07-25) so admins pick from a real, maintained list instead of
+// typing a role name that doesn't exist anywhere in the system.
+export const BROADCAST_RECIPIENT_ROLE_OPTIONS = Object.keys(BROADCAST_ROLE_PERMISSIONS);

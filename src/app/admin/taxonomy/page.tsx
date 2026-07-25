@@ -147,21 +147,19 @@ export default function TaxonomyPage() {
 
   const activeItems = items.filter(i => i.category === activeTab);
 
+  const TAB_GUIDES: Record<typeof activeTab, string> = {
+    Incident: 'Define incident classifications and their sub-types used when logging a new Incident case.',
+    Fault: 'Define fault classifications and their sub-types used when logging a new Fault case.',
+    Priority: 'Define the priority levels available when assigning and escalating tasks.',
+    eDiary: 'Define the topic categories available when writing a new e-Diary entry.',
+    Event: 'Define the event types available when planning a new Event.'
+  };
+
   return (
     <AdminGuard pageTitle="Taxonomy">
-      <div className="admin-header-bar glass" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-card)' }}>
-        <div>
-          <h1 style={{ fontFamily: 'var(--font-headline)', fontSize: '20px', fontWeight: 700, color: 'var(--text-main)' }}>SYSTEM TAXONOMY</h1>
-          <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginTop: '2px' }}>Configure categorization taxonomy codes, incident classification trees, task priorities, e-diary topics, and event types.</p>
-        </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button onClick={loadAuditHistory} className="btn btn-secondary" style={{ padding: '8px 16px', borderRadius: '6px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span>📜</span> View Audit History
-          </button>
-          <button onClick={openCreate} className="btn btn-primary" style={{ padding: '8px 16px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--color-primary-dark)', border: 'none', color: '#fff', cursor: 'pointer' }}>
-            <span>+</span> Add Category
-          </button>
-        </div>
+      <div className="admin-header-bar glass" style={{ padding: '16px 24px', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-card)' }}>
+        <h1 style={{ fontFamily: 'var(--font-headline)', fontSize: '20px', fontWeight: 700, color: 'var(--text-main)' }}>SYSTEM TAXONOMY</h1>
+        <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginTop: '2px' }}>Configure categorization taxonomy codes, incident classification trees, task priorities, e-diary topics, and event types.</p>
       </div>
 
       {/* Tabs */}
@@ -194,6 +192,20 @@ export default function TaxonomyPage() {
 
       {/* Active configuration panel */}
       <div className="glass" style={{ padding: '20px', background: 'var(--bg-card)', marginTop: '20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', marginBottom: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 14px', background: 'var(--bg-inset)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '12.5px', color: 'var(--text-sub)', flex: 1 }}>
+            <span>💡</span>
+            <span>{TAB_GUIDES[activeTab]}</span>
+          </div>
+          <div style={{ display: 'flex', gap: '10px', flexShrink: 0 }}>
+            <button onClick={loadAuditHistory} className="btn btn-secondary" style={{ padding: '8px 16px', borderRadius: '6px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span>📜</span> View Audit History
+            </button>
+            <button onClick={openCreate} className="btn btn-primary" style={{ padding: '8px 16px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--color-primary-dark)', border: 'none', color: '#fff', cursor: 'pointer' }}>
+              <span>+</span> Add Category
+            </button>
+          </div>
+        </div>
         <div className="table-container" style={{ border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
           <table className="custom-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>

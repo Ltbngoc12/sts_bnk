@@ -7,6 +7,8 @@ import {
   getDistributionGroups,
   getBroadcastTemplates,
   getBroadcastMatrix,
+  getActivePromptRule,
+  addNotification,
 } from '@/lib/broadcastStore';
 import {
   isClosureBroadcastRequired,
@@ -529,8 +531,28 @@ export async function POST(
             incident.closureBroadcastStatus = 'pending';
             incident.closureBroadcastId = broadcastId;
             incident.log.push(makeLogEntry(incident,
-              `Closure broadcast ${broadcastId} queued for Controller review — ${resolved.recipients.length} recipient(s) pre-filled from "${resolved.recipientGroup || 'no matched group'}".`
+              `Closure broadcast ${broadcastId} queued for Controller review — ${resolved.recipients.length} recipient(s) pre-filled from "${resolved.recipientGroups.join(', ') || 'no matched group'}".`
             ));
+
+            // ── Action Prompt Rule: notify recipient role(s) (admin config redesign,
+            // 2026-07-25). Previously this prompt didn't exist at all — the Controller
+            // had no in-app signal that a closure broadcast was waiting. Recipient
+            // role(s) are config-driven (Broadcast Config → Action Prompt Rules), not
+            // hardcoded; if the rule is Inactive/missing, nothing is sent (no hardcoded
+            // fallback). recipientRoles is multi-select (2026-07-25, Kyle) — one
+            // notification is fired per configured role.
+            const closurePromptRule = await getActivePromptRule('closure_broadcast_queued');
+            if (closurePromptRule) {
+              for (const recipientRole of closurePromptRule.recipientRoles) {
+                await addNotification({
+                  recipientRole,
+                  type: 'broadcast',
+                  title: '📣 Closure Broadcast Pending Dispatch',
+                  message: `${broadcastId} for incident ${incident.id} is queued and awaiting your review/dispatch.`,
+                  link: `/incidents/${incident.id}`,
+                });
+              }
+            }
           } else {
             // Informational/Exercise & Backdated: FSD §5.1.2 — no broadcast handling by default.
             incident.closureBroadcastStatus = 'not_required';

@@ -102,7 +102,8 @@ export async function POST(request: Request) {
       beforeSnapshot: body.beforeSnapshot || '',
       afterSnapshot: body.afterSnapshot || '',
       correlationId: body.correlationId || `CORR-${Date.now()}`,
-      ipAddress: body.ipAddress || '127.0.0.1'
+      ipAddress: body.ipAddress || '127.0.0.1',
+      entityId: body.entityId || undefined
     };
 
     if (!db.auditLogs) {

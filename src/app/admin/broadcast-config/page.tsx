@@ -1,127 +1,146 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+// Broadcast Configuration — admin redesign (2026-07-25, per Kyle + see
+// BROADCAST_CONFIG_PAGE_REDESIGN_PLAN.md at repo root for the full gap analysis
+// and phased plan this implements).
+//
+// 4 tabs per Kyle's spec: Template / Routing Matrix / End-of-Day broadcast timing /
+// Action Prompt Rules. Everything here reads/writes the REAL backend built in
+// src/lib/broadcastStore.ts (Mongo) via the /api/admin/broadcast-* routes — the
+// previous version of this page stored everything in localStorage and was fully
+// disconnected from the broadcast dispatch logic that actually runs in
+// src/app/api/incidents/[...id]/route.ts (`close` action) and
+// src/app/api/cron/eod-broadcast/route.ts. No localStorage is used anywhere below.
+//
+// Delivery Channel *management* (Email/Push gateway settings) is intentionally NOT
+// a tab here — Kyle's spec lists exactly the 4 tabs above. Channels are still
+// fetched read-only from /api/admin/broadcast-channels to populate the Delivery
+// Channel checkboxes on the Routing Matrix tab.
+
+import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { AdminGuard } from '@/components/AdminGuard';
 import { useRole } from '@/context/RoleContext';
+import { hasBroadcastPermission, BROADCAST_RECIPIENT_ROLE_OPTIONS } from '@/lib/permissions';
+import {
+  BROADCAST_TYPES,
+  CRISIS_LEVELS,
+  DEFAULT_BROADCAST_CONFIG,
+} from '@/lib/broadcastConfig';
+import type {
+  BroadcastTemplate,
+  BroadcastMatrixRule,
+  BroadcastChannel,
+  BroadcastConfig,
+  BroadcastActionPromptRule,
+  BroadcastPromptTrigger,
+} from '@/lib/broadcastConfig';
+import { getIncidentTaxonomy } from '@/lib/taxonomy';
+import type { DistributionGroup } from '@/lib/groups';
 
-interface BroadcastTemplate {
-  id: string;
-  category: 'Incident Broadcast' | 'Crisis Broadcast' | 'End-of-Day Interim Broadcast';
-  name: string;
-  subject: string;
-  body: string;
-}
+type TabKey = 'Template' | 'Matrix' | 'EOD' | 'PromptRules';
+const ANY = 'Any';
 
-interface MatrixRule {
-  id: string;
-  crisisLevel: string;
-  broadcastType: string;
-  recipientGroup: string;
-  deliveryChannels: string[];
-}
-
-interface DeliveryChannel {
-  name: string;
-  details: string;
-  status: 'Active' | 'Inactive';
-}
-
-const DEFAULT_TEMPLATES: BroadcastTemplate[] = [
-  {
-    id: 'tpl-1',
-    category: 'Incident Broadcast',
-    name: 'Standard Incident Notification',
-    subject: '[ALERT] SDC Operational Alert: {incident_title}',
-    body: 'Incident ID: {incident_id}\nClassification: {incident_type}\nLocation: {location}\nTime Logged: {time}\nSeverity Level: {crisis_level}\nStatus: {status}\n\nDescription: {summary}\n\nThis is an automated dispatch from Sentosa. Responders have been deployed.'
-  },
-  {
-    id: 'tpl-2',
-    category: 'Crisis Broadcast',
-    name: 'Major Crisis Alert',
-    subject: '[URGENT] Emergency Crisis Escalation: {incident_title}',
-    body: 'CRITICAL EMERGENCY WARNING:\nA major crisis event (Level {crisis_level}) has been declared at Sentosa Island.\nEvent: {incident_title}\nLocation: {location}\nTime: {time}\n\nOperational Action: Emergency agencies SCDF/SPF have been alerted and are conveying to scene. All precinct managers please prepare to coordinate evacuation.'
-  },
-  {
-    id: 'tpl-3',
-    category: 'End-of-Day Interim Broadcast',
-    name: 'End-of-Day Operational Summary',
-    subject: '[SUMMARY] Sentosa End-of-Day Interim Broadcast - {time}',
-    body: 'Sentosa Daily Briefing Summary:\nDate: {time}\n\nToday\'s Operations Overview:\n- Total Active Cases: {total_incidents}\n- Unclosed Safety/Security Events: {open_incidents}\n- Closed Logs: {closed_incidents}\n- CMMS Fault Tickets Raised: {active_tasks}\n\nThis interim broadcast summary was audited and dispatched by the Duty Manager on duty.'
-  }
-];
-
-const DEFAULT_MATRIX: MatrixRule[] = [
-  { id: 'mat-1', crisisLevel: 'Level 1 & 2 (Emergency)', broadcastType: 'Crisis Broadcast', recipientGroup: 'SDC Crisis Command', deliveryChannels: ['Email', 'SMS', 'System Notification'] },
-  { id: 'mat-2', crisisLevel: 'Level 3 (Alert)', broadcastType: 'Incident Broadcast', recipientGroup: 'SDC Crisis Command', deliveryChannels: ['Email', 'System Notification'] },
-  { id: 'mat-3', crisisLevel: 'Level 4 & 5 (Routine)', broadcastType: 'Incident Broadcast', recipientGroup: 'Beach Operators & F&B Tenants', deliveryChannels: ['Email'] }
-];
-
-const DEFAULT_CHANNELS: DeliveryChannel[] = [
-  { name: 'Email Gateway', details: 'Host: smtp.sdc.gov.sg | Encryption: STARTTLS | Port: 587', status: 'Active' },
-  { name: 'SMS Gateway', details: 'On-premises HTTP Gateway | API: sms-gate.sdc.local', status: 'Active' },
-  { name: 'System Notification', details: 'Real-time WebSocket Broadcast Server | Port: 8082', status: 'Active' }
-];
-
-const MOCK_VARS = {
-  incident_id: 'SEN/IR/20260613/0014',
-  incident_title: 'Water Pipe Burst near Beach Station',
-  incident_type: 'Facilities',
-  location: 'Siloso Beach Walk - Siloso Beach Station Level 1 Space ticket-counter',
-  time: '2026-06-13 22:45:00',
-  crisis_level: '3',
-  status: 'Live (Assigned)',
-  summary: 'Major water leakage detected under ticketing kiosk. Tram lines flooded.',
-  total_incidents: '12',
-  open_incidents: '4',
-  closed_incidents: '8',
-  active_tasks: '3'
+const TRIGGER_LABELS: Record<BroadcastPromptTrigger, string> = {
+  closure_broadcast_queued: 'Closure Broadcast Queued (Incident closed, broadcast required)',
+  eod_broadcast_queued: 'End-of-Day Broadcast Queued (interim queue built)',
 };
+const TRIGGER_OPTIONS: BroadcastPromptTrigger[] = ['closure_broadcast_queued', 'eod_broadcast_queued'];
+
+function genId(prefix: string) {
+  return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+}
+
+// Normalize documents fetched from Mongo into the current shape. Needed because
+// this page's schema changed twice in the same session (added `status`, then
+// converted several fields to arrays for multi-select, 2026-07-25) — any doc
+// seeded/saved before those changes lacks the new fields, which would otherwise
+// crash the UI (e.g. `.join()` on undefined). Normalizing on read means the page
+// never crashes on legacy data, and it self-heals the moment that row is saved
+// again (the API always writes the current shape).
+function normalizeTemplate(t: any): BroadcastTemplate {
+  return { ...t, status: t.status === 'Inactive' ? 'Inactive' : 'Active' };
+}
+
+function normalizeMatrixRule(r: any): BroadcastMatrixRule {
+  return {
+    ...r,
+    crisisLevels: Array.isArray(r.crisisLevels) ? r.crisisLevels : r.crisisLevel ? [r.crisisLevel] : [ANY],
+    incidentTypes: Array.isArray(r.incidentTypes) ? r.incidentTypes : r.incidentType ? [r.incidentType] : [ANY],
+    incidentSubTypes: Array.isArray(r.incidentSubTypes) ? r.incidentSubTypes : r.incidentSubType ? [r.incidentSubType] : [ANY],
+    recipientGroups: Array.isArray(r.recipientGroups) ? r.recipientGroups : r.recipientGroup ? [r.recipientGroup] : [],
+    deliveryChannels: Array.isArray(r.deliveryChannels) ? r.deliveryChannels : [],
+    status: r.status === 'Inactive' ? 'Inactive' : 'Active',
+  };
+}
+
+function normalizePromptRule(r: any): BroadcastActionPromptRule {
+  return {
+    ...r,
+    recipientRoles: Array.isArray(r.recipientRoles) ? r.recipientRoles : r.recipientRole ? [r.recipientRole] : [],
+    status: r.status === 'Inactive' ? 'Inactive' : 'Active',
+  };
+}
 
 export default function BroadcastConfigPage() {
   const { username } = useRole();
-  const [activeSec, setActiveSec] = useState<'Templates' | 'Matrix' | 'Channels'>('Templates');
+  const [activeTab, setActiveTab] = useState<TabKey>('Template');
+  const [loading, setLoading] = useState(true);
+
   const [templates, setTemplates] = useState<BroadcastTemplate[]>([]);
-  const [matrix, setMatrix] = useState<MatrixRule[]>([]);
-  const [channels, setChannels] = useState<DeliveryChannel[]>([]);
+  const [matrix, setMatrix] = useState<BroadcastMatrixRule[]>([]);
+  const [channels, setChannels] = useState<BroadcastChannel[]>([]);
+  const [config, setConfig] = useState<BroadcastConfig>(DEFAULT_BROADCAST_CONFIG);
+  const [promptRules, setPromptRules] = useState<BroadcastActionPromptRule[]>([]);
+  const [groups, setGroups] = useState<DistributionGroup[]>([]);
+  const [taxonomy, setTaxonomy] = useState<Record<string, string[]>>({});
 
-  // Selected Template state
-  const [selectedTemplate, setSelectedTemplate] = useState<BroadcastTemplate | null>(null);
-  const [formName, setFormName] = useState('');
-  const [formSubject, setFormSubject] = useState('');
-  const [formBody, setFormBody] = useState('');
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-
-  // Selected Matrix state
-  const [isMatrixModalOpen, setIsMatrixModalOpen] = useState(false);
-  const [selectedMatrixRule, setSelectedMatrixRule] = useState<MatrixRule | null>(null);
-  const [formCrisis, setFormCrisis] = useState('');
-  const [formBType, setFormBType] = useState('');
-  const [formGroup, setFormGroup] = useState('');
-  const [formChannels, setFormChannels] = useState<string[]>([]);
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [isAuditOpen, setIsAuditOpen] = useState(false);
 
   useEffect(() => {
-    const tStored = localStorage.getItem('admin_bc_templates');
-    const mStored = localStorage.getItem('admin_bc_matrix');
-    const cStored = localStorage.getItem('admin_bc_channels');
+    // Incident Type/Sub-type: snapshot taxonomy only (decided with Kyle 2026-07-25 —
+    // no /api/admin/taxonomy this round; see plan doc §8.3). Read client-side.
+    setTaxonomy(getIncidentTaxonomy());
 
-    if (tStored) setTemplates(JSON.parse(tStored));
-    else { setTemplates(DEFAULT_TEMPLATES); localStorage.setItem('admin_bc_templates', JSON.stringify(DEFAULT_TEMPLATES)); }
-
-    if (mStored) setMatrix(JSON.parse(mStored));
-    else { setMatrix(DEFAULT_MATRIX); localStorage.setItem('admin_bc_matrix', JSON.stringify(DEFAULT_MATRIX)); }
-
-    if (cStored) setChannels(JSON.parse(cStored));
-    else { setChannels(DEFAULT_CHANNELS); localStorage.setItem('admin_bc_channels', JSON.stringify(DEFAULT_CHANNELS)); }
+    (async () => {
+      try {
+        const [t, m, c, cfg, pr, g] = await Promise.all([
+          fetch('/api/admin/broadcast-templates').then((r) => r.json()),
+          fetch('/api/admin/broadcast-matrix').then((r) => r.json()),
+          fetch('/api/admin/broadcast-channels').then((r) => r.json()),
+          fetch('/api/admin/broadcast-config').then((r) => r.json()),
+          fetch('/api/admin/broadcast-prompt-rules').then((r) => r.json()),
+          fetch('/api/admin/distribution-groups').then((r) => r.json()),
+        ]);
+        setTemplates((Array.isArray(t) ? t : []).map(normalizeTemplate));
+        setMatrix((Array.isArray(m) ? m : []).map(normalizeMatrixRule));
+        setChannels(Array.isArray(c) ? c : []);
+        setConfig(cfg && cfg.endOfDayTime ? cfg : DEFAULT_BROADCAST_CONFIG);
+        setPromptRules((Array.isArray(pr) ? pr : []).map(normalizePromptRule));
+        setGroups(Array.isArray(g) ? g : []);
+      } catch (e) {
+        console.error('Failed to load broadcast configuration', e);
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
-  const saveTemplates = (updated: BroadcastTemplate[]) => {
-    setTemplates(updated);
-    localStorage.setItem('admin_bc_templates', JSON.stringify(updated));
+  const loadAudit = async () => {
+    try {
+      const res = await fetch('/api/admin/audit');
+      const data = await res.json();
+      setAuditLogs(Array.isArray(data) ? data.filter((l: any) => l.module === 'Broadcast Configuration') : []);
+    } catch (e) {
+      console.error('Failed to load audit log', e);
+    }
   };
 
-  const saveMatrix = (updated: MatrixRule[]) => {
-    setMatrix(updated);
-    localStorage.setItem('admin_bc_matrix', JSON.stringify(updated));
+  const openAudit = () => {
+    setIsAuditOpen(true);
+    loadAudit();
   };
 
   const logAudit = async (action: string, before: any, after: any, details: string) => {
@@ -136,408 +155,741 @@ export default function BroadcastConfigPage() {
           details,
           beforeSnapshot: JSON.stringify(before),
           afterSnapshot: JSON.stringify(after),
-          correlationId: `BCS-${Date.now()}`
-        })
+          correlationId: `BCS-${Date.now()}`,
+        }),
       });
     } catch (e) {
       console.error('Audit logging failed:', e);
     }
   };
 
-  const handleSaveTemplate = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedTemplate) return;
-
-    const updated = templates.map(t => {
-      if (t.id === selectedTemplate.id) {
-        return {
-          ...t,
-          name: formName,
-          subject: formSubject,
-          body: formBody
-        };
-      }
-      return t;
-    });
-
-    const updatedTemplate = updated.find(t => t.id === selectedTemplate.id);
-    logAudit('Update Template', selectedTemplate, updatedTemplate, `Updated broadcast template: ${formName}`);
-    saveTemplates(updated);
-    setSelectedTemplate(updatedTemplate || null);
-    alert('Template saved successfully!');
+  const incidentTypeOptions = [ANY, ...Object.keys(taxonomy)];
+  // Multi-value variant for the Routing Matrix tab — union of sub-types across all
+  // selected incident types.
+  const subTypeOptionsForMulti = (incidentTypes: string[] | undefined) => {
+    if (!incidentTypes || incidentTypes.length === 0 || incidentTypes.includes(ANY)) return [ANY];
+    const set = new Set<string>();
+    incidentTypes.forEach((it) => (taxonomy[it] || []).forEach((st) => set.add(st)));
+    return [ANY, ...Array.from(set)];
   };
+  const activeGroups = groups.filter((g) => g.status === 'Active');
 
-  const handleSaveMatrixRule = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (selectedMatrixRule) {
-      // Edit
-      const updated = matrix.map(m => {
-        if (m.id === selectedMatrixRule.id) {
-          return {
-            ...m,
-            crisisLevel: formCrisis,
-            broadcastType: formBType,
-            recipientGroup: formGroup,
-            deliveryChannels: formChannels
-          };
-        }
-        return m;
-      });
-      const updatedRule = updated.find(m => m.id === selectedMatrixRule.id);
-      logAudit('Update Matrix Rule', selectedMatrixRule, updatedRule, `Updated broadcast matrix rule for: ${formCrisis}`);
-      saveMatrix(updated);
-    } else {
-      // Create
-      const newRule: MatrixRule = {
-        id: `mat-${Date.now()}`,
-        crisisLevel: formCrisis,
-        broadcastType: formBType,
-        recipientGroup: formGroup,
-        deliveryChannels: formChannels
-      };
-      logAudit('Create Matrix Rule', null, newRule, `Created new broadcast matrix rule for: ${formCrisis}`);
-      saveMatrix([...matrix, newRule]);
-    }
-    setIsMatrixModalOpen(false);
-  };
-
-  const openEditMatrixRule = (rule: MatrixRule | null) => {
-    setSelectedMatrixRule(rule);
-    if (rule) {
-      setFormCrisis(rule.crisisLevel);
-      setFormBType(rule.broadcastType);
-      setFormGroup(rule.recipientGroup);
-      setFormChannels(rule.deliveryChannels);
-    } else {
-      setFormCrisis('Level 4 & 5 (Routine)');
-      setFormBType('Incident Broadcast');
-      setFormGroup('Beach Operators & F&B Tenants');
-      setFormChannels(['Email']);
-    }
-    setIsMatrixModalOpen(true);
-  };
-
-  const handleToggleChannelStatus = (chName: string) => {
-    const updated = channels.map(c => {
-      if (c.name === chName) {
-        const nextStatus: 'Active' | 'Inactive' = c.status === 'Active' ? 'Inactive' : 'Active';
-        logAudit('Toggle Channel Status', c, { ...c, status: nextStatus }, `Toggled gateway channel ${chName} to ${nextStatus}`);
-        return { ...c, status: nextStatus };
-      }
-      return c;
-    });
-    setChannels(updated);
-    localStorage.setItem('admin_bc_channels', JSON.stringify(updated));
-  };
-
-  const renderVarsPreview = (subjectOrBody: string) => {
-    let output = subjectOrBody;
-    Object.entries(MOCK_VARS).forEach(([key, val]) => {
-      output = output.replace(new RegExp(`{${key}}`, 'g'), val);
-    });
-    return output;
-  };
+  if (loading) {
+    return (
+      <AdminGuard pageTitle="Broadcast Configuration" permissionCheck={(r) => hasBroadcastPermission(r, 'broadcast.config')}>
+        <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading broadcast configuration…</div>
+      </AdminGuard>
+    );
+  }
 
   return (
-    <AdminGuard pageTitle="Broadcast Configuration">
+    <AdminGuard pageTitle="Broadcast Configuration" permissionCheck={(r) => hasBroadcastPermission(r, 'broadcast.config')}>
       <div className="admin-header-bar glass" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-card)' }}>
         <div>
           <h1 style={{ fontFamily: 'var(--font-headline)', fontSize: '20px', fontWeight: 700, color: 'var(--text-main)' }}>BROADCAST CONFIGURATION</h1>
-          <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginTop: '2px' }}>Configure notification layouts, crisis routing matrix rules, and delivery channels gateways.</p>
+          <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginTop: '2px' }}>Templates, routing matrix, end-of-day timing and action prompt rules for the Broadcast &amp; Notification Framework.</p>
         </div>
+        <button onClick={openAudit} className="btn btn-secondary" style={{ padding: '8px 16px', borderRadius: '6px', fontSize: '12.5px' }}>
+          View Change History
+        </button>
       </div>
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: '10px', marginTop: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '2px' }}>
-        {(['Templates', 'Matrix', 'Channels'] as const).map(sec => (
+        {([
+          ['Template', 'Template'],
+          ['Matrix', 'Routing Matrix'],
+          ['EOD', 'End-of-Day Broadcast Timing'],
+          ['PromptRules', 'Action Prompt Rules'],
+        ] as [TabKey, string][]).map(([key, label]) => (
           <button
-            key={sec}
-            onClick={() => setActiveSec(sec)}
+            key={key}
+            onClick={() => setActiveTab(key)}
             style={{
               padding: '10px 20px',
               border: 'none',
               background: 'none',
-              borderBottom: activeSec === sec ? '3px solid var(--color-primary)' : '3px solid transparent',
-              color: activeSec === sec ? 'var(--color-primary-dark)' : 'var(--text-muted)',
-              fontWeight: activeSec === sec ? 700 : 500,
+              borderBottom: activeTab === key ? '3px solid var(--color-primary)' : '3px solid transparent',
+              color: activeTab === key ? 'var(--color-primary-dark)' : 'var(--text-muted)',
+              fontWeight: activeTab === key ? 700 : 500,
               fontSize: '13.5px',
               cursor: 'pointer',
               outline: 'none',
-              transition: 'all 0.15s'
+              transition: 'all 0.15s',
             }}
           >
-            {sec === 'Templates' && 'Broadcast Templates'}
-            {sec === 'Matrix' && 'Broadcast Matrix'}
-            {sec === 'Channels' && 'Delivery Channels Gateways'}
+            {label}
           </button>
         ))}
       </div>
 
-      {/* SECTION: TEMPLATES */}
-      {activeSec === 'Templates' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 2fr', gap: '20px', marginTop: '20px' }}>
-          {/* Left: Templates List */}
-          <div className="glass" style={{ padding: '20px', background: 'var(--bg-card)', height: 'fit-content' }}>
-            <h2 style={{ fontFamily: 'var(--font-headline)', fontSize: '14px', marginBottom: '15px', color: 'var(--text-main)', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>AVAILABLE TEMPLATES</h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {templates.map(tpl => (
-                <button
-                  key={tpl.id}
-                  onClick={() => {
-                    setSelectedTemplate(tpl);
-                    setFormName(tpl.name);
-                    setFormSubject(tpl.subject);
-                    setFormBody(tpl.body);
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '12px 16px',
-                    borderRadius: '8px',
-                    border: '1px solid ' + (selectedTemplate?.id === tpl.id ? 'var(--color-primary-border)' : 'var(--border-color)'),
-                    background: selectedTemplate?.id === tpl.id ? 'var(--color-primary-bg)' : 'transparent',
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s'
-                  }}
-                >
-                  <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)' }}>{tpl.category}</div>
-                  <div style={{ fontWeight: 600, color: selectedTemplate?.id === tpl.id ? 'var(--color-primary-dark)' : 'var(--text-main)', fontSize: '13px', marginTop: '2px' }}>{tpl.name}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Right: Template Editor */}
-          {selectedTemplate ? (
-            <div className="glass" style={{ padding: '20px', background: 'var(--bg-card)' }}>
-              <h2 style={{ fontFamily: 'var(--font-headline)', fontSize: '18px', color: 'var(--text-main)', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', marginBottom: '20px' }}>
-                Template: {selectedTemplate.category}
-              </h2>
-              <form onSubmit={handleSaveTemplate} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '5px', textTransform: 'uppercase' }}>Template Name</label>
-                  <input
-                    type="text"
-                    required
-                    value={formName}
-                    onChange={e => setFormName(e.target.value)}
-                    style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '13px' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '5px', textTransform: 'uppercase' }}>Subject Header</label>
-                  <input
-                    type="text"
-                    required
-                    value={formSubject}
-                    onChange={e => setFormSubject(e.target.value)}
-                    style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '13px' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '5px', textTransform: 'uppercase' }}>Message Body</label>
-                  <textarea
-                    rows={8}
-                    required
-                    value={formBody}
-                    onChange={e => setFormBody(e.target.value)}
-                    style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '12.5px', fontFamily: 'var(--font-mono)', resize: 'vertical', lineHeight: '1.4' }}
-                  />
-                </div>
-                
-                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '10px' }}>
-                  <button type="button" onClick={() => setIsPreviewOpen(true)} className="btn btn-secondary" style={{ padding: '8px 16px', borderRadius: '6px' }}>
-                    Preview variables
-                  </button>
-                  <button type="submit" className="btn btn-primary" style={{ padding: '8px 16px', borderRadius: '6px', background: 'var(--color-primary-dark)', border: 'none', color: '#fff' }}>
-                    Save changes
-                  </button>
-                </div>
-              </form>
-            </div>
-          ) : (
-            <div className="glass" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '300px', color: 'var(--text-muted)', textAlign: 'center', padding: '40px', background: 'var(--bg-card)' }}>
-              <span>✉️</span>
-              <h3>No Template Selected</h3>
-              <p style={{ fontSize: '12.5px', marginTop: '6px' }}>Select a broadcast template from the left menu to view, modify text structures or preview output variables.</p>
-            </div>
-          )}
-        </div>
+      {activeTab === 'Template' && (
+        <TemplateTab templates={templates} matrix={matrix} />
       )}
 
-      {/* SECTION: MATRIX */}
-      {activeSec === 'Matrix' && (
-        <div className="glass" style={{ padding: '20px', background: 'var(--bg-card)', marginTop: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
-            <h2 style={{ fontFamily: 'var(--font-headline)', fontSize: '14px', color: 'var(--text-main)', margin: 0 }}>CRISIS BROADCAST MATRIX</h2>
-            <button onClick={() => openEditMatrixRule(null)} className="btn btn-primary" style={{ padding: '6px 12px', borderRadius: '4px', fontSize: '12.5px', background: 'var(--color-primary-dark)', border: 'none', color: '#fff' }}>
-              + Add Rule
-            </button>
-          </div>
-          <div className="table-container" style={{ border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
-            <table className="custom-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-              <thead>
-                <tr style={{ background: 'var(--bg-inset)', borderBottom: '1px solid var(--border-color)' }}>
-                  <th style={{ padding: '12px 16px', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Crisis Level</th>
-                  <th style={{ padding: '12px 16px', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Broadcast Type</th>
-                  <th style={{ padding: '12px 16px', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Recipient Group</th>
-                  <th style={{ padding: '12px 16px', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Delivery Channel</th>
-                  <th style={{ padding: '12px 16px', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', width: '120px', textAlign: 'right' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {matrix.map(rule => (
-                  <tr key={rule.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                    <td style={{ padding: '12px 16px', fontWeight: 600 }}>{rule.crisisLevel}</td>
-                    <td style={{ padding: '12px 16px', fontSize: '13px' }}>{rule.broadcastType}</td>
-                    <td style={{ padding: '12px 16px', fontSize: '13px', fontWeight: 600, color: 'var(--color-primary-dark)' }}>{rule.recipientGroup}</td>
-                    <td style={{ padding: '12px 16px' }}>
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        {rule.deliveryChannels.map(ch => (
-                          <span key={ch} className="badge badge-onsite" style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '11px' }}>
-                            {ch}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                      <button onClick={() => openEditMatrixRule(rule)} className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '11.5px', borderRadius: '4px' }}>
-                        Edit
-                      </button>
-                    </td>
-                  </tr>
+      {activeTab === 'Matrix' && (
+        <MatrixTab
+          matrix={matrix}
+          setMatrix={setMatrix}
+          templates={templates}
+          activeGroups={activeGroups}
+          channels={channels}
+          taxonomy={taxonomy}
+          incidentTypeOptions={incidentTypeOptions}
+          subTypeOptionsForMulti={subTypeOptionsForMulti}
+          logAudit={logAudit}
+        />
+      )}
+
+      {activeTab === 'EOD' && <EodTimingTab config={config} setConfig={setConfig} logAudit={logAudit} />}
+
+      {activeTab === 'PromptRules' && (
+        <PromptRulesTab promptRules={promptRules} setPromptRules={setPromptRules} logAudit={logAudit} />
+      )}
+
+      {isAuditOpen && (
+        <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="modal-box glass" style={{ width: '100%', maxWidth: '720px', maxHeight: '80vh', overflowY: 'auto', padding: '24px', background: 'var(--bg-card)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
+              <h2 style={{ fontFamily: 'var(--font-headline)', fontSize: '18px', margin: 0 }}>Broadcast Configuration — Change History</h2>
+              <button onClick={() => setIsAuditOpen(false)} className="btn btn-secondary" style={{ padding: '6px 12px', borderRadius: '6px', fontSize: '12px' }}>Close</button>
+            </div>
+            {auditLogs.length === 0 ? (
+              <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>No changes recorded yet.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {auditLogs.map((log) => (
+                  <div key={log.id} style={{ padding: '10px 12px', border: '1px solid var(--border-color)', borderRadius: '6px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-muted)' }}>
+                      <span>{new Date(log.timestamp).toLocaleString()}</span>
+                      <span>{log.user}</span>
+                    </div>
+                    <div style={{ fontWeight: 600, fontSize: '13px', marginTop: '4px' }}>{log.action}</div>
+                    <div style={{ fontSize: '12.5px', color: 'var(--text-sub)', marginTop: '2px' }}>{log.details}</div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* SECTION: CHANNELS */}
-      {activeSec === 'Channels' && (
-        <div className="glass" style={{ padding: '20px', background: 'var(--bg-card)', marginTop: '20px' }}>
-          <h2 style={{ fontFamily: 'var(--font-headline)', fontSize: '14px', marginBottom: '15px', color: 'var(--text-main)', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
-            DELIVERY GATEWAY CONFIGURATIONS
-          </h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            {channels.map(ch => (
-              <div key={ch.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', border: '1px solid var(--border-color)', borderRadius: '8px', background: 'var(--bg-card)' }}>
-                <div>
-                  <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-main)' }}>{ch.name}</h3>
-                  <p style={{ fontSize: '12.5px', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', marginTop: '4px' }}>{ch.details}</p>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                  <span className={`badge ${ch.status === 'Active' ? 'badge-completed' : 'badge-live'}`} style={{ padding: '4px 10px', borderRadius: '4px', fontSize: '12px' }}>
-                    {ch.status}
-                  </span>
-                  <button
-                    onClick={() => handleToggleChannelStatus(ch.name)}
-                    className={`btn ${ch.status === 'Active' ? 'btn-danger' : 'btn-success'}`}
-                    style={{ padding: '6px 12px', fontSize: '12.5px', borderRadius: '4px' }}
-                  >
-                    {ch.status === 'Active' ? 'Deactivate' : 'Reactivate'}
-                  </button>
-                </div>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* TEMPLATE VARIABLES PREVIEW MODAL */}
-      {isPreviewOpen && selectedTemplate && (
-        <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div className="modal-box glass" style={{ width: '100%', maxWidth: '600px', padding: '24px', background: 'var(--bg-card)' }}>
-            <h2 style={{ fontFamily: 'var(--font-headline)', fontSize: '18px', marginBottom: '15px', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
-              Variables Preview - {selectedTemplate.name}
-            </h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-              <div>
-                <strong style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>Subject Preview</strong>
-                <div style={{ padding: '10px', background: 'var(--bg-inset)', borderRadius: '6px', border: '1px solid var(--border-color)', fontFamily: 'var(--font-body)', fontWeight: 600 }}>
-                  {renderVarsPreview(formSubject)}
-                </div>
-              </div>
-              <div>
-                <strong style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>Body Message Preview</strong>
-                <div style={{ padding: '12px', background: 'var(--bg-inset)', borderRadius: '6px', border: '1px solid var(--border-color)', fontFamily: 'var(--font-mono)', fontSize: '12px', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
-                  {renderVarsPreview(formBody)}
-                </div>
-              </div>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
-              <button onClick={() => setIsPreviewOpen(false)} className="btn btn-secondary" style={{ padding: '8px 16px', borderRadius: '6px' }}>Close Preview</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MATRIX RULE CREATE / EDIT MODAL */}
-      {isMatrixModalOpen && (
-        <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div className="modal-box glass" style={{ width: '100%', maxWidth: '480px', padding: '24px', background: 'var(--bg-card)' }}>
-            <h2 style={{ fontFamily: 'var(--font-headline)', fontSize: '18px', marginBottom: '20px' }}>
-              {selectedMatrixRule ? 'Edit Matrix Rule' : 'Add Matrix Rule'}
-            </h2>
-            <form onSubmit={handleSaveMatrixRule} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '5px', textTransform: 'uppercase' }}>Crisis Level</label>
-                <select
-                  value={formCrisis}
-                  onChange={e => setFormCrisis(e.target.value)}
-                  style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '13px' }}
-                >
-                  <option value="Level 1 & 2 (Emergency)">Level 1 & 2 (Emergency)</option>
-                  <option value="Level 3 (Alert)">Level 3 (Alert)</option>
-                  <option value="Level 4 & 5 (Routine)">Level 4 & 5 (Routine)</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '5px', textTransform: 'uppercase' }}>Broadcast Type</label>
-                <select
-                  value={formBType}
-                  onChange={e => setFormBType(e.target.value)}
-                  style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '13px' }}
-                >
-                  <option value="Incident Broadcast">Incident Broadcast</option>
-                  <option value="Crisis Broadcast">Crisis Broadcast</option>
-                  <option value="End-of-Day Interim Broadcast">End-of-Day Interim Broadcast</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '5px', textTransform: 'uppercase' }}>Recipient Group</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. SDC Crisis Command"
-                  value={formGroup}
-                  onChange={e => setFormGroup(e.target.value)}
-                  style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '13px' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '5px', textTransform: 'uppercase' }}>Delivery Channels (comma-separated)</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Email, SMS, System Notification"
-                  value={formChannels.join(', ')}
-                  onChange={e => setFormChannels(e.target.value.split(',').map(s => s.trim()))}
-                  style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '13px' }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '10px' }}>
-                <button type="button" onClick={() => setIsMatrixModalOpen(false)} className="btn btn-secondary" style={{ padding: '8px 16px', borderRadius: '6px' }}>Cancel</button>
-                <button type="submit" className="btn btn-primary" style={{ padding: '8px 16px', borderRadius: '6px', background: 'var(--color-primary-dark)', border: 'none', color: '#fff' }}>Save Rule</button>
-              </div>
-            </form>
+            )}
           </div>
         </div>
       )}
     </AdminGuard>
   );
 }
+
+// ── Tab 1: Template ────────────────────────────────────────────────────────────
+
+// This tab is now a browsable, grouped list ONLY — editing/preview/history live on
+// their own page at /admin/broadcast-config/templates/[id] (2026-07-25, Kyle: (1)
+// Incident Type/Sub-type/Crisis Level removed from Template entirely — see
+// BroadcastTemplate comment in broadcastConfig.ts; (2) multiple templates per
+// Broadcast Type is the normal case, not a special one, so the list groups by
+// type instead of implying 1:1; (3) a dedicated route means a template is
+// deep-linkable, e.g. from an audit log entry).
+function TemplateTab({
+  templates,
+  matrix,
+}: {
+  templates: BroadcastTemplate[];
+  matrix: BroadcastMatrixRule[];
+}) {
+  const router = useRouter();
+  const usageCount = (templateId: string) => matrix.filter((r) => r.templateId === templateId).length;
+
+  // Single flat table with a Type column (2026-07-25, Kyle feedback — grouped
+  // blocks were harder to scan than one table), sorted so templates still cluster
+  // by Broadcast Type (in BROADCAST_TYPES order) without needing separate sections.
+  const knownTypes: readonly string[] = BROADCAST_TYPES;
+  const typeOrder = (category: string) => {
+    const i = knownTypes.indexOf(category);
+    return i === -1 ? knownTypes.length : i;
+  };
+  const sortedTemplates = [...templates].sort((a, b) => typeOrder(a.category) - typeOrder(b.category));
+
+  return (
+    <div className="glass" style={{ padding: '20px', background: 'var(--bg-card)', marginTop: '20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
+        <div>
+          <h2 style={{ fontFamily: 'var(--font-headline)', fontSize: '14px', color: 'var(--text-main)', margin: 0 }}>BROADCAST TEMPLATES</h2>
+          <p style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '4px' }}>
+            Multiple templates per Broadcast Type are supported — a Routing Matrix Rule picks the exact one to use.
+          </p>
+        </div>
+        <button
+          onClick={() => router.push('/admin/broadcast-config/templates/new')}
+          className="btn btn-primary"
+          style={{ padding: '6px 12px', borderRadius: '4px', fontSize: '12px', background: 'var(--color-primary-dark)', border: 'none', color: '#fff' }}
+        >
+          + New
+        </button>
+      </div>
+
+      {templates.length === 0 ? (
+        <p style={{ fontSize: '12.5px', color: 'var(--text-muted)' }}>No templates yet.</p>
+      ) : (
+        <div className="table-container" style={{ border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
+          <table className="custom-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <thead>
+              <tr style={{ background: 'var(--bg-inset)', borderBottom: '1px solid var(--border-color)' }}>
+                <th style={thStyle}>Type</th>
+                <th style={thStyle}>Name</th>
+                <th style={thStyle}>Subject</th>
+                <th style={thStyle}>Used By</th>
+                <th style={thStyle}>Status</th>
+                <th style={{ ...thStyle, width: '100px', textAlign: 'right' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedTemplates.map((tpl) => (
+                <tr key={tpl.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                  <td style={{ ...tdStyle, color: 'var(--text-muted)' }}>{tpl.category}</td>
+                  <td style={{ ...tdStyle, fontWeight: 600 }}>{tpl.name}</td>
+                  <td style={{ ...tdStyle, color: 'var(--text-muted)', maxWidth: '340px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {tpl.subject || '(no subject)'}
+                  </td>
+                  <td style={tdStyle}>{usageCount(tpl.id)} rule{usageCount(tpl.id) !== 1 ? 's' : ''}</td>
+                  <td style={tdStyle}>
+                    <span className={`badge ${tpl.status === 'Active' ? 'badge-completed' : 'badge-live'}`} style={{ padding: '3px 8px', borderRadius: '4px', fontSize: '11px' }}>{tpl.status}</span>
+                  </td>
+                  <td style={{ ...tdStyle, textAlign: 'right' }}>
+                    <Link
+                      href={`/admin/broadcast-config/templates/${tpl.id}`}
+                      className="btn btn-secondary"
+                      style={{ padding: '4px 8px', fontSize: '11.5px', borderRadius: '4px', textDecoration: 'none' }}
+                    >
+                      View
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Tab 2: Routing Matrix ───────────────────────────────────────────────────────
+
+function MatrixTab({
+  matrix,
+  setMatrix,
+  templates,
+  activeGroups,
+  channels,
+  taxonomy,
+  incidentTypeOptions,
+  subTypeOptionsForMulti,
+  logAudit,
+}: {
+  matrix: BroadcastMatrixRule[];
+  setMatrix: (m: BroadcastMatrixRule[]) => void;
+  templates: BroadcastTemplate[];
+  activeGroups: DistributionGroup[];
+  channels: BroadcastChannel[];
+  taxonomy: Record<string, string[]>;
+  incidentTypeOptions: string[];
+  subTypeOptionsForMulti: (incidentTypes: string[] | undefined) => string[];
+  logAudit: (action: string, before: any, after: any, details: string) => Promise<void>;
+}) {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editing, setEditing] = useState<BroadcastMatrixRule | null>(null);
+  const [form, setForm] = useState<BroadcastMatrixRule | null>(null);
+
+  const persist = async (updated: BroadcastMatrixRule[], action: string, before: any, after: any, details: string) => {
+    setMatrix(updated);
+    await fetch('/api/admin/broadcast-matrix', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updated),
+    });
+    await logAudit(action, before, after, details);
+  };
+
+  const openNew = () => {
+    setEditing(null);
+    const defaultType = BROADCAST_TYPES[0];
+    const firstTemplate = templates.find((t) => t.category === defaultType && t.status === 'Active');
+    setForm({
+      id: genId('mat'),
+      crisisLevels: [ANY],
+      broadcastType: defaultType,
+      incidentTypes: [ANY],
+      incidentSubTypes: [ANY],
+      recipientGroups: activeGroups[0] ? [activeGroups[0].name] : [],
+      deliveryChannels: [],
+      templateId: firstTemplate?.id,
+      status: 'Active',
+    });
+    setIsModalOpen(true);
+  };
+
+  const openEdit = (rule: BroadcastMatrixRule) => {
+    setEditing(rule);
+    setForm({ ...rule });
+    setIsModalOpen(true);
+  };
+
+  const handleSave = async () => {
+    if (!form) return;
+    if (!form.templateId) {
+      alert('Select a Template for this rule before saving. Every routing rule must name an exact template — there is no auto-select fallback.');
+      return;
+    }
+    const exists = matrix.some((r) => r.id === form.id);
+    const updated = exists ? matrix.map((r) => (r.id === form.id ? form : r)) : [...matrix, form];
+    const typesLabel = (form.incidentTypes && form.incidentTypes.length ? form.incidentTypes : [ANY]).join(', ');
+    const levelsLabel = form.crisisLevels.join(', ');
+    const groupsLabel = form.recipientGroups.join(', ') || '(no group)';
+    await persist(
+      updated,
+      exists ? 'Update Matrix Rule' : 'Create Matrix Rule',
+      editing,
+      form,
+      `${exists ? 'Updated' : 'Created'} routing rule: ${form.broadcastType} / ${typesLabel} / ${levelsLabel} → ${groupsLabel}`
+    );
+    setIsModalOpen(false);
+  };
+
+  const handleToggleStatus = async (rule: BroadcastMatrixRule) => {
+    const nextStatus = rule.status === 'Active' ? 'Inactive' : 'Active';
+    const after = { ...rule, status: nextStatus as 'Active' | 'Inactive' };
+    const updated = matrix.map((r) => (r.id === rule.id ? after : r));
+    await persist(updated, 'Toggle Matrix Rule Status', rule, after, `Set routing rule ${rule.id} to ${nextStatus}`);
+  };
+
+  const toggleChannel = (ch: string) => {
+    if (!form) return;
+    const has = form.deliveryChannels.includes(ch);
+    setForm({ ...form, deliveryChannels: has ? form.deliveryChannels.filter((c) => c !== ch) : [...form.deliveryChannels, ch] });
+  };
+
+  const templateOptions = templates.filter((t) => t.category === form?.broadcastType && t.status === 'Active');
+
+  return (
+    <div className="glass" style={{ padding: '20px', background: 'var(--bg-card)', marginTop: '20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
+        <div>
+          <h2 style={{ fontFamily: 'var(--font-headline)', fontSize: '14px', color: 'var(--text-main)', margin: 0 }}>BROADCAST ROUTING MATRIX</h2>
+          <p style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '4px' }}>Rules can be deactivated but never deleted. All changes are audit-logged.</p>
+        </div>
+        <button onClick={openNew} className="btn btn-primary" style={{ padding: '6px 12px', borderRadius: '4px', fontSize: '12.5px', background: 'var(--color-primary-dark)', border: 'none', color: '#fff' }}>
+          + Add Rule
+        </button>
+      </div>
+      <div className="table-container" style={{ border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
+        <table className="custom-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <thead>
+            <tr style={{ background: 'var(--bg-inset)', borderBottom: '1px solid var(--border-color)' }}>
+              <th style={thStyle}>Broadcast Type</th>
+              <th style={thStyle}>Incident Type / Sub-type</th>
+              <th style={thStyle}>Crisis Level</th>
+              <th style={thStyle}>Recipient Group</th>
+              <th style={thStyle}>Channels</th>
+              <th style={thStyle}>Template</th>
+              <th style={thStyle}>Status</th>
+              <th style={{ ...thStyle, width: '160px', textAlign: 'right' }}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {matrix.map((rule) => {
+              const tpl = templates.find((t) => t.id === rule.templateId);
+              return (
+                <tr key={rule.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                  <td style={tdStyle}>{rule.broadcastType}</td>
+                  <td style={tdStyle}>
+                    {(rule.incidentTypes && rule.incidentTypes.length ? rule.incidentTypes : [ANY]).join(', ')}
+                    {rule.incidentSubTypes && rule.incidentSubTypes.length && !rule.incidentSubTypes.includes(ANY) ? ` / ${rule.incidentSubTypes.join(', ')}` : ''}
+                  </td>
+                  <td style={{ ...tdStyle, fontWeight: 600 }}>{rule.crisisLevels.join(', ')}</td>
+                  <td style={{ ...tdStyle, fontWeight: 600, color: 'var(--color-primary-dark)' }}>{rule.recipientGroups.join(', ') || '—'}</td>
+                  <td style={tdStyle}>
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                      {rule.deliveryChannels.map((ch) => (
+                        <span key={ch} className="badge badge-onsite" style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '11px' }}>{ch}</span>
+                      ))}
+                    </div>
+                  </td>
+                  <td style={tdStyle}>{tpl ? tpl.name : <span style={{ color: 'var(--color-critical)' }}>(no template — click Edit)</span>}</td>
+                  <td style={tdStyle}>
+                    <span className={`badge ${rule.status === 'Active' ? 'badge-completed' : 'badge-live'}`} style={{ padding: '3px 8px', borderRadius: '4px', fontSize: '11px' }}>{rule.status}</span>
+                  </td>
+                  <td style={{ ...tdStyle, textAlign: 'right' }}>
+                    <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                      <button onClick={() => openEdit(rule)} className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '11.5px', borderRadius: '4px' }}>Edit</button>
+                      <button onClick={() => handleToggleStatus(rule)} className={`btn ${rule.status === 'Active' ? 'btn-danger' : 'btn-success'}`} style={{ padding: '4px 8px', fontSize: '11.5px', borderRadius: '4px' }}>
+                        {rule.status === 'Active' ? 'Deactivate' : 'Reactivate'}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+            {matrix.length === 0 && (
+              <tr><td colSpan={8} style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>No routing rules configured.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {isModalOpen && form && (
+        <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="modal-box glass" style={{ width: '100%', maxWidth: '520px', padding: '24px', background: 'var(--bg-card)' }}>
+            <h2 style={{ fontFamily: 'var(--font-headline)', fontSize: '18px', marginBottom: '20px' }}>{editing ? 'Edit Routing Rule' : 'Add Routing Rule'}</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <FormField label="Broadcast Type">
+                <select
+                  value={form.broadcastType}
+                  onChange={(e) => {
+                    const nextType = e.target.value;
+                    const firstTemplate = templates.find((t) => t.category === nextType && t.status === 'Active');
+                    setForm({ ...form, broadcastType: nextType, templateId: firstTemplate?.id });
+                  }}
+                  style={selectStyle}
+                >
+                  {BROADCAST_TYPES.map((bt) => <option key={bt} value={bt}>{bt}</option>)}
+                </select>
+              </FormField>
+
+              <FormField label="Incident Type (select one or more)">
+                <CheckboxMultiSelect
+                  options={incidentTypeOptions}
+                  selected={form.incidentTypes && form.incidentTypes.length ? form.incidentTypes : [ANY]}
+                  onChange={(next) => setForm({ ...form, incidentTypes: next, incidentSubTypes: [ANY] })}
+                  anyValue={ANY}
+                />
+              </FormField>
+
+              <FormField label="Incident Sub-type (select one or more)">
+                <CheckboxMultiSelect
+                  options={subTypeOptionsForMulti(form.incidentTypes)}
+                  selected={form.incidentSubTypes && form.incidentSubTypes.length ? form.incidentSubTypes : [ANY]}
+                  onChange={(next) => setForm({ ...form, incidentSubTypes: next })}
+                  anyValue={ANY}
+                  disabled={!form.incidentTypes || form.incidentTypes.length === 0 || form.incidentTypes.includes(ANY)}
+                />
+              </FormField>
+
+              <FormField label="Crisis Level (select one or more)">
+                <CheckboxMultiSelect
+                  options={[ANY, ...CRISIS_LEVELS]}
+                  selected={form.crisisLevels}
+                  onChange={(next) => setForm({ ...form, crisisLevels: next })}
+                  anyValue={ANY}
+                />
+              </FormField>
+
+              <FormField label="Recipient Group (select one or more)">
+                <CheckboxMultiSelect
+                  options={activeGroups.map((g) => g.name)}
+                  selected={form.recipientGroups}
+                  onChange={(next) => setForm({ ...form, recipientGroups: next })}
+                />
+              </FormField>
+
+              <div>
+                <label style={labelStyle}>Delivery Channels</label>
+                <div style={{ display: 'flex', gap: '14px', marginTop: '6px', flexWrap: 'wrap' }}>
+                  {channels.map((ch) => (
+                    <label key={ch.id} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12.5px' }}>
+                      <input type="checkbox" checked={form.deliveryChannels.includes(ch.name)} onChange={() => toggleChannel(ch.name)} />
+                      {ch.name}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <FormField label="Template (required)">
+                {templateOptions.length === 0 ? (
+                  <p style={{ fontSize: '12px', color: 'var(--color-critical)', margin: 0 }}>
+                    No active template exists for {form.broadcastType}. Create one on the Template tab before this rule can be saved.
+                  </p>
+                ) : (
+                  <select value={form.templateId || ''} onChange={(e) => setForm({ ...form, templateId: e.target.value || undefined })} style={selectStyle}>
+                    <option value="" disabled>— Select a template —</option>
+                    {templateOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                )}
+              </FormField>
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '20px' }}>
+              <button type="button" onClick={() => setIsModalOpen(false)} className="btn btn-secondary" style={{ padding: '8px 16px', borderRadius: '6px' }}>Cancel</button>
+              <button type="button" onClick={handleSave} className="btn btn-primary" style={{ padding: '8px 16px', borderRadius: '6px', background: 'var(--color-primary-dark)', border: 'none', color: '#fff' }}>Save Rule</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Tab 3: End-of-Day Broadcast Timing ─────────────────────────────────────────
+
+function EodTimingTab({
+  config,
+  setConfig,
+  logAudit,
+}: {
+  config: BroadcastConfig;
+  setConfig: (c: BroadcastConfig) => void;
+  logAudit: (action: string, before: any, after: any, details: string) => Promise<void>;
+}) {
+  const [time, setTime] = useState(config.endOfDayTime);
+
+  useEffect(() => setTime(config.endOfDayTime), [config.endOfDayTime]);
+
+  const handleSave = async () => {
+    const before = config;
+    const after: BroadcastConfig = { ...config, endOfDayTime: time };
+    setConfig(after);
+    await fetch('/api/admin/broadcast-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(after),
+    });
+    await logAudit('Update End-of-Day Timing', before, after, `Set end-of-day broadcast timing to ${time}`);
+    alert('End-of-day timing saved.');
+  };
+
+  return (
+    <div className="glass" style={{ padding: '20px', background: 'var(--bg-card)', marginTop: '20px', maxWidth: '480px' }}>
+      <h2 style={{ fontFamily: 'var(--font-headline)', fontSize: '14px', marginBottom: '8px', color: 'var(--text-main)', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
+        END-OF-DAY BROADCAST TIMING
+      </h2>
+      <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+        Defines the time at which open Incidents are surfaced in the Duty Manager&apos;s end-of-day interim broadcast queue.
+      </p>
+      <FormField label="Cutover Time (24h)">
+        <input type="time" value={time} onChange={(e) => setTime(e.target.value)} style={inputStyle} />
+      </FormField>
+      <div style={{ background: 'var(--bg-inset)', padding: '12px 14px', borderRadius: '8px', borderLeft: '3px solid var(--color-primary)', fontSize: '12px', color: 'var(--text-muted)', marginTop: '14px', lineHeight: 1.5 }}>
+        This time takes effect once a scheduler is configured to call <code>/api/cron/eod-broadcast</code> at the configured cutover — until then, the job can be run on demand from the &quot;Run End-of-Day Check Now&quot; button on the Duty Manager&apos;s End-of-Day Review page.
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>
+        <button onClick={handleSave} className="btn btn-primary" style={{ padding: '8px 16px', borderRadius: '6px', background: 'var(--color-primary-dark)', border: 'none', color: '#fff' }}>Save</button>
+      </div>
+    </div>
+  );
+}
+
+// ── Tab 4: Action Prompt Rules ──────────────────────────────────────────────────
+
+function PromptRulesTab({
+  promptRules,
+  setPromptRules,
+  logAudit,
+}: {
+  promptRules: BroadcastActionPromptRule[];
+  setPromptRules: (r: BroadcastActionPromptRule[]) => void;
+  logAudit: (action: string, before: any, after: any, details: string) => Promise<void>;
+}) {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editing, setEditing] = useState<BroadcastActionPromptRule | null>(null);
+  const [form, setForm] = useState<BroadcastActionPromptRule | null>(null);
+
+  const persist = async (updated: BroadcastActionPromptRule[], action: string, before: any, after: any, details: string) => {
+    setPromptRules(updated);
+    await fetch('/api/admin/broadcast-prompt-rules', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updated),
+    });
+    await logAudit(action, before, after, details);
+  };
+
+  const openNew = () => {
+    setEditing(null);
+    setForm({
+      id: genId('prompt'),
+      name: '',
+      triggerEvent: 'closure_broadcast_queued',
+      recipientRoles: [BROADCAST_RECIPIENT_ROLE_OPTIONS[0]],
+      description: '',
+      status: 'Active',
+    });
+    setIsModalOpen(true);
+  };
+
+  const openEdit = (rule: BroadcastActionPromptRule) => {
+    setEditing(rule);
+    setForm({ ...rule });
+    setIsModalOpen(true);
+  };
+
+  const handleSave = async () => {
+    if (!form || !form.name.trim()) { alert('Name is required.'); return; }
+    if (!form.recipientRoles || form.recipientRoles.length === 0) { alert('Select at least one recipient role.'); return; }
+    const exists = promptRules.some((r) => r.id === form.id);
+    const updated = exists ? promptRules.map((r) => (r.id === form.id ? form : r)) : [...promptRules, form];
+    await persist(
+      updated,
+      exists ? 'Update Action Prompt Rule' : 'Create Action Prompt Rule',
+      editing,
+      form,
+      `${exists ? 'Updated' : 'Created'} prompt rule "${form.name}" — ${TRIGGER_LABELS[form.triggerEvent]} → ${form.recipientRoles.join(', ')}`
+    );
+    setIsModalOpen(false);
+  };
+
+  const handleToggleStatus = async (rule: BroadcastActionPromptRule) => {
+    const nextStatus = rule.status === 'Active' ? 'Inactive' : 'Active';
+    const after = { ...rule, status: nextStatus as 'Active' | 'Inactive' };
+    const updated = promptRules.map((r) => (r.id === rule.id ? after : r));
+    await persist(updated, 'Toggle Action Prompt Rule Status', rule, after, `Set prompt rule "${rule.name}" to ${nextStatus}`);
+  };
+
+  return (
+    <div className="glass" style={{ padding: '20px', background: 'var(--bg-card)', marginTop: '20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
+        <div>
+          <h2 style={{ fontFamily: 'var(--font-headline)', fontSize: '14px', color: 'var(--text-main)', margin: 0 }}>BROADCAST ACTION PROMPT RULES</h2>
+          <p style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '4px' }}>
+            Configures who is notified when a broadcast-related trigger fires. Trigger events are fixed (each maps to a real code hook point) — only the recipient role and status are configurable here.
+          </p>
+        </div>
+        <button onClick={openNew} className="btn btn-primary" style={{ padding: '6px 12px', borderRadius: '4px', fontSize: '12.5px', background: 'var(--color-primary-dark)', border: 'none', color: '#fff' }}>
+          + Add Rule
+        </button>
+      </div>
+      <div className="table-container" style={{ border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
+        <table className="custom-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <thead>
+            <tr style={{ background: 'var(--bg-inset)', borderBottom: '1px solid var(--border-color)' }}>
+              <th style={thStyle}>Name</th>
+              <th style={thStyle}>Trigger Event</th>
+              <th style={thStyle}>Recipient Role</th>
+              <th style={thStyle}>Status</th>
+              <th style={{ ...thStyle, width: '160px', textAlign: 'right' }}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {promptRules.map((rule) => (
+              <tr key={rule.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                <td style={{ ...tdStyle, fontWeight: 600 }}>
+                  {rule.name}
+                  {rule.description && <div style={{ fontWeight: 400, fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>{rule.description}</div>}
+                </td>
+                <td style={tdStyle}>{TRIGGER_LABELS[rule.triggerEvent]}</td>
+                <td style={{ ...tdStyle, fontWeight: 600, color: 'var(--color-primary-dark)' }}>{rule.recipientRoles.join(', ')}</td>
+                <td style={tdStyle}>
+                  <span className={`badge ${rule.status === 'Active' ? 'badge-completed' : 'badge-live'}`} style={{ padding: '3px 8px', borderRadius: '4px', fontSize: '11px' }}>{rule.status}</span>
+                </td>
+                <td style={{ ...tdStyle, textAlign: 'right' }}>
+                  <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                    <button onClick={() => openEdit(rule)} className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '11.5px', borderRadius: '4px' }}>Edit</button>
+                    <button onClick={() => handleToggleStatus(rule)} className={`btn ${rule.status === 'Active' ? 'btn-danger' : 'btn-success'}`} style={{ padding: '4px 8px', fontSize: '11.5px', borderRadius: '4px' }}>
+                      {rule.status === 'Active' ? 'Deactivate' : 'Reactivate'}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {promptRules.length === 0 && (
+              <tr><td colSpan={5} style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>No prompt rules configured — no one will be notified for these events.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {isModalOpen && form && (
+        <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="modal-box glass" style={{ width: '100%', maxWidth: '480px', padding: '24px', background: 'var(--bg-card)' }}>
+            <h2 style={{ fontFamily: 'var(--font-headline)', fontSize: '18px', marginBottom: '20px' }}>{editing ? 'Edit Prompt Rule' : 'Add Prompt Rule'}</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <FormField label="Name">
+                <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} style={inputStyle} placeholder="e.g. Closure Broadcast Prompt" />
+              </FormField>
+              <FormField label="Trigger Event">
+                <select value={form.triggerEvent} onChange={(e) => setForm({ ...form, triggerEvent: e.target.value as BroadcastPromptTrigger })} style={selectStyle}>
+                  {TRIGGER_OPTIONS.map((t) => <option key={t} value={t}>{TRIGGER_LABELS[t]}</option>)}
+                </select>
+              </FormField>
+              <FormField label="Recipient Role(s) (select one or more)">
+                <CheckboxMultiSelect
+                  options={BROADCAST_RECIPIENT_ROLE_OPTIONS}
+                  selected={form.recipientRoles}
+                  onChange={(next) => setForm({ ...form, recipientRoles: next })}
+                />
+              </FormField>
+              <FormField label="Description (optional)">
+                <textarea rows={3} value={form.description || ''} onChange={(e) => setForm({ ...form, description: e.target.value })} style={{ ...inputStyle, resize: 'vertical' }} />
+              </FormField>
+            </div>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '20px' }}>
+              <button type="button" onClick={() => setIsModalOpen(false)} className="btn btn-secondary" style={{ padding: '8px 16px', borderRadius: '6px' }}>Cancel</button>
+              <button type="button" onClick={handleSave} className="btn btn-primary" style={{ padding: '8px 16px', borderRadius: '6px', background: 'var(--color-primary-dark)', border: 'none', color: '#fff' }}>Save Rule</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Shared bits ─────────────────────────────────────────────────────────────────
+
+function FormField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label style={labelStyle}>{label}</label>
+      <div style={{ marginTop: '5px' }}>{children}</div>
+    </div>
+  );
+}
+
+// Multi-select as a checkbox group (2026-07-25, Kyle) — used for Incident Type,
+// Incident Sub-type, Crisis Level and Recipient Group on the Routing Matrix tab,
+// and Recipient Role on the Action Prompt Rules tab. Native <select multiple> is
+// poor UX (requires ctrl/cmd-click, no visible checked state), so this renders a
+// wrapping row of checkboxes instead.
+//
+// `anyValue` (e.g. "Any") is treated as a wildcard that's mutually exclusive with
+// every other option: picking "Any" clears specific selections and vice versa.
+// Fields with no wildcard concept (Recipient Group, Recipient Role) simply omit it.
+function CheckboxMultiSelect({
+  options,
+  selected,
+  onChange,
+  anyValue,
+  disabled,
+}: {
+  options: string[];
+  selected: string[];
+  onChange: (next: string[]) => void;
+  anyValue?: string;
+  disabled?: boolean;
+}) {
+  const toggle = (val: string) => {
+    if (disabled) return;
+    if (anyValue && val === anyValue) {
+      onChange(selected.includes(anyValue) ? [] : [anyValue]);
+      return;
+    }
+    const withoutAny = anyValue ? selected.filter((v) => v !== anyValue) : selected;
+    const next = withoutAny.includes(val) ? withoutAny.filter((v) => v !== val) : [...withoutAny, val];
+    onChange(next);
+  };
+
+  if (options.length === 0) {
+    return <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0 }}>No options available.</p>;
+  }
+
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', opacity: disabled ? 0.5 : 1 }}>
+      {options.map((opt) => (
+        <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12.5px', cursor: disabled ? 'not-allowed' : 'pointer' }}>
+          <input type="checkbox" checked={selected.includes(opt)} disabled={disabled} onChange={() => toggle(opt)} />
+          {opt}
+        </label>
+      ))}
+    </div>
+  );
+}
+
+const labelStyle: React.CSSProperties = { display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' };
+const inputStyle: React.CSSProperties = { width: '100%', padding: '8px 12px', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '13px' };
+const selectStyle: React.CSSProperties = { ...inputStyle };
+const thStyle: React.CSSProperties = { padding: '12px 16px', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' };
+const tdStyle: React.CSSProperties = { padding: '12px 16px', fontSize: '12.5px' };

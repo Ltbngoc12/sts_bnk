@@ -27,45 +27,83 @@ export function isClosureBroadcastRequired(
   return cfg.closureRequiredCategories.includes(cat);
 }
 
-// Pick the most specific matrix rule for an incident (type + sub-type + crisis level),
-// falling back to less specific matches, then any rule at that crisis level.
+// True if a multi-select field (crisisLevels/incidentTypes/incidentSubTypes) is a
+// wildcard — either explicitly containing 'Any', or empty/undefined (fail-open,
+// same semantics the old singular-string fields had for a missing value).
+function isWildcard(values: string[] | undefined): boolean {
+  return !values || values.length === 0 || values.includes('Any');
+}
+
+// Pick the most specific matrix rule for an incident (broadcast type + incident
+// type + sub-type + crisis level), falling back to less specific matches, then
+// any rule at that crisis level. Deactivated rules (status !== 'Active') are
+// never resolved — toggling a rule off in the admin UI takes effect immediately
+// without deleting it.
+//
+// crisisLevels/incidentTypes/incidentSubTypes are multi-select (2026-07-25, Kyle) —
+// a rule matches if the incident's value is IN the rule's list, or the list is a
+// wildcard (see isWildcard above).
+//
+// `broadcastType` is optional for backward compatibility with any existing caller
+// that doesn't pass one, but resolveClosureBroadcast/resolveEodBroadcast both pass
+// it (added 2026-07-25, Phương án B): without it, a Closure rule's `templateId`
+// could otherwise leak into an End-of-Day resolution just because both share the
+// same crisis-level/incident-type shape — recipients/channels were already scoped
+// this way in intent (§10.6), this just makes template selection safe too.
 export function resolveMatrixRule(
   matrix: BroadcastMatrixRule[],
-  opts: { incidentType?: string; incidentSubType?: string; crisisLevel: string }
+  opts: { incidentType?: string; incidentSubType?: string; crisisLevel: string; broadcastType?: string }
 ): BroadcastMatrixRule | undefined {
-  const { incidentType, incidentSubType, crisisLevel } = opts;
-  const atLevel = matrix.filter((r) => r.crisisLevel === crisisLevel || r.crisisLevel === 'Any');
+  const { incidentType, incidentSubType, crisisLevel, broadcastType } = opts;
+  const activeOnly = matrix.filter((r) => r.status !== 'Inactive');
+  const scoped = broadcastType ? activeOnly.filter((r) => r.broadcastType === broadcastType) : activeOnly;
+  const atLevel = scoped.filter((r) => isWildcard(r.crisisLevels) || r.crisisLevels.includes(crisisLevel));
   const typeMatch = (r: BroadcastMatrixRule) =>
-    !r.incidentType || r.incidentType === 'Any' || r.incidentType === incidentType;
+    isWildcard(r.incidentTypes) || (!!incidentType && r.incidentTypes!.includes(incidentType));
   const subMatch = (r: BroadcastMatrixRule) =>
-    !r.incidentSubType || r.incidentSubType === 'Any' || r.incidentSubType === incidentSubType;
+    isWildcard(r.incidentSubTypes) || (!!incidentSubType && r.incidentSubTypes!.includes(incidentSubType));
+  const isSpecificType = (r: BroadcastMatrixRule) => !isWildcard(r.incidentTypes);
 
   return (
-    atLevel.find((r) => typeMatch(r) && subMatch(r) && r.incidentType && r.incidentType !== 'Any') ||
+    atLevel.find((r) => typeMatch(r) && subMatch(r) && isSpecificType(r)) ||
     atLevel.find((r) => typeMatch(r) && subMatch(r)) ||
     atLevel[0]
   );
 }
 
-// Expand a distribution group (by name) into a de-duplicated list of member emails.
-export function resolveGroupEmails(groups: DistributionGroup[], groupName?: string): string[] {
-  if (!groupName) return [];
-  const group = groups.find((g) => g.name === groupName && g.status === 'Active');
-  if (!group) return [];
-  return Array.from(new Set(group.members.map((m) => m.email).filter(Boolean)));
+// Expand one or more distribution groups (by name) into a de-duplicated list of
+// member emails. Multi-select (2026-07-25, Kyle) — a rule can fan out to several
+// recipient groups at once; emails are unioned and de-duplicated across all of them.
+export function resolveGroupEmails(groups: DistributionGroup[], groupNames?: string[]): string[] {
+  if (!groupNames || groupNames.length === 0) return [];
+  const emails = groups
+    .filter((g) => groupNames.includes(g.name) && g.status === 'Active')
+    .flatMap((g) => g.members.map((m) => m.email))
+    .filter(Boolean);
+  return Array.from(new Set(emails));
 }
 
-// Choose the template for a broadcast type (+ optional incident type match).
+// Defensive fallback ONLY — every Matrix Rule created/edited via the admin UI now
+// names an exact templateId (mandatory as of 2026-07-25, Kyle; see BroadcastTemplate
+// comment in broadcastConfig.ts for why templates no longer carry their own
+// incident type/sub-type/crisis level). This just picks the first Active template
+// in the right category, for the edge case of a legacy Mongo row that predates
+// templateId and hasn't been re-saved yet. Not exposed anywhere in the admin UI.
 export function resolveTemplate(
   templates: BroadcastTemplate[],
-  opts: { category: string; incidentType?: string }
+  opts: { category: string }
 ): BroadcastTemplate | undefined {
-  const byCat = templates.filter((t) => t.category === opts.category);
-  return (
-    byCat.find((t) => t.incidentType && t.incidentType !== 'Any' && t.incidentType === opts.incidentType) ||
-    byCat.find((t) => !t.incidentType || t.incidentType === 'Any') ||
-    byCat[0]
-  );
+  return templates.find((t) => t.category === opts.category && t.status !== 'Inactive');
+}
+
+// Look up a template by id, honouring the Active-only rule (used when a Matrix
+// Rule names an exact templateId — Phương án B, 2026-07-25).
+export function resolveTemplateById(
+  templates: BroadcastTemplate[],
+  templateId: string | undefined
+): BroadcastTemplate | undefined {
+  if (!templateId) return undefined;
+  return templates.find((t) => t.id === templateId && t.status !== 'Inactive');
 }
 
 // {variable} substitution — unmatched tokens are left blank.
@@ -81,7 +119,7 @@ export interface ResolvedBroadcast {
   templateUsed: string;
   templateId?: string;
   content: string;
-  recipientGroup?: string;
+  recipientGroups: string[];
   channels: string[];
   sensitiveFields: string[];
 }
@@ -100,12 +138,14 @@ export function resolveClosureBroadcast(input: {
     incidentType: incident?.type,
     incidentSubType: incident?.subType,
     crisisLevel: levelKey,
+    broadcastType: 'Closure Broadcast',
   });
-  const recipients = resolveGroupEmails(groups, rule?.recipientGroup);
-  const template = resolveTemplate(templates, {
-    category: 'Closure Broadcast',
-    incidentType: incident?.type,
-  });
+  const recipients = resolveGroupEmails(groups, rule?.recipientGroups);
+  // Phương án B (2026-07-25): a Matrix Rule may name an exact template. Prefer
+  // that over the category+incidentType guess when the rule sets one.
+  const template =
+    resolveTemplateById(templates, rule?.templateId) ||
+    resolveTemplate(templates, { category: 'Closure Broadcast' });
 
   const vars: Record<string, string | undefined> = {
     case_id: caseId,
@@ -136,7 +176,7 @@ export function resolveClosureBroadcast(input: {
     templateUsed: template?.name || 'Closure Broadcast Template',
     templateId: template?.id,
     content,
-    recipientGroup: rule?.recipientGroup,
+    recipientGroups: rule?.recipientGroups || [],
     channels: rule?.deliveryChannels || ['Email'],
     sensitiveFields: template?.sensitiveFields || [],
   };
@@ -166,12 +206,13 @@ export function resolveEodBroadcast(input: {
     incidentType: incident?.type,
     incidentSubType: incident?.subType,
     crisisLevel: levelKey,
+    broadcastType: 'End-of-Day Interim Broadcast',
   });
-  const recipients = resolveGroupEmails(groups, rule?.recipientGroup);
-  const template = resolveTemplate(templates, {
-    category: 'End-of-Day Interim Broadcast',
-    incidentType: incident?.type,
-  });
+  const recipients = resolveGroupEmails(groups, rule?.recipientGroups);
+  // Phương án B (2026-07-25): prefer the Matrix Rule's exact template if set.
+  const template =
+    resolveTemplateById(templates, rule?.templateId) ||
+    resolveTemplate(templates, { category: 'End-of-Day Interim Broadcast' });
 
   const vars: Record<string, string | undefined> = {
     case_id: caseId,
@@ -201,7 +242,7 @@ export function resolveEodBroadcast(input: {
     templateUsed: template?.name || 'End-of-Day Interim Broadcast',
     templateId: template?.id,
     content,
-    recipientGroup: rule?.recipientGroup,
+    recipientGroups: rule?.recipientGroups || [],
     channels: rule?.deliveryChannels || ['Email'],
     sensitiveFields: template?.sensitiveFields || [],
   };

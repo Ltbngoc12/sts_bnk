@@ -431,6 +431,12 @@ export interface AuditLog {
   afterSnapshot?: string; // JSON snapshot
   correlationId: string;
   ipAddress?: string;
+  // Optional pointer to the specific record this entry is about (e.g. a
+  // BroadcastTemplate id). Added 2026-07-25 so per-entity history views (like the
+  // Broadcast Template detail page) can filter precisely instead of parsing
+  // beforeSnapshot/afterSnapshot JSON. Omitted by callers that log page/module-wide
+  // events without one specific record.
+  entityId?: string;
 }
 
 // Hydrated Case interface used by Next.js endpoints

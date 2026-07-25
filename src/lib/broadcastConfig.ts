@@ -24,32 +24,68 @@ export const CRISIS_LEVELS = ['Level 1', 'Level 2', 'Level 3', 'Level 4', 'Level
 export type CrisisLevel = (typeof CRISIS_LEVELS)[number];
 
 // ── Broadcast Template (FSD §10.4 / §13.3) ─────────────────────────────────────
-// Templates define the default set of incident fields per incident type, sub-type
-// and crisis level, and must exclude sensitive content by default (§10.4c).
+// Templates are pure content (subject/body/sensitive-field policy) scoped only to
+// a Broadcast Type. Multiple templates per Broadcast Type are expected and
+// supported (e.g. two different Closure Broadcast templates) — the admin UI lists
+// them all and a Routing Matrix Rule picks the exact one to use.
+//
+// incidentType/incidentSubType/crisisLevel were REMOVED from this model
+// (2026-07-25, Kyle — see BROADCAST_CONFIG_PAGE_REDESIGN_PLAN.md discussion log).
+// Reasoning: a Routing Matrix Rule already carries its own Incident Type/Sub-type/
+// Crisis Level selection and now always names an exact `templateId` (see
+// BroadcastMatrixRule.templateId, mandatory as of this change) — resolveTemplateById()
+// only ever checked template.status, never these fields, so keeping them on the
+// Template editor implied a second, unused source of truth that could visually
+// contradict the Matrix Rule it was actually used by. The Matrix Rule is now the
+// SOLE place that decides when a template applies; the Template itself just holds
+// content. (This also removes the old category+incidentType "auto-select" fallback
+// — see resolveTemplate() in broadcast.ts.)
 export interface BroadcastTemplate {
   id: string;
   category: string;            // BroadcastType (kept as string for forward-compat)
   name: string;
   subject: string;
   body: string;
-  incidentType?: string;       // §10.4a — mapped determinant
-  incidentSubType?: string;    // §10.1e / §13.3 — added in v0.5
-  crisisLevel?: string;        // §10.4a — mapped determinant
   // §10.4c-d — fields excluded from the default template; may only be added at
   // dispatch with explicit Duty Manager confirmation.
   sensitiveFields?: string[];
+  // Admin config redesign (2026-07-25): multiple templates per broadcast type are
+  // supported; status lets an admin retire/reinstate a template WITHOUT deleting
+  // it. resolveTemplateById() filters to 'Active' only.
+  status: 'Active' | 'Inactive';
 }
 
 // ── Broadcast Matrix Rule (FSD §10.6 / §13.3) ──────────────────────────────────
 // Maps incident type + sub-type + crisis level → distribution group + channels.
+//
+// crisisLevels / recipientGroups / incidentTypes / incidentSubTypes are all
+// multi-select (2026-07-25, Kyle) — one rule can cover several incident types,
+// sub-types, crisis levels and/or fan out to several recipient groups at once,
+// instead of needing a separate row per value. 'Any' inside crisisLevels/
+// incidentTypes/incidentSubTypes is a wildcard and is mutually exclusive with
+// specific values in the UI (see CheckboxMultiSelect in the admin page). An
+// empty/undefined array also behaves as a wildcard for those three (fail-open,
+// consistent with how a missing field was treated before this was an array).
+// recipientGroups has no wildcard — it's always the explicit list to notify.
 export interface BroadcastMatrixRule {
   id: string;
-  crisisLevel: string;
+  crisisLevels: string[];
   broadcastType: string;
-  recipientGroup: string;      // DistributionGroup.name
+  recipientGroups: string[];   // DistributionGroup.name[]
   deliveryChannels: string[];
-  incidentType?: string;       // §13.3 — added in v0.5
-  incidentSubType?: string;    // §13.3 — added in v0.5
+  incidentTypes?: string[];    // §13.3 — added in v0.5
+  incidentSubTypes?: string[]; // §13.3 — added in v0.5
+  // Admin config redesign (2026-07-25, Kyle — Phương án B, made MANDATORY same
+  // day): every rule names the exact BroadcastTemplate to use. The admin UI no
+  // longer offers a "auto-select best match" option — Save is blocked until a
+  // template is chosen. Optional only for legacy Mongo rows saved before this
+  // change; resolveClosureBroadcast/resolveEodBroadcast fall back to the first
+  // Active template in the rule's broadcastType category if a rule somehow still
+  // lacks one (see resolveTemplate() in broadcast.ts).
+  templateId?: string;
+  // Routing Matrix rules are never deleted from the admin UI — only deactivated.
+  // resolveMatrixRule() filters to 'Active' only.
+  status: 'Active' | 'Inactive';
 }
 
 // ── Delivery Channel config (FSD §10.2) ────────────────────────────────────────
@@ -90,10 +126,9 @@ export const DEFAULT_BROADCAST_TEMPLATES: BroadcastTemplate[] = [
     subject: '[SDC] Incident Closed: {incident_title}',
     body:
       'INCIDENT CLOSURE NOTICE\n\nCase ID: {case_id}\nIncident ID: {incident_id}\nTitle: {incident_title}\nClassification: {incident_type} — {incident_subtype}\nLocation: {location}\nCrisis Level: {crisis_level}\nClosed At: {closed_at}\nClosed By: {closed_by}\n\nSummary: {summary}\n\nThis is an automated closure dispatch from the Sentosa CMS.',
-    incidentType: 'Any',
-    crisisLevel: 'Any',
     // Excluded by default per §10.4c — operationally sensitive fields.
     sensitiveFields: ['emergency_services', 'casualty_details', 'investigation_notes', 'media_involvement'],
+    status: 'Active',
   },
   {
     id: 'tpl-eod',
@@ -102,9 +137,8 @@ export const DEFAULT_BROADCAST_TEMPLATES: BroadcastTemplate[] = [
     subject: '[SDC] End-of-Day Interim Update: {incident_title}',
     body:
       'END-OF-DAY INTERIM UPDATE\n\nCase ID: {case_id}\nIncident ID: {incident_id}\nTitle: {incident_title}\nClassification: {incident_type} — {incident_subtype}\nLocation: {location}\nCrisis Level: {crisis_level}\nCurrent Status: {status}\n\nSummary of progress to date: {summary}\n\nThis incident remains open and under management. Issued by the Duty Manager on duty.',
-    incidentType: 'Any',
-    crisisLevel: 'Any',
     sensitiveFields: ['emergency_services', 'casualty_details', 'investigation_notes'],
+    status: 'Active',
   },
   {
     id: 'tpl-weather',
@@ -113,20 +147,36 @@ export const DEFAULT_BROADCAST_TEMPLATES: BroadcastTemplate[] = [
     subject: '[SDC] Weather Advisory: {incident_title}',
     body:
       'WEATHER ADVISORY\n\n{summary}\n\nLocation(s) affected: {location}\nIssued At: {time}\n\nPlease take appropriate precautions. Issued by the authorised Duty Officer.',
-    incidentType: 'Weather',
-    crisisLevel: 'Any',
     sensitiveFields: [],
+    status: 'Active',
   },
 ];
 
 // Matrix seed keyed by crisis level → recipient group + channels (§10.6, TBC in FSD;
 // this is a working draft using the seeded distribution groups from groups.ts).
+// templateId points at the seeded template for that broadcast type. Every rule
+// (seed and admin-created) now names one explicitly — the old category+incidentType
+// "auto-select" fallback was removed the same day templateId became mandatory in
+// the admin UI (Phương án B → mandatory, 2026-07-25).
+//
+// NOTE: resolveMatrixRule() now scopes by `broadcastType` (2026-07-25 fix — see
+// comment on resolveMatrixRule in broadcast.ts) so that a Closure rule's templateId
+// can never leak into an End-of-Day resolution. Previously the same 5 rows were
+// silently reused for both Closure and End-of-Day since nothing filtered on
+// broadcastType — this seed now has an explicit End-of-Day set (same recipient/
+// channel mapping, tpl-eod instead of tpl-closure) so EOD keeps resolving a
+// recipient group exactly as it did before this fix.
 export const DEFAULT_BROADCAST_MATRIX: BroadcastMatrixRule[] = [
-  { id: 'mat-l1', crisisLevel: 'Level 1', broadcastType: 'Closure Broadcast', incidentType: 'Any', recipientGroup: 'SDC Crisis Command', deliveryChannels: ['Email', 'Push Notification'] },
-  { id: 'mat-l2', crisisLevel: 'Level 2', broadcastType: 'Closure Broadcast', incidentType: 'Any', recipientGroup: 'SDC Crisis Command', deliveryChannels: ['Email', 'Push Notification'] },
-  { id: 'mat-l3', crisisLevel: 'Level 3', broadcastType: 'Closure Broadcast', incidentType: 'Any', recipientGroup: 'SDC Crisis Command', deliveryChannels: ['Email', 'Push Notification'] },
-  { id: 'mat-l4', crisisLevel: 'Level 4', broadcastType: 'Closure Broadcast', incidentType: 'Any', recipientGroup: 'Beach Operators & F&B Tenants', deliveryChannels: ['Email'] },
-  { id: 'mat-l5', crisisLevel: 'Level 5', broadcastType: 'Closure Broadcast', incidentType: 'Any', recipientGroup: 'Beach Operators & F&B Tenants', deliveryChannels: ['Email'] },
+  { id: 'mat-l1', crisisLevels: ['Level 1'], broadcastType: 'Closure Broadcast', incidentTypes: ['Any'], recipientGroups: ['SDC Crisis Command'], deliveryChannels: ['Email', 'Push Notification'], templateId: 'tpl-closure', status: 'Active' },
+  { id: 'mat-l2', crisisLevels: ['Level 2'], broadcastType: 'Closure Broadcast', incidentTypes: ['Any'], recipientGroups: ['SDC Crisis Command'], deliveryChannels: ['Email', 'Push Notification'], templateId: 'tpl-closure', status: 'Active' },
+  { id: 'mat-l3', crisisLevels: ['Level 3'], broadcastType: 'Closure Broadcast', incidentTypes: ['Any'], recipientGroups: ['SDC Crisis Command'], deliveryChannels: ['Email', 'Push Notification'], templateId: 'tpl-closure', status: 'Active' },
+  { id: 'mat-l4', crisisLevels: ['Level 4'], broadcastType: 'Closure Broadcast', incidentTypes: ['Any'], recipientGroups: ['Beach Operators & F&B Tenants'], deliveryChannels: ['Email'], templateId: 'tpl-closure', status: 'Active' },
+  { id: 'mat-l5', crisisLevels: ['Level 5'], broadcastType: 'Closure Broadcast', incidentTypes: ['Any'], recipientGroups: ['Beach Operators & F&B Tenants'], deliveryChannels: ['Email'], templateId: 'tpl-closure', status: 'Active' },
+  { id: 'mat-eod-l1', crisisLevels: ['Level 1'], broadcastType: 'End-of-Day Interim Broadcast', incidentTypes: ['Any'], recipientGroups: ['SDC Crisis Command'], deliveryChannels: ['Email', 'Push Notification'], templateId: 'tpl-eod', status: 'Active' },
+  { id: 'mat-eod-l2', crisisLevels: ['Level 2'], broadcastType: 'End-of-Day Interim Broadcast', incidentTypes: ['Any'], recipientGroups: ['SDC Crisis Command'], deliveryChannels: ['Email', 'Push Notification'], templateId: 'tpl-eod', status: 'Active' },
+  { id: 'mat-eod-l3', crisisLevels: ['Level 3'], broadcastType: 'End-of-Day Interim Broadcast', incidentTypes: ['Any'], recipientGroups: ['SDC Crisis Command'], deliveryChannels: ['Email', 'Push Notification'], templateId: 'tpl-eod', status: 'Active' },
+  { id: 'mat-eod-l4', crisisLevels: ['Level 4'], broadcastType: 'End-of-Day Interim Broadcast', incidentTypes: ['Any'], recipientGroups: ['Beach Operators & F&B Tenants'], deliveryChannels: ['Email'], templateId: 'tpl-eod', status: 'Active' },
+  { id: 'mat-eod-l5', crisisLevels: ['Level 5'], broadcastType: 'End-of-Day Interim Broadcast', incidentTypes: ['Any'], recipientGroups: ['Beach Operators & F&B Tenants'], deliveryChannels: ['Email'], templateId: 'tpl-eod', status: 'Active' },
 ];
 
 // FSD §10.2 delivery channels: Email + Push Notification. (SMS is reserved for
@@ -150,5 +200,56 @@ export interface NotificationRecord {
   read: boolean;
   timestamp: string;
 }
+
+// ── Broadcast Action Prompt Rules (admin config redesign, 2026-07-25) ──────────
+// Config-drivable version of the two in-app "prompt" notifications tied to the
+// broadcast lifecycle. Each rule maps a fixed, code-defined trigger event to a
+// recipient role. Previously: the Closure prompt to the Controller didn't exist
+// at all in code, and the EOD prompt to the Duty Manager was hardcoded inline in
+// /api/cron/eod-broadcast/route.ts. Both call sites now look up the Active rule
+// for their trigger event instead (see incidents/[...id]/route.ts `close` action
+// and cron/eod-broadcast/route.ts).
+//
+// triggerEvent is a closed enum, NOT free text — each value corresponds to one
+// real code hook point. Adding a new trigger always requires a developer to wire
+// a new call site; it can't be created purely through this admin UI. Scoped to
+// exactly these 2 values for v1 (Kyle, 2026-07-25) — Weather Advisory has no
+// dispatch trigger yet, and Crisis Recall (§11) is a separate module out of scope.
+export type BroadcastPromptTrigger =
+  | 'closure_broadcast_queued'   // incidents/[...id] action `close`, when the C1 gate is required
+  | 'eod_broadcast_queued';      // cron/eod-broadcast, when >=1 incident is queued into the EOD review
+
+export interface BroadcastActionPromptRule {
+  id: string;
+  name: string;
+  triggerEvent: BroadcastPromptTrigger;
+  // Multi-select (2026-07-25, Kyle) — a single prompt can notify several roles at
+  // once (e.g. both Controller and Duty Manager) instead of needing a separate
+  // rule per role. Each role in the list gets its own NotificationRecord.
+  recipientRoles: string[]; // UserRole from RoleContext / role registry in admin/roles
+  description?: string;
+  status: 'Active' | 'Inactive';
+}
+
+// Seeded to match current/intended behaviour exactly (no behaviour change on migrate):
+// Closure -> Controller was a gap (never notified); EOD -> Duty Manager was hardcoded.
+export const DEFAULT_BROADCAST_PROMPT_RULES: BroadcastActionPromptRule[] = [
+  {
+    id: 'prompt-closure',
+    name: 'Closure Broadcast Prompt',
+    triggerEvent: 'closure_broadcast_queued',
+    recipientRoles: ['Controller'],
+    description: 'Fires when a Duty Manager approves and closes an Incident that requires a closure broadcast (FSD §5.11.1a / §5.1.2). Notifies the Controller to review and dispatch the queued broadcast.',
+    status: 'Active',
+  },
+  {
+    id: 'prompt-eod',
+    name: 'End-of-Day Interim Broadcast Prompt',
+    triggerEvent: 'eod_broadcast_queued',
+    recipientRoles: ['Duty Manager'],
+    description: 'Fires when the End-of-Day cutover job queues one or more open incidents into the interim broadcast review queue (FSD §5.11.2 / §10.7). Notifies the Duty Manager to review and dispatch.',
+    status: 'Active',
+  },
+];
 
 export type { DistributionGroup };

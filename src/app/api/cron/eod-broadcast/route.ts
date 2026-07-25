@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDb, saveDb, BroadcastRecord } from '@/lib/db';
 import { isEodEligible, resolveEodBroadcast } from '@/lib/broadcast';
-import { getDistributionGroups, getBroadcastTemplates, getBroadcastMatrix, addNotification } from '@/lib/broadcastStore';
+import { getDistributionGroups, getBroadcastTemplates, getBroadcastMatrix, addNotification, getActivePromptRule } from '@/lib/broadcastStore';
 
 // FSD §5.11.2 / §10.7 — End-of-Day Interim Broadcast queue builder.
 // At EOD cutover, surface open incidents into the Duty Manager's review queue by
@@ -63,15 +63,24 @@ async function run() {
   if (queued > 0) {
     await saveDb(db);
     // Server-authoritative — this route has no client page open when a real
-    // scheduler fires it, so the Duty Manager notification is written directly
-    // here rather than relying on a client-side addNotification() call.
-    await addNotification({
-      recipientRole: 'Duty Manager',
-      type: 'broadcast',
-      title: '🌆 End-of-Day Broadcasts Queued',
-      message: `${queued} incident(s) still open at End-of-Day cutover — review and dispatch interim broadcasts.`,
-      link: '/broadcasts/eod-review',
-    });
+    // scheduler fires it, so the notification is written directly here rather
+    // than relying on a client-side addNotification() call. Recipient role(s) are
+    // config-driven (Broadcast Config → Action Prompt Rules, 2026-07-25) instead
+    // of the hardcoded 'Duty Manager' this route used before — if the rule is
+    // Inactive/missing, nothing is sent (no hardcoded fallback). recipientRoles is
+    // multi-select (2026-07-25, Kyle) — one notification is fired per configured role.
+    const eodPromptRule = await getActivePromptRule('eod_broadcast_queued');
+    if (eodPromptRule) {
+      for (const recipientRole of eodPromptRule.recipientRoles) {
+        await addNotification({
+          recipientRole,
+          type: 'broadcast',
+          title: '🌆 End-of-Day Broadcasts Queued',
+          message: `${queued} incident(s) still open at End-of-Day cutover — review and dispatch interim broadcasts.`,
+          link: '/broadcasts/eod-review',
+        });
+      }
+    }
   }
   return NextResponse.json({ ranAt: new Date().toISOString(), queued, created });
 }

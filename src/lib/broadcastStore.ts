@@ -15,11 +15,13 @@ import {
   BroadcastMatrixRule,
   BroadcastChannel,
   BroadcastConfig,
+  BroadcastActionPromptRule,
   NotificationRecord,
   DEFAULT_BROADCAST_TEMPLATES,
   DEFAULT_BROADCAST_MATRIX,
   DEFAULT_BROADCAST_CHANNELS,
   DEFAULT_BROADCAST_CONFIG,
+  DEFAULT_BROADCAST_PROMPT_RULES,
 } from './broadcastConfig';
 
 async function mdb(): Promise<Db> {
@@ -78,6 +80,23 @@ export const getBroadcastChannels = () =>
   readOrSeed<BroadcastChannel>('broadcastChannels', DEFAULT_BROADCAST_CHANNELS);
 export const saveBroadcastChannels = (c: BroadcastChannel[]) =>
   replaceAll('broadcastChannels', c);
+
+// ── Broadcast Action Prompt Rules (admin config redesign, 2026-07-25) ──────────
+export const getBroadcastPromptRules = () =>
+  readOrSeed<BroadcastActionPromptRule>('broadcastPromptRules', DEFAULT_BROADCAST_PROMPT_RULES);
+export const saveBroadcastPromptRules = (r: BroadcastActionPromptRule[]) =>
+  replaceAll('broadcastPromptRules', r);
+
+// Convenience lookup used by the two trigger call sites (incidents/[...id] `close`
+// action and cron/eod-broadcast) — returns the first Active rule for the event, or
+// undefined if none configured/enabled (in which case the caller sends nothing,
+// no hardcoded fallback).
+export async function getActivePromptRule(
+  triggerEvent: BroadcastActionPromptRule['triggerEvent']
+): Promise<BroadcastActionPromptRule | undefined> {
+  const rules = await getBroadcastPromptRules();
+  return rules.find((r) => r.triggerEvent === triggerEvent && r.status === 'Active');
+}
 
 // ── Broadcast-level config: EOD timing + closure-required categories (§13.3) ────
 export async function getBroadcastConfig(): Promise<BroadcastConfig> {
