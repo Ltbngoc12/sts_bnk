@@ -99,12 +99,34 @@ export async function getActivePromptRule(
 }
 
 // ── Broadcast-level config: EOD timing + closure-required categories (§13.3) ────
+// Merges over DEFAULT_BROADCAST_CONFIG rather than returning the persisted doc
+// as-is: a Mongo doc saved before 2026-07-26 (Phase 0) predates
+// eodExcludedCategories/eodMinCrisisLevel/eodExcludedStatuses/eodSchedulerEnabled
+// and would otherwise come back with those fields simply missing, which crashes
+// isEodEligible()'s `cfg.eodExcludedStatuses.includes(...)`. This is the same
+// forward-compatible-merge approach as hydrateDb() elsewhere in the codebase.
 export async function getBroadcastConfig(): Promise<BroadcastConfig> {
   const rows = await readOrSeed<BroadcastConfig>('broadcastConfig', [DEFAULT_BROADCAST_CONFIG]);
-  return rows[0] || DEFAULT_BROADCAST_CONFIG;
+  return { ...DEFAULT_BROADCAST_CONFIG, ...(rows[0] || {}) };
 }
 export const saveBroadcastConfig = (cfg: BroadcastConfig) =>
   replaceAll('broadcastConfig', [{ ...cfg, id: 'singleton' as const }]);
+
+// Records that the EOD cutover check ran for a given calendar night (§10.7,
+// gap G8). Backs the lazy-trigger the EOD review tab uses in place of a real
+// external scheduler (this deployment has no Vercel Cron / vercel.json — see
+// BROADCAST_MODULE_FSD_GAP_AND_UIUX_PLAN.md Phase 3) and lets the UI show
+// "Cutover 20:00 · last ran 20:03" instead of losing that the moment the page
+// is refreshed (it used to live only in React state).
+export async function recordEodRun(eodDate: string): Promise<void> {
+  const cfg = await getBroadcastConfig();
+  const nowIso = new Date().toISOString();
+  await saveBroadcastConfig({
+    ...cfg,
+    lastEodRunAt: nowIso,
+    lastEodRunPerDate: { ...(cfg.lastEodRunPerDate || {}), [eodDate]: nowIso },
+  });
+}
 
 // ── Notifications mailbox (server-side; FSD §10.5) ─────────────────────────────
 export async function getNotifications(): Promise<NotificationRecord[]> {

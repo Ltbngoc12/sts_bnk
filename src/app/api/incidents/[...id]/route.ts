@@ -14,6 +14,9 @@ import {
   isClosureBroadcastRequired,
   resolveClosureBroadcast,
   initialDeliveryCounts,
+  nextBroadcastId,
+  crisisLevelKey,
+  encodeIdPath,
 } from '@/lib/broadcast';
 import { hasBroadcastPermission } from '@/lib/permissions';
 import { sendEmailMockBatch } from '@/lib/emailMock';
@@ -189,12 +192,28 @@ export async function PUT(
       const prevMedia = incident.mediaInvolvement.mediaAtScene;
       const prevComms = incident.mediaInvolvement.commsNotified;
       incident.mediaInvolvement = { ...incident.mediaInvolvement, ...body.mediaInvolvement };
-      
+
       if (incident.mediaInvolvement.mediaAtScene && !prevMedia) {
         incident.log.push({ eventNumber: incident.log.length + 1, date: logDate, time: logTime, description: 'Media presence detected at scene.' });
       }
       if (incident.mediaInvolvement.commsNotified && !prevComms) {
         incident.log.push({ eventNumber: incident.log.length + 1, date: logDate, time: logTime, description: 'SDC Communications Team notified regarding media presence.' });
+        // §10.8/G10 — was log-only before; now also prompts the Controller in-app
+        // (recipient role config-driven — see 'media_present_confirmed' in
+        // broadcastConfig.ts). The Controller still creates the actual SDC
+        // Communications broadcast manually via New Broadcast.
+        const mediaPromptRule = await getActivePromptRule('media_present_confirmed');
+        if (mediaPromptRule) {
+          for (const recipientRole of mediaPromptRule.recipientRoles) {
+            await addNotification({
+              recipientRole,
+              type: 'broadcast',
+              title: '📰 Notify SDC Communications Team',
+              message: `Media presence confirmed on ${incident.id}${incident.mediaInvolvement.mediaName ? ` (${incident.mediaInvolvement.mediaName})` : ''} — please notify the SDC Communications team by broadcast.`,
+              link: `/incidents/${incident.id}`,
+            });
+          }
+        }
       }
     }
     if (body.propertyDamage) incident.propertyDamage = { ...incident.propertyDamage, ...body.propertyDamage };
@@ -380,6 +399,19 @@ export async function POST(
         incident.log.push(makeLogEntry(incident,
           `Responder ${target.responderId} has notified completion of ground activities — awaiting Controller review.`
         ));
+        // §10.5 (gap G7) — this System Notification event existed in the FSD's
+        // 10-event list but was never wired server-side; it only ever fired if a
+        // Controller happened to have the incident page open in a browser tab at
+        // that exact moment (client-side addNotification calls elsewhere in the
+        // codebase). Moved server-side here so it's reliable regardless of who's
+        // looking at what.
+        await addNotification({
+          recipientRole: 'Controller',
+          type: 'incident',
+          title: '✅ Responder reported completion',
+          message: `${target.responderId} has notified completion on ${incident.id} — awaiting your review.`,
+          link: `/incidents/${incident.id}`,
+        });
         break;
       }
 
@@ -511,8 +543,11 @@ export async function POST(
               getBroadcastMatrix(),
             ]);
             const resolved = resolveClosureBroadcast({ incident, caseId, groups, templates, matrix });
-            const broadcastSeq = db.broadcasts.filter(b => b.caseId === caseId).length + 1;
-            const broadcastId = `${caseId}-BC${String(broadcastSeq).padStart(3, '0')}`;
+            // Fixes B4 — parses the max existing sequence instead of counting array
+            // length, so a deleted broadcast or a race with the EOD cron can't
+            // produce a duplicate/collided ID.
+            const broadcastId = nextBroadcastId(db.broadcasts, caseId);
+            const nowIso = new Date().toISOString();
             db.broadcasts.push({
               id: broadcastId,
               caseId,
@@ -520,8 +555,20 @@ export async function POST(
               type: 'Closure',
               recipients: resolved.recipients,
               templateUsed: resolved.templateUsed,
+              templateId: resolved.templateId,
+              matrixRuleId: resolved.matrixRuleId,
+              recipientGroups: resolved.recipientGroups,
+              subject: resolved.subject,
               contentDispatched: resolved.content,
+              contentDefault: resolved.content,
               channels: resolved.channels,
+              crisisLevel: crisisLevelKey(incident.crisisLevel),
+              incidentType: incident.type,
+              incidentSubType: incident.subType,
+              incidentTitle: incident.title,
+              createdAt: nowIso,
+              queuedBy: 'system',
+              resolutionWarning: resolved.resolutionWarning,
               sentAt: null as any,
               sentBy: actor,
               status: 'PENDING',
@@ -551,6 +598,20 @@ export async function POST(
                   link: `/incidents/${incident.id}`,
                 });
               }
+            }
+            // §10.3c/G15 — 0-recipient records used to sit PENDING forever with no
+            // signal that it was a config gap (missing/inactive Matrix rule or
+            // group) rather than a deliberate empty broadcast. Flag System
+            // Administrator directly since this is a config problem, not a
+            // dispatch-review problem the Controller can fix from the broadcast UI.
+            if (resolved.resolutionWarning) {
+              await addNotification({
+                recipientRole: 'System Administrator',
+                type: 'broadcast',
+                title: '⚠ Broadcast queued with 0 recipients',
+                message: `${broadcastId}: ${resolved.resolutionWarning}`,
+                link: `/broadcasts/${encodeIdPath(broadcastId)}`,
+              });
             }
           } else {
             // Informational/Exercise & Backdated: FSD §5.1.2 — no broadcast handling by default.
@@ -785,9 +846,23 @@ export async function POST(
       case 'update-fields': {
         if (body.emergencyServices) incident.emergencyServices = { ...incident.emergencyServices, ...body.emergencyServices };
         if (body.mediaInvolvement) {
+          const prevComms = incident.mediaInvolvement.commsNotified;
           incident.mediaInvolvement = { ...incident.mediaInvolvement, ...body.mediaInvolvement };
-          if (body.mediaInvolvement.commsNotified) {
+          if (incident.mediaInvolvement.commsNotified && !prevComms) {
             incident.log.push(makeLogEntry(incident, 'SDC Communications Team notified regarding media presence.'));
+            // §10.8/G10 — see matching PUT-handler comment above.
+            const mediaPromptRule = await getActivePromptRule('media_present_confirmed');
+            if (mediaPromptRule) {
+              for (const recipientRole of mediaPromptRule.recipientRoles) {
+                await addNotification({
+                  recipientRole,
+                  type: 'broadcast',
+                  title: '📰 Notify SDC Communications Team',
+                  message: `Media presence confirmed on ${incident.id}${incident.mediaInvolvement.mediaName ? ` (${incident.mediaInvolvement.mediaName})` : ''} — please notify the SDC Communications team by broadcast.`,
+                  link: `/incidents/${incident.id}`,
+                });
+              }
+            }
           }
         }
         if (body.propertyDamage) incident.propertyDamage = { ...incident.propertyDamage, ...body.propertyDamage };
@@ -811,8 +886,15 @@ export async function POST(
       // Controller reviews the pre-filled recipients/content, then dispatches. Moves
       // the BroadcastRecord PENDING → SENT and stamps the incident as 'dispatched'.
       case 'dispatch-broadcast': {
-        // RBAC (FSD §3 / §13.1) — broadcast.dispatch required.
-        if (body.role && !hasBroadcastPermission(body.role, 'broadcast.dispatch')) {
+        // RBAC (FSD §3 / §13.1) — broadcast.dispatch required. Fixes bug B5: role
+        // used to be optional here (`if (body.role && ...)`), so simply omitting
+        // it from the request body skipped the permission check entirely. Once a
+        // real auth/session layer replaces the mock-identity RoleContext, swap
+        // this for the resolved session role instead of trusting the client body.
+        if (!body.role) {
+          return NextResponse.json({ error: 'role is required.' }, { status: 400 });
+        }
+        if (!hasBroadcastPermission(body.role, 'broadcast.dispatch')) {
           return NextResponse.json({ error: 'You do not have permission to dispatch broadcasts.' }, { status: 403 });
         }
         if (!db.broadcasts) db.broadcasts = [];
@@ -831,10 +913,12 @@ export async function POST(
         // §10.4d — content edited BEYOND the auto-filled default needs explicit
         // confirmation (2026-07-25: content-diff gate, replaces the old per-field
         // sensitiveFields checklist — see BroadcastTemplate comment in
-        // broadcastConfig.ts). Diff against contentDispatched as it stands right
-        // now, i.e. still the untouched auto-fill from queue time — must be
-        // computed BEFORE it gets overwritten below.
-        const contentChanged = typeof body.content === 'string' && body.content.trim() !== (bc.contentDispatched || '').trim();
+        // broadcastConfig.ts). Diffs against contentDefault (the untouched
+        // auto-fill snapshot taken at queue time, gap G6) when present, falling
+        // back to contentDispatched for records queued before that field existed —
+        // must be computed BEFORE contentDispatched gets overwritten below.
+        const baseline = bc.contentDefault ?? bc.contentDispatched ?? '';
+        const contentChanged = typeof body.content === 'string' && body.content.trim() !== baseline.trim();
         if (contentChanged && !body.confirmContentChange) {
           return NextResponse.json({
             error: 'Content has been edited from the auto-filled default — explicit confirmation is required before dispatch.',
@@ -863,13 +947,33 @@ export async function POST(
         ));
         // Mock Email gateway — fire the actual send for the Email channel (§10.1a/§10.2).
         // Fire-and-forget: broadcast dispatch is not blocked on gateway latency.
+        // Uses bc.subject (rendered from BroadcastTemplate.subject at queue time —
+        // fixes G4) with a fallback for legacy records queued before that field
+        // existed, so old PENDING broadcasts don't crash dispatch.
         if (!bc.channels || bc.channels.includes('Email')) {
           sendEmailMockBatch({
             recipients,
-            subject: `[SDC] ${bc.type} Broadcast — ${bc.id}`,
+            subject: bc.subject || `[SDC] ${bc.type} Broadcast — ${bc.id}`,
             body: bc.contentDispatched,
             caseId: bc.caseId,
             broadcastId: bc.id,
+          }).catch(() => {});
+        }
+        // In-app "Push Notification" channel (§10.2) — fixes G2: previously the
+        // Matrix could set this channel and the UI would display it as part of the
+        // broadcast, but nothing was ever sent for it. The notification mailbox
+        // (broadcastStore/NotificationContext) only targets ROLES, not individual
+        // email addresses — there's no email→user-account resolution wired in yet
+        // — so this fires one role-level System Notification to the receive-only
+        // 'Broadcast Recipient' role rather than silently doing nothing. Revisit
+        // once real auth maps recipients to actual user accounts.
+        if (bc.channels?.includes('Push Notification')) {
+          addNotification({
+            recipientRole: 'Broadcast Recipient',
+            type: 'broadcast',
+            title: bc.subject || `${bc.type} Broadcast`,
+            message: bc.contentDispatched.slice(0, 240),
+            link: `/broadcasts/${encodeIdPath(bc.id)}`,
           }).catch(() => {});
         }
         // Audit trail (FSD §13.5) — recorded server-side alongside the dispatch.

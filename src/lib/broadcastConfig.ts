@@ -88,7 +88,7 @@ export interface BroadcastMatrixRule {
   deliveryChannels: string[];
   incidentTypes?: string[];    // §13.3 — added in v0.5
   incidentSubTypes?: string[]; // §13.3 — added in v0.5
-  // Admin config redesign (2026-07-25, Kyle — Phương án B, made MANDATORY same
+  // Admin config redesign (2026-07-25, Kyle — Option B, made MANDATORY same
   // day): every rule names the exact BroadcastTemplate to use. The admin UI no
   // longer offers a "auto-select best match" option — Save is blocked until a
   // template is chosen. Optional only for legacy Mongo rows saved before this
@@ -118,6 +118,29 @@ export interface BroadcastConfig {
   // §5.1.2 / §5.11.1a — which incident categories require a closure broadcast by
   // default. Drives the C1 gate in the incident `close` action.
   closureRequiredCategories: string[];
+
+  // ── Added 2026-07-26 (Phase 0, gap G9) ─────────────────────────────────────────
+  // isEodEligible() previously only excluded status Closed/Pending Endorsement —
+  // every other open incident queued into the EOD review, including Informational/
+  // Exercise incidents (§5.1.2 explicitly says these "do not require ... broadcast
+  // handling by default") and Level 5 false alarms. That produced a queue of mostly
+  // junk (43 pending records observed 2026-07-26) that no Duty Manager could
+  // realistically triage at end of shift. These three settings make the EOD gate
+  // symmetric with the Closure gate instead of hardcoding the exclusion list.
+  eodExcludedCategories: string[];   // Incident.category values that never queue for EOD
+  eodMinCrisisLevel: number;         // only crisisLevel <= this queues (1 = most severe); 5 = no level filter
+  eodExcludedStatuses: string[];     // Incident.status values that never queue (was OPEN_STATUSES_EXCLUDED, hardcoded)
+
+  // ── Added 2026-07-26 (Phase 3, gap G8) ─────────────────────────────────────────
+  // This deployment has no external scheduler (plain `next dev`/`next start`, no
+  // vercel.json/Vercel Cron in this repo) — endOfDayTime was previously "dead"
+  // config that nothing ever read. lastEodRunAt/lastEodRunPerDate back a
+  // lazy-trigger: the EOD tab checks on load whether today's cutover has passed
+  // and the job hasn't run yet today, and if so runs it automatically, instead of
+  // relying on someone remembering to click "Run Check Now".
+  eodSchedulerEnabled: boolean;
+  lastEodRunAt?: string;                      // ISO — most recent run, any night
+  lastEodRunPerDate?: Record<string, string>; // eodDate (YYYY-MM-DD) -> ISO run timestamp
 }
 
 export const DEFAULT_BROADCAST_CONFIG: BroadcastConfig = {
@@ -127,6 +150,16 @@ export const DEFAULT_BROADCAST_CONFIG: BroadcastConfig = {
   // "do not require … broadcast handling by default"; Backdated makes no mention of a
   // broadcast (already-concluded incident) → excluded by default, pending BA confirmation.
   closureRequiredCategories: ['Operational Incident'],
+  // Mirrors closureRequiredCategories' reasoning for the EOD gate (G9): Informational/
+  // Exercise incidents don't get broadcast handling by default, and Backdated incidents
+  // are already-concluded records that shouldn't resurface at end of shift. Values must
+  // match INCIDENT_CATEGORIES in incidentCategory.ts.
+  eodExcludedCategories: ['Informational / Exercise Records', 'Backdated Incident'],
+  // Level 5 = occurrence/false-alarm severity (§5.2) — excluded from EOD noise by
+  // default; set to 5 to stop filtering by level.
+  eodMinCrisisLevel: 4,
+  eodExcludedStatuses: ['Closed', 'Pending Endorsement'],
+  eodSchedulerEnabled: true,
 };
 
 // ── Default seed data (FSD-aligned) ────────────────────────────────────────────
@@ -166,7 +199,7 @@ export const DEFAULT_BROADCAST_TEMPLATES: BroadcastTemplate[] = [
 // templateId points at the seeded template for that broadcast type. Every rule
 // (seed and admin-created) now names one explicitly — the old category+incidentType
 // "auto-select" fallback was removed the same day templateId became mandatory in
-// the admin UI (Phương án B → mandatory, 2026-07-25).
+// the admin UI (Option B → mandatory, 2026-07-25).
 //
 // NOTE: resolveMatrixRule() now scopes by `broadcastType` (2026-07-25 fix — see
 // comment on resolveMatrixRule in broadcast.ts) so that a Closure rule's templateId
@@ -186,6 +219,13 @@ export const DEFAULT_BROADCAST_MATRIX: BroadcastMatrixRule[] = [
   { id: 'mat-eod-l3', crisisLevels: ['Level 3'], broadcastType: 'End-of-Day Interim Broadcast', incidentTypes: ['Any'], recipientGroups: ['SDC Crisis Command'], deliveryChannels: ['Email', 'Push Notification'], templateId: 'tpl-eod', status: 'Active' },
   { id: 'mat-eod-l4', crisisLevels: ['Level 4'], broadcastType: 'End-of-Day Interim Broadcast', incidentTypes: ['Any'], recipientGroups: ['Beach Operators & F&B Tenants'], deliveryChannels: ['Email'], templateId: 'tpl-eod', status: 'Active' },
   { id: 'mat-eod-l5', crisisLevels: ['Level 5'], broadcastType: 'End-of-Day Interim Broadcast', incidentTypes: ['Any'], recipientGroups: ['Beach Operators & F&B Tenants'], deliveryChannels: ['Email'], templateId: 'tpl-eod', status: 'Active' },
+  // Weather Advisory Broadcast (2026-07-26, Phase 3 gap G1) — previously had NO
+  // matrix rule at all, so resolveMatrixRule() always returned undefined and every
+  // "Weather Advisory" broadcast went out with 0 pre-filled recipients regardless
+  // of what was configured in Admin. Island-wide notice, not tied to a single
+  // incident's crisis level/type, so this rule is scoped 'Any'/'Any' and fires
+  // for any crisisLevel resolveWeatherBroadcast() is called with.
+  { id: 'mat-weather-1', crisisLevels: ['Any'], broadcastType: 'Weather Advisory Broadcast', incidentTypes: ['Any'], recipientGroups: ['Beach Operators & F&B Tenants', 'Sentosa Cove Residents'], deliveryChannels: ['Email'], templateId: 'tpl-weather', status: 'Active' },
 ];
 
 // FSD §10.2 delivery channels: Email + Push Notification. (SMS is reserved for
@@ -224,9 +264,20 @@ export interface NotificationRecord {
 // a new call site; it can't be created purely through this admin UI. Scoped to
 // exactly these 2 values for v1 (Kyle, 2026-07-25) — Weather Advisory has no
 // dispatch trigger yet, and Crisis Recall (§11) is a separate module out of scope.
+//
+// 'media_present_confirmed' added 2026-07-26 (Phase 3, gap G10) — §10.8 requires
+// the system to "prompt the Controller to notify the SDC Communications team by
+// broadcast" when media presence is confirmed at scene. Previously this only
+// appended a plain incident.log line with no in-app signal to anyone. Scoped to a
+// PROMPT only (not a full auto-queued broadcast type/template/matrix — that would
+// need a 4th BroadcastType wired through broadcastFields.ts's per-type field
+// catalog and a new distribution group, which is more admin-config surface than
+// this pass covers) — the Controller still creates the actual SDC Communications
+// broadcast manually via New Broadcast, same as any other ad-hoc broadcast.
 export type BroadcastPromptTrigger =
   | 'closure_broadcast_queued'   // incidents/[...id] action `close`, when the C1 gate is required
-  | 'eod_broadcast_queued';      // cron/eod-broadcast, when >=1 incident is queued into the EOD review
+  | 'eod_broadcast_queued'       // cron/eod-broadcast, when >=1 incident is queued into the EOD review
+  | 'media_present_confirmed';   // incidents/[...id] PUT/`update-fields`, when mediaInvolvement.commsNotified flips to true
 
 export interface BroadcastActionPromptRule {
   id: string;
@@ -257,6 +308,14 @@ export const DEFAULT_BROADCAST_PROMPT_RULES: BroadcastActionPromptRule[] = [
     triggerEvent: 'eod_broadcast_queued',
     recipientRoles: ['Duty Manager'],
     description: 'Fires when the End-of-Day cutover job queues one or more open incidents into the interim broadcast review queue (FSD §5.11.2 / §10.7). Notifies the Duty Manager to review and dispatch.',
+    status: 'Active',
+  },
+  {
+    id: 'prompt-media',
+    name: 'SDC Communications Notification Prompt',
+    triggerEvent: 'media_present_confirmed',
+    recipientRoles: ['Controller'],
+    description: 'Fires when media presence at scene is confirmed (FSD §10.8). Prompts the Controller to notify the SDC Communications team by broadcast, including the incident and the media organisation present.',
     status: 'Active',
   },
 ];

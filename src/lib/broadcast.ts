@@ -46,7 +46,7 @@ function isWildcard(values: string[] | undefined): boolean {
 //
 // `broadcastType` is optional for backward compatibility with any existing caller
 // that doesn't pass one, but resolveClosureBroadcast/resolveEodBroadcast both pass
-// it (added 2026-07-25, Phương án B): without it, a Closure rule's `templateId`
+// it (added 2026-07-25, Option B): without it, a Closure rule's `templateId`
 // could otherwise leak into an End-of-Day resolution just because both share the
 // same crisis-level/incident-type shape — recipients/channels were already scoped
 // this way in intent (§10.6), this just makes template selection safe too.
@@ -97,7 +97,7 @@ export function resolveTemplate(
 }
 
 // Look up a template by id, honouring the Active-only rule (used when a Matrix
-// Rule names an exact templateId — Phương án B, 2026-07-25).
+// Rule names an exact templateId — Option B, 2026-07-25).
 export function resolveTemplateById(
   templates: BroadcastTemplate[],
   templateId: string | undefined
@@ -118,9 +118,31 @@ export interface ResolvedBroadcast {
   recipients: string[];
   templateUsed: string;
   templateId?: string;
+  matrixRuleId?: string;
   content: string;
+  subject: string;
   recipientGroups: string[];
   channels: string[];
+  // Set when NOTHING matched — no rule, or the matched rule's group(s) resolved to
+  // 0 active members. Populated with a human-readable "what was tried" string so
+  // the record (and its UI badge) can explain the gap instead of silently showing
+  // "0 recipients" (fixes G15).
+  resolutionWarning?: string;
+}
+
+// Shared by resolveClosureBroadcast/resolveEodBroadcast/resolveWeatherBroadcast —
+// builds the resolutionWarning message when recipients come back empty (G15).
+function buildResolutionWarning(opts: {
+  broadcastType: string;
+  incidentType?: string;
+  crisisLevel: string;
+  rule?: BroadcastMatrixRule;
+}): string {
+  const { broadcastType, incidentType, crisisLevel, rule } = opts;
+  if (!rule) {
+    return `No Broadcast Matrix rule matched (type "${broadcastType}", incident type "${incidentType || 'N/A'}", ${crisisLevel}). Add or activate a matching rule in Broadcast Matrix.`;
+  }
+  return `Matrix rule "${rule.id}" matched but resolved to 0 active recipients — its recipient group(s) (${(rule.recipientGroups || []).join(', ') || 'none configured'}) may be empty or Deactivated.`;
 }
 
 export function resolveClosureBroadcast(input: {
@@ -140,7 +162,7 @@ export function resolveClosureBroadcast(input: {
     broadcastType: 'Closure Broadcast',
   });
   const recipients = resolveGroupEmails(groups, rule?.recipientGroups);
-  // Phương án B (2026-07-25): a Matrix Rule may name an exact template. Prefer
+  // Option B (2026-07-25): a Matrix Rule may name an exact template. Prefer
   // that over the category+incidentType guess when the rule sets one.
   const template =
     resolveTemplateById(templates, rule?.templateId) ||
@@ -169,14 +191,25 @@ export function resolveClosureBroadcast(input: {
         `Incident ID: ${incident?.id}`,
         `Title: ${incident?.title}`,
       ].join('\n');
+  // §10.4b/G4 — template.subject was defined but never rendered/used; dispatch
+  // hardcoded "[SDC] {type} Broadcast — {id}" instead, so recipients saw a subject
+  // line unrelated to the configured template. Render it the same way as the body.
+  const subject = template
+    ? renderTemplate(template.subject, vars)
+    : `[SDC] Incident Closed: ${incident?.title || caseId}`;
 
   return {
     recipients,
     templateUsed: template?.name || 'Closure Broadcast Template',
     templateId: template?.id,
+    matrixRuleId: rule?.id,
     content,
+    subject,
     recipientGroups: rule?.recipientGroups || [],
     channels: rule?.deliveryChannels || ['Email'],
+    resolutionWarning: recipients.length === 0
+      ? buildResolutionWarning({ broadcastType: 'Closure Broadcast', incidentType: incident?.type, crisisLevel: levelKey, rule })
+      : undefined,
   };
 }
 
@@ -184,6 +217,27 @@ export function resolveClosureBroadcast(input: {
 // The mock email gateway marks everything "sent"; a real gateway would update these.
 export function initialDeliveryCounts(recipientCount: number) {
   return { sent: recipientCount, delivered: 0, failed: 0, pending: 0 };
+}
+
+// Roll BroadcastRecord.recipientStatus (real per-recipient state, written back
+// from emailMock's lifecycle — see /api/broadcasts/[...id]/delivery) up into the
+// same {sent, delivered, failed, pending} shape the UI already reads. Replaces
+// the old behaviour of freezing deliveryCounts at dispatch time and never
+// touching it again (fixes G11 — "delivered 0" forever).
+export function rollupDeliveryCounts(
+  recipientStatus: { status: 'Queued' | 'Sent' | 'Delivered' | 'Failed' }[] | undefined
+): { sent: number; delivered: number; failed: number; pending: number } {
+  const list = recipientStatus || [];
+  return list.reduce(
+    (acc, r) => {
+      if (r.status === 'Delivered') acc.delivered++;
+      else if (r.status === 'Failed') acc.failed++;
+      else if (r.status === 'Sent') acc.sent++;
+      else acc.pending++;
+      return acc;
+    },
+    { sent: 0, delivered: 0, failed: 0, pending: 0 }
+  );
 }
 
 // Resolve the default recipient list + template + rendered content for an
@@ -207,7 +261,7 @@ export function resolveEodBroadcast(input: {
     broadcastType: 'End-of-Day Interim Broadcast',
   });
   const recipients = resolveGroupEmails(groups, rule?.recipientGroups);
-  // Phương án B (2026-07-25): prefer the Matrix Rule's exact template if set.
+  // Option B (2026-07-25): prefer the Matrix Rule's exact template if set.
   const template =
     resolveTemplateById(templates, rule?.templateId) ||
     resolveTemplate(templates, { category: 'End-of-Day Interim Broadcast' });
@@ -234,14 +288,74 @@ export function resolveEodBroadcast(input: {
         `Title: ${incident?.title}`,
         `Status: ${incident?.status}`,
       ].join('\n');
+  const subject = template
+    ? renderTemplate(template.subject, vars)
+    : `[SDC] End-of-Day Interim Update: ${incident?.title || caseId}`;
 
   return {
     recipients,
     templateUsed: template?.name || 'End-of-Day Interim Broadcast',
     templateId: template?.id,
+    matrixRuleId: rule?.id,
     content,
+    subject,
     recipientGroups: rule?.recipientGroups || [],
     channels: rule?.deliveryChannels || ['Email'],
+    resolutionWarning: recipients.length === 0
+      ? buildResolutionWarning({ broadcastType: 'End-of-Day Interim Broadcast', incidentType: incident?.type, crisisLevel: levelKey, rule })
+      : undefined,
+  };
+}
+
+// Resolve the default recipient list + template + rendered content for a Weather
+// Advisory Broadcast (§10.1). Unlike Closure/EOD this isn't tied to one incident's
+// crisis level — it's an island-wide advisory a Duty Officer initiates manually
+// (§10.1d), so callers pass free-form vars (location/summary/time) instead of an
+// incident object, and crisisLevel defaults to a wildcard match (2026-07-26,
+// Phase 3, fixes gap G1 — previously there was no resolver for this broadcast type
+// at all, so "Weather Advisory" in the New Broadcast modal produced an empty shell
+// that ignored the configured template/matrix entirely).
+export function resolveWeatherBroadcast(input: {
+  vars: { location?: string; summary?: string; time?: string };
+  groups: DistributionGroup[];
+  templates: BroadcastTemplate[];
+  matrix: BroadcastMatrixRule[];
+}): ResolvedBroadcast {
+  const { vars: inputVars, groups, templates, matrix } = input;
+
+  const rule = resolveMatrixRule(matrix, {
+    crisisLevel: 'Any',
+    broadcastType: 'Weather Advisory Broadcast',
+  });
+  const recipients = resolveGroupEmails(groups, rule?.recipientGroups);
+  const template =
+    resolveTemplateById(templates, rule?.templateId) ||
+    resolveTemplate(templates, { category: 'Weather Advisory Broadcast' });
+
+  const vars: Record<string, string | undefined> = {
+    location: inputVars.location || 'Sentosa Island',
+    summary: inputVars.summary || 'N/A',
+    time: inputVars.time || new Date().toISOString(),
+    incident_title: 'Weather Advisory',
+  };
+
+  const content = template
+    ? renderTemplate(template.body, vars)
+    : ['WEATHER ADVISORY', '', vars.summary].join('\n');
+  const subject = template ? renderTemplate(template.subject, vars) : '[SDC] Weather Advisory';
+
+  return {
+    recipients,
+    templateUsed: template?.name || 'Weather Advisory Broadcast',
+    templateId: template?.id,
+    matrixRuleId: rule?.id,
+    content,
+    subject,
+    recipientGroups: rule?.recipientGroups || [],
+    channels: rule?.deliveryChannels || ['Email'],
+    resolutionWarning: recipients.length === 0
+      ? buildResolutionWarning({ broadcastType: 'Weather Advisory Broadcast', crisisLevel: 'Any', rule })
+      : undefined,
   };
 }
 
@@ -249,12 +363,84 @@ export function resolveEodBroadcast(input: {
 // An incident is eligible for the interim broadcast queue if it is still open at
 // EOD cutover. "Open" = not Closed and not already Pending Endorsement/awaiting
 // endorsement. Exact criteria are TBC in FSD (§15.3) — kept behind this predicate.
-const OPEN_STATUSES_EXCLUDED = ['Closed', 'Pending Endorsement'];
-export function isEodEligible(incident: any): boolean {
+//
+// 2026-07-26 (Phase 0, gap G9): previously ONLY checked status, with the excluded
+// list hardcoded here — every Informational/Exercise incident and every Level 5
+// false alarm queued right alongside genuine open incidents, because the C1 gate
+// used for Closure broadcasts (isClosureBroadcastRequired, driven by category) was
+// never applied to the EOD path. Now takes the same BroadcastConfig the Closure
+// gate uses, so both paths agree on what actually needs broadcast handling.
+// `config` is optional (defaults to DEFAULT_BROADCAST_CONFIG) so existing callers
+// that don't pass one keep working, but every real call site should pass the
+// live config from broadcastStore.
+export function isEodEligible(incident: any, config?: BroadcastConfig): boolean {
   if (!incident) return false;
-  return !OPEN_STATUSES_EXCLUDED.includes(incident.status);
+  const cfg = config || DEFAULT_BROADCAST_CONFIG;
+  if (cfg.eodExcludedStatuses.includes(incident.status)) return false;
+  if (cfg.eodExcludedCategories.includes(incident.category)) return false;
+  const level = typeof incident.crisisLevel === 'number' ? incident.crisisLevel : 4; // §5.2d default
+  if (level > cfg.eodMinCrisisLevel) return false; // level 5 excluded when eodMinCrisisLevel=4, etc.
+  return true;
 }
 
-export function buildEodCandidates(incidents: any[]): any[] {
-  return (incidents || []).filter(isEodEligible);
+export function buildEodCandidates(incidents: any[], config?: BroadcastConfig): any[] {
+  return (incidents || []).filter((i) => isEodEligible(i, config));
+}
+
+// ── Broadcast ID generation (fixes bug B4) ─────────────────────────────────────
+// The old `db.broadcasts.filter(b => b.caseId === caseId).length + 1` pattern used
+// at all 3 creation call sites breaks in two ways: (1) deleting any broadcast for
+// that case shifts every subsequent ID down, producing a collision with an ID that
+// already exists; (2) two near-simultaneous creations (e.g. the EOD cron firing
+// while a Controller manually creates a broadcast) can both read the same `length`
+// and both produce the same next ID. Parsing the max sequence actually present is
+// not a full fix for true concurrent writes (that needs a DB-level unique index /
+// transaction, which this prototype's Mongo layer doesn't set up for any
+// collection), but it removes the far more common "gap from a deleted record"
+// failure mode and is at least stable across repeated calls in the same tick.
+export function nextBroadcastId(broadcasts: { id: string; caseId: string }[], caseId: string): string {
+  const prefix = `${caseId}-BC`;
+  let maxSeq = 0;
+  for (const b of broadcasts) {
+    if (b.caseId !== caseId || !b.id.startsWith(prefix)) continue;
+    const seq = parseInt(b.id.slice(prefix.length), 10);
+    if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
+  }
+  return `${prefix}${String(maxSeq + 1).padStart(3, '0')}`;
+}
+
+// Standalone (caseless) broadcast ID — Weather Advisory and any other manual
+// broadcast not tied to a Case (§10.1d, fixes bug B6: manual broadcast creation
+// used to hard-require caseId). Sequenced per calendar day: SEN/BC/YYYYMMDD/###.
+export function nextStandaloneBroadcastId(broadcasts: { id: string }[], date = new Date()): string {
+  const ymd = date.toISOString().slice(0, 10).replace(/-/g, '');
+  const prefix = `SEN/BC/${ymd}/`;
+  let maxSeq = 0;
+  for (const b of broadcasts) {
+    if (!b.id.startsWith(prefix)) continue;
+    const seq = parseInt(b.id.slice(prefix.length), 10);
+    if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
+  }
+  return `${prefix}${String(maxSeq + 1).padStart(3, '0')}`;
+}
+
+// The calendar-day key (Duty Manager's "today") an End-of-Day broadcast belongs
+// to — used as BroadcastRecord.eodDate, the idempotency key for the cron (fixes
+// bug B1) and the axis the EOD review tab's day navigator runs on.
+export function todayDateStr(d = new Date()): string {
+  return d.toISOString().slice(0, 10);
+}
+
+// Broadcast IDs contain literal `/` (e.g. SEN/CI/20260621/002-BC001) since they're
+// derived from Case IDs. When building a PATH to a catch-all route
+// (/broadcasts/[...id], /api/broadcasts/[...id]) each segment must be encoded
+// individually and rejoined with literal slashes — encoding the whole ID at once
+// (encodeURIComponent(id)) turns the separators into %2F, which Next's router
+// treats as part of a single segment instead of a path boundary, so the catch-all
+// route never recombines it back to the original ID. This mirrors the existing
+// `fault.id.split('/').map(encodeURIComponent).join('/')` pattern already used in
+// FaultLogTab.tsx/faults/[...id]/page.tsx for the same reason. NOT for query
+// string values (`?id=...`) — encodeURIComponent(id) there is correct as-is.
+export function encodeIdPath(id: string): string {
+  return id.split('/').map(encodeURIComponent).join('/');
 }

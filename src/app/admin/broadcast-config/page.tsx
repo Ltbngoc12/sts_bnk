@@ -37,6 +37,7 @@ import type {
   BroadcastPromptTrigger,
 } from '@/lib/broadcastConfig';
 import { getIncidentTaxonomy } from '@/lib/taxonomy';
+import { INCIDENT_CATEGORIES } from '@/lib/incidentCategory';
 import type { DistributionGroup } from '@/lib/groups';
 
 type TabKey = 'Template' | 'Matrix' | 'EOD' | 'PromptRules';
@@ -45,8 +46,9 @@ const ANY = 'Any';
 const TRIGGER_LABELS: Record<BroadcastPromptTrigger, string> = {
   closure_broadcast_queued: 'Closure Broadcast Queued (Incident closed, broadcast required)',
   eod_broadcast_queued: 'End-of-Day Broadcast Queued (interim queue built)',
+  media_present_confirmed: 'Media Presence Confirmed (§10.8 — notify SDC Communications)',
 };
-const TRIGGER_OPTIONS: BroadcastPromptTrigger[] = ['closure_broadcast_queued', 'eod_broadcast_queued'];
+const TRIGGER_OPTIONS: BroadcastPromptTrigger[] = ['closure_broadcast_queued', 'eod_broadcast_queued', 'media_present_confirmed'];
 
 function genId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
@@ -702,6 +704,8 @@ function MatrixTab({
 
 // ── Tab 3: End-of-Day Broadcast Timing ─────────────────────────────────────────
 
+const EOD_EXCLUDABLE_STATUSES = ['Live', 'Live (Assigned)', 'Pending Endorsement', 'Returned', 'Closed'];
+
 function EodTimingTab({
   config,
   setConfig,
@@ -712,35 +716,92 @@ function EodTimingTab({
   logAudit: (action: string, before: any, after: any, details: string) => Promise<void>;
 }) {
   const [time, setTime] = useState(config.endOfDayTime);
+  // 2026-07-26 (Phase 0/3, gap G9/G8) — these three used to be hardcoded
+  // (OPEN_STATUSES_EXCLUDED in broadcast.ts) with no admin control at all, so the
+  // EOD queue picked up every Informational/Exercise incident and every Level 5
+  // false alarm regardless of what anyone wanted. Exposed here so an admin can
+  // tune them without a code change. eodSchedulerEnabled backs the lazy-trigger
+  // on the End-of-Day Interim tab (no external scheduler in this deployment).
+  const [excludedCategories, setExcludedCategories] = useState<string[]>(config.eodExcludedCategories || []);
+  const [minLevel, setMinLevel] = useState<number>(config.eodMinCrisisLevel ?? 4);
+  const [excludedStatuses, setExcludedStatuses] = useState<string[]>(config.eodExcludedStatuses || []);
+  const [schedulerEnabled, setSchedulerEnabled] = useState<boolean>(config.eodSchedulerEnabled ?? true);
 
-  useEffect(() => setTime(config.endOfDayTime), [config.endOfDayTime]);
+  useEffect(() => {
+    setTime(config.endOfDayTime);
+    setExcludedCategories(config.eodExcludedCategories || []);
+    setMinLevel(config.eodMinCrisisLevel ?? 4);
+    setExcludedStatuses(config.eodExcludedStatuses || []);
+    setSchedulerEnabled(config.eodSchedulerEnabled ?? true);
+  }, [config]);
+
+  const toggle = (list: string[], value: string, set: (v: string[]) => void) => {
+    set(list.includes(value) ? list.filter((x) => x !== value) : [...list, value]);
+  };
 
   const handleSave = async () => {
     const before = config;
-    const after: BroadcastConfig = { ...config, endOfDayTime: time };
+    const after: BroadcastConfig = {
+      ...config,
+      endOfDayTime: time,
+      eodExcludedCategories: excludedCategories,
+      eodMinCrisisLevel: minLevel,
+      eodExcludedStatuses: excludedStatuses,
+      eodSchedulerEnabled: schedulerEnabled,
+    };
     setConfig(after);
     await fetch('/api/admin/broadcast-config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(after),
     });
-    await logAudit('Update End-of-Day Timing', before, after, `Set end-of-day broadcast timing to ${time}`);
-    alert('End-of-day timing saved.');
+    await logAudit('Update End-of-Day Timing', before, after, `Set end-of-day broadcast timing to ${time}, min crisis level ${minLevel}, excluded categories [${excludedCategories.join(', ')}], excluded statuses [${excludedStatuses.join(', ')}]`);
   };
 
   return (
-    <div className="glass" style={{ padding: '20px', background: 'var(--bg-card)', marginTop: '12px', maxWidth: '480px' }}>
+    <div className="glass" style={{ padding: '20px', background: 'var(--bg-card)', marginTop: '12px', maxWidth: '560px' }}>
       <h2 style={{ fontFamily: 'var(--font-headline)', fontSize: '14px', marginBottom: '8px', color: 'var(--text-main)', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
-        END-OF-DAY BROADCAST TIMING
+        END-OF-DAY BROADCAST TIMING &amp; ELIGIBILITY
       </h2>
       <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginBottom: '16px' }}>
-        Defines the time at which open Incidents are surfaced in the Duty Manager&apos;s end-of-day interim broadcast queue.
+        Defines the time at which open Incidents are surfaced in the Duty Manager&apos;s end-of-day interim broadcast queue, and which incidents are eligible at all (§5.1.2 — Informational/Exercise incidents and Level 5 occurrences don&apos;t require broadcast handling by default).
       </p>
       <FormField label="Cutover Time (24h)">
         <input type="time" value={time} onChange={(e) => setTime(e.target.value)} style={inputStyle} />
       </FormField>
+      <FormField label="Minimum crisis level queued (1 = most severe, 5 = queue everything)">
+        <select value={minLevel} onChange={(e) => setMinLevel(parseInt(e.target.value, 10))} style={inputStyle}>
+          {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>Level {n} and more severe{n < 5 ? ' (excludes less severe levels)' : ' (no level filter)'}</option>)}
+        </select>
+      </FormField>
+      <FormField label="Excluded incident categories">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {INCIDENT_CATEGORIES.map((cat) => (
+            <label key={cat} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, cursor: 'pointer' }}>
+              <input type="checkbox" checked={excludedCategories.includes(cat)} onChange={() => toggle(excludedCategories, cat, setExcludedCategories)} />
+              {cat}
+            </label>
+          ))}
+        </div>
+      </FormField>
+      <FormField label="Excluded incident statuses">
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 14px' }}>
+          {EOD_EXCLUDABLE_STATUSES.map((st) => (
+            <label key={st} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, cursor: 'pointer' }}>
+              <input type="checkbox" checked={excludedStatuses.includes(st)} onChange={() => toggle(excludedStatuses, st, setExcludedStatuses)} />
+              {st}
+            </label>
+          ))}
+        </div>
+      </FormField>
+      <FormField label="Automatic scheduling">
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, cursor: 'pointer' }}>
+          <input type="checkbox" checked={schedulerEnabled} onChange={(e) => setSchedulerEnabled(e.target.checked)} />
+          Auto-run the check once cutover has passed (lazy-trigger from the End-of-Day Interim tab)
+        </label>
+      </FormField>
       <div style={{ background: 'var(--bg-inset)', padding: '12px 14px', borderRadius: '8px', borderLeft: '3px solid var(--color-primary)', fontSize: '12px', color: 'var(--text-muted)', marginTop: '14px', lineHeight: 1.5 }}>
-        This time takes effect once a scheduler is configured to call <code>/api/cron/eod-broadcast</code> at the configured cutover — until then, the job can be run on demand from the &quot;Run End-of-Day Check Now&quot; button on the Duty Manager&apos;s End-of-Day Review page.
+        This deployment has no external scheduler (plain Next.js dev/prod server, no Vercel Cron config) — the End-of-Day Interim tab lazy-triggers <code>/api/cron/eod-broadcast</code> once cutover has passed for the day, or it can be run on demand from the &quot;⟳ Re-run check&quot; button there.
       </div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>
         <button onClick={handleSave} className="btn btn-primary" style={{ padding: '8px 16px', borderRadius: '6px', background: 'var(--color-primary-dark)', border: 'none', color: '#fff' }}>Save</button>

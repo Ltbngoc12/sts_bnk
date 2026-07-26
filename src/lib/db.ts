@@ -391,7 +391,7 @@ export interface NOPRecord {
 }
 
 export interface BroadcastRecord {
-  id: string; // [Case ID]-BC[3-digit sequence]
+  id: string; // [Case ID]-BC[3-digit sequence], or SEN/BC/YYYYMMDD/### when caseless (§10.1d)
   caseId: string;
   incidentId: string;
   type: string; // "Closure" | "End-of-Day" | "Weather Advisory" | "Manual"
@@ -400,7 +400,7 @@ export interface BroadcastRecord {
   contentDispatched: string;
   sentAt: string;
   sentBy: string;
-  status: string; // "PENDING" | "SENT" | "FAILED" | "REJECTED"
+  status: string; // "PENDING" | "SENT" | "FAILED" | "REJECTED" (REJECTED is legacy-only, see broadcastStore note)
   deliveryAttempts: number;
   lastErrorMessage?: string;
   // FSD §10.9d-e — per-status delivery breakdown + acknowledgement counts.
@@ -420,6 +420,61 @@ export interface BroadcastRecord {
   // for why). The gate itself is computed server-side at dispatch time by comparing
   // the submitted content against contentDispatched as it stood before this call.
   contentEditConfirmed?: boolean;
+
+  // ── Added 2026-07-26 (BROADCAST_MODULE_FSD_GAP_AND_UIUX_PLAN.md, Phase 0) ──────
+  // Previously resolved at queue time (broadcast.ts ResolvedBroadcast) then thrown
+  // away — only a bare recipient email list and the template's *name* survived.
+  // Persisting these closes gap G5 (§10.3/§10.9b: record must carry which group and
+  // exactly which rule/template routed it, not just a snapshot of emails) and lets
+  // the UI show "Group: SDC Crisis Command" instead of a bare comma list.
+  recipientGroups?: string[];      // DistributionGroup.name[] resolved at queue time
+  matrixRuleId?: string;           // BroadcastMatrixRule.id that resolved this record
+  templateId?: string;             // BroadcastTemplate.id (templateUsed keeps the *name* for display)
+  subject?: string;                // rendered from BroadcastTemplate.subject (fixes G4 — was hardcoded)
+  // Rendered default content AS OF QUEUE TIME, kept forever even after a Duty
+  // Manager/Controller edits contentDispatched before dispatch. Without this,
+  // §10.4d's "content edited beyond default" confirmation had nothing to diff
+  // against after dispatch — the original default was overwritten and lost
+  // (gap G6). contentDispatched remains "what was actually sent"; contentDefault
+  // is "what the template would have produced".
+  contentDefault?: string;
+  crisisLevel?: string;            // snapshot "Level N" — table/filter column, avoids re-joining the incident
+  incidentType?: string;
+  incidentSubType?: string;
+  incidentTitle?: string;          // snapshot — incident title may itself change/be redacted later
+
+  // createdAt is the record's actual creation time, distinct from sentAt/dispatchedAt
+  // which are null/undefined for PENDING records. Without this, filtering broadcasts
+  // by a date range hid 100% of the PENDING queue and the default list sort buried
+  // pending work under already-sent records (gap G14 — the "43 pending records
+  // disappear when you filter by month" bug). Optional only for pre-2026-07-26 Mongo
+  // rows that predate this field; getBroadcastRecordCreatedAt() in broadcast.ts
+  // supplies a best-effort fallback for those.
+  createdAt?: string;              // ISO — set at push time by every creation call site
+  queuedBy?: string;                // 'system' for cron/closure auto-queue, username for manual (§10.9b)
+
+  // §10.7/B1 — the calendar night (Duty Manager's local "today", YYYY-MM-DD) an
+  // End-of-Day record belongs to. This is what makes "leave it PENDING" a valid
+  // substitute for a Reject action (Kyle, 2026-07-26, decision D6): a record whose
+  // eodDate has passed and is still PENDING simply reads as "not sent that night" —
+  // no separate REJECTED status, no reason field, no carry-over into the next
+  // night's queue. Also the idempotency key for the EOD cron (fixes bug B1 — the
+  // old guard only checked status==='PENDING', so re-running the check after a
+  // dispatch created a second record for the same incident/night).
+  eodDate?: string;
+
+  // §10.3c/G15 — set when resolveClosureBroadcast/resolveEodBroadcast couldn't find
+  // ANY matching Broadcast Matrix rule (or the matched group had 0 active members),
+  // so recipients came back empty. Previously a 0-recipient PENDING record just sat
+  // there silently, forever undispatchable, with no signal to anyone that it was a
+  // config gap rather than a deliberate empty list.
+  resolutionWarning?: string;
+
+  // §10.9d-e — real per-recipient delivery status, sourced from emailMock's
+  // Queued→Sent→Delivered→Failed lifecycle via a write-back poll. deliveryCounts
+  // above is now a ROLLUP computed from this array, not a frozen snapshot (fixes
+  // G11 — "delivered 0" forever, even days after a successful send).
+  recipientStatus?: { email: string; status: 'Queued' | 'Sent' | 'Delivered' | 'Failed'; at?: string; error?: string }[];
 }
 
 export interface AuditLog {
