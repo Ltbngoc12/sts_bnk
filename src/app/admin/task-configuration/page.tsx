@@ -8,7 +8,7 @@
 // and audit module names — only the admin UI/navigation is consolidated. The
 // group member detail drill-down moved to /admin/task-configuration/groups/[id].
 
-import React, { useState, useEffect } from 'react';
+import React, { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AdminGuard } from '@/components/AdminGuard';
 import { useRole } from '@/context/RoleContext';
@@ -23,7 +23,7 @@ import { DistributionGroup, DEFAULT_GROUPS, GROUPS_STORAGE_KEY } from '@/lib/gro
 
 type TabKey = 'templates' | 'distribution';
 
-export default function TaskConfigurationPage() {
+function TaskConfigurationPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { username } = useRole();
@@ -478,5 +478,13 @@ export default function TaskConfigurationPage() {
         </div>
       )}
     </AdminGuard>
+  );
+}
+
+export default function TaskConfigurationPage() {
+  return (
+    <Suspense fallback={<div style={{ padding: 40 }}>Loading…</div>}>
+      <TaskConfigurationPageInner />
+    </Suspense>
   );
 }
