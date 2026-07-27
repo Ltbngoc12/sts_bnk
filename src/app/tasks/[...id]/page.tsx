@@ -3,17 +3,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { Task, TaskChecklistItem } from '@/lib/db';
+import { Task, TaskChecklistItem, TaskAssignee } from '@/lib/db';
 import { useRole } from '@/context/RoleContext';
 import { useNotifications } from '@/context/NotificationContext';
 import {
   taskBadgeClass,
   isControllerPlus,
-  getAssignableUsers,
-  getAssignableGroups,
+  getTaskAssignees,
+  isTaskAssignee,
 } from '@/lib/taskHelpers';
 import { getUsers } from '@/lib/users';
 import { getTaskPriorityTaxonomy } from '@/lib/taxonomy';
+import TaskAssigneeSelect from '@/components/TaskAssigneeSelect';
 
 export default function TaskDetailPage() {
   const params = useParams();
@@ -29,8 +30,7 @@ export default function TaskDetailPage() {
   const [busy, setBusy] = useState(false);
 
   // Reassign / assign
-  const [assignTarget, setAssignTarget] = useState('');
-  const [assignType, setAssignType] = useState<'user' | 'group'>('user');
+  const [assignTargets, setAssignTargets] = useState<TaskAssignee[]>([]);
   const [reassigning, setReassigning] = useState(false);
 
   // Comment
@@ -86,37 +86,39 @@ export default function TaskDetailPage() {
   }, []);
 
   const canControl = isControllerPlus(role);
-  const isAssignee =
-    !!task &&
-    (username === task.assignee ||
-      (task.assigneeType === 'group' && role === 'Responder (Ranger)'));
+  const isAssignee = !!task && isTaskAssignee(getTaskAssignees(task), username);
   const isRanger = role === 'Responder (Ranger)';
 
   // A ranger who is not the assignee has no access (per spec decision).
   const noAccess = !!task && isRanger && !isAssignee;
 
-  function notifyAssignee(targetName: string, targetType: 'user' | 'group', verb: string) {
-    if (targetType === 'group') {
-      addNotification({
-        title: `Task ${verb}`,
-        message: `Task "${task?.title}" ${verb.toLowerCase()} to group ${targetName}.`,
-        role: 'Responder (Ranger)',
-        type: 'task',
-        link: `/tasks/${taskId}`,
-      });
-    } else {
-      const u = getUsers().find(x => x.name === targetName);
-      const targetRole =
-        u?.role === 'Responder' ? 'Responder (Ranger)' :
-        (u?.role as any) || 'Responder (Ranger)';
-      addNotification({
-        title: `Task ${verb}`,
-        message: `Task "${task?.title}" ${verb.toLowerCase()} to you.`,
-        role: targetRole,
-        type: 'task',
-        link: `/tasks/${taskId}`,
-      });
-    }
+  function notifyAssignees(targets: TaskAssignee[], verb: string) {
+    const notifiedUsers = new Set<string>();
+    targets.forEach(t => {
+      if (t.type === 'group') {
+        addNotification({
+          title: `Task ${verb}`,
+          message: `Task "${task?.title}" ${verb.toLowerCase()} to group ${t.name}.`,
+          role: 'Responder (Ranger)',
+          type: 'task',
+          link: `/tasks/${taskId}`,
+        });
+      } else {
+        if (notifiedUsers.has(t.name)) return;
+        notifiedUsers.add(t.name);
+        const u = getUsers().find(x => x.name === t.name);
+        const targetRole =
+          u?.role === 'Responder' ? 'Responder (Ranger)' :
+          (u?.role as any) || 'Responder (Ranger)';
+        addNotification({
+          title: `Task ${verb}`,
+          message: `Task "${task?.title}" ${verb.toLowerCase()} to you.`,
+          role: targetRole,
+          type: 'task',
+          link: `/tasks/${taskId}`,
+        });
+      }
+    });
   }
 
   async function performAction(action: string, payload: Record<string, any> = {}) {
@@ -145,15 +147,15 @@ export default function TaskDetailPage() {
 
   // ─── Action handlers ──────────────────────────────────────────────
   const handleAssign = async () => {
-    if (!assignTarget) return;
-    const verb = task?.assignee && task.assignee !== 'Unassigned' ? 'Reassigned' : 'Assigned';
-    const ok = await performAction(task?.assignee && task.assignee !== 'Unassigned' ? 'reassign' : 'assign', {
-      assignee: assignTarget,
-      assigneeType: assignType,
+    if (assignTargets.length === 0) return;
+    const hadAssignee = !!task && getTaskAssignees(task).length > 0;
+    const verb = hadAssignee ? 'Reassigned' : 'Assigned';
+    const ok = await performAction(hadAssignee ? 'reassign' : 'assign', {
+      assignees: assignTargets,
     });
     if (ok) {
-      notifyAssignee(assignTarget, assignType, verb);
-      setAssignTarget('');
+      notifyAssignees(assignTargets, verb);
+      setAssignTargets([]);
       setReassigning(false);
     }
   };
@@ -255,9 +257,7 @@ export default function TaskDetailPage() {
     if (!reviewNote.trim()) return; // reason mandatory — assignee needs to know what to fix
     const ok = await performAction('reject-completion', { reviewNote });
     if (ok) {
-      if (task?.assignee && task.assignee !== 'Unassigned') {
-        notifyAssignee(task.assignee, task.assigneeType === 'group' ? 'group' : 'user', 'Returned');
-      }
+      if (task) notifyAssignees(getTaskAssignees(task), 'Returned');
       setShowReject(false);
       setReviewNote('');
     }
@@ -285,7 +285,9 @@ export default function TaskDetailPage() {
   // Recurrence / edge-case computed state
   const isRecurring = !!task.recurrence || !!task.seriesId;
   const overdue = !!task.dueDate && task.status !== 'Closed' && task.status !== 'Pending Closure' && new Date(task.dueDate).getTime() < Date.now();
-  const sameAssignee = assignType === 'user' && !!assignTarget && assignTarget === task.assignee;
+  const currentAssignees = getTaskAssignees(task);
+  const sameAssigneeKey = (list: TaskAssignee[]) => list.map(a => `${a.type}:${a.name}`).sort().join('|');
+  const sameAssignees = assignTargets.length > 0 && sameAssigneeKey(assignTargets) === sameAssigneeKey(currentAssignees);
 
   // Activity Log = system audit trail only (reverse-chronological)
   const auditFeed = (task.audits || [])
@@ -297,9 +299,6 @@ export default function TaskDetailPage() {
     .map(c => ({ ts: c.timestamp, operator: c.user, body: c.text, images: c.images || [] }))
     .sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
 
-  const assignableUsers = getAssignableUsers();
-  const assignableGroups = getAssignableGroups();
-
   const getInitials = (name: string) => {
     if (!name || name === 'Unassigned') return '?';
     return name
@@ -309,7 +308,6 @@ export default function TaskDetailPage() {
       .slice(0, 2)
       .toUpperCase();
   };
-  const assigneeInitials = getInitials(task.assignee || '');
   const checklistProgress = checklistTotal > 0 ? Math.round((checklistDone / checklistTotal) * 100) : 0;
 
   return (
@@ -469,7 +467,11 @@ export default function TaskDetailPage() {
                 <div className="td-meta">
                   <div className="td-meta-item">
                     <span>Assignee</span>
-                    <strong>{task.assignee}{task.assigneeType === 'group' ? ' (group)' : ''}</strong>
+                    <strong>
+                      {currentAssignees.length === 0
+                        ? 'Unassigned'
+                        : currentAssignees.map(a => `${a.name}${a.type === 'group' ? ' (group)' : ''}`).join(', ')}
+                    </strong>
                   </div>
                   <div className="td-meta-item">
                     <span>Priority</span>
@@ -683,15 +685,28 @@ export default function TaskDetailPage() {
           <div className="glass td-card">
             <div className="td-card-head"><h3>👤 ASSIGNEE</h3></div>
 
-            <div className="assignee-profile-card">
-              <div className="assignee-avatar-large">{assigneeInitials}</div>
-              <div className="assignee-info">
-                <p className="td-assignee-name">{task.assignee}</p>
-                <span className="td-assignee-badge">
-                  {task.assigneeType === 'group' ? 'Distribution Group' : 'Assigned Staff'}
-                </span>
+            {currentAssignees.length === 0 ? (
+              <div className="assignee-profile-card">
+                <div className="assignee-avatar-large">?</div>
+                <div className="assignee-info">
+                  <p className="td-assignee-name">Unassigned</p>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {currentAssignees.map(a => (
+                  <div className="assignee-profile-card" key={`${a.type}-${a.id}`} style={{ marginBottom: 0 }}>
+                    <div className="assignee-avatar-large">{getInitials(a.name)}</div>
+                    <div className="assignee-info">
+                      <p className="td-assignee-name">{a.name}</p>
+                      <span className="td-assignee-badge">
+                        {a.type === 'group' ? 'Distribution Group' : 'Assigned Staff'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {canControl && task.status !== 'Closed' && task.status !== 'Pending Closure' && (
               <div className="td-reassign">
@@ -699,30 +714,21 @@ export default function TaskDetailPage() {
                   <button
                     className="btn btn-secondary btn-sm"
                     style={{ width: '100%', marginTop: '12px' }}
-                    onClick={() => setReassigning(true)}
+                    onClick={() => { setAssignTargets(currentAssignees); setReassigning(true); }}
                   >
-                    {task.assignee && task.assignee !== 'Unassigned' ? 'Reassign' : 'Assign'}
+                    {currentAssignees.length > 0 ? 'Reassign' : 'Assign'}
                   </button>
                 ) : (
                   <>
-                    <h4>{task.assignee && task.assignee !== 'Unassigned' ? 'REASSIGN TASK' : 'ASSIGN TASK'}</h4>
-                    <div className="td-reassign-row" style={{ marginTop: '8px' }}>
-                      <select className="form-control select-dark" value={assignType} onChange={e => { setAssignType(e.target.value as any); setAssignTarget(''); }}>
-                        <option value="user">User</option>
-                        <option value="group">Group</option>
-                      </select>
-                      <select className="form-control select-dark" value={assignTarget} onChange={e => setAssignTarget(e.target.value)}>
-                        <option value="">-- Select {assignType} --</option>
-                        {assignType === 'user'
-                          ? assignableUsers.map(u => <option key={u.id} value={u.name}>{u.name} ({u.role})</option>)
-                          : assignableGroups.map(g => <option key={g.id} value={g.name}>{g.name}</option>)}
-                      </select>
+                    <h4>{currentAssignees.length > 0 ? 'REASSIGN TASK' : 'ASSIGN TASK'}</h4>
+                    <div style={{ marginTop: '8px' }}>
+                      <TaskAssigneeSelect value={assignTargets} onChange={setAssignTargets} label="" />
                     </div>
                     <div style={{ display: 'flex', gap: '8px', marginTop: '12px', justifyContent: 'flex-end' }}>
-                      <button className="btn btn-secondary btn-sm" onClick={() => { setReassigning(false); setAssignTarget(''); }}>Cancel</button>
-                      <button className="btn btn-primary btn-sm" disabled={busy || !assignTarget || sameAssignee} onClick={handleAssign}>Apply</button>
+                      <button className="btn btn-secondary btn-sm" onClick={() => { setReassigning(false); setAssignTargets([]); }}>Cancel</button>
+                      <button className="btn btn-primary btn-sm" disabled={busy || assignTargets.length === 0 || sameAssignees} onClick={handleAssign}>Apply</button>
                     </div>
-                    {sameAssignee && <p className="td-hint" style={{ marginTop: 8 }}>Already assigned to {task.assignee} — choose a different assignee.</p>}
+                    {sameAssignees && <p className="td-hint" style={{ marginTop: 8 }}>Already assigned to this same set — choose different assignees.</p>}
                   </>
                 )}
               </div>

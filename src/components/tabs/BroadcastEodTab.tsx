@@ -238,8 +238,7 @@ export function BroadcastEodTab() {
         </div>
         <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
           Cutover <b style={{ color: 'var(--text-main)' }}>{cutover}</b>
-          {lastRun && <> · last ran <b style={{ color: 'var(--text-main)' }}>{fmtDateTime(lastRun).slice(11)}</b></>}
-          {' · '}<b style={{ color: 'var(--text-main)' }}>{items.length}</b> incident{items.length === 1 ? '' : 's'}
+          {lastRun && <> · last ran <b style={{ color: 'var(--text-main)' }}>{fmtDdMm(lastRun.slice(0, 10))} {fmtDateTime(lastRun).slice(11)}</b></>}
         </div>
         {canDispatch && (
           <button type="button" onClick={runCheck} disabled={running} className="btn btn-secondary btn-sm">
@@ -260,9 +259,6 @@ export function BroadcastEodTab() {
             {notSentYetCount > 0 && <span><i style={{ width: 8, height: 8, borderRadius: '50%', display: 'inline-block', background: 'var(--color-high)', marginRight: 5 }} />{notSentYetCount} not sent yet <span style={{ color: 'var(--text-faint)', fontWeight: 500 }}>(night still open)</span></span>}
             {notSentCount > 0 && <span><i style={{ width: 8, height: 8, borderRadius: '50%', display: 'inline-block', background: 'var(--color-closed)', marginRight: 5 }} />{notSentCount} not sent</span>}
           </div>
-          <span className="cal" style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--color-primary-dark)', background: 'var(--color-primary-bg)', border: '1px dashed var(--color-primary-border)', padding: '5px 9px', borderRadius: 'var(--radius-sm)' }}>
-            No Reject button — once the night passes, unsent items automatically become &quot;Not Sent&quot;
-          </span>
         </div>
       )}
 

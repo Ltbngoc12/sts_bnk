@@ -1,5 +1,10 @@
 'use client';
 
+// Moved from /admin/distribution-groups/[id] (2026-07-27) when the Template and
+// Task Distribution pages were merged into /admin/task-configuration as tabs.
+// Data/store and API route are unchanged — only the admin UI route moved, so
+// back-links now point at /admin/task-configuration?tab=distribution.
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -238,7 +243,7 @@ export default function GroupMemberListPage() {
 
   if (loading) {
     return (
-      <AdminGuard pageTitle="Distribution Groups">
+      <AdminGuard pageTitle="Task Configuration">
         <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading group…</div>
       </AdminGuard>
     );
@@ -246,22 +251,22 @@ export default function GroupMemberListPage() {
 
   if (!selectedGroup) {
     return (
-      <AdminGuard pageTitle="Distribution Groups">
+      <AdminGuard pageTitle="Task Configuration">
         <div className="glass" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-critical)' }}>
           <p>Distribution group not found.</p>
-          <Link href="/admin/distribution-groups" style={{ color: 'var(--color-primary)', textDecoration: 'none', fontSize: '13px' }}>← Back to Distribution Groups</Link>
+          <Link href="/admin/task-configuration?tab=distribution" style={{ color: 'var(--color-primary)', textDecoration: 'none', fontSize: '13px' }}>← Back to Task Configuration</Link>
         </div>
       </AdminGuard>
     );
   }
 
   return (
-    <AdminGuard pageTitle="Distribution Groups">
+    <AdminGuard pageTitle="Task Configuration">
       <div className="admin-header-bar glass" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '16px 24px', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-card)' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px', flexWrap: 'wrap' }}>
-            <Link href="/admin/distribution-groups" style={{ color: 'var(--text-faint)', fontSize: '12px', textDecoration: 'none' }}>
-              ← Distribution Groups
+            <Link href="/admin/task-configuration?tab=distribution" style={{ color: 'var(--text-faint)', fontSize: '12px', textDecoration: 'none' }}>
+              ← Task Configuration
             </Link>
             <span style={{ color: 'var(--text-faint)', fontSize: '12px' }}>/</span>
             <span style={{ fontSize: '10px', fontWeight: 800, color: 'var(--color-primary-dark)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Group Member List</span>

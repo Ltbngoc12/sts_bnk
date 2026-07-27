@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getDb, saveDb, Task, TaskAudit, TaskChecklistItem, TaskComment, TASK_PRIORITIES } from '@/lib/db';
 import { tryAutoCloseCase } from '@/lib/autoclose';
+import { getTaskAssignees, deriveLegacyAssigneeFields, sanitizeAssignees } from '@/lib/taskHelpers';
+import { isTaskAssigneeServer } from '@/lib/taskAssigneeServer';
 
 const CONTROLLER_PLUS = [
   'Controller',
@@ -68,9 +70,10 @@ export async function PUT(
     const role: string = body.role || '';
 
     const canControl = isControllerPlus(role);
-    const isAssignee =
-      actor === task.assignee ||
-      (task.assigneeType === 'group' && role === 'Responder (Ranger)');
+    // Real membership check (Mongo-backed), not a role heuristic — any of the
+    // task's assignees, including any internal member of an assigned group,
+    // counts (FRD 7.2 — one shared task, multiple possible assignees).
+    const isAssignee = await isTaskAssigneeServer(getTaskAssignees(task), actor);
 
     const deny = (msg: string) =>
       NextResponse.json({ error: msg }, { status: 403 });
@@ -83,10 +86,20 @@ export async function PUT(
       case 'reassign': {
         if (!canControl) return deny('Only a Controller or higher may assign tasks.');
         if (task.status === 'Closed') return invalid('Cannot reassign a closed task. Reopen it first.');
-        if (!body.assignee) return invalid('An assignee is required.');
-        const prev = task.assignee;
-        task.assignee = body.assignee;
-        task.assigneeType = body.assigneeType === 'group' ? 'group' : 'user';
+        // `assignees` (array) is the current shape — falls back to the legacy
+        // singular assignee/assigneeType if an older caller still sends those.
+        const nextAssignees = Array.isArray(body.assignees)
+          ? sanitizeAssignees(body.assignees)
+          : (body.assignee
+            ? [{ type: (body.assigneeType === 'group' ? 'group' : 'user') as 'user' | 'group', id: body.assignee, name: body.assignee }]
+            : []);
+        if (nextAssignees.length === 0) return invalid('At least one assignee is required.');
+        const prevAssignees = getTaskAssignees(task);
+        const prevNames = prevAssignees.map(a => a.name).join(', ');
+        const legacy = deriveLegacyAssigneeFields(nextAssignees);
+        task.assignees = nextAssignees;
+        task.assignee = legacy.assignee;
+        task.assigneeType = legacy.assigneeType;
         // FRD 7.2: reassignment returns status to Assigned
         task.status = 'Assigned';
         task.completed = false;
@@ -98,7 +111,7 @@ export async function PUT(
           task,
           actor,
           action === 'assign' ? 'Assigned' : 'Reassigned',
-          `${action === 'assign' ? 'Assigned' : 'Reassigned'} to ${task.assignee} (${task.assigneeType})${prev && prev !== 'Unassigned' ? ` from ${prev}` : ''} by ${actor}. Status set to Assigned.`
+          `${action === 'assign' ? 'Assigned' : 'Reassigned'} to ${nextAssignees.map(a => `${a.name} (${a.type})`).join(', ')}${prevNames && prevNames !== 'Unassigned' ? ` from ${prevNames}` : ''} by ${actor}. Status set to Assigned.`
         );
         break;
       }

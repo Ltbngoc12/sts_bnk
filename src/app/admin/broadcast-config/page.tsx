@@ -4,18 +4,25 @@
 // BROADCAST_CONFIG_PAGE_REDESIGN_PLAN.md at repo root for the full gap analysis
 // and phased plan this implements).
 //
-// 4 tabs per Kyle's spec: Template / Routing Matrix / End-of-Day broadcast timing /
-// Action Prompt Rules. Everything here reads/writes the REAL backend built in
-// src/lib/broadcastStore.ts (Mongo) via the /api/admin/broadcast-* routes — the
+// 5 tabs: Template / Routing Matrix / End-of-Day broadcast timing / Action Prompt
+// Rules / Distribution Groups. Everything here reads/writes the REAL backend built
+// in src/lib/broadcastStore.ts (Mongo) via the /api/admin/broadcast-* routes — the
 // previous version of this page stored everything in localStorage and was fully
 // disconnected from the broadcast dispatch logic that actually runs in
 // src/app/api/incidents/[...id]/route.ts (`close` action) and
 // src/app/api/cron/eod-broadcast/route.ts. No localStorage is used anywhere below.
 //
 // Delivery Channel *management* (Email/Push gateway settings) is intentionally NOT
-// a tab here — Kyle's spec lists exactly the 4 tabs above. Channels are still
+// a tab here — Kyle's spec lists exactly the tabs above. Channels are still
 // fetched read-only from /api/admin/broadcast-channels to populate the Delivery
 // Channel checkboxes on the Routing Matrix tab.
+//
+// Distribution Groups tab (added 2026-07-27, Kyle — confirmed with client) moved in
+// from the old shared /admin/distribution-groups page. Broadcast's recipient groups
+// are now a SEPARATE dataset from the Task module's (now the "Task Distribution"
+// tab on /admin/task-configuration) — this tab fetches/saves
+// /api/admin/broadcast-distribution-groups, its own Mongo collection, not the Task
+// module's. See DEFAULT_BROADCAST_DISTRIBUTION_GROUPS in broadcastConfig.ts.
 
 import React, { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
@@ -27,6 +34,7 @@ import {
   BROADCAST_TYPES,
   CRISIS_LEVELS,
   DEFAULT_BROADCAST_CONFIG,
+  DEFAULT_BROADCAST_PROMPT_RULES,
 } from '@/lib/broadcastConfig';
 import type {
   BroadcastTemplate,
@@ -40,7 +48,7 @@ import { getIncidentTaxonomy } from '@/lib/taxonomy';
 import { INCIDENT_CATEGORIES } from '@/lib/incidentCategory';
 import type { DistributionGroup } from '@/lib/groups';
 
-type TabKey = 'Template' | 'Matrix' | 'EOD' | 'PromptRules';
+type TabKey = 'Template' | 'Matrix' | 'EOD' | 'PromptRules' | 'Groups';
 const ANY = 'Any';
 
 const TRIGGER_LABELS: Record<BroadcastPromptTrigger, string> = {
@@ -114,7 +122,7 @@ export default function BroadcastConfigPage() {
           fetch('/api/admin/broadcast-channels').then((r) => r.json()),
           fetch('/api/admin/broadcast-config').then((r) => r.json()),
           fetch('/api/admin/broadcast-prompt-rules').then((r) => r.json()),
-          fetch('/api/admin/distribution-groups').then((r) => r.json()),
+          fetch('/api/admin/broadcast-distribution-groups').then((r) => r.json()),
         ]);
         setTemplates((Array.isArray(t) ? t : []).map(normalizeTemplate));
         setMatrix((Array.isArray(m) ? m : []).map(normalizeMatrixRule));
@@ -189,7 +197,7 @@ export default function BroadcastConfigPage() {
       <div className="admin-header-bar glass" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-card)' }}>
         <div>
           <h1 style={{ fontFamily: 'var(--font-headline)', fontSize: '20px', fontWeight: 700, color: 'var(--text-main)' }}>BROADCAST CONFIGURATION</h1>
-          <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginTop: '2px' }}>Templates, routing matrix, end-of-day timing and action prompt rules for the Broadcast &amp; Notification Framework.</p>
+          <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginTop: '2px' }}>Templates, routing matrix, end-of-day timing, action prompt rules and distribution groups for the Broadcast &amp; Notification Framework.</p>
         </div>
         <button onClick={openAudit} className="btn btn-secondary" style={{ padding: '8px 16px', borderRadius: '6px', fontSize: '12.5px' }}>
           View Change History
@@ -200,9 +208,10 @@ export default function BroadcastConfigPage() {
       <div style={{ display: 'flex', gap: '10px', marginTop: '12px', borderBottom: '1px solid var(--border-color)', paddingBottom: '2px' }}>
         {([
           ['Template', 'Template'],
+          ['Groups', 'Distribution Groups'],
           ['Matrix', 'Routing Matrix'],
-          ['EOD', 'End-of-Day Broadcast Timing'],
           ['PromptRules', 'Action Prompt Rules'],
+          ['EOD', 'End-of-Day Broadcast Timing'],
         ] as [TabKey, string][]).map(([key, label]) => (
           <button
             key={key}
@@ -247,6 +256,10 @@ export default function BroadcastConfigPage() {
 
       {activeTab === 'PromptRules' && (
         <PromptRulesTab promptRules={promptRules} setPromptRules={setPromptRules} logAudit={logAudit} />
+      )}
+
+      {activeTab === 'Groups' && (
+        <GroupsTab groups={groups} setGroups={setGroups} logAudit={logAudit} />
       )}
 
       {isAuditOpen && (
@@ -706,6 +719,29 @@ function MatrixTab({
 
 const EOD_EXCLUDABLE_STATUSES = ['Live', 'Live (Assigned)', 'Pending Endorsement', 'Returned', 'Closed'];
 
+// 2026-07-27 (Kyle) — the eligibility controls below (min crisis level, excluded
+// categories/statuses, automatic scheduling) are temporarily hidden from the UI.
+// Their state is still loaded from / saved back to config unchanged, so nothing
+// is lost — flip this back to true to restore the controls.
+const SHOW_EOD_ADVANCED_CONTROLS = false;
+
+// Cutover Time is restricted to whole hours only (no minutes) per Kyle 2026-07-27.
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, h) => {
+  const value = `${String(h).padStart(2, '0')}:00`;
+  const period = h < 12 ? 'AM' : 'PM';
+  const hour12 = h % 12 === 0 ? 12 : h % 12;
+  return { value, label: `${hour12}:00 ${period}` };
+});
+
+// Existing saved times may include minutes (e.g. from before this restriction, or
+// legacy/seed data) — round down to the hour so the controlled <select> always has
+// a matching option.
+function normalizeToHour(t: string): string {
+  const h = (t || '').split(':')[0];
+  const hh = h && !isNaN(parseInt(h, 10)) ? String(parseInt(h, 10)).padStart(2, '0') : '20';
+  return `${hh}:00`;
+}
+
 function EodTimingTab({
   config,
   setConfig,
@@ -715,7 +751,7 @@ function EodTimingTab({
   setConfig: (c: BroadcastConfig) => void;
   logAudit: (action: string, before: any, after: any, details: string) => Promise<void>;
 }) {
-  const [time, setTime] = useState(config.endOfDayTime);
+  const [time, setTime] = useState(normalizeToHour(config.endOfDayTime));
   // 2026-07-26 (Phase 0/3, gap G9/G8) — these three used to be hardcoded
   // (OPEN_STATUSES_EXCLUDED in broadcast.ts) with no admin control at all, so the
   // EOD queue picked up every Informational/Exercise incident and every Level 5
@@ -728,7 +764,7 @@ function EodTimingTab({
   const [schedulerEnabled, setSchedulerEnabled] = useState<boolean>(config.eodSchedulerEnabled ?? true);
 
   useEffect(() => {
-    setTime(config.endOfDayTime);
+    setTime(normalizeToHour(config.endOfDayTime));
     setExcludedCategories(config.eodExcludedCategories || []);
     setMinLevel(config.eodMinCrisisLevel ?? 4);
     setExcludedStatuses(config.eodExcludedStatuses || []);
@@ -764,45 +800,51 @@ function EodTimingTab({
         END-OF-DAY BROADCAST TIMING &amp; ELIGIBILITY
       </h2>
       <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginBottom: '16px' }}>
-        Defines the time at which open Incidents are surfaced in the Duty Manager&apos;s end-of-day interim broadcast queue, and which incidents are eligible at all (§5.1.2 — Informational/Exercise incidents and Level 5 occurrences don&apos;t require broadcast handling by default).
+        Defines the time at which open Incidents are surfaced in the Duty Manager&apos;s end-of-day interim broadcast queue.
       </p>
-      <FormField label="Cutover Time (24h)">
-        <input type="time" value={time} onChange={(e) => setTime(e.target.value)} style={inputStyle} />
-      </FormField>
-      <FormField label="Minimum crisis level queued (1 = most severe, 5 = queue everything)">
-        <select value={minLevel} onChange={(e) => setMinLevel(parseInt(e.target.value, 10))} style={inputStyle}>
-          {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>Level {n} and more severe{n < 5 ? ' (excludes less severe levels)' : ' (no level filter)'}</option>)}
+      <FormField label="Cutover Time">
+        <select value={time} onChange={(e) => setTime(e.target.value)} style={inputStyle}>
+          {HOUR_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
         </select>
       </FormField>
-      <FormField label="Excluded incident categories">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {INCIDENT_CATEGORIES.map((cat) => (
-            <label key={cat} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, cursor: 'pointer' }}>
-              <input type="checkbox" checked={excludedCategories.includes(cat)} onChange={() => toggle(excludedCategories, cat, setExcludedCategories)} />
-              {cat}
+      {SHOW_EOD_ADVANCED_CONTROLS && (
+        <>
+          <FormField label="Minimum crisis level queued (1 = most severe, 5 = queue everything)">
+            <select value={minLevel} onChange={(e) => setMinLevel(parseInt(e.target.value, 10))} style={inputStyle}>
+              {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>Level {n} and more severe{n < 5 ? ' (excludes less severe levels)' : ' (no level filter)'}</option>)}
+            </select>
+          </FormField>
+          <FormField label="Excluded incident categories">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {INCIDENT_CATEGORIES.map((cat) => (
+                <label key={cat} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={excludedCategories.includes(cat)} onChange={() => toggle(excludedCategories, cat, setExcludedCategories)} />
+                  {cat}
+                </label>
+              ))}
+            </div>
+          </FormField>
+          <FormField label="Excluded incident statuses">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 14px' }}>
+              {EOD_EXCLUDABLE_STATUSES.map((st) => (
+                <label key={st} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={excludedStatuses.includes(st)} onChange={() => toggle(excludedStatuses, st, setExcludedStatuses)} />
+                  {st}
+                </label>
+              ))}
+            </div>
+          </FormField>
+          <FormField label="Automatic scheduling">
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, cursor: 'pointer' }}>
+              <input type="checkbox" checked={schedulerEnabled} onChange={(e) => setSchedulerEnabled(e.target.checked)} />
+              Auto-run the check once cutover has passed (lazy-trigger from the End-of-Day Interim tab)
             </label>
-          ))}
-        </div>
-      </FormField>
-      <FormField label="Excluded incident statuses">
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 14px' }}>
-          {EOD_EXCLUDABLE_STATUSES.map((st) => (
-            <label key={st} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, cursor: 'pointer' }}>
-              <input type="checkbox" checked={excludedStatuses.includes(st)} onChange={() => toggle(excludedStatuses, st, setExcludedStatuses)} />
-              {st}
-            </label>
-          ))}
-        </div>
-      </FormField>
-      <FormField label="Automatic scheduling">
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, cursor: 'pointer' }}>
-          <input type="checkbox" checked={schedulerEnabled} onChange={(e) => setSchedulerEnabled(e.target.checked)} />
-          Auto-run the check once cutover has passed (lazy-trigger from the End-of-Day Interim tab)
-        </label>
-      </FormField>
-      <div style={{ background: 'var(--bg-inset)', padding: '12px 14px', borderRadius: '8px', borderLeft: '3px solid var(--color-primary)', fontSize: '12px', color: 'var(--text-muted)', marginTop: '14px', lineHeight: 1.5 }}>
-        This deployment has no external scheduler (plain Next.js dev/prod server, no Vercel Cron config) — the End-of-Day Interim tab lazy-triggers <code>/api/cron/eod-broadcast</code> once cutover has passed for the day, or it can be run on demand from the &quot;⟳ Re-run check&quot; button there.
-      </div>
+          </FormField>
+          <div style={{ background: 'var(--bg-inset)', padding: '12px 14px', borderRadius: '8px', borderLeft: '3px solid var(--color-primary)', fontSize: '12px', color: 'var(--text-muted)', marginTop: '14px', lineHeight: 1.5 }}>
+            This deployment has no external scheduler (plain Next.js dev/prod server, no Vercel Cron config) — the End-of-Day Interim tab lazy-triggers <code>/api/cron/eod-broadcast</code> once cutover has passed for the day, or it can be run on demand from the &quot;⟳ Re-run check&quot; button there.
+          </div>
+        </>
+      )}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>
         <button onClick={handleSave} className="btn btn-primary" style={{ padding: '8px 16px', borderRadius: '6px', background: 'var(--color-primary-dark)', border: 'none', color: '#fff' }}>Save</button>
       </div>
@@ -825,6 +867,18 @@ function PromptRulesTab({
   const [editing, setEditing] = useState<BroadcastActionPromptRule | null>(null);
   const [form, setForm] = useState<BroadcastActionPromptRule | null>(null);
 
+  // Trigger events are fixed at exactly 3 (see TRIGGER_OPTIONS) — there is no "Add
+  // Rule" flow any more (2026-07-27, Kyle). One row per event, always, so the list
+  // always shows all 3 regardless of what's persisted. If a rule for a given event
+  // hasn't been saved yet (e.g. legacy DBs seeded before the 3rd trigger existed),
+  // fall back to its DEFAULT_BROADCAST_PROMPT_RULES entry so the row still renders
+  // and can be edited/saved like any other.
+  const displayRules: BroadcastActionPromptRule[] = TRIGGER_OPTIONS.map(
+    (trigger) =>
+      promptRules.find((r) => r.triggerEvent === trigger) ||
+      DEFAULT_BROADCAST_PROMPT_RULES.find((d) => d.triggerEvent === trigger)!
+  );
+
   const persist = async (updated: BroadcastActionPromptRule[], action: string, before: any, after: any, details: string) => {
     setPromptRules(updated);
     await fetch('/api/admin/broadcast-prompt-rules', {
@@ -835,19 +889,6 @@ function PromptRulesTab({
     await logAudit(action, before, after, details);
   };
 
-  const openNew = () => {
-    setEditing(null);
-    setForm({
-      id: genId('prompt'),
-      name: '',
-      triggerEvent: 'closure_broadcast_queued',
-      recipientRoles: [BROADCAST_RECIPIENT_ROLE_OPTIONS[0]],
-      description: '',
-      status: 'Active',
-    });
-    setIsModalOpen(true);
-  };
-
   const openEdit = (rule: BroadcastActionPromptRule) => {
     setEditing(rule);
     setForm({ ...rule });
@@ -855,7 +896,7 @@ function PromptRulesTab({
   };
 
   const handleSave = async () => {
-    if (!form || !form.name.trim()) { alert('Name is required.'); return; }
+    if (!form) return;
     if (!form.recipientRoles || form.recipientRoles.length === 0) { alert('Select at least one recipient role.'); return; }
     const exists = promptRules.some((r) => r.id === form.id);
     const updated = exists ? promptRules.map((r) => (r.id === form.id ? form : r)) : [...promptRules, form];
@@ -864,7 +905,7 @@ function PromptRulesTab({
       exists ? 'Update Action Prompt Rule' : 'Create Action Prompt Rule',
       editing,
       form,
-      `${exists ? 'Updated' : 'Created'} prompt rule "${form.name}" — ${TRIGGER_LABELS[form.triggerEvent]} → ${form.recipientRoles.join(', ')}`
+      `Set "${TRIGGER_LABELS[form.triggerEvent]}" recipient role(s) to ${form.recipientRoles.join(', ')}`
     );
     setIsModalOpen(false);
   };
@@ -872,28 +913,20 @@ function PromptRulesTab({
   const handleToggleStatus = async (rule: BroadcastActionPromptRule) => {
     const nextStatus = rule.status === 'Active' ? 'Inactive' : 'Active';
     const after = { ...rule, status: nextStatus as 'Active' | 'Inactive' };
-    const updated = promptRules.map((r) => (r.id === rule.id ? after : r));
-    await persist(updated, 'Toggle Action Prompt Rule Status', rule, after, `Set prompt rule "${rule.name}" to ${nextStatus}`);
+    const exists = promptRules.some((r) => r.id === rule.id);
+    const updated = exists ? promptRules.map((r) => (r.id === rule.id ? after : r)) : [...promptRules, after];
+    await persist(updated, 'Toggle Action Prompt Rule Status', rule, after, `Set "${TRIGGER_LABELS[rule.triggerEvent]}" to ${nextStatus}`);
   };
 
   return (
     <div className="glass" style={{ padding: '20px', background: 'var(--bg-card)', marginTop: '12px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
-        <div>
-          <h2 style={{ fontFamily: 'var(--font-headline)', fontSize: '14px', color: 'var(--text-main)', margin: 0 }}>BROADCAST ACTION PROMPT RULES</h2>
-          <p style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '4px' }}>
-            Configures who is notified when a broadcast-related trigger fires. Trigger events are fixed (each maps to a real code hook point) — only the recipient role and status are configurable here.
-          </p>
-        </div>
-        <button onClick={openNew} className="btn btn-primary" style={{ padding: '6px 12px', borderRadius: '4px', fontSize: '12.5px', background: 'var(--color-primary-dark)', border: 'none', color: '#fff' }}>
-          + Add Rule
-        </button>
+      <div style={{ marginBottom: '15px', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
+        <h2 style={{ fontFamily: 'var(--font-headline)', fontSize: '14px', color: 'var(--text-main)', margin: 0 }}>BROADCAST ACTION PROMPT RULES</h2>
       </div>
       <div className="table-container" style={{ border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
         <table className="custom-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
           <thead>
             <tr style={{ background: 'var(--bg-inset)', borderBottom: '1px solid var(--border-color)' }}>
-              <th style={thStyle}>Name</th>
               <th style={thStyle}>Trigger Event</th>
               <th style={thStyle}>Recipient Role</th>
               <th style={thStyle}>Status</th>
@@ -901,13 +934,9 @@ function PromptRulesTab({
             </tr>
           </thead>
           <tbody>
-            {promptRules.map((rule) => (
-              <tr key={rule.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                <td style={{ ...tdStyle, fontWeight: 600 }}>
-                  {rule.name}
-                  {rule.description && <div style={{ fontWeight: 400, fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>{rule.description}</div>}
-                </td>
-                <td style={tdStyle}>{TRIGGER_LABELS[rule.triggerEvent]}</td>
+            {displayRules.map((rule) => (
+              <tr key={rule.triggerEvent} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                <td style={{ ...tdStyle, fontWeight: 600 }}>{TRIGGER_LABELS[rule.triggerEvent]}</td>
                 <td style={tdStyle}>
                   {rule.recipientRoles && rule.recipientRoles.length > 0 ? (
                     <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -943,25 +972,25 @@ function PromptRulesTab({
                 </td>
               </tr>
             ))}
-            {promptRules.length === 0 && (
-              <tr><td colSpan={5} style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>No prompt rules configured — no one will be notified for these events.</td></tr>
-            )}
           </tbody>
         </table>
       </div>
 
       {isModalOpen && form && (
         <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div className="modal-box glass" style={{ width: '100%', maxWidth: '480px', padding: '24px', background: 'var(--bg-card)' }}>
-            <h2 style={{ fontFamily: 'var(--font-headline)', fontSize: '18px', marginBottom: '20px' }}>{editing ? 'Edit Prompt Rule' : 'Add Prompt Rule'}</h2>
+          <div className="modal-box glass" style={{ width: '100%', maxWidth: '480px', padding: '24px', background: 'var(--bg-card)', overflowY: 'visible' }}>
+            {/* overflowY: 'visible' overrides the shared .modal-box's overflow-y: auto
+                (globals.css) — that auto-scroll clips the Recipient Role dropdown's
+                absolutely-positioned popover since it renders past this box's edge.
+                Safe here because this modal's content (one static field + one
+                dropdown + buttons) always fits within max-height: 90vh, so there's
+                nothing to scroll anyway. */}
+            <h2 style={{ fontFamily: 'var(--font-headline)', fontSize: '18px', marginBottom: '20px' }}>Edit Prompt Rule</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <FormField label="Name">
-                <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} style={inputStyle} placeholder="e.g. Closure Broadcast Prompt" />
-              </FormField>
               <FormField label="Trigger Event">
-                <select value={form.triggerEvent} onChange={(e) => setForm({ ...form, triggerEvent: e.target.value as BroadcastPromptTrigger })} style={selectStyle}>
-                  {TRIGGER_OPTIONS.map((t) => <option key={t} value={t}>{TRIGGER_LABELS[t]}</option>)}
-                </select>
+                <div style={{ ...inputStyle, display: 'flex', alignItems: 'center', background: 'var(--bg-inset)', color: 'var(--text-muted)' }}>
+                  {TRIGGER_LABELS[form.triggerEvent]}
+                </div>
               </FormField>
               <FormField label="Recipient Role(s) (select one or more)">
                 <DropdownMultiSelect
@@ -971,31 +1000,168 @@ function PromptRulesTab({
                   placeholder="Select Recipient Roles..."
                 />
               </FormField>
-              <FormField label="Description (optional)">
-                <textarea rows={3} value={form.description || ''} onChange={(e) => setForm({ ...form, description: e.target.value })} style={{ ...inputStyle, resize: 'vertical' }} />
-              </FormField>
             </div>
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px' }}>
-              <div>
-                {editing && (
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      await handleToggleStatus(form);
-                      setIsModalOpen(false);
-                    }}
-                    className={`btn ${form.status === 'Active' ? 'btn-danger' : 'btn-success'}`}
-                    style={{ padding: '8px 16px', borderRadius: '6px', fontSize: '12.5px' }}
-                  >
-                    {form.status === 'Active' ? 'Deactivate Rule' : 'Reactivate Rule'}
-                  </button>
-                )}
-              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  await handleToggleStatus(form);
+                  setIsModalOpen(false);
+                }}
+                className={`btn ${form.status === 'Active' ? 'btn-danger' : 'btn-success'}`}
+                style={{ padding: '8px 16px', borderRadius: '6px', fontSize: '12.5px' }}
+              >
+                {form.status === 'Active' ? 'Deactivate Rule' : 'Reactivate Rule'}
+              </button>
               <div style={{ display: 'flex', gap: '12px' }}>
                 <button type="button" onClick={() => setIsModalOpen(false)} className="btn btn-secondary" style={{ padding: '8px 16px', borderRadius: '6px' }}>Cancel</button>
                 <button type="button" onClick={handleSave} className="btn btn-primary" style={{ padding: '8px 16px', borderRadius: '6px', background: 'var(--color-primary-dark)', border: 'none', color: '#fff' }}>Save Rule</button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Tab 5: Distribution Groups (Broadcast-only) ─────────────────────────────────
+//
+// 2026-07-27 (Kyle, confirmed with client) — moved in from the old shared
+// /admin/distribution-groups page. Broadcast's recipient groups are now a
+// SEPARATE dataset from the Task module's (now the "Task Distribution" tab on
+// /admin/task-configuration) — this tab reads/writes only
+// /api/admin/broadcast-distribution-groups (its own Mongo collection). Editing a
+// group here has zero effect on the Task module, and vice versa.
+//
+// This tab is list-only — "View Members" (2026-07-27, per Kyle) navigates to its
+// own route at admin/broadcast-config/distribution-groups/[id]/page.tsx instead of
+// swapping in an inline detail view, matching the Template tab's nested-route
+// pattern (admin/broadcast-config/templates/[id]/page.tsx).
+
+function GroupsTab({
+  groups,
+  setGroups,
+  logAudit,
+}: {
+  groups: DistributionGroup[];
+  setGroups: (g: DistributionGroup[]) => void;
+  logAudit: (action: string, before: any, after: any, details: string) => Promise<void>;
+}) {
+  const persist = async (
+    updated: DistributionGroup[],
+    action: string,
+    before: any,
+    after: any,
+    details: string
+  ) => {
+    setGroups(updated);
+    await fetch('/api/admin/broadcast-distribution-groups', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updated),
+    });
+    await logAudit(action, before, after, details);
+  };
+
+  const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
+  const [formGroupName, setFormGroupName] = useState('');
+  const [formGroupDesc, setFormGroupDesc] = useState('');
+
+  const openCreateGroup = () => {
+    setFormGroupName('');
+    setFormGroupDesc('');
+    setIsGroupModalOpen(true);
+  };
+
+  const handleCreateGroup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const newGroup: DistributionGroup = {
+      id: genId('bgrp'),
+      name: formGroupName,
+      description: formGroupDesc,
+      members: [],
+      status: 'Active',
+    };
+    await persist(
+      [...groups, newGroup],
+      'Create Broadcast Distribution Group',
+      null,
+      newGroup,
+      `Created broadcast distribution group: ${formGroupName}`
+    );
+    setIsGroupModalOpen(false);
+  };
+
+  return (
+    <div className="glass" style={{ padding: '20px', background: 'var(--bg-card)', marginTop: '12px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
+        <div>
+          <h2 style={{ fontFamily: 'var(--font-headline)', fontSize: '14px', color: 'var(--text-main)', margin: 0 }}>BROADCAST DISTRIBUTION GROUPS</h2>
+          <p style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '4px' }}>
+            Recipient groups used only by Broadcast routing — separate from the Task module&apos;s own Distribution Groups.
+          </p>
+        </div>
+        <button onClick={openCreateGroup} className="btn btn-primary" style={{ padding: '6px 12px', borderRadius: '4px', fontSize: '12.5px', background: 'var(--color-primary-dark)', border: 'none', color: '#fff' }}>
+          + Create Group
+        </button>
+      </div>
+
+      <div className="table-container" style={{ border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
+        <table className="custom-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <thead>
+            <tr style={{ background: 'var(--bg-inset)', borderBottom: '1px solid var(--border-color)' }}>
+              <th style={thStyle}>Group Name</th>
+              <th style={thStyle}>Description</th>
+              <th style={{ ...thStyle, width: '110px' }}>Members</th>
+              <th style={{ ...thStyle, width: '110px' }}>Status</th>
+              <th style={{ ...thStyle, width: '130px', textAlign: 'right' }}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {groups.length === 0 ? (
+              <tr><td colSpan={5} style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>No broadcast distribution groups configured.</td></tr>
+            ) : (
+              groups.map((group) => (
+                <tr key={group.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                  <td style={{ ...tdStyle, fontWeight: 600 }}>{group.name}</td>
+                  <td style={{ ...tdStyle, color: 'var(--text-muted)' }}>{group.description}</td>
+                  <td style={tdStyle}>{group.members.length}</td>
+                  <td style={tdStyle}>
+                    <span className={`badge ${group.status === 'Active' ? 'badge-completed' : 'badge-live'}`} style={{ padding: '3px 8px', borderRadius: '4px', fontSize: '11px' }}>{group.status}</span>
+                  </td>
+                  <td style={{ ...tdStyle, textAlign: 'right' }}>
+                    <Link
+                      href={`/admin/broadcast-config/distribution-groups/${encodeURIComponent(group.id)}`}
+                      className="btn btn-secondary"
+                      style={{ padding: '4px 8px', fontSize: '11.5px', borderRadius: '4px', textDecoration: 'none' }}
+                    >
+                      View Members
+                    </Link>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {isGroupModalOpen && (
+        <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="modal-box glass" style={{ width: '100%', maxWidth: '480px', padding: '24px', background: 'var(--bg-card)' }}>
+            <h2 style={{ fontFamily: 'var(--font-headline)', fontSize: '18px', marginBottom: '20px' }}>Create Broadcast Distribution Group</h2>
+            <form onSubmit={handleCreateGroup} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+              <FormField label="Group Name">
+                <input type="text" required value={formGroupName} onChange={(e) => setFormGroupName(e.target.value)} style={inputStyle} />
+              </FormField>
+              <FormField label="Description">
+                <textarea rows={3} required value={formGroupDesc} onChange={(e) => setFormGroupDesc(e.target.value)} style={{ ...inputStyle, resize: 'vertical' }} />
+              </FormField>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '10px' }}>
+                <button type="button" onClick={() => setIsGroupModalOpen(false)} className="btn btn-secondary" style={{ padding: '8px 16px', borderRadius: '6px' }}>Cancel</button>
+                <button type="submit" className="btn btn-primary" style={{ padding: '8px 16px', borderRadius: '6px', background: 'var(--color-primary-dark)', border: 'none', color: '#fff' }}>Save Group</button>
+              </div>
+            </form>
           </div>
         </div>
       )}

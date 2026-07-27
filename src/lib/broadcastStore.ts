@@ -22,6 +22,7 @@ import {
   DEFAULT_BROADCAST_CHANNELS,
   DEFAULT_BROADCAST_CONFIG,
   DEFAULT_BROADCAST_PROMPT_RULES,
+  DEFAULT_BROADCAST_DISTRIBUTION_GROUPS,
 } from './broadcastConfig';
 
 async function mdb(): Promise<Db> {
@@ -57,11 +58,19 @@ async function replaceAll<T extends { id: string }>(name: string, docs: T[]): Pr
   await col.deleteMany({ id: { $nin: docs.map((d) => d.id) } });
 }
 
-// ── Distribution Groups (FSD §10.3) ────────────────────────────────────────────
+// ── Distribution Groups — Task module (FSD §10.3) ──────────────────────────────
 export const getDistributionGroups = () =>
   readOrSeed<DistributionGroup>('distributionGroups', DEFAULT_GROUPS);
 export const saveDistributionGroups = (g: DistributionGroup[]) =>
   replaceAll('distributionGroups', g);
+
+// ── Distribution Groups — Broadcast module only (2026-07-27, Kyle) ─────────────
+// Deliberately a separate collection from `distributionGroups` above — see
+// DEFAULT_BROADCAST_DISTRIBUTION_GROUPS comment in broadcastConfig.ts.
+export const getBroadcastDistributionGroups = () =>
+  readOrSeed<DistributionGroup>('broadcastDistributionGroups', DEFAULT_BROADCAST_DISTRIBUTION_GROUPS);
+export const saveBroadcastDistributionGroups = (g: DistributionGroup[]) =>
+  replaceAll('broadcastDistributionGroups', g);
 
 // ── Broadcast Templates (FSD §10.4) ────────────────────────────────────────────
 export const getBroadcastTemplates = () =>

@@ -1,7 +1,15 @@
-// Shared source for Broadcast Recipient Groups.
-// Used by /admin/distribution-groups (management UI) and the Task module
-// (group assignment per FRD 7.2). Persisted client-side in localStorage so
-// admin edits are reflected wherever groups are consumed.
+// Source for Task Distribution Groups (group assignment per FRD 7.2), managed at
+// /admin/task-configuration ("Task Configuration" in the sidebar — "Task
+// Distribution" tab, since 2026-07-27 when it merged with the Template tab).
+// Persisted client-side in localStorage so admin edits are reflected wherever
+// groups are consumed.
+//
+// 2026-07-27 (Kyle, confirmed with client) — Broadcast used to read this exact
+// store too, but Broadcast's recipient groups are now a SEPARATE dataset: see
+// DEFAULT_BROADCAST_DISTRIBUTION_GROUPS in broadcastConfig.ts, managed from the
+// "Distribution Groups" tab on /admin/broadcast-config (its own Mongo collection,
+// no localStorage). Editing a group here no longer has any effect on Broadcast
+// routing, and vice versa.
 
 export interface GroupMember {
   id: string;

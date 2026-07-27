@@ -252,6 +252,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       afterSnapshot: JSON.stringify({ status: 'SENT', recipients: recipients.length }),
       correlationId: `CORR-${Date.now()}`,
       ipAddress: '127.0.0.1',
+      entityId: bc.id,
     });
 
     await saveDb(db);

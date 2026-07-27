@@ -308,8 +308,22 @@ export interface RecurrenceSeries {
     priority: TaskPriority;
     assignee: string;
     assigneeType?: 'user' | 'group';
+    assignees?: TaskAssignee[]; // preferred — assignee/assigneeType are the derived back-compat pair
     checklist?: TaskChecklistItem[];
   };
+}
+
+// Multi-assignee support (2026-07-27, per Kyle feedback on the Assignee field):
+// a Task can be dispatched to any mix of individual users and pre-configured
+// Task Distribution groups in one go. It stays ONE shared task — not cloned per
+// person — and any assignee in the set (including any internal member of an
+// assigned group) may Acknowledge/Begin/Comment/Mark Complete on behalf of the
+// whole set; the audit trail records who specifically acted. `id` is the
+// underlying user id (lib/users.ts) or Distribution Group id (lib/groups.ts).
+export interface TaskAssignee {
+  type: 'user' | 'group';
+  id: string;
+  name: string;
 }
 
 export interface Task {
@@ -319,8 +333,14 @@ export interface Task {
   sourceEDiaryId?: string; // Set when created from an e-Diary entry via the combined Actions menu
   title: string;
   description: string;
-  assignee: string; // User name or Group name
-  assigneeType?: 'user' | 'group'; // FRD 7.2 — individual or pre-configured group
+  // `assignee`/`assigneeType` are now DERIVED back-compat fields (kept in sync
+  // by the API on every write): assignee = assignees.map(a=>a.name).join(', '),
+  // assigneeType = assignees.length === 1 ? assignees[0].type : undefined.
+  // New code should read/write `assignees` — the derived fields exist only so
+  // any display path not yet migrated still shows something reasonable.
+  assignee: string; // User name(s) or Group name(s), comma-joined
+  assigneeType?: 'user' | 'group'; // Only meaningful when assignees.length === 1
+  assignees?: TaskAssignee[]; // FRD 7.2 — one shared task, any mix of users/groups
   priority: string; // "Low" | "Normal" | "High" | "Critical" — see TASK_PRIORITIES
   dueDate: string;
   status: string; // TaskStatus — Created, Assigned, Acknowledged, In Progress, Pending Further Action, Pending Closure, Closed

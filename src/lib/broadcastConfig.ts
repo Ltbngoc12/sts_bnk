@@ -11,6 +11,7 @@
 // Level 4 the creation default (§5.2d).
 
 import type { DistributionGroup } from './groups';
+import { DEFAULT_GROUPS } from './groups';
 
 export const BROADCAST_TYPES = [
   'Closure Broadcast',
@@ -321,3 +322,19 @@ export const DEFAULT_BROADCAST_PROMPT_RULES: BroadcastActionPromptRule[] = [
 ];
 
 export type { DistributionGroup };
+
+// ── Broadcast Distribution Groups (2026-07-27, Kyle — confirmed with client) ────
+// Broadcast's recipient groups are now a SEPARATE dataset from the Task module's
+// Distribution Groups (lib/groups.ts, managed at /admin/task-configuration's
+// "Task Distribution" tab). They share the same DistributionGroup/GroupMember
+// shape but live in their own Mongo collection (broadcastStore.ts ->
+// broadcastDistributionGroups, via /api/admin/broadcast-distribution-groups) and
+// are managed from the "Distribution Groups" tab on /admin/broadcast-config — no
+// localStorage, consistent with the rest of that page. Seeded once from the same
+// starting data as a convenience default (a deep copy, so neither list mutates the
+// other); from this point on the two are fully independent — editing one never
+// touches the other.
+export const DEFAULT_BROADCAST_DISTRIBUTION_GROUPS: DistributionGroup[] = DEFAULT_GROUPS.map((g) => ({
+  ...g,
+  members: g.members.map((m) => ({ ...m })),
+}));

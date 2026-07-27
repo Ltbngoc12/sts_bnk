@@ -92,6 +92,21 @@ async function run() {
     created.push(id);
     queued++;
     if (resolved.resolutionWarning) warned++;
+
+    // Audit trail — entityId lets the broadcast detail page's Audit Log section
+    // filter the shared /api/admin/audit log to this record only.
+    if (!db.auditLogs) db.auditLogs = [];
+    db.auditLogs.push({
+      id: `AUD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      timestamp: nowIso,
+      user: 'system',
+      module: 'Broadcast',
+      action: 'Queue EOD Broadcast',
+      details: `Queued End-of-Day broadcast ${id} for ${resolved.recipients.length} recipient(s) — ${eodDate}.`,
+      correlationId: `CORR-${Date.now()}`,
+      ipAddress: '127.0.0.1',
+      entityId: id,
+    });
   }
 
   await saveDb(db);

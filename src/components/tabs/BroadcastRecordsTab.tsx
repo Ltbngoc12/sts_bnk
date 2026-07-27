@@ -18,9 +18,6 @@ import {
 } from '@/components/broadcasts/broadcastUi';
 import { BroadcastDrawer } from '@/components/broadcasts/BroadcastDrawer';
 
-interface DistributionGroupLite { name: string; status: string }
-
-const BROADCAST_TYPES_UI = ['Closure', 'End-of-Day', 'Weather Advisory', 'Manual'];
 const LEVELS_UI = ['Level 1', 'Level 2', 'Level 3', 'Level 4', 'Level 5'];
 
 export function BroadcastRecordsTab() {
@@ -43,20 +40,10 @@ export function BroadcastRecordsTab() {
   const [page, setPage] = useState(1);
 
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [dateBasis, setDateBasis] = useState<'createdAt' | 'sentAt'>('createdAt');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [type, setType] = useState('');
   const [levels, setLevels] = useState<string[]>([]);
   const [showLevelDropdown, setShowLevelDropdown] = useState(false);
-  const [group, setGroup] = useState('');
-  const [dispatchedBy, setDispatchedBy] = useState('');
-  const [channel, setChannel] = useState('');
-  const [deliveryResult, setDeliveryResult] = useState('');
-  const [contentEdited, setContentEdited] = useState('');
-  const [incidentType, setIncidentType] = useState('');
-
-  const [groupOptions, setGroupOptions] = useState<DistributionGroupLite[]>([]);
 
   const [showNew, setShowNew] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -85,13 +72,6 @@ export function BroadcastRecordsTab() {
     return () => clearTimeout(handler);
   }, [search]);
 
-  useEffect(() => {
-    fetch('/api/admin/distribution-groups')
-      .then((r) => (r.ok ? r.json() : []))
-      .then((g) => setGroupOptions(Array.isArray(g) ? g.filter((x) => x.status === 'Active') : []))
-      .catch(() => {});
-  }, []);
-
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -101,21 +81,15 @@ export function BroadcastRecordsTab() {
       params.set('limit', String(pagination.limit));
       if (statusTab !== 'All') params.set('status', statusTab);
       if (debouncedSearch) params.set('search', debouncedSearch);
-      params.set('dateBasis', dateBasis);
+      // No dateBasis param — From/To now matches a broadcast CREATED or SENT/dispatched
+      // within the window (server defaults to that OR-match when dateBasis is omitted).
       if (startDate) params.set('startDate', new Date(startDate).toISOString());
       if (endDate) {
         const end = new Date(endDate);
         end.setHours(23, 59, 59, 999);
         params.set('endDate', end.toISOString());
       }
-      if (type) params.set('type', type);
       if (levels.length > 0) params.set('level', levels.join(','));
-      if (group) params.set('group', group);
-      if (dispatchedBy) params.set('dispatchedBy', dispatchedBy);
-      if (channel) params.set('channel', channel);
-      if (deliveryResult) params.set('deliveryResult', deliveryResult);
-      if (contentEdited) params.set('contentEdited', contentEdited);
-      if (incidentType) params.set('incidentType', incidentType);
 
       const res = await fetch(`/api/broadcasts?${params.toString()}`);
       if (res.ok) {
@@ -127,16 +101,14 @@ export function BroadcastRecordsTab() {
     } finally {
       setLoading(false);
     }
-  }, [page, pagination.limit, statusTab, debouncedSearch, dateBasis, startDate, endDate, type, levels, group, dispatchedBy, channel, deliveryResult, contentEdited, incidentType]);
+  }, [page, pagination.limit, statusTab, debouncedSearch, startDate, endDate, levels]);
 
   useEffect(() => { if (canView) load(); }, [canView, load]);
 
   const clearFilters = () => {
-    setStartDate(''); setEndDate(''); setType(''); setLevels([]); setGroup('');
-    setDispatchedBy(''); setChannel(''); setDeliveryResult(''); setContentEdited(''); setIncidentType('');
-    setDateBasis('createdAt'); setPage(1);
+    setStartDate(''); setEndDate(''); setLevels([]); setPage(1);
   };
-  const hasActiveFilters = !!(startDate || endDate || type || levels.length || group || dispatchedBy || channel || deliveryResult || contentEdited || incidentType);
+  const hasActiveFilters = !!(startDate || endDate || levels.length);
 
   const exportCsv = () => {
     const header = ['Broadcast ID', 'Type', 'Level', 'Case ID', 'Incident ID', 'Incident', 'Status', 'Recipient Count', 'Group', 'Channel', 'Template', 'Content Edited', 'Sent By', 'Created At', 'Sent At'];
@@ -265,23 +237,11 @@ export function BroadcastRecordsTab() {
 
         {showAdvanced && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 16, paddingTop: 4 }}>
-            <FormGroup label="Filter date by:">
-              <select value={dateBasis} onChange={(e) => { setDateBasis(e.target.value as any); setPage(1); }} className="form-control select-dark">
-                <option value="createdAt">Created date</option>
-                <option value="sentAt">Sent date</option>
-              </select>
-            </FormGroup>
-            <FormGroup label="From:">
+            <FormGroup label="From (created or sent):">
               <input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setPage(1); }} className="form-control" style={{ height: 36 }} />
             </FormGroup>
-            <FormGroup label="To:">
+            <FormGroup label="To (created or sent):">
               <input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setPage(1); }} className="form-control" style={{ height: 36 }} />
-            </FormGroup>
-            <FormGroup label="Broadcast type:">
-              <select value={type} onChange={(e) => { setType(e.target.value); setPage(1); }} className="form-control select-dark">
-                <option value="">All Types</option>
-                {BROADCAST_TYPES_UI.map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
             </FormGroup>
             <FormGroup label="Crisis level:" style={{ position: 'relative' }}>
               <button type="button" onClick={() => setShowLevelDropdown((v) => !v)} className="form-control"
@@ -310,40 +270,6 @@ export function BroadcastRecordsTab() {
                   ))}
                 </div>
               )}
-            </FormGroup>
-            <FormGroup label="Recipient group:">
-              <select value={group} onChange={(e) => { setGroup(e.target.value); setPage(1); }} className="form-control select-dark">
-                <option value="">All Groups</option>
-                {groupOptions.map((g) => <option key={g.name} value={g.name}>{g.name}</option>)}
-              </select>
-            </FormGroup>
-            <FormGroup label="Approved / sent by:">
-              <input type="text" value={dispatchedBy} onChange={(e) => { setDispatchedBy(e.target.value); setPage(1); }} className="form-control" style={{ height: 36 }} placeholder="Sender name…" />
-            </FormGroup>
-            <FormGroup label="Channel:">
-              <select value={channel} onChange={(e) => { setChannel(e.target.value); setPage(1); }} className="form-control select-dark">
-                <option value="">All Channels</option>
-                <option value="Email">Email</option>
-                <option value="Push Notification">Push Notification</option>
-              </select>
-            </FormGroup>
-            <FormGroup label="Delivery result:">
-              <select value={deliveryResult} onChange={(e) => { setDeliveryResult(e.target.value); setPage(1); }} className="form-control select-dark">
-                <option value="">All</option>
-                <option value="success">Fully successful</option>
-                <option value="error">Delivery error(s)</option>
-                <option value="none">Not sent yet</option>
-              </select>
-            </FormGroup>
-            <FormGroup label="Content:">
-              <select value={contentEdited} onChange={(e) => { setContentEdited(e.target.value); setPage(1); }} className="form-control select-dark">
-                <option value="">All</option>
-                <option value="true">Edited from template (§10.4d)</option>
-                <option value="false">Original template</option>
-              </select>
-            </FormGroup>
-            <FormGroup label="Incident type:">
-              <input type="text" value={incidentType} onChange={(e) => { setIncidentType(e.target.value); setPage(1); }} className="form-control" style={{ height: 36 }} placeholder="e.g. Facilities" />
             </FormGroup>
             {hasActiveFilters && (
               <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end' }}>

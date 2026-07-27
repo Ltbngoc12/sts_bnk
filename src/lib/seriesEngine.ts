@@ -67,6 +67,7 @@ export function generateOccurrencesForSeries(
       description: tmpl.description || '',
       assignee: hasAssignee ? tmpl.assignee : 'Unassigned',
       assigneeType: tmpl.assigneeType === 'group' ? 'group' : 'user',
+      assignees: tmpl.assignees && tmpl.assignees.length > 0 ? tmpl.assignees : undefined,
       priority: normalizeTaskPriority(tmpl.priority),
       dueDate: `${date}T${dueTime}`,
       status: hasAssignee ? 'Assigned' : 'Created',

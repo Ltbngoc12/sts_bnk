@@ -8,7 +8,8 @@ import {
   taskBadgeClass,
   TASK_STATUSES,
   isControllerPlus,
-  internalGroupMembers,
+  getTaskAssignees,
+  isTaskAssignee,
 } from '@/lib/taskHelpers';
 import { getTaskPriorityTaxonomy } from '@/lib/taxonomy';
 import TaskCreateModal from '@/components/TaskCreateModal';
@@ -57,9 +58,7 @@ export function TaskBoardTab() {
   useEffect(() => { fetchTasks(); }, []);
   useEffect(() => { if (isRanger) setTab('mine'); }, [isRanger]);
 
-  const isMine = (t: Task) =>
-    t.assignee === username ||
-    (t.assigneeType === 'group' && internalGroupMembers(t.assignee).includes(username));
+  const isMine = (t: Task) => isTaskAssignee(getTaskAssignees(t), username);
 
   // ─── Derived data ─────────────────────────────────────────────────
   const now = Date.now();
@@ -68,18 +67,22 @@ export function TaskBoardTab() {
   // Base set respecting tab / role visibility
   const baseTasks = (isRanger || tab === 'mine') ? tasks.filter(isMine) : tasks;
 
-  const uniqueAssignees = Array.from(new Set(tasks.map(t => t.assignee).filter(a => a && a !== 'Unassigned'))).sort();
+  const uniqueAssignees = Array.from(
+    new Set(tasks.flatMap(t => getTaskAssignees(t).map(a => a.name)))
+  ).sort();
 
   const filteredTasks = baseTasks.filter(t => {
+    const taskAssignees = getTaskAssignees(t);
     if (filterStatus !== 'All' && t.status !== filterStatus) return false;
     if (filterPriority !== 'All' && t.priority !== filterPriority) return false;
-    if (filterAssignee !== 'All' && t.assignee !== filterAssignee) return false;
+    if (filterAssignee !== 'All' && !taskAssignees.some(a => a.name === filterAssignee)) return false;
     if (filterCase !== 'All' && t.caseId !== filterCase) return false;
     if (filterDateStart && (!t.dueDate || new Date(t.dueDate) < new Date(filterDateStart))) return false;
     if (filterDateEnd && (!t.dueDate || new Date(t.dueDate) > new Date(filterDateEnd + 'T23:59:59'))) return false;
     if (searchTerm.trim()) {
       const q = searchTerm.toLowerCase();
-      const hay = `${t.id} ${t.title} ${t.description} ${t.assignee} ${t.caseId}`.toLowerCase();
+      const assigneeNames = taskAssignees.map(a => a.name).join(' ');
+      const hay = `${t.id} ${t.title} ${t.description} ${assigneeNames} ${t.caseId}`.toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;
@@ -343,7 +346,7 @@ export function TaskBoardTab() {
                       </span>
                     </td>
                     <td>
-                      <RespondersAvatars names={t.assignee} />
+                      <RespondersAvatars names={getTaskAssignees(t).map(a => a.name)} />
                     </td>
                     <td>
                       <span className={`badge ${taskBadgeClass(t.status)}`}>{t.status}</span>

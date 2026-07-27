@@ -12,7 +12,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import {
-  BroadcastRecordDTO, StatusBadge, LevelDot, ChannelIcons, EditedTag,
+  BroadcastRecordDTO, StatusBadge, LevelDot, EditedTag,
   fmtDateTime, effectiveStatusLabel,
 } from './broadcastUi';
 import { RecipientChips } from './RecipientChips';
@@ -34,7 +34,7 @@ export function RoutingInfo({ bc }: { bc: BroadcastRecordDTO }) {
         <dt style={dtStyle}>Recipient group</dt>
         <dd style={ddStyle}>{bc.recipientGroups?.length ? bc.recipientGroups.join(', ') : <span style={{ color: 'var(--text-faint)', fontWeight: 500 }}>group unknown</span>}</dd>
         <dt style={dtStyle}>Channel</dt>
-        <dd style={ddStyle}><ChannelIcons channels={bc.channels} /> {bc.channels?.join(', ')}</dd>
+        <dd style={ddStyle}>{bc.channels?.join(', ')}</dd>
         {bc.incidentId && (
           <>
             <dt style={dtStyle}>Incident</dt>
@@ -148,6 +148,21 @@ export function BroadcastReviewCore({
       <div style={{ paddingBottom: 16, borderBottom: '1px solid var(--border-color)', marginBottom: 16 }}>
         <RoutingInfo bc={bc} />
       </div>
+
+      {error && (
+        <div style={{ background: 'var(--color-critical-bg)', border: '1px solid var(--color-critical-border)', color: '#991B1B', borderRadius: 'var(--radius-md)', padding: '10px 12px', fontSize: 12.5, marginBottom: 16 }}>
+          {error}
+        </div>
+      )}
+
+      {isEditable && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+          <button type="button" onClick={dispatch} disabled={busy || recipients.length === 0} className="btn btn-primary">
+            {busy ? 'Sending…' : 'Approve & Send →'}
+          </button>
+        </div>
+      )}
+
       <div style={{ paddingBottom: 16, borderBottom: '1px solid var(--border-color)', marginBottom: 16 }}>
         <h3 style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 10 }}>
           Recipients ({recipients.length})
@@ -184,20 +199,6 @@ export function BroadcastReviewCore({
       </div>
 
       <RecordAuditBlock bc={bc} />
-
-      {error && (
-        <div style={{ background: 'var(--color-critical-bg)', border: '1px solid var(--color-critical-border)', color: '#991B1B', borderRadius: 'var(--radius-md)', padding: '10px 12px', fontSize: 12.5, marginTop: 16 }}>
-          {error}
-        </div>
-      )}
-
-      {isEditable && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border-color)' }}>
-          <button type="button" onClick={dispatch} disabled={busy || recipients.length === 0} className="btn btn-primary">
-            {busy ? 'Sending…' : 'Approve & Send →'}
-          </button>
-        </div>
-      )}
     </>
   );
 }

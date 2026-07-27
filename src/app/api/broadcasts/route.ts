@@ -52,7 +52,12 @@ export async function GET(request: Request) {
     const contentEdited = searchParams.get('contentEdited'); // 'true' | 'false'
     const incidentType = searchParams.get('incidentType');
     const search = searchParams.get('search')?.trim().toLowerCase();
-    const dateBasis = (searchParams.get('dateBasis') === 'sentAt' ? 'sentAt' : 'createdAt') as 'createdAt' | 'sentAt';
+    // dateBasis is legacy/optional now — the Broadcast Records filter card (redesigned
+    // 2026-07-27 per Kyle) dropped the "Filter date by" picker entirely: From/To now
+    // matches a record that was either CREATED or SENT/dispatched within the window,
+    // instead of forcing the user to pick one basis up front. A caller that still
+    // passes dateBasis explicitly keeps the old single-basis behavior.
+    const dateBasis = searchParams.get('dateBasis') as 'createdAt' | 'sentAt' | null;
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
@@ -82,12 +87,17 @@ export async function GET(request: Request) {
     if (contentEdited === 'false') broadcasts = broadcasts.filter((b) => !b.contentEditConfirmed);
     if (incidentType) broadcasts = broadcasts.filter((b) => b.incidentType === incidentType);
     if (startDate || endDate) {
-      broadcasts = broadcasts.filter((b) => {
-        const basisValue = dateBasis === 'sentAt' ? (b.sentAt || b.dispatchedAt) : (b.createdAt || b.sentAt || b.dispatchedAt);
-        if (!basisValue) return false; // a record with no timestamp on the chosen basis can't match a date range
-        if (startDate && basisValue < startDate) return false;
-        if (endDate && basisValue > endDate) return false;
+      const inRange = (v?: string | null) => {
+        if (!v) return false;
+        if (startDate && v < startDate) return false;
+        if (endDate && v > endDate) return false;
         return true;
+      };
+      broadcasts = broadcasts.filter((b) => {
+        if (dateBasis === 'createdAt') return inRange(b.createdAt);
+        if (dateBasis === 'sentAt') return inRange(b.sentAt) || inRange(b.dispatchedAt);
+        // No basis specified — match a record CREATED or SENT/dispatched within the window.
+        return inRange(b.createdAt) || inRange(b.sentAt) || inRange(b.dispatchedAt);
       });
     }
     if (search) {
@@ -240,6 +250,23 @@ export async function POST(request: Request) {
       deliveryAttempts: 0,
     };
     db.broadcasts.push(record);
+
+    // Audit trail — entityId lets the broadcast detail page's Audit Log section
+    // (added 2026-07-27) filter the shared /api/admin/audit log down to just this
+    // record's history, same pattern as the Broadcast Template detail page.
+    if (!db.auditLogs) db.auditLogs = [];
+    db.auditLogs.push({
+      id: `AUD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      timestamp: nowIso,
+      user: record.queuedBy || 'system',
+      module: 'Broadcast',
+      action: 'Queue Broadcast',
+      details: `Queued ${record.type} broadcast ${id} for ${recipients.length} recipient(s).`,
+      correlationId: `CORR-${Date.now()}`,
+      ipAddress: '127.0.0.1',
+      entityId: id,
+    });
+
     await saveDb(db);
 
     if (resolutionWarning) {

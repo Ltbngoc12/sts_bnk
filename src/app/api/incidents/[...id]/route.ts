@@ -580,6 +580,21 @@ export async function POST(
               `Closure broadcast ${broadcastId} queued for Controller review — ${resolved.recipients.length} recipient(s) pre-filled from "${resolved.recipientGroups.join(', ') || 'no matched group'}".`
             ));
 
+            // Audit trail — entityId lets the broadcast detail page's Audit Log
+            // section filter the shared /api/admin/audit log to this record only.
+            if (!db.auditLogs) db.auditLogs = [];
+            db.auditLogs.push({
+              id: `AUD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+              timestamp: nowIso,
+              user: actor,
+              module: 'Broadcast',
+              action: 'Queue Closure Broadcast',
+              details: `Closure broadcast ${broadcastId} queued for Controller review — ${resolved.recipients.length} recipient(s).`,
+              correlationId: `CORR-${Date.now()}`,
+              ipAddress: '127.0.0.1',
+              entityId: broadcastId,
+            });
+
             // ── Action Prompt Rule: notify recipient role(s) (admin config redesign,
             // 2026-07-25). Previously this prompt didn't exist at all — the Controller
             // had no in-app signal that a closure broadcast was waiting. Recipient

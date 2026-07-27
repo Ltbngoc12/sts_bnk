@@ -54,10 +54,9 @@ const ADMIN_ITEMS = [
   { name: 'User Management', path: '/admin/users' },
   { name: 'Role Management', path: '/admin/roles' },
   { name: 'Taxonomy', path: '/admin/taxonomy' },
-  { name: 'Task Checklist Templates', path: '/admin/task-templates' },
   { name: 'Location Hierarchy', path: '/admin/location-hierarchy' },
   { name: 'Broadcast Configuration', path: '/admin/broadcast-config' },
-  { name: 'Distribution Groups', path: '/admin/distribution-groups' },
+  { name: 'Task Configuration', path: '/admin/task-configuration' },
   { name: 'Audit Log', path: '/admin/audit-log' },
   { name: 'System Settings', path: '/admin/system-settings' },
 ];

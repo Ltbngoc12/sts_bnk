@@ -1,13 +1,13 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Task, Case, RecurrenceConfig } from '@/lib/db';
+import { Task, Case, RecurrenceConfig, TaskAssignee } from '@/lib/db';
 import { RecurrenceScheduleField, recurrenceSummary } from '@/components/RecurrenceScheduleField';
 import { useNotifications } from '@/context/NotificationContext';
-import { getAssignableUsers, getAssignableGroups } from '@/lib/taskHelpers';
 import { getUsers } from '@/lib/users';
 import { getTaskPriorityTaxonomy } from '@/lib/taxonomy';
 import { ChecklistTemplate, getActiveChecklistTemplates } from '@/lib/checklistTemplates';
+import TaskAssigneeSelect from '@/components/TaskAssigneeSelect';
 
 interface ChecklistDraft { id: string; text: string; }
 
@@ -42,8 +42,7 @@ export default function TaskCreateModal({
   const [taskTitle, setTaskTitle] = useState('');
   const [taskDesc, setTaskDesc] = useState('');
   const [taskCaseId, setTaskCaseId] = useState('new-case');
-  const [assignType, setAssignType] = useState<'user' | 'group'>('user');
-  const [taskAssignee, setTaskAssignee] = useState('');
+  const [taskAssignees, setTaskAssignees] = useState<TaskAssignee[]>([]);
   const [taskPriority, setTaskPriority] = useState('Normal');
   const [priorityOptions, setPriorityOptions] = useState<string[]>(['Normal', 'High']);
   const [taskDueDate, setTaskDueDate] = useState('');
@@ -76,7 +75,7 @@ export default function TaskCreateModal({
   function resetForm() {
     setTaskTitle(''); setTaskDesc(''); setTaskDueDate('');
     setRecurrence(null); setChecklist([]); setChecklistInput('');
-    setAttachments([]); setTaskAssignee(''); setAssignType('user');
+    setAttachments([]); setTaskAssignees([]);
     setTaskPriority('Normal'); setCreateError(''); setSelectedTemplateId('');
     setTaskCaseId(isLinked ? (caseId as string) : 'new-case');
     setSelectedCase(isLinked ? { id: caseId as string, title: caseId as string } : { id: 'NEW CASE', title: 'Auto-create new case' });
@@ -117,14 +116,19 @@ export default function TaskCreateModal({
     setChecklist(tpl.checklist.map((c, i) => ({ id: `chk-${Date.now()}-${i}`, text: c.text })));
   };
 
-  const notifyNewAssignee = (name: string, type: 'user' | 'group', title: string) => {
-    if (type === 'group') {
-      addNotification({ title: 'Task Assigned', message: `New task "${title}" assigned to group ${name}.`, role: 'Responder (Ranger)', type: 'task', link: '/tasks' });
-    } else {
-      const u = getUsers().find(x => x.name === name);
-      const targetRole = u?.role === 'Responder' ? 'Responder (Ranger)' : ((u?.role as any) || 'Responder (Ranger)');
-      addNotification({ title: 'Task Assigned', message: `New task "${title}" assigned to you.`, role: targetRole, type: 'task', link: '/tasks' });
-    }
+  const notifyNewAssignees = (assignees: TaskAssignee[], title: string) => {
+    const notifiedUsers = new Set<string>();
+    assignees.forEach(a => {
+      if (a.type === 'group') {
+        addNotification({ title: 'Task Assigned', message: `New task "${title}" assigned to group ${a.name}.`, role: 'Responder (Ranger)', type: 'task', link: '/tasks' });
+      } else {
+        if (notifiedUsers.has(a.name)) return; // avoid duplicate pings if picked twice somehow
+        notifiedUsers.add(a.name);
+        const u = getUsers().find(x => x.name === a.name);
+        const targetRole = u?.role === 'Responder' ? 'Responder (Ranger)' : ((u?.role as any) || 'Responder (Ranger)');
+        addNotification({ title: 'Task Assigned', message: `New task "${title}" assigned to you.`, role: targetRole, type: 'task', link: '/tasks' });
+      }
+    });
   };
 
   const handleCreateTask = async (e: React.FormEvent) => {
@@ -161,8 +165,7 @@ export default function TaskCreateModal({
         caseId: targetCaseId,
         title: taskTitle,
         description: taskDesc,
-        assignee: taskAssignee || 'Unassigned',
-        assigneeType: assignType,
+        assignees: taskAssignees,
         priority: taskPriority,
         dueDate: taskDueDate,
         recurrence: recurrence || undefined,
@@ -180,7 +183,7 @@ export default function TaskCreateModal({
       });
       if (res.ok) {
         const newTask = await res.json();
-        if (taskAssignee) notifyNewAssignee(taskAssignee, assignType, taskTitle);
+        if (taskAssignees.length > 0) notifyNewAssignees(taskAssignees, taskTitle);
         resetForm();
         onSuccess(newTask);
         onClose();
@@ -196,9 +199,6 @@ export default function TaskCreateModal({
   };
 
   if (!isOpen) return null;
-
-  const assignableUsers = getAssignableUsers();
-  const assignableGroups = getAssignableGroups();
 
   const activeCases = cases.filter(c => c.status !== 'Closed');
   const filteredCases = activeCases.filter(c => {
@@ -416,24 +416,7 @@ export default function TaskCreateModal({
               )}
             </div>
 
-            <div className="form-grid">
-              <div className="form-group">
-                <label>Assign To</label>
-                <select value={assignType} onChange={e => { setAssignType(e.target.value as any); setTaskAssignee(''); }} className="form-control select-dark">
-                  <option value="user">Individual User</option>
-                  <option value="group">Group</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label>{assignType === 'user' ? 'Assignee' : 'Group'}</label>
-                <select value={taskAssignee} onChange={e => setTaskAssignee(e.target.value)} className="form-control select-dark">
-                  <option value="">-- Unassigned --</option>
-                  {assignType === 'user'
-                    ? assignableUsers.map(u => <option key={u.id} value={u.name}>{u.name} ({u.role})</option>)
-                    : assignableGroups.map(g => <option key={g.id} value={g.name}>{g.name}</option>)}
-                </select>
-              </div>
-            </div>
+            <TaskAssigneeSelect value={taskAssignees} onChange={setTaskAssignees} />
 
             <div className="form-grid">
               <div className="form-group">

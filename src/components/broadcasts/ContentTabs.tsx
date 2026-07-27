@@ -1,6 +1,6 @@
 'use client';
 
-// Content viewer/editor — Preview / Source(or Edit) / Diff tabs.
+// Content viewer/editor — Preview / Source(or Edit) tabs.
 //
 // Fixes the typography half of gap U4/U6/U17: the old panel rendered content as
 // `<pre style={{fontFamily: monospace, fontSize: 11.5px}}>` regardless of context
@@ -10,34 +10,12 @@
 // line) — Source/Edit keeps the monospace view since that IS an editing surface
 // where exact whitespace matters.
 //
-// Diff (fixes gap G6 — the old confirmation checkbox had nothing to diff
-// against because contentDispatched was overwritten at dispatch time and the
-// original default was lost) compares contentDefault (queue-time snapshot,
-// preserved forever) against the current draft with a small LCS line diff.
+// The Diff tab (queue-time snapshot vs. current draft) was removed 2026-07-27
+// per Kyle's request — the "Content edited from default" callout in the Edit
+// tab already surfaces the confirmation checkbox (§10.4d), so the separate
+// diff view was redundant.
 
 import React, { useState } from 'react';
-
-type Line = { type: 'same' | 'del' | 'add'; text: string };
-
-function diffLines(a: string[], b: string[]): Line[] {
-  const n = a.length, m = b.length;
-  const dp: number[][] = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
-  for (let i = n - 1; i >= 0; i--) {
-    for (let j = m - 1; j >= 0; j--) {
-      dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
-    }
-  }
-  const result: Line[] = [];
-  let i = 0, j = 0;
-  while (i < n && j < m) {
-    if (a[i] === b[j]) { result.push({ type: 'same', text: a[i] }); i++; j++; }
-    else if (dp[i + 1][j] >= dp[i][j + 1]) { result.push({ type: 'del', text: a[i] }); i++; }
-    else { result.push({ type: 'add', text: b[j] }); j++; }
-  }
-  while (i < n) { result.push({ type: 'del', text: a[i] }); i++; }
-  while (j < m) { result.push({ type: 'add', text: b[j] }); j++; }
-  return result;
-}
 
 export function ContentTabs({
   subject,
@@ -58,10 +36,9 @@ export function ContentTabs({
   onConfirmChange: (v: boolean) => void;
   editTabLabel?: string;
 }) {
-  const [tab, setTab] = useState<'preview' | 'edit' | 'diff'>('preview');
+  const [tab, setTab] = useState<'preview' | 'edit'>('preview');
   const baseline = defaultContent ?? value;
   const changed = value.trim() !== baseline.trim();
-  const diff = tab === 'diff' ? diffLines(baseline.split('\n'), value.split('\n')) : [];
 
   const tabBtn = (key: typeof tab, label: string) => (
     <button
@@ -84,7 +61,6 @@ export function ContentTabs({
       <div style={{ display: 'flex', gap: 4, marginBottom: 12, borderBottom: '1px solid var(--border-color)' }}>
         {tabBtn('preview', 'Preview')}
         {tabBtn('edit', editable ? editTabLabel : 'Source')}
-        {tabBtn('diff', changed ? 'Diff (edited)' : 'Diff')}
       </div>
 
       {tab === 'preview' && (
@@ -134,29 +110,6 @@ export function ContentTabs({
             {value}
           </pre>
         )
-      )}
-
-      {tab === 'diff' && (
-        <div style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: 12, background: '#fff' }}>
-          {!changed ? (
-            <div style={{ color: 'var(--text-faint)', fontSize: 12.5 }}>No changes from the default.</div>
-          ) : (
-            diff.map((l, idx) => (
-              <div
-                key={idx}
-                style={{
-                  fontFamily: 'var(--font-mono)', fontSize: 11.5, lineHeight: 1.7,
-                  padding: '1px 6px', borderRadius: 3,
-                  background: l.type === 'del' ? 'var(--color-critical-bg)' : l.type === 'add' ? 'var(--color-active-bg)' : 'transparent',
-                  color: l.type === 'del' ? '#991B1B' : l.type === 'add' ? '#065F46' : 'var(--text-main)',
-                  textDecoration: l.type === 'del' ? 'line-through' : 'none',
-                }}
-              >
-                {l.type === 'del' ? '− ' : l.type === 'add' ? '+ ' : '  '}{l.text || ' '}
-              </div>
-            ))
-          )}
-        </div>
       )}
     </div>
   );

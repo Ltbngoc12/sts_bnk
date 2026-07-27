@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
-import { getDb, saveDb, generateTaskId, generateCaseId, generateSeriesId, Task, TaskChecklistItem, TaskAudit, RecurrenceSeries, normalizeTaskPriority } from '@/lib/db';
+import { getDb, saveDb, generateTaskId, generateCaseId, generateSeriesId, Task, TaskAssignee, TaskChecklistItem, TaskAudit, RecurrenceSeries, normalizeTaskPriority } from '@/lib/db';
 import { validateRecurrence } from '@/lib/recurrence';
 import { advanceSeries } from '@/lib/seriesEngine';
+import { deriveLegacyAssigneeFields, sanitizeAssignees } from '@/lib/taskHelpers';
 
 function makeAudit(operator: string, action: string, details: string): TaskAudit {
   return {
@@ -64,7 +65,16 @@ export async function POST(request: Request) {
       }
 
       const creator = body.username || 'Controller';
-      const hasAssignee = !!body.assignee && body.assignee !== 'Unassigned';
+      // `assignees` (array) is the current shape — falls back to the legacy
+      // singular assignee/assigneeType if an older caller still sends those
+      // (e.g. anything not yet migrated off the old single-select shape).
+      const assignees: TaskAssignee[] = Array.isArray(body.assignees)
+        ? sanitizeAssignees(body.assignees)
+        : (body.assignee && body.assignee !== 'Unassigned'
+          ? [{ type: body.assigneeType === 'group' ? 'group' as const : 'user' as const, id: body.assignee, name: body.assignee }]
+          : []);
+      const hasAssignee = assignees.length > 0;
+      const legacy = deriveLegacyAssigneeFields(assignees);
 
       // Sanitize checklist items coming from the client
       const checklist: TaskChecklistItem[] = Array.isArray(body.checklist)
@@ -84,8 +94,9 @@ export async function POST(request: Request) {
         sourceEDiaryId: body.sourceEDiaryId || undefined,
         title: body.title,
         description: body.description || '',
-        assignee: hasAssignee ? body.assignee : 'Unassigned',
-        assigneeType: body.assigneeType === 'group' ? 'group' : 'user',
+        assignee: legacy.assignee,
+        assigneeType: legacy.assigneeType,
+        assignees,
         priority: normalizeTaskPriority(body.priority),
         dueDate: body.dueDate || '',
         // If an assignee is provided at creation, the task starts in Assigned (FRD 7.2)
@@ -102,7 +113,7 @@ export async function POST(request: Request) {
         audits: [
           makeAudit(creator, 'Created', `Task created by ${creator}.`),
           ...(hasAssignee
-            ? [makeAudit(creator, 'Assigned', `Assigned to ${body.assignee} (${body.assigneeType === 'group' ? 'group' : 'user'}). Status set to Assigned.`)]
+            ? [makeAudit(creator, 'Assigned', `Assigned to ${assignees.map(a => `${a.name} (${a.type})`).join(', ')}. Status set to Assigned.`)]
             : []),
         ],
       };
@@ -128,6 +139,7 @@ export async function POST(request: Request) {
             priority: normalizeTaskPriority(newTask.priority),
             assignee: newTask.assignee,
             assigneeType: newTask.assigneeType,
+            assignees: newTask.assignees,
             checklist,
           },
         };

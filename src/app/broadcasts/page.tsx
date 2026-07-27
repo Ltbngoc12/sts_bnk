@@ -56,7 +56,7 @@ function BroadcastsPageInner() {
             cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap',
           }}
         >
-          <span style={{ fontSize: 14 }}>📡</span> Broadcasts
+          <span style={{ fontSize: 14 }}>📡</span> Broadcast Records
         </button>
         {canReviewEod && (
           <button
