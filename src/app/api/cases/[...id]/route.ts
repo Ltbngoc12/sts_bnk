@@ -93,7 +93,9 @@ export async function PUT(
         type: incidentData.type || 'Others',
         subType: incidentData.subType || 'Others',
         priority: incidentData.priority || 'Normal',
-        crisisLevel: 4,
+        // See the same fix in api/cases/route.ts — this was hardcoded to 4 and
+        // discarded the crisis level entered on the form.
+        crisisLevel: incidentData.crisisLevel !== undefined ? parseInt(String(incidentData.crisisLevel), 10) : 4,
         reporterName: incidentData.reporterName || 'Unknown',
         requestedBy: incidentData.requestedBy || 'IIOC Controller',
         reportingSource: incidentData.reportingSource || '',
@@ -159,6 +161,18 @@ export async function PUT(
 
     db.cases[caseIndex] = existingCase;
     await saveDb(db);
+
+    // Crisis trigger hook — see the equivalent block in api/cases/route.ts. This is
+    // the "add an incident to an existing case" path, which is the other way an
+    // incident can first appear at a triggering crisis level.
+    if (existingCase.incident) {
+      try {
+        const { evaluateCrisisTrigger } = await import('@/lib/crisisRuntime');
+        await evaluateCrisisTrigger(existingCase.incident, body.username || 'System');
+      } catch (crisisErr) {
+        console.error('Crisis trigger evaluation failed (case saved regardless):', crisisErr);
+      }
+    }
 
     return NextResponse.json(existingCase);
   } catch (error: any) {

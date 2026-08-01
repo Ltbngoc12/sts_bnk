@@ -228,6 +228,27 @@ export async function PUT(
     db.cases[caseIndex] = currentCase;
     await saveDb(db);
 
+    // ── Crisis trigger hook (Crisis build plan Epic 2, stories 9–11) ──
+    // An incident reaching a triggering crisis level auto-creates a Crisis record
+    // in PENDING_REVIEW and notifies the Duty Manager role. If a crisis already
+    // exists for this incident, evaluateCrisisTrigger() is a no-op and
+    // reconcileIncidentLevelChange() applies the §5.1 linkage rules instead
+    // (downgrade before review supersedes; after dispatch nothing is automatic,
+    // because responders are already mobilising).
+    //
+    // Deliberately non-fatal: a crisis-module failure must never prevent an
+    // incident from being saved. The incident record is the system of record.
+    if (body.crisisLevel !== undefined) {
+      try {
+        const { evaluateCrisisTrigger, reconcileIncidentLevelChange } = await import('@/lib/crisisRuntime');
+        const crisisActor = body.username ?? 'System';
+        await reconcileIncidentLevelChange(incident, crisisActor);
+        await evaluateCrisisTrigger(incident, crisisActor);
+      } catch (crisisErr) {
+        console.error('Crisis trigger evaluation failed (incident saved regardless):', crisisErr);
+      }
+    }
+
     return NextResponse.json(incident);
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
@@ -513,6 +534,26 @@ export async function POST(
       case 'close': {
         if (incident.status === 'Closed') {
           return NextResponse.json({ error: 'Incident is already Closed.' }, { status: 409 });
+        }
+
+        // ── Crisis build plan §5.1 linkage ──
+        // An incident cannot be closed while its emergency recall is still live.
+        // A recall with responders who have not been stood down must not outlive
+        // its incident silently — someone is still driving in.
+        try {
+          const { blockingCrisisForIncident } = await import('@/lib/crisisRuntime');
+          const openCrisis = await blockingCrisisForIncident(incident.id);
+          if (openCrisis) {
+            return NextResponse.json(
+              {
+                error: `This incident has an active emergency recall (${openCrisis.status}). Stand the crisis down before closing the incident.`,
+                crisisId: openCrisis.id,
+              },
+              { status: 409 }
+            );
+          }
+        } catch (crisisErr) {
+          console.error('Crisis closure check failed:', crisisErr);
         }
         incident.status = 'Closed';
         incident.completionRemarks = body.closureRemarks || '';

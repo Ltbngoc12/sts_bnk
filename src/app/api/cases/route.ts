@@ -190,7 +190,11 @@ export async function POST(request: Request) {
           type: incidentData.type || 'Others',
           subType: incidentData.subType || 'Others',
           priority: incidentData.priority || 'Normal',
-          crisisLevel: 4,
+          // Was hardcoded to 4, silently discarding whatever crisis level the
+          // Controller picked on the new-incident form. That made every incident a
+          // Level 4 regardless of what was entered — which also meant the crisis
+          // recall trigger (FSD §11.5, Level 1–2) could never fire from creation.
+          crisisLevel: incidentData.crisisLevel !== undefined ? parseInt(String(incidentData.crisisLevel), 10) : 4,
           reporterName: incidentData.reporterName || 'Unknown',
           requestedBy: incidentData.requestedBy || 'IIOC Controller',
           reportingSource: incidentData.reportingSource || '',
@@ -256,6 +260,23 @@ export async function POST(request: Request) {
 
       db.cases.push(newCase);
       await saveDb(db); // Commit transaction
+
+      // ── Crisis trigger hook (Crisis build plan Epic 2, story 9) ──
+      // Must run on CREATION, not only on update: an incident reported straight in
+      // at Level 1–2 is exactly the case the emergency recall exists for, and it is
+      // the most severe one. Hooking only the edit path would mean the worst
+      // incidents — the ones logged correctly first time — never raise a recall.
+      //
+      // Non-fatal by design: a crisis-module failure must never stop an incident
+      // from being created. The incident is the system of record.
+      if (newCase.incident) {
+        try {
+          const { evaluateCrisisTrigger } = await import('@/lib/crisisRuntime');
+          await evaluateCrisisTrigger(newCase.incident, body.username || 'System');
+        } catch (crisisErr) {
+          console.error('Crisis trigger evaluation failed (case created regardless):', crisisErr);
+        }
+      }
 
       return NextResponse.json(newCase, { status: 201 });
     } catch (validationError: any) {

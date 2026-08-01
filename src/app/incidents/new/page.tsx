@@ -33,8 +33,7 @@ export default function NewIncidentPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Simulation Setting state
-  const [simulatedOffset, setSimulatedOffset] = useState<'now' | '45m' | '12d' | '15d'>('now');
+
 
   // Accordion Expand States (1 to 12)
   const [expandedSections, setExpandedSections] = useState<Record<number, boolean>>({
@@ -185,22 +184,7 @@ export default function NewIncidentPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [postalCode]);
 
-  // Time simulation effects
-  useEffect(() => {
-    const now = new Date();
-    if (simulatedOffset === 'now') {
-      setIncidentDateTime(now.toISOString().slice(0, 16));
-    } else if (simulatedOffset === '45m') {
-      const offset = new Date(now.getTime() - 45 * 60 * 1000);
-      setIncidentDateTime(offset.toISOString().slice(0, 16));
-    } else if (simulatedOffset === '12d') {
-      const offset = new Date(now.getTime() - 12 * 24 * 60 * 60 * 1000);
-      setIncidentDateTime(offset.toISOString().slice(0, 16));
-    } else if (simulatedOffset === '15d') {
-      const offset = new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000);
-      setIncidentDateTime(offset.toISOString().slice(0, 16));
-    }
-  }, [simulatedOffset]);
+
 
   // Handle Type -> Sub-Type resets
   useEffect(() => {
@@ -215,7 +199,7 @@ export default function NewIncidentPage() {
   const elapsedMinutes = elapsedMs / (60 * 1000);
   const elapsedDays = elapsedMs / (24 * 60 * 60 * 1000);
 
-  const showCrisisLevelBanner = elapsedMinutes >= 45 && elapsedDays < 12;
+
   const showReviewWarningBanner = elapsedDays >= 12 && elapsedDays < 14;
   const showEscalationWarningBanner = elapsedDays >= 14;
   const showMediaBanner = mediaAtScene;
@@ -770,45 +754,7 @@ export default function NewIncidentPage() {
         </div>
       </div>
 
-      {/* Time Simulation Settings Panel */}
-      <div className="simulator-panel">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-          <span className="simulator-title">⏱️ Incident Age Simulator:</span>
-          <span style={{ fontSize: '11px', color: '#B27C24', opacity: 0.8, fontStyle: 'italic' }}>
-            (Demo simulation for Ageing Alert only — will be removed in production)
-          </span>
-        </div>
-        <div className="simulator-options">
-          <button 
-            type="button" 
-            className={`sim-btn ${simulatedOffset === 'now' ? 'active' : ''}`}
-            onClick={() => setSimulatedOffset('now')}
-          >
-            Just Created
-          </button>
-          <button 
-            type="button" 
-            className={`sim-btn ${simulatedOffset === '45m' ? 'active' : ''}`}
-            onClick={() => setSimulatedOffset('45m')}
-          >
-            45 mins ago
-          </button>
-          <button 
-            type="button" 
-            className={`sim-btn ${simulatedOffset === '12d' ? 'active' : ''}`}
-            onClick={() => setSimulatedOffset('12d')}
-          >
-            12 days ago
-          </button>
-          <button 
-            type="button" 
-            className={`sim-btn ${simulatedOffset === '15d' ? 'active' : ''}`}
-            onClick={() => setSimulatedOffset('15d')}
-          >
-            15 days ago
-          </button>
-        </div>
-      </div>
+
 
       {/* Warning Banners area */}
       <div className="banner-container">
@@ -816,13 +762,6 @@ export default function NewIncidentPage() {
           <div className="warning-banner warning">
             <span className="banner-icon">📢</span>
             <div><strong>SDC Comms Notification:</strong> Press/Media present at scene. SDC Communications team must be notified immediately.</div>
-          </div>
-        )}
-
-        {showCrisisLevelBanner && (
-          <div className="warning-banner info">
-            <span className="banner-icon">⏳</span>
-            <div><strong>Crisis Level Review:</strong> This incident has been open for 45 minutes. Please review and confirm the Crisis Level.</div>
           </div>
         )}
 

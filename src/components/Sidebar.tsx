@@ -43,6 +43,14 @@ const NAV_GROUPS = [
     ]
   },
   {
+    label: 'Crisis',
+    items: [
+      // Emergency Recall queue (FSD §11.5). Visible to every DM rather than a named
+      // one — see the mitigation note at the top of src/app/crisis/page.tsx.
+      { name: 'Crisis Queue', path: '/crisis', d: 'M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01' },
+    ]
+  },
+  {
     label: 'Analytics',
     items: [
       { name: 'Statistics',      path: '/statistics',   d: 'M18 20V10M12 20V4M6 20v-6' },
@@ -56,6 +64,7 @@ const ADMIN_ITEMS = [
   { name: 'Taxonomy', path: '/admin/taxonomy' },
   { name: 'Location Hierarchy', path: '/admin/location-hierarchy' },
   { name: 'Broadcast Configuration', path: '/admin/broadcast-config' },
+  { name: 'Crisis Configuration', path: '/admin/crisis-config' },
   { name: 'Task Configuration', path: '/admin/task-configuration' },
   { name: 'Audit Log', path: '/admin/audit-log' },
   { name: 'System Settings', path: '/admin/system-settings' },
