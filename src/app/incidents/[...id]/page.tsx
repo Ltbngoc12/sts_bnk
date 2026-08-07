@@ -161,6 +161,8 @@ export default function IncidentDetailsPage() {
   // Closure Broadcast compose/dispatch (FSD §5.11.1b / §10.1)
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
   const [broadcastRecipients, setBroadcastRecipients] = useState('');
+  const [broadcastRecipientGroups, setBroadcastRecipientGroups] = useState<string[]>([]);
+  const [showRecipientEmails, setShowRecipientEmails] = useState(false);
   const [broadcastContent, setBroadcastContent] = useState('');
   // Auto-filled default content at the time the modal was opened — diffed against
   // the (possibly edited) broadcastContent to decide whether the "content edited
@@ -679,6 +681,8 @@ export default function IncidentDetailsPage() {
     const bc = list.find(b => b.id === (incident as any)?.closureBroadcastId)
       || list.find(b => b.status === 'PENDING');
     setBroadcastRecipients((bc?.recipients || []).join(', '));
+    setBroadcastRecipientGroups(bc?.recipientGroups || []);
+    setShowRecipientEmails(false);
     setBroadcastContent(bc?.contentDispatched || '');
     setBroadcastOriginalContent(bc?.contentDispatched || '');
     setBroadcastConfirmContentChange(false);
@@ -2510,7 +2514,7 @@ export default function IncidentDetailsPage() {
                       <span className="cd-info-value">
                         {(incident as any).closureBroadcastStatus === 'pending' && (
                           <>
-                            <span className="badge" style={{ background: 'var(--color-high-bg)', color: 'var(--color-high)', borderColor: 'var(--color-high-border)', fontSize: 10 }}>⏳ Pending Dispatch</span>
+                            <span className="badge" style={{ background: 'var(--color-high-bg)', color: 'var(--color-high)', borderColor: 'var(--color-high-border)', fontSize: 10 }}>⏳ Pending Broadcast</span>
                             {hasBroadcastPermission(role, 'broadcast.dispatch') && (
                               <button className="btn btn-primary btn-sm" style={{ marginLeft: 8 }} onClick={openClosureBroadcastModal} disabled={saving}>Review &amp; Dispatch</button>
                             )}
@@ -2542,9 +2546,32 @@ export default function IncidentDetailsPage() {
                   <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
                     Review the pre-filled recipients and content, then dispatch. Broadcast ID: {(incident as any)?.closureBroadcastId || '—'}
                   </div>
-                  <label style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Recipients (comma-separated emails)</label>
-                  <textarea value={broadcastRecipients} onChange={(e) => setBroadcastRecipients(e.target.value)}
-                    rows={3} style={{ width: '100%', margin: '4px 0 14px', padding: 10, borderRadius: 8, border: '1px solid var(--border)', fontSize: 13, fontFamily: 'inherit' }} />
+                  <label style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Recipients</label>
+                  <div style={{ margin: '4px 0 14px' }}>
+                    {broadcastRecipientGroups.length > 0 ? (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                        {broadcastRecipientGroups.map((g) => (
+                          <span key={g} style={{
+                            padding: '3px 9px', borderRadius: 5, fontSize: 11.5, fontWeight: 600,
+                            background: 'var(--sidebar-active-bg, #FFF7ED)', color: 'var(--color-primary-dark, #C2410C)',
+                            border: '1px solid rgba(255, 130, 0, 0.25)', display: 'inline-flex', alignItems: 'center', lineHeight: 1.2,
+                          }}>{g}</span>
+                        ))}
+                        <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+                          {broadcastRecipients.split(',').map(s => s.trim()).filter(Boolean).length} recipient(s)
+                        </span>
+                        <button type="button" className="btn btn-secondary btn-sm" style={{ marginLeft: 'auto' }}
+                          onClick={() => setShowRecipientEmails(v => !v)}>
+                          {showRecipientEmails ? 'Hide emails' : 'Edit emails'}
+                        </button>
+                      </div>
+                    ) : null}
+                    {(showRecipientEmails || broadcastRecipientGroups.length === 0) && (
+                      <textarea value={broadcastRecipients} onChange={(e) => setBroadcastRecipients(e.target.value)}
+                        rows={3} placeholder="comma-separated emails"
+                        style={{ width: '100%', marginTop: broadcastRecipientGroups.length > 0 ? 8 : 0, padding: 10, borderRadius: 8, border: '1px solid var(--border)', fontSize: 13, fontFamily: 'inherit' }} />
+                    )}
+                  </div>
                   <label style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Content</label>
                   <textarea value={broadcastContent} onChange={(e) => setBroadcastContent(e.target.value)}
                     rows={10} style={{ width: '100%', margin: '4px 0 16px', padding: 10, borderRadius: 8, border: '1px solid var(--border)', fontSize: 13, fontFamily: 'monospace' }} />

@@ -21,6 +21,7 @@ export interface BroadcastRecordDTO {
   subject?: string;
   contentDispatched: string;
   contentDefault?: string;
+  carryForwardSummary?: string; // US-BC-01 — see BroadcastRecord.carryForwardSummary comment in db.ts
   sentAt: string | null;
   sentBy: string;
   status: string;

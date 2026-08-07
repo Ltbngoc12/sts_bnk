@@ -653,108 +653,6 @@ export async function markAckWindowElapsed(
   return count;
 }
 
-export async function evaluateReminders(
-  crisis: Crisis,
-  rule: AckEscalationRule,
-  recipients: DispatchRecipient[],
-  db: any,
-  origin: string
-): Promise<number> {
-  if (!rule.remindersEnabled || !rule.reminderMaxCount || rule.reminderMaxCount <= 0) return 0;
-  let count = 0;
-  const nowMs = Date.now();
-  const nowIso = new Date().toISOString();
-
-  let customTemplateBody: string | undefined;
-  if (rule.reminderTemplateId) {
-    const templates = await getRecallTemplates();
-    const tpl = templates.find((t) => t.id === rule.reminderTemplateId && t.status === 'Active');
-    if (tpl) customTemplateBody = tpl.body;
-  }
-
-  const dispatches = await getCrisisDispatches(crisis.id);
-  const baseMessage = dispatches[0]?.renderedMessage || `[CRISIS L${crisis.crisisLevel}] ${crisis.incidentType} — ${crisis.locationSummary}.`;
-
-  for (const r of recipients) {
-    if (r.ackStatus === 'ACKNOWLEDGED') continue;
-
-    if (r.ackStatus === 'DECLINED' && rule.reminderStopOnDecline) {
-      continue;
-    }
-
-    if ((r.deliveryStatus === 'FAILED' || r.deliveryStatus === 'EXHAUSTED') && rule.reminderStopOnDeliveryFailed) {
-      continue;
-    }
-
-    const sentCount = r.remindersSent || 0;
-    if (sentCount >= rule.reminderMaxCount) continue;
-
-    const baseIso = r.firstSentAt || r.sentAt || crisis.dispatchedAt || crisis.createdAt;
-    const elapsedMin = (nowMs - new Date(baseIso).getTime()) / 60000;
-    const dueMin = rule.reminderFirstAfterMinutes + sentCount * rule.reminderIntervalMinutes;
-
-    if (elapsedMin >= dueMin) {
-      if (!r.mobile) {
-        await auditCrisis(crisis.id, 'System', 'Reminder skipped', `${r.name}: Reminder #${sentCount + 1} skipped (no mobile number).`);
-        continue;
-      }
-
-      const reminderNoStr = String(sentCount + 1);
-      const minRemStr = String(Math.max(0, Math.round(rule.ackWindowMinutes - elapsedMin)));
-
-      let msgText = '';
-      if (customTemplateBody) {
-        msgText = renderPlaceholders(customTemplateBody, {
-          '{{crisis_level}}': `L${crisis.crisisLevel}`,
-          '{{incident_type}}': crisis.incidentType,
-          '{{location}}': crisis.locationSummary,
-          '{{reporting_point}}': 'Command Centre L1',
-          '{{incident_no}}': crisis.sourceIncidentId,
-          '{{recipient_name}}': r.name,
-          '{{ack_link}}': `${origin}/ack/${r.ackToken}`,
-          '{{dispatched_at}}': new Date(crisis.dispatchedAt || crisis.createdAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
-          '{{reminder_no}}': reminderNoStr,
-          '{{minutes_remaining}}': minRemStr,
-        });
-      } else {
-        msgText = `[NHẮC LẦN ${reminderNoStr}] ${baseMessage}`;
-      }
-
-      try {
-        const res = await fetch(`${origin}/api/sms-mock`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ recipient: r.name, phoneNumber: r.mobile, message: msgText }),
-        });
-        await db.collection('crisisRecipients').updateOne(
-          { id: r.id },
-          {
-            $set: {
-              deliveryStatus: res.ok ? 'SENT' : 'FAILED',
-              sentAt: nowIso,
-              lastReminderAt: nowIso,
-              failureReason: res.ok ? undefined : 'Gateway rejected reminder SMS',
-            },
-            $inc: { attempts: 1, remindersSent: 1 },
-          }
-        );
-        await auditCrisis(crisis.id, 'System', 'Reminder sent', `Reminder #${reminderNoStr} sent to ${r.name}.`);
-        count++;
-      } catch (e: any) {
-        await db.collection('crisisRecipients').updateOne(
-          { id: r.id },
-          {
-            $set: { deliveryStatus: 'FAILED', lastReminderAt: nowIso, failureReason: e.message },
-            $inc: { attempts: 1, remindersSent: 1 },
-          }
-        );
-        await auditCrisis(crisis.id, 'System', 'Reminder skipped', `${r.name}: Reminder #${reminderNoStr} failed (${e.message}).`);
-      }
-    }
-  }
-  return count;
-}
-
 export async function evaluateCrisisRules(crisisId: string, origin: string): Promise<{ advanced: number }> {
   const crisis = await getCrisis(crisisId);
   if (!crisis || crisis.status !== 'ACTIVE') return { advanced: 0 };
@@ -767,7 +665,6 @@ export async function evaluateCrisisRules(crisisId: string, origin: string): Pro
   advanced += await markAckWindowElapsed(crisis, rule, recipients, db);
 
   const currentRecipients = await getCrisisRecipients(crisisId);
-  advanced += await evaluateReminders(crisis, rule, currentRecipients, db, origin);
 
   for (const r of currentRecipients) {
     if (r.ackStatus === 'ACKNOWLEDGED' || r.ackStatus === 'DECLINED') continue;

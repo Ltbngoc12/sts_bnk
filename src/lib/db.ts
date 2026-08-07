@@ -458,6 +458,20 @@ export interface BroadcastRecord {
   // (gap G6). contentDispatched remains "what was actually sent"; contentDefault
   // is "what the template would have produced".
   contentDefault?: string;
+
+  // US-BC-01 (2026-08-07, Kyle) — free-text note the Duty Manager enters on the
+  // End-of-Day review screen explaining why THIS incident is carrying forward to
+  // the next day, without having to open the full Edit tab. Scoped to this one
+  // record (i.e. this one incident/eodDate night) — never copied or defaulted
+  // from a prior night's record (BR3). Only ever written at dispatch time (same
+  // as recipients/content — there is no separate draft-save path on this screen),
+  // so an un-dispatched record reloaded after a refresh has no value here even if
+  // something was typed into the box in a previous session (EC4). When present,
+  // it is substituted into the rendered content ahead of incident.summary — see
+  // applyCarryForwardSummary() in broadcast.ts — WITHOUT counting as a manual
+  // content edit (BR5): the confirmation gate below only fires on top of that
+  // substitution, not because of it.
+  carryForwardSummary?: string;
   crisisLevel?: string;            // snapshot "Level N" — table/filter column, avoids re-joining the incident
   incidentType?: string;
   incidentSubType?: string;

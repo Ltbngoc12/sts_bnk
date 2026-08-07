@@ -9,16 +9,17 @@
 // (e.g. the content-diff gate, or the dispatch request shape) can't drift
 // between the two tabs the way the old two separate pages did.
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   BroadcastRecordDTO, StatusBadge, LevelDot, EditedTag,
   fmtDateTime, effectiveStatusLabel,
 } from './broadcastUi';
 import { RecipientChips } from './RecipientChips';
+import { CarryForwardSummaryField } from './CarryForwardSummaryField';
 import { ContentTabs } from './ContentTabs';
 import { DeliveryTable } from './DeliveryTable';
-import { encodeIdPath } from '@/lib/broadcast';
+import { encodeIdPath, applyCarryForwardSummary } from '@/lib/broadcast';
 
 export function RoutingInfo({ bc }: { bc: BroadcastRecordDTO }) {
   return (
@@ -118,6 +119,28 @@ export function BroadcastReviewCore({
   // the snapshot as first loaded, before any local edits in this session.
   const [initialRecipients] = useState<string[]>(bc.recipients || []);
 
+  // US-BC-01 — Carry-Forward Summary. Like recipients/content, this only lives in
+  // local state until dispatch() sends it — there is no separate draft-save path
+  // on this screen (see BroadcastRecord.carryForwardSummary comment in db.ts).
+  const [carryForwardSummary, setCarryForwardSummary] = useState(bc.carryForwardSummary || '');
+  // Whether the Duty Manager has directly typed into the Edit tab THIS session.
+  // Once true, the summary box no longer auto-updates `content` — an Edit-tab
+  // edit is authoritative over the guided summary substitution (US-BC-01 EC1).
+  const [contentTouched, setContentTouched] = useState(false);
+
+  // The baseline BOTH the Preview tab and the "content edited from default"
+  // confirmation gate treat as "unedited" — the queue-time default with the
+  // Carry-Forward Summary merged in, if any (BR4/BR5: typing in that box must
+  // never by itself require the confirmation checkbox). Recomputed on every
+  // keystroke in the summary box; `content` (the Edit tab's live value) is kept
+  // in sync with it below UNLESS the Duty Manager has edited the Edit tab
+  // directly, at which point their edit wins (EC1).
+  const effectiveDefault = applyCarryForwardSummary(bc.contentDefault ?? bc.contentDispatched ?? '', carryForwardSummary);
+  useEffect(() => {
+    if (isEditable && !contentTouched) setContent(effectiveDefault);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveDefault, contentTouched, isEditable]);
+
   const dispatch = async () => {
     if (recipients.length === 0) { setError('Recipient list cannot be empty.'); return; }
     setBusy(true);
@@ -129,6 +152,7 @@ export function BroadcastReviewCore({
         body: JSON.stringify({
           action: 'dispatch', recipients, content, role, user: username,
           confirmContentChange: confirmChange,
+          carryForwardSummary,
         }),
       });
       const data = await res.json();
@@ -148,6 +172,14 @@ export function BroadcastReviewCore({
       <div style={{ paddingBottom: 16, borderBottom: '1px solid var(--border-color)', marginBottom: 16 }}>
         <RoutingInfo bc={bc} />
       </div>
+
+      {/* US-BC-01 — End-of-Day Interim only (BR7); Closure/Weather/Manual records
+          never render this block. */}
+      {bc.type === 'End-of-Day' && (
+        <div style={{ paddingBottom: 16, borderBottom: '1px solid var(--border-color)', marginBottom: 16 }}>
+          <CarryForwardSummaryField value={carryForwardSummary} editable={isEditable} onChange={setCarryForwardSummary} />
+        </div>
+      )}
 
       {error && (
         <div style={{ background: 'var(--color-critical-bg)', border: '1px solid var(--color-critical-border)', color: '#991B1B', borderRadius: 'var(--radius-md)', padding: '10px 12px', fontSize: 12.5, marginBottom: 16 }}>
@@ -186,10 +218,15 @@ export function BroadcastReviewCore({
             // the edit and reject the dispatch with "explicit confirmation is
             // required" — a dead end with no checkbox to satisfy it. Bug found by
             // Kyle 2026-07-26 on a legacy record with no contentDefault.
-            defaultContent={bc.contentDefault ?? bc.contentDispatched}
+            //
+            // US-BC-01: also merged with the Carry-Forward Summary (effectiveDefault
+            // instead of the raw contentDefault/contentDispatched) so that typing in
+            // that box alone never trips the "edited from default" gate — only an
+            // Edit-tab change ON TOP of the summary substitution does (BR5/EC1).
+            defaultContent={effectiveDefault}
             value={content}
             editable={isEditable}
-            onChange={setContent}
+            onChange={(v) => { setContentTouched(true); setContent(v); }}
             confirmChecked={confirmChange}
             onConfirmChange={setConfirmChange}
             editTabLabel={editTabLabel}

@@ -242,7 +242,7 @@ export default function CrisisConfigPage() {
         <RoutingTab rules={rules} setRules={setRules} groups={groups} templates={templates} taxonomy={taxonomy} logAudit={logAudit} />
       )}
       {activeTab === 'Provider' && provider && <ProviderTab cfg={provider} setCfg={setProvider} templates={templates} logAudit={logAudit} />}
-      {activeTab === 'Ack' && ack && <AckTab rule={ack} setRule={setAck} provider={provider} templates={templates} logAudit={logAudit} />}
+      {activeTab === 'Ack' && ack && <AckTab rule={ack} setRule={setAck} provider={provider} logAudit={logAudit} />}
     </AdminGuard>
   );
 }
@@ -1099,13 +1099,11 @@ function AckTab({
   rule,
   setRule,
   provider,
-  templates,
   logAudit,
 }: {
   rule: AckEscalationRule;
   setRule: (r: AckEscalationRule) => void;
   provider: MessagingServiceConfig | null;
-  templates: RecallMessageTemplate[];
   logAudit: (a: string, b: any, c: any, d: string) => Promise<void>;
 }) {
   const [draft, setDraft] = useState<AckEscalationRule>(rule);
@@ -1127,7 +1125,7 @@ function AckTab({
         'Edit Acknowledgement & Escalation Rules',
         rule,
         json.rule,
-        `Ack window ${draft.ackWindowMinutes}m, Reminders ${draft.remindersEnabled ? 'enabled' : 'disabled'}, ${draft.ladder.length} escalation step(s).`
+        `Ack window ${draft.ackWindowMinutes}m, ${draft.ladder.length} escalation step(s).`
       );
     } catch (e: any) {
       alert(`Could not save: ${e.message}`);
@@ -1185,35 +1183,14 @@ function AckTab({
             <input style={input} type="number" min={1} value={draft.ackWindowMinutes} onChange={(e) => setDraft({ ...draft, ackWindowMinutes: Number(e.target.value) })} />
           </div>
           <div>
-            <label style={label}>Capture ETA on acknowledgement</label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', paddingTop: '8px' }}>
-              <input type="checkbox" checked={draft.captureEta} onChange={(e) => setDraft({ ...draft, captureEta: e.target.checked })} />
-              Ask the responder for an estimated arrival time
-            </label>
-          </div>
-          <div>
             <label style={label}>Acknowledge keywords</label>
             <input style={input} value={draft.ackKeywords} onChange={(e) => setDraft({ ...draft, ackKeywords: e.target.value })} disabled={!draft.ackMethodKeyword} />
-          </div>
-          <div>
-            <label style={label}>Decline keywords</label>
-            <input style={input} value={draft.declineKeywords} onChange={(e) => setDraft({ ...draft, declineKeywords: e.target.value })} disabled={!draft.ackMethodKeyword} />
-            <p style={{ ...sub, marginTop: '4px' }}>
-              Keep decline enabled. Without it the DM waits out the full window before learning someone is not coming.
-            </p>
           </div>
         </div>
 
         <div style={{ marginTop: '16px' }}>
           <label style={label}>Acknowledgement methods</label>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '12.5px' }}>
-              <input type="checkbox" checked={draft.ackMethodLink} onChange={(e) => setDraft({ ...draft, ackMethodLink: e.target.checked })} style={{ marginTop: '3px' }} />
-              <span>
-                <strong>Tokenised link</strong> — recipient taps a short link and confirms on a lightweight page. Precise timestamp, no telco dependency,
-                supports ETA capture. <em>Default method.</em>
-              </span>
-            </label>
             <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '12.5px' }}>
               <input type="checkbox" checked={draft.ackMethodKeyword} onChange={(e) => setDraft({ ...draft, ackMethodKeyword: e.target.checked })} style={{ marginTop: '3px' }} />
               <span>
@@ -1227,7 +1204,7 @@ function AckTab({
               inbound SMS. Every reply would be silently discarded. Either obtain a two-way number or leave this method off.
             </p>
           )}
-          {!draft.ackMethodLink && !draft.ackMethodKeyword && (
+          {!draft.ackMethodKeyword && (
             <p style={{ fontSize: '12px', color: 'var(--color-critical)', marginTop: '8px' }}>
               No acknowledgement method is enabled. The system will prevent saving this configuration.
             </p>
@@ -1235,113 +1212,11 @@ function AckTab({
         </div>
       </div>
 
-      {/* ── Block 2: Reminder Rules (NEW) ── */}
-      <div style={{ marginTop: '22px', paddingTop: '16px', borderTop: '1px solid var(--border-color)', marginBottom: '24px' }}>
-        <div style={sectionHead}>
-          <div>
-            <h3 style={{ ...h2, fontSize: '13px', color: 'var(--color-primary)' }}>2 · REMINDER RULES</h3>
-            <p style={sub}>Automated periodic reminders sent to recipients who have not yet acknowledged.</p>
-          </div>
-        </div>
-
-        <div style={{ marginBottom: '14px' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600 }}>
-            <input
-              type="checkbox"
-              checked={draft.remindersEnabled}
-              onChange={(e) => setDraft({ ...draft, remindersEnabled: e.target.checked })}
-            />
-            Enable automated reminders
-          </label>
-        </div>
-
-        {draft.remindersEnabled && (
-          <div style={{ background: 'var(--bg-inset)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', maxWidth: '820px' }}>
-              <div>
-                <label style={label}>First reminder after (minutes)</label>
-                <input
-                  style={input}
-                  type="number"
-                  min={1}
-                  max={draft.ackWindowMinutes - 1}
-                  value={draft.reminderFirstAfterMinutes}
-                  onChange={(e) => setDraft({ ...draft, reminderFirstAfterMinutes: Number(e.target.value) })}
-                />
-                <p style={{ ...sub, marginTop: '4px' }}>Must be less than acknowledgement window ({draft.ackWindowMinutes}m).</p>
-              </div>
-              <div>
-                <label style={label}>Reminder interval (minutes)</label>
-                <input
-                  style={input}
-                  type="number"
-                  min={1}
-                  value={draft.reminderIntervalMinutes}
-                  onChange={(e) => setDraft({ ...draft, reminderIntervalMinutes: Number(e.target.value) })}
-                />
-              </div>
-              <div>
-                <label style={label}>Max reminders count</label>
-                <input
-                  style={input}
-                  type="number"
-                  min={0}
-                  max={10}
-                  value={draft.reminderMaxCount}
-                  onChange={(e) => setDraft({ ...draft, reminderMaxCount: Number(e.target.value) })}
-                />
-              </div>
-              <div>
-                <label style={label}>Reminder template (optional)</label>
-                <select
-                  style={input}
-                  value={draft.reminderTemplateId || ''}
-                  onChange={(e) => setDraft({ ...draft, reminderTemplateId: e.target.value })}
-                >
-                  <option value="">Reuse original message (with [NHẮC LẦN n] prefix)</option>
-                  {templates.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px dashed var(--border-color)' }}>
-              <label style={{ ...label, marginBottom: '8px' }}>Stop reminder conditions</label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12.5px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', opacity: 0.8 }}>
-                  <input type="checkbox" checked disabled />
-                  <span><strong>Acknowledged</strong> — Always stops reminders (locked).</span>
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <input
-                    type="checkbox"
-                    checked={draft.reminderStopOnDecline}
-                    onChange={(e) => setDraft({ ...draft, reminderStopOnDecline: e.target.checked })}
-                  />
-                  <span><strong>Declined</strong> — Stop reminders if responder explicitly declines.</span>
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <input
-                    type="checkbox"
-                    checked={draft.reminderStopOnDeliveryFailed}
-                    onChange={(e) => setDraft({ ...draft, reminderStopOnDeliveryFailed: e.target.checked })}
-                  />
-                  <span><strong>Delivery Failed</strong> — Stop reminders if initial message delivery failed.</span>
-                </label>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* ── Block 3: Escalation Ladder ── */}
+      {/* ── Block 2: Escalation Ladder ── */}
       <div style={{ marginTop: '22px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
         <div style={sectionHead}>
           <div>
-            <h3 style={{ ...h2, fontSize: '13px', color: 'var(--color-primary)' }}>3 · ESCALATION LADDER</h3>
+            <h3 style={{ ...h2, fontSize: '13px', color: 'var(--color-primary)' }}>2 · ESCALATION LADDER</h3>
             <p style={sub}>Actions taken automatically when non-responders remain silent. Timings measured from initial dispatch.</p>
           </div>
           <button onClick={addStep} className="btn btn-secondary" style={{ padding: '6px 14px', borderRadius: '6px', fontSize: '12px' }}>

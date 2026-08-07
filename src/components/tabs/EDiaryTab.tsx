@@ -52,7 +52,6 @@ export function EDiaryTab() {
   // always auto-creates its own dedicated Case (client feedback: never merge).
   const [quickTopic, setQuickTopic] = useState('');
   const [quickContent, setQuickContent] = useState('');
-  const [quickDateTime, setQuickDateTime] = useState('');
   const [showMore, setShowMore] = useState(false);
   const [quickSubmitting, setQuickSubmitting] = useState(false);
 
@@ -196,13 +195,12 @@ export function EDiaryTab() {
           username,
           topic: finalTopic,
           content: quickContent.trim(),
-          dateTime: quickDateTime ? new Date(quickDateTime).toISOString() : undefined,
           refNo: quickLinkedId || undefined,
         }),
       });
       if (res.ok) {
         setQuickTopic(''); setQuickContent('');
-        setQuickLinkedId(''); setQuickLinkSearchText(''); setQuickDateTime(''); setShowMore(false);
+        setQuickLinkedId(''); setQuickLinkSearchText(''); setShowMore(false);
         await fetchOccurrences();
       }
     } finally {
@@ -416,10 +414,6 @@ export function EDiaryTab() {
                       );
                     })()}
                   </div>
-                </div>
-                <div style={{ flex: '0 1 240px', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <label style={labelStyle}>Time <span style={{ fontWeight: 400, textTransform: 'none' }}>(defaults to now)</span></label>
-                  <input type="datetime-local" value={quickDateTime} onChange={e => setQuickDateTime(e.target.value)} className="form-control" style={{ height: 34, fontSize: 13 }} />
                 </div>
               </div>
             )}

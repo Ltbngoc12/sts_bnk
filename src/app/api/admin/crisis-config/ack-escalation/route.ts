@@ -23,9 +23,9 @@ export async function POST(request: Request) {
     }
 
     // 1. Validation for Acknowledgement methods
-    if (!body.ackMethodLink && !body.ackMethodKeyword) {
+    if (!body.ackMethodKeyword) {
       return NextResponse.json(
-        { error: 'At least one acknowledgement method (Tokenised link or SMS reply keyword) must be enabled.' },
+        { error: 'The SMS reply keyword acknowledgement method must be enabled.' },
         { status: 400 }
       );
     }
@@ -36,27 +36,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Acknowledgement window must be an integer greater than or equal to 1 minute.' }, { status: 400 });
     }
 
-    // 3. Validation for Reminder Rules (if enabled)
-    if (body.remindersEnabled) {
-      const firstAfter = Number(body.reminderFirstAfterMinutes);
-      const interval = Number(body.reminderIntervalMinutes);
-      const maxCount = Number(body.reminderMaxCount);
-
-      if (!Number.isInteger(firstAfter) || firstAfter < 1) {
-        return NextResponse.json({ error: 'Initial reminder delay must be an integer greater than or equal to 1 minute.' }, { status: 400 });
-      }
-      if (firstAfter >= ackWindowMinutes) {
-        return NextResponse.json({ error: `Initial reminder delay (${firstAfter}m) must be less than acknowledgement window (${ackWindowMinutes}m).` }, { status: 400 });
-      }
-      if (!Number.isInteger(interval) || interval < 1) {
-        return NextResponse.json({ error: 'Reminder interval must be an integer greater than or equal to 1 minute.' }, { status: 400 });
-      }
-      if (!Number.isInteger(maxCount) || maxCount < 0 || maxCount > 10) {
-        return NextResponse.json({ error: 'Max reminders count must be between 0 and 10.' }, { status: 400 });
-      }
-    }
-
-    // 4. Validation for Escalation Ladder
+    // 3. Validation for Escalation Ladder
     const rawLadder = Array.isArray(body.ladder) ? body.ladder : [];
     const minutesSeen = new Set<number>();
     for (const step of rawLadder) {

@@ -254,20 +254,7 @@ export interface AckEscalationRule {
   // (sequence: initial | re-send | escalation). Tin stand_down không yêu cầu ack.
   ackWindowMinutes: number;
   ackKeywords: string;       // comma-separated, matched case-insensitively
-  declineKeywords: string;
-  // Appendix A: both methods write the same ack record, first arrival wins.
-  ackMethodLink: boolean;
   ackMethodKeyword: boolean;
-  captureEta: boolean;
-
-  // ── Reminder (MỚI) ──
-  remindersEnabled: boolean;
-  reminderFirstAfterMinutes: number;   // timing from recipient firstSentAt
-  reminderIntervalMinutes: number;
-  reminderMaxCount: number;
-  reminderTemplateId?: string;         // empty = reuse original message
-  reminderStopOnDecline: boolean;
-  reminderStopOnDeliveryFailed: boolean;
 
   // ── Escalation ──
   ladder: EscalationStep[];
@@ -406,17 +393,7 @@ export const DEFAULT_ACK_ESCALATION_RULE: AckEscalationRule = {
   id: 'singleton',
   ackWindowMinutes: 10,
   ackKeywords: 'YES, Y, ACK, OK',
-  declineKeywords: 'NO, N, UNABLE',
-  ackMethodLink: true,
-  ackMethodKeyword: false,
-  captureEta: true,
-  remindersEnabled: false,
-  reminderFirstAfterMinutes: 3,
-  reminderIntervalMinutes: 3,
-  reminderMaxCount: 2,
-  reminderTemplateId: '',
-  reminderStopOnDecline: true,
-  reminderStopOnDeliveryFailed: true,
+  ackMethodKeyword: true,
   ladder: [
     { id: 'esc-1', afterMinutes: 5, action: 'Resend SMS', note: 'Second SMS to anyone still silent.' },
     { id: 'esc-2', afterMinutes: 12, action: 'Notify Duty Manager', note: 'DM to phone the remaining non-responders directly.' },

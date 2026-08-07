@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDb, saveDb } from '@/lib/db';
-import { initialDeliveryCounts, rollupDeliveryCounts, encodeIdPath } from '@/lib/broadcast';
+import { initialDeliveryCounts, rollupDeliveryCounts, encodeIdPath, applyCarryForwardSummary } from '@/lib/broadcast';
 import { hasBroadcastPermission } from '@/lib/permissions';
 import { getEmailQueue, sendEmailMockBatch } from '@/lib/emailMock';
 import { addNotification } from '@/lib/broadcastStore';
@@ -183,14 +183,29 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (!recipients || recipients.length === 0) {
       return NextResponse.json({ error: 'Cannot dispatch: recipient list is empty.' }, { status: 400 });
     }
+    // US-BC-01 — Carry-Forward Summary (End-of-Day Interim only, BR7). Persisted
+    // here because, like recipients/content, this screen has no separate
+    // draft-save path — everything sits in the client's local state until
+    // Approve & Send actually fires.
+    const carryForwardSummary: string | undefined =
+      bc.type === 'End-of-Day' && typeof body.carryForwardSummary === 'string'
+        ? body.carryForwardSummary
+        : bc.carryForwardSummary;
+
     // §10.4d — content edited BEYOND the auto-filled default needs explicit
     // confirmation (2026-07-25: content-diff gate, replaces the old per-field
     // sensitiveFields checklist — see BroadcastTemplate comment in
     // broadcastConfig.ts). Diff BEFORE contentDispatched gets overwritten below.
     // Diffs against contentDefault (the untouched auto-fill snapshot, gap G6) when
     // present, falling back to contentDispatched for records queued before that
-    // field existed.
-    const baseline = bc.contentDefault ?? bc.contentDispatched ?? '';
+    // field existed. US-BC-01: also merged with carryForwardSummary so a Duty
+    // Manager who only used that box (never touched the Edit tab) never trips
+    // this gate — mirrors the identical merge the client does before computing
+    // its own "changed" state (BR5/EC1); if the two sides disagreed here, a
+    // summary-only submission would pass the client's check and still bounce off
+    // this 409 with no checkbox visible to satisfy it.
+    const rawBaseline = bc.contentDefault ?? bc.contentDispatched ?? '';
+    const baseline = applyCarryForwardSummary(rawBaseline, carryForwardSummary);
     const contentChanged = typeof body.content === 'string' && body.content.trim() !== baseline.trim();
     if (contentChanged && !body.confirmContentChange) {
       return NextResponse.json({
@@ -200,6 +215,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
     bc.recipients = recipients;
     if (typeof body.content === 'string' && body.content.length > 0) bc.contentDispatched = body.content;
+    bc.carryForwardSummary = carryForwardSummary;
     bc.status = 'SENT';
     bc.sentAt = now;
     bc.sentBy = actor;

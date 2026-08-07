@@ -111,6 +111,40 @@ export function renderTemplate(body: string, vars: Record<string, string | undef
   return body.replace(/\{(\w+)\}/g, (_, key) => (vars[key] != null ? String(vars[key]) : ''));
 }
 
+// US-BC-01 — merges a Duty Manager's Carry-Forward Summary (BroadcastRecord.
+// carryForwardSummary) into ALREADY-RENDERED End-of-Day broadcast content.
+//
+// Records only persist rendered text, not the pre-substitution template (see
+// contentDefault comment in db.ts), so this can't re-run renderTemplate with a
+// new `summary` var — instead it targets the exact label the default tpl-eod
+// template renders ("Summary of progress to date: ") and replaces just that ONE
+// line up to the next blank line, leaving the rest of the content (and any
+// manual Edit-tab changes elsewhere in it) untouched.
+//
+// A custom admin-authored EOD template that doesn't render this exact label has
+// nothing for this to substitute into — the summary is still saved on the
+// record, it just has no visible effect on the dispatched content. Accepted gap,
+// not a bug — see US-BC-01 Edge Case EC6.
+//
+// Called identically on the client (live Preview) and the server (dispatch's
+// content-diff gate) so both sides agree on what "unedited" means once a summary
+// is present — see the route.ts comment on the dispatch POST handler for why
+// that agreement matters (BR5: this substitution must never, by itself, require
+// the "content edited from default" confirmation).
+const EOD_SUMMARY_LABEL = 'Summary of progress to date:';
+
+export function applyCarryForwardSummary(content: string, carryForwardSummary?: string): string {
+  const text = (carryForwardSummary || '').trim();
+  if (!text) return content; // nothing entered — leave today's rendered content untouched (BR4)
+  const idx = content.indexOf(EOD_SUMMARY_LABEL);
+  if (idx === -1) return content; // EC6 — template doesn't render this line, no-op
+  const lineStart = idx + EOD_SUMMARY_LABEL.length;
+  const rest = content.slice(lineStart);
+  const blankLineIdx = rest.indexOf('\n\n');
+  const after = blankLineIdx === -1 ? '' : rest.slice(blankLineIdx);
+  return `${content.slice(0, lineStart)} ${text}${after}`;
+}
+
 // Resolve the full default recipient list + template + rendered content for a
 // closure broadcast, given the incident and the current config. Recipients are a
 // SNAPSHOT (never a live group reference) per §10.3d.

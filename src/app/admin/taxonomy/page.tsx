@@ -164,7 +164,7 @@ export default function TaxonomyPage() {
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: '10px', marginTop: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '2px' }}>
-        {(['Incident', 'Fault', 'Priority', 'eDiary', 'Event'] as const).map(tab => (
+        {(['Incident', 'Fault', 'eDiary', 'Event'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => { setActiveTab(tab); resetForm(); }}
