@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup v2 — Broadcast Module (gộp 2 tab) · Sentosa CMS</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Token lấy nguyên từ src/app/globals.css */
+:root{
+  --bg-base:#F3F4F6; --bg-card:#FFFFFF; --bg-inset:#F9FAFB; --bg-hover:#F3F4F6;
+  --color-critical:#EF4444; --color-critical-bg:#FEF2F2; --color-critical-border:#FCA5A5;
+  --color-high:#F97316; --color-high-bg:#FFF7ED; --color-high-border:#FED7AA;
+  --color-active:#10B981; --color-active-bg:#ECFDF5; --color-active-border:#A7F3D0;
+  --color-review:#0D9488; --color-review-bg:#F0FDFA; --color-review-border:#99F6E4;
+  --color-closed:#6B7280; --color-closed-bg:#F3F4F6; --color-closed-border:#E5E7EB;
+  --color-info:#3B82F6; --color-info-bg:#EFF6FF; --color-info-border:#BFDBFE;
+  --color-purple:#7C3AED; --color-purple-bg:#F5F3FF; --color-purple-border:#DDD6FE;
+  --color-primary:#FF8200; --color-primary-hover:#E07200; --color-primary-dark:#6D3500;
+  --color-primary-bg:#FFF7ED; --color-primary-border:#FFEDD5;
+  --text-main:#1F2937; --text-sub:#4B5563; --text-muted:#6B7280; --text-faint:#9CA3AF;
+  --border-color:#E5E7EB; --border-color-hover:#D1D5DB; --border-focus:#FF8200;
+  --radius-sm:4px; --radius-md:8px; --radius-lg:12px;
+  --space-s:8px; --space-m:12px;
+  --font-body:'Inter',system-ui,-apple-system,sans-serif; --font-mono:'JetBrains Mono',Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-body);background:var(--bg-base);color:var(--text-main);font-size:13.5px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.glass{background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-lg);box-shadow:0 4px 20px -2px rgba(31,41,55,.03),0 2px 6px -1px rgba(31,41,55,.02)}
+
+/* ── form-control: COPY NGUYÊN từ globals.css ─────────────────── */
+.form-control{background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:var(--space-s) var(--space-m);color:var(--text-main);font-family:var(--font-body);font-size:13.5px;outline:none;transition:border-color .15s,box-shadow .15s;width:100%}
+.form-control:focus{border-color:var(--border-focus);box-shadow:0 0 0 3px rgba(255,130,0,.12)}
+.form-control::placeholder{color:var(--text-faint)}
+select.form-control,.select-dark{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:30px}
+.form-group{margin:0}
+.form-group>label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);margin-bottom:4px;display:block}
+.btn{font-family:var(--font-body);font-size:12.5px;font-weight:600;border-radius:var(--radius-md);padding:0 14px;height:36px;display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;border:1px solid transparent;white-space:nowrap;transition:.12s}
+.btn-primary{background:var(--color-primary);color:#fff;border-color:var(--color-primary)}
+.btn-primary:hover{background:var(--color-primary-hover)}
+.btn-secondary{background:#fff;color:var(--text-sub);border-color:var(--border-color)}
+.btn-secondary:hover{border-color:var(--border-color-hover);background:var(--bg-inset)}
+.btn-info{background:var(--color-info-bg);color:var(--color-info);border-color:var(--color-info-border)}
+.btn-sm{height:30px;font-size:11.5px;padding:0 11px}
+
+/* ── mockup chrome ────────────────────────────────────────────── */
+.mock-banner{background:var(--color-primary-dark);color:#fff;padding:8px 20px;font-size:12px;font-weight:600;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.mock-banner .tag{background:rgba(255,255,255,.16);padding:2px 8px;border-radius:20px;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase}
+.mock-banner em{font-style:normal;opacity:.75;font-weight:500}
+.shell{display:flex;min-height:calc(100vh - 36px)}
+.sidebar{width:212px;flex:0 0 212px;background:#fff;border-right:1px solid var(--border-color);padding:18px 0}
+.sb-brand{padding:0 18px 18px;border-bottom:1px solid var(--border-color);margin-bottom:8px}
+.sb-brand b{font-size:16px;font-weight:800;letter-spacing:-.01em}
+.sb-brand small{display:block;font-size:10.5px;color:var(--text-muted);font-weight:600;letter-spacing:.03em}
+.sb-group{font-size:10px;font-weight:800;letter-spacing:.11em;color:var(--text-faint);text-transform:uppercase;padding:14px 18px 6px}
+.sb-item{display:flex;align-items:center;gap:9px;padding:8px 18px;font-size:13px;font-weight:500;color:var(--text-sub);cursor:default}
+.sb-item.active{background:var(--color-primary-bg);color:var(--color-primary-dark);font-weight:700;box-shadow:inset 3px 0 0 var(--color-primary)}
+.sb-item .dot{width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.45}
+.sb-strike{text-decoration:line-through;opacity:.42}
+.sb-note{font-size:10px;color:var(--color-primary-dark);background:var(--color-primary-bg);border:1px dashed var(--color-primary-border);margin:6px 12px;padding:6px 8px;border-radius:var(--radius-sm);line-height:1.35}
+.main{flex:1;padding:20px;min-width:0}
+.cal{font-size:11px;color:var(--color-primary-dark);background:var(--color-primary-bg);border:1px dashed var(--color-primary-border);padding:5px 9px;border-radius:var(--radius-sm);display:inline-block;font-weight:600}
+
+/* ── page header + page tabs (theo case-management/page.tsx) ──── */
+.page-header-bar{padding:16px 20px;display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.page-header-bar h1{font-size:15px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.page-header-bar p{font-size:12px;color:var(--text-muted);margin-top:2px}
+.pagetabs{padding:0 20px;display:flex;align-items:flex-end;background:var(--bg-card);border-bottom:1px solid var(--border-color);margin-bottom:16px}
+.ptab{background:transparent;border:none;border-bottom:2px solid transparent;color:var(--text-muted);padding:12px 18px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;font-family:var(--font-body);transition:all .15s}
+.ptab:hover{color:var(--text-main)}
+.ptab.on{color:var(--color-primary);border-bottom-color:var(--color-primary)}
+.pill{font-size:11px;font-weight:700;background:var(--bg-inset);color:var(--text-muted);padding:2px 8px;border-radius:10px;min-width:20px;text-align:center}
+.ptab.on .pill,.stab.on .pill{background:var(--color-primary-bg);color:var(--color-primary)}
+
+/* ── filter card (COPY cấu trúc CaseLogTab.tsx) ──────────────── */
+.filtercard{padding:20px;display:flex;flex-direction:column;gap:16px;margin-bottom:16px}
+.frow-main{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;border-bottom:1px solid var(--border-color);padding-bottom:12px}
+.stabs{display:flex;gap:4px}
+.stab{background:transparent;border:none;border-bottom:2px solid transparent;color:var(--text-muted);padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;font-family:var(--font-body);transition:all .15s}
+.stab:hover{color:var(--text-main)}
+.stab.on{color:var(--color-primary);border-bottom-color:var(--color-primary)}
+.fright{display:flex;gap:12px;align-items:center;flex-wrap:wrap;flex-grow:1;justify-content:flex-end}
+.searchwrap{position:relative;width:100%;max-width:300px}
+.searchwrap svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-faint)}
+.searchwrap input{padding-left:36px;height:36px;font-size:13px}
+.iconbtn{padding:0 10px;height:36px;width:36px}
+.advgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px;padding-top:4px}
+.advgrid .full{grid-column:1/-1;display:flex;justify-content:flex-end}
+.clearbtn{padding:0 12px;font-size:12.5px;height:34px;border:none;background:transparent;text-decoration:underline;color:var(--text-sub);cursor:pointer;font-family:var(--font-body);font-weight:600}
+.multibtn{height:36px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;text-align:left;background:var(--bg-inset)}
+.multibtn span{font-size:13px}
+.dd{position:absolute;top:calc(100% + 4px);left:0;z-index:50;min-width:180px;background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-md);box-shadow:0 4px 16px rgba(0,0,0,.12);padding:6px 0}
+.dd label{display:flex;align-items:center;gap:10px;padding:7px 14px;font-size:13px;color:var(--text-main);cursor:pointer}
+.dd label:hover{background:var(--bg-inset)}
+.dd input{accent-color:var(--color-primary);width:14px;height:14px}
+
+/* ── table ────────────────────────────────────────────────────── */
+.custom-table{width:100%;border-collapse:collapse;text-align:left;font-size:13px}
+.custom-table th{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-muted);padding:12px;border-bottom:1px solid var(--border-color);background:var(--bg-inset)}
+.custom-table td{padding:11px 12px;border-bottom:1px solid var(--border-color);vertical-align:top}
+.custom-table tbody tr{cursor:pointer;transition:background .1s}
+.custom-table tbody tr:hover{background:var(--color-primary-bg)}
+.custom-table tbody tr.sel{background:var(--color-primary-bg)}
+td.acc{padding:0;width:4px}
+td.acc i{display:block;width:4px;height:100%;min-height:54px}
+.case-id-cell{font-family:var(--font-mono);font-weight:600;color:var(--color-info);white-space:nowrap;font-size:12px}
+.case-title-cell{font-weight:600}
+.sub{font-size:11px;color:var(--text-faint);margin-top:4px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.lvl{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;font-size:11px;font-weight:800;color:#fff}
+.l1,.l2{background:var(--color-critical)}.l3,.l4{background:var(--color-high)}.l5{background:var(--color-closed)}
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;letter-spacing:.03em;padding:3px 8px;border-radius:20px;border:1px solid;text-transform:uppercase}
+.b-sent{background:var(--color-active-bg);border-color:var(--color-active-border);color:#065F46}
+.b-pend{background:var(--color-high-bg);border-color:var(--color-high-border);color:#9A3412}
+.b-none{background:var(--color-closed-bg);border-color:var(--color-closed-border);color:var(--text-muted)}
+.b-warn{background:var(--color-critical-bg);border-color:var(--color-critical-border);color:#991B1B;text-transform:none;letter-spacing:0}
+.b-type{background:var(--bg-inset);border-color:var(--border-color);color:var(--text-sub)}
+.tag-edit{background:var(--color-purple-bg);border:1px solid var(--color-purple-border);color:var(--color-purple);font-size:10px;font-weight:700;padding:1px 6px;border-radius:var(--radius-sm)}
+.chn{font-size:12px;letter-spacing:2px}
+.deliv{font-size:11px;color:var(--color-active);font-weight:700}
+.deliv.bad{color:var(--color-critical)}
+.pager{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;font-size:12px;color:var(--text-muted);border-top:1px solid var(--border-color)}
+.pg{display:flex;gap:4px}
+.pg b,.pg a{display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:28px;border-radius:var(--radius-sm);font-size:12px;font-weight:600;color:var(--text-sub);border:1px solid var(--border-color);background:#fff;text-decoration:none;cursor:pointer}
+.pg b{background:var(--color-primary);border-color:var(--color-primary);color:#fff}
+
+/* ── drawer ───────────────────────────────────────────────────── */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:.18s;z-index:1000}
+.scrim.on{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:0;height:100vh;width:800px;max-width:96vw;background:var(--bg-card);border-left:1px solid var(--border-color);box-shadow:-14px 0 40px -12px rgba(0,0,0,.18);transform:translateX(102%);transition:transform .22s cubic-bezier(.32,.72,0,1);z-index:1001;display:flex;flex-direction:column}
+.drawer.on{transform:none}
+.dr-head{padding:16px 20px;border-bottom:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:flex-start;gap:14px}
+.dr-head h2{font-family:var(--font-mono);font-size:15px;font-weight:600}
+.dr-body{flex:1;overflow:auto;padding:0 20px}
+.dr-sec{padding:16px 0;border-bottom:1px solid var(--border-color)}
+.dr-sec>h3{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px}
+.kv{display:grid;grid-template-columns:110px 1fr 96px 1fr;gap:8px 12px;font-size:12.5px;align-items:baseline}
+.kv dt{color:var(--text-muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em}
+.kv dd{font-weight:600}
+.rchip{display:inline-flex;align-items:center;gap:6px;background:var(--bg-inset);border:1px solid var(--border-color);border-radius:20px;padding:4px 10px;font-size:12px;font-weight:500;margin:0 5px 5px 0}
+.rchip x{cursor:pointer;color:var(--text-faint);font-style:normal;font-weight:700}
+.rchip.added{background:var(--color-primary-bg);border-color:var(--color-primary-border);color:var(--color-primary-dark)}
+.ctabs{display:flex;gap:4px;margin-bottom:12px;border-bottom:1px solid var(--border-color)}
+.ctab{background:transparent;border:none;border-bottom:2px solid transparent;color:var(--text-muted);padding:7px 13px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:var(--font-body)}
+.ctab.on{color:var(--color-primary);border-bottom-color:var(--color-primary)}
+.split{display:grid;grid-template-columns:1fr 250px;gap:16px;align-items:start}
+.mailcard{border:1px solid var(--border-color);border-radius:var(--radius-md);overflow:hidden;background:#fff}
+.mailsubj{background:var(--bg-inset);border-bottom:1px solid var(--border-color);padding:10px 14px;font-size:12.5px;font-weight:700}
+.mailsubj em{font-style:normal;color:var(--text-muted);font-weight:700;font-size:10.5px;display:block;letter-spacing:.05em;text-transform:uppercase;margin-bottom:2px}
+.mailbody{padding:14px;font-size:13.5px;line-height:1.62;max-width:70ch;white-space:pre-wrap}
+.mailbody.src{font-family:var(--font-mono);font-size:11.5px;line-height:1.5;background:var(--bg-inset);max-width:none}
+.diff span{display:block;padding:1px 6px;border-radius:3px;font-family:var(--font-mono);font-size:11.5px;line-height:1.7}
+.diff .del{background:var(--color-critical-bg);color:#991B1B;text-decoration:line-through}
+.diff .add{background:var(--color-active-bg);color:#065F46}
+.dtab{width:100%;font-size:11.5px;border-collapse:collapse}
+.dtab td{padding:7px 4px;border-bottom:1px solid var(--border-color);vertical-align:top}
+.dtab td:first-child{font-family:var(--font-mono);font-size:10.5px;color:var(--text-sub);word-break:break-all}
+.dr-foot{padding:12px 20px;border-top:1px solid var(--border-color);background:var(--bg-inset);display:flex;justify-content:space-between;align-items:center;gap:12px}
+.note{font-size:11.5px;color:var(--text-muted)}
+.x{background:none;border:none;font-size:22px;line-height:1;color:var(--text-faint);cursor:pointer;font-family:inherit}
+
+/* ── EOD ──────────────────────────────────────────────────────── */
+.daynav{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 16px;margin-bottom:16px;flex-wrap:wrap}
+.days{display:flex;align-items:center;gap:4px}
+.day{padding:7px 14px;border-radius:var(--radius-md);font-size:12.5px;font-weight:600;color:var(--text-sub);border:1px solid transparent;cursor:pointer;background:none;font-family:var(--font-body)}
+.day:hover{background:var(--bg-hover)}
+.day.on{background:var(--color-primary);color:#fff}
+.day.arrow{color:var(--text-faint);font-size:15px;padding:7px 10px}
+.day.miss{color:var(--color-critical)}
+.meta{font-size:12px;color:var(--text-muted)}
+.meta b{color:var(--text-main);font-weight:700}
+.progwrap{padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.bar{flex:1;min-width:200px;height:9px;border-radius:20px;background:var(--color-closed-bg);overflow:hidden;display:flex}
+.bar i{display:block;height:100%}
+.bar .s{background:var(--color-active)}.bar .p{background:var(--color-high)}
+.legend{display:flex;gap:14px;font-size:12px;font-weight:600;flex-wrap:wrap}
+.legend s{text-decoration:none;display:inline-flex;align-items:center;gap:5px}
+.dotm{width:8px;height:8px;border-radius:50%;display:inline-block}
+.bulkbar{padding:10px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;background:var(--color-primary-dark);border-radius:var(--radius-lg);color:#fff;font-size:12.5px;font-weight:600}
+.bulkbar .lnk{margin-left:auto;color:rgba(255,255,255,.72);cursor:pointer;font-size:12px;font-weight:600;text-decoration:underline}
+.eodgrid{display:grid;grid-template-columns:344px 1fr;gap:16px;align-items:start}
+.eodlist{overflow:hidden}
+.eodlist .lh{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid var(--border-color);background:var(--bg-inset);font-size:11px;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.row{display:flex;gap:10px;padding:11px 12px;border-bottom:1px solid var(--border-color);cursor:pointer;align-items:flex-start;transition:background .1s}
+.row:hover{background:var(--color-primary-bg)}
+.row.on{background:var(--color-primary-bg);box-shadow:inset 3px 0 0 var(--color-primary)}
+.row.done{opacity:.52}
+.row .stat{font-size:13px;width:14px;flex:0 0 14px;text-align:center;padding-top:2px}
+.row .body{flex:1;min-width:0}
+.row .t{font-weight:600;font-size:12.5px;line-height:1.35}
+.row .m{font-size:11px;color:var(--text-muted);margin-top:3px;line-height:1.45}
+.row input[type=checkbox]{margin-top:3px;accent-color:var(--color-primary);width:14px;height:14px}
+.panel{padding:0}
+.p-head{padding:16px 18px;border-bottom:1px solid var(--border-color)}
+.p-head h2{font-size:15px;font-weight:700}
+.p-head .idl{font-family:var(--font-mono);font-size:11px;color:var(--text-faint)}
+.p-head .ctx{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--text-sub);font-weight:500}
+.p-body{padding:0 18px;max-height:440px;overflow:auto}
+.p-foot{padding:12px 18px;border-top:1px solid var(--border-color);background:var(--bg-inset);display:flex;justify-content:space-between;align-items:center;gap:12px;border-radius:0 0 var(--radius-lg) var(--radius-lg)}
+.warnbox{background:var(--color-high-bg);border:1px solid var(--color-high-border);border-radius:var(--radius-md);padding:10px 12px;font-size:12px;margin-top:10px}
+.warnbox b{color:#9A3412;display:block;margin-bottom:4px;font-size:11.5px}
+.warnbox label{display:flex;gap:7px;align-items:flex-start;cursor:pointer;line-height:1.45}
+.warnbox input{accent-color:var(--color-high);margin-top:2px}
+.hide{display:none!important}
+@media(max-width:1280px){.eodgrid{grid-template-columns:300px 1fr}.split{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div class="mock-banner">
+  <span class="tag">Mockup v2</span>
+  <b>Broadcast Module — 1 trang / 2 tab</b>
+  <em>Đã bỏ dải KPI-chip · bỏ view Theo tháng · filter &amp; search dựng theo đúng pattern CaseLogTab.tsx + globals.css</em>
+</div>
+
+<div class="shell">
+  <aside class="sidebar">
+    <div class="sb-brand"><b>Sentosa</b><small>CASE MANAGEMENT SYSTEM</small></div>
+    <div class="sb-group">Operations</div>
+    <div class="sb-item"><i class="dot"></i>Dashboard</div>
+    <div class="sb-item"><i class="dot"></i>Case Management</div>
+    <div class="sb-group">Planning</div>
+    <div class="sb-item"><i class="dot"></i>Events</div>
+    <div class="sb-item"><i class="dot"></i>NOP</div>
+    <div class="sb-group">Communications</div>
+    <div class="sb-item active"><i class="dot"></i>Broadcasts</div>
+    <div class="sb-item sb-strike"><i class="dot"></i>End-of-Day Review</div>
+    <div class="sb-note">Gộp vào Broadcasts (tab 2).<br>Route cũ giữ làm <b>redirect</b> — notification cũ trong DB còn trỏ tới nó.</div>
+    <div class="sb-group">Analytics</div>
+    <div class="sb-item"><i class="dot"></i>Statistics</div>
+    <div class="sb-group">Administration</div>
+    <div class="sb-item"><i class="dot"></i>System Configuration</div>
+  </aside>
+
+  <main class="main">
+    <div class="glass page-header-bar">
+      <div>
+        <h1>Broadcasts</h1>
+        <p>Hồ sơ broadcast &amp; hàng chờ duyệt — FSD §10.9</p>
+      </div>
+    </div>
+
+    <!-- PAGE TABS — theo case-management/page.tsx -->
+    <div class="glass pagetabs">
+      <button class="ptab on" id="tb1" onclick="setTab(1)">📡 Broadcasts <span class="pill">49</span></button>
+      <button class="ptab" id="tb2" onclick="setTab(2)">🌆 End-of-Day Interim <span class="pill">2</span></button>
+    </div>
+
+    <!-- ══════════════ TAB 1 ══════════════ -->
+    <section id="pane1">
+
+      <!-- FILTER CARD — cấu trúc copy CaseLogTab.tsx -->
+      <div class="glass filtercard">
+        <div class="frow-main">
+          <!-- sub-tab trạng thái, count pill = chỗ chứa tín hiệu "có việc" (thay dải KPI-chip đã bỏ) -->
+          <div class="stabs">
+            <button class="stab on" onclick="stab(this)">Chờ xử lý <span class="pill">43</span></button>
+            <button class="stab" onclick="stab(this)">Đã gửi <span class="pill">6</span></button>
+            <button class="stab" onclick="stab(this)">Tất cả <span class="pill">49</span></button>
+          </div>
+
+          <div class="fright">
+            <button class="btn btn-info iconbtn" onclick="adv()" title="Bộ lọc">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+            </button>
+            <div class="searchwrap">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" class="form-control" placeholder="Search broadcast ID, incident, case, recipient...">
+            </div>
+            <button class="btn btn-primary">+ New Broadcast</button>
+          </div>
+        </div>
+
+        <!-- ADVANCED FILTERS — grid auto-fill minmax(180px,1fr), gap 16px -->
+        <div class="advgrid" id="advg">
+          <div class="form-group"><label>Lọc ngày theo:</label>
+            <select class="form-control select-dark"><option>Ngày tạo</option><option>Ngày gửi</option></select></div>
+          <div class="form-group"><label>Từ ngày:</label><input type="date" class="form-control" value="2026-07-01" style="height:36px"></div>
+          <div class="form-group"><label>Đến ngày:</label><input type="date" class="form-control" value="2026-07-26" style="height:36px"></div>
+          <div class="form-group"><label>Loại broadcast:</label>
+            <select class="form-control select-dark"><option>All Types</option><option>Closure</option><option>End-of-Day Interim</option><option>Weather Advisory</option><option>Manual</option></select></div>
+          <div class="form-group" style="position:relative"><label>Mức khủng hoảng:</label>
+            <button class="form-control multibtn" onclick="dd('ddLevel')"><span>Level 1, Level 2</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></button>
+            <div class="dd hide" id="ddLevel">
+              <label><input type="checkbox" checked>Level 1</label><label><input type="checkbox" checked>Level 2</label>
+              <label><input type="checkbox">Level 3</label><label><input type="checkbox">Level 4</label><label><input type="checkbox">Level 5</label>
+            </div>
+          </div>
+          <div class="form-group"><label>Nhóm người nhận:</label>
+            <select class="form-control select-dark"><option>All Groups</option><option>SDC Crisis Command</option><option>Beach Operators &amp; F&amp;B Tenants</option><option>SC Management Group</option></select></div>
+          <div class="form-group"><label>Người duyệt / gửi:</label><input type="text" class="form-control" placeholder="Tên người gửi..." style="height:36px"></div>
+          <div class="form-group"><label>Kênh gửi:</label>
+            <select class="form-control select-dark"><option>All Channels</option><option>Email</option><option>Push Notification</option></select></div>
+          <div class="form-group"><label>Kết quả giao nhận:</label>
+            <select class="form-control select-dark"><option>All</option><option>Thành công toàn bộ</option><option>Có lỗi giao nhận</option><option>Chưa gửi</option></select></div>
+          <div class="form-group"><label>Nội dung:</label>
+            <select class="form-control select-dark"><option>All</option><option>Đã sửa khác template (§10.4d)</option><option>Nguyên bản template</option></select></div>
+          <div class="form-group"><label>Incident type:</label>
+            <select class="form-control select-dark"><option>All Types</option><option>Facilities</option><option>Attraction</option><option>Environment</option><option>Security</option></select></div>
+          <div class="full"><button class="clearbtn">Clear Filters</button></div>
+        </div>
+      </div>
+
+      <!-- BẢNG -->
+      <div class="glass" style="overflow:hidden">
+        <table class="custom-table">
+          <thead><tr>
+            <th style="width:4px"></th><th>Broadcast ID</th><th style="width:112px">Loại</th><th style="width:56px">Mức</th>
+            <th>Sự việc / Case</th><th style="width:172px">Người nhận</th><th style="width:64px">Kênh</th>
+            <th style="width:136px">Trạng thái</th><th style="width:108px"></th>
+          </tr></thead>
+          <tbody>
+            <tr onclick="openDrawer('warn')">
+              <td class="acc"><i style="background:var(--color-review)"></i></td>
+              <td><span class="case-id-cell">SEN/CI/…/003-BC001</span><div class="sub">tạo 3 ngày trước · system</div></td>
+              <td><span class="badge b-type">Closure</span></td>
+              <td><span class="lvl l5">5</span></td>
+              <td><div class="case-title-cell">Beach Litter Report</div><div class="sub">SEN/IR/20260623/0002 · Environment</div></td>
+              <td><span class="badge b-warn">⚠ 0 người nhận</span><div class="sub" style="color:var(--color-critical)">chưa khớp rule nào</div></td>
+              <td class="chn">✉</td>
+              <td><span class="badge b-pend">Chờ xử lý</span><div class="sub">chờ 3 ngày</div></td>
+              <td><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();openDrawer('warn')">Xem xét →</button></td>
+            </tr>
+            <tr class="sel" onclick="openDrawer('ok')">
+              <td class="acc"><i style="background:var(--color-review)"></i></td>
+              <td><span class="case-id-cell">SEN/CI/…/002-BC001</span><div class="sub">gửi 22/07 04:07 <span class="tag-edit">✎ đã sửa</span></div></td>
+              <td><span class="badge b-type">Closure</span></td>
+              <td><span class="lvl l2">2</span></td>
+              <td><div class="case-title-cell">Siloso Beach Power Outage</div><div class="sub">SEN/IR/20260621/0001 · Facilities — Power Outage</div></td>
+              <td>3 người<div class="sub">SDC Crisis Command</div></td>
+              <td class="chn">✉📱</td>
+              <td><span class="badge b-sent">Đã gửi</span><div class="sub"><span class="deliv bad">✓2 / ⚠1 lỗi</span></div></td>
+              <td></td>
+            </tr>
+            <tr onclick="openDrawer('ok')">
+              <td class="acc"><i style="background:var(--color-primary)"></i></td>
+              <td><span class="case-id-cell">SEN/CI/…/001-BC001</span><div class="sub">gửi 25/07 05:45 · đêm 25/07</div></td>
+              <td><span class="badge b-type">End-of-Day</span></td>
+              <td><span class="lvl l4">4</span></td>
+              <td><div class="case-title-cell">Cable Car Stoppage — Sentosa Line</div><div class="sub">SEN/IR/20260615/0001 · Attraction</div></td>
+              <td>3 người<div class="sub">SDC Crisis Command</div></td>
+              <td class="chn">✉</td>
+              <td><span class="badge b-sent">Đã gửi</span><div class="sub"><span class="deliv">✓3 / 3</span></div></td>
+              <td></td>
+            </tr>
+            <tr onclick="openDrawer('ok')">
+              <td class="acc"><i style="background:var(--color-closed)"></i></td>
+              <td><span class="case-id-cell">SEN/BC/20260612/001</span><div class="sub">gửi 12/06 10:30</div></td>
+              <td><span class="badge b-type">Weather</span></td>
+              <td><span style="color:var(--text-faint)">—</span></td>
+              <td><div class="case-title-cell">Cảnh báo mưa dông toàn đảo</div><div class="sub" style="color:var(--text-faint)">không gắn Case — ID theo pattern riêng</div></td>
+              <td>12 người<div class="sub">All Tenants</div></td>
+              <td class="chn">✉📱</td>
+              <td><span class="badge b-sent">Đã gửi</span><div class="sub"><span class="deliv">✓12 / 12</span></div></td>
+              <td></td>
+            </tr>
+            <tr onclick="openDrawer('ok')" style="opacity:.6">
+              <td class="acc"><i style="background:var(--color-primary)"></i></td>
+              <td><span class="case-id-cell">SEN/CI/…/004-BC001</span><div class="sub">tạo 24/07 20:03 · đêm 24/07</div></td>
+              <td><span class="badge b-type">End-of-Day</span></td>
+              <td><span class="lvl l5">5</span></td>
+              <td><div class="case-title-cell">Lost Property — Palawan</div><div class="sub">SEN/IR/20260724/0007</div></td>
+              <td>3 người<div class="sub">Beach Operators &amp; F&amp;B</div></td>
+              <td class="chn">✉</td>
+              <td><span class="badge b-none">⊙ Không gửi</span><div class="sub">đêm đã qua</div></td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="pager">
+          <span>Hiện 1–25 / <b>49</b> bản ghi · sắp xếp: <b>Chờ xử lý lên đầu</b></span>
+          <span class="pg"><a>‹</a><b>1</b><a>2</a><a>3</a><a>›</a></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════ TAB 2 ══════════════ -->
+    <section id="pane2" class="hide">
+
+      <div class="glass daynav">
+        <div class="days">
+          <button class="day arrow">‹</button>
+          <button class="day miss" onclick="setDay(this)">24/07 ⚠</button>
+          <button class="day" onclick="setDay(this)">25/07</button>
+          <button class="day on" onclick="setDay(this)">26/07 · Hôm nay</button>
+          <button class="day arrow">›</button>
+          <input type="date" class="form-control" value="2026-07-26" style="width:auto;height:34px;font-size:12.5px;margin-left:6px">
+        </div>
+        <div class="meta">Cutover <b>20:00</b> · đã chạy <b>20:03</b> · <b>5</b> sự việc</div>
+        <button class="btn btn-secondary">⟳ Chạy lại check</button>
+      </div>
+
+      <div class="glass progwrap">
+        <div class="bar"><i class="s" style="width:60%"></i><i class="p" style="width:40%"></i></div>
+        <div class="legend">
+          <s><i class="dotm" style="background:var(--color-active)"></i>3 đã gửi</s>
+          <s><i class="dotm" style="background:var(--color-high)"></i>2 chưa gửi <span style="color:var(--text-faint);font-weight:500">(còn trong đêm)</span></s>
+        </div>
+        <span class="cal" style="margin-left:auto">Không có nút Từ chối — hết đêm, mục chưa gửi tự thành “Không gửi” theo <b>eodDate</b></span>
+      </div>
+
+      <div class="glass bulkbar" id="bulk" style="display:none">
+        <span>☑ <b id="bn">0</b> đã chọn</span>
+        <button class="btn btn-primary btn-sm">Gửi <span id="bn2">0</span> mục đã chọn →</button>
+        <span class="lnk" onclick="clearSel()">Bỏ chọn tất cả</span>
+      </div>
+
+      <div class="eodgrid">
+        <div class="glass eodlist">
+          <div class="lh"><span>Sắp xếp: Mức độ ↓</span><span style="cursor:pointer">Lọc ▾</span></div>
+
+          <div class="row on" onclick="pick(this)">
+            <input type="checkbox" onclick="event.stopPropagation();cnt()">
+            <span class="stat" style="color:var(--color-high)">⊙</span><span class="lvl l1">1</span>
+            <div class="body"><div class="t">Demo: Siloso Beach Outage</div>
+              <div class="m">Facilities — Power Outage · <b>Live</b><br>Mở <b>2 ngày 4 giờ</b> · 3 người · SDC Crisis</div></div>
+          </div>
+          <div class="row" onclick="pick(this)">
+            <input type="checkbox" onclick="event.stopPropagation();cnt()">
+            <span class="stat" style="color:var(--color-high)">⊙</span><span class="lvl l2">2</span>
+            <div class="body"><div class="t">Cable Car Stoppage — Sentosa Line</div>
+              <div class="m">Attraction · <b>Live (Assigned)</b><br>Mở <b>1 ngày</b> · 3 người · SDC Crisis</div></div>
+          </div>
+          <div class="row done" onclick="pick(this)">
+            <input type="checkbox" disabled>
+            <span class="stat" style="color:var(--color-active)">✓</span><span class="lvl l4">4</span>
+            <div class="body"><div class="t">Beach Litter Report — Tanjong</div>
+              <div class="m">Đã gửi <b>20:11</b> · duty.manager.lim · 3 người</div></div>
+          </div>
+          <div class="row done" onclick="pick(this)">
+            <input type="checkbox" disabled>
+            <span class="stat" style="color:var(--color-active)">✓</span><span class="lvl l5">5</span>
+            <div class="body"><div class="t">False Alarm — Gate 3 Sensor</div>
+              <div class="m">Đã gửi <b>20:11</b> · duty.manager.lim · 3 người</div></div>
+          </div>
+          <div class="row done" onclick="pick(this)">
+            <input type="checkbox" disabled>
+            <span class="stat" style="color:var(--color-active)">✓</span><span class="lvl l5">5</span>
+            <div class="body"><div class="t">Lost Property — Palawan Beach</div>
+              <div class="m">Đã gửi <b>20:12</b> · duty.manager.lim · 3 người</div></div>
+          </div>
+        </div>
+
+        <div class="glass panel">
+          <div class="p-head">
+            <div class="idl">CASE-DEMO-ONGOING-BC002 · SEN/IR/20260612/9004</div>
+            <h2>Demo: Siloso Beach Outage</h2>
+            <div class="ctx">
+              <span class="lvl l1">1</span><span>Facilities — Power Outage</span>
+              <span style="color:var(--border-color)">|</span><span class="badge b-pend">Live</span>
+              <span style="color:var(--border-color)">|</span><span>Mở <b>2 ngày 4 giờ</b></span>
+              <span style="color:var(--border-color)">|</span><span>cập nhật cuối <b>14:20</b></span>
+              <span style="color:var(--border-color)">|</span><span>Controller <b>nguyen.vh</b> · 2 Responder active</span>
+            </div>
+          </div>
+          <div class="p-body">
+            <div class="dr-sec">
+              <h3>Định tuyến</h3>
+              <dl class="kv">
+                <dt>Rule khớp</dt><dd>mat-eod-l1 <span style="font-weight:500;color:var(--text-muted)">· Level 1 · Any type</span></dd>
+                <dt>Template</dt><dd>End-of-Day Interim Broadcast</dd>
+                <dt>Nhóm nhận</dt><dd>SDC Crisis Command</dd>
+                <dt>Kênh</dt><dd>✉ Email &nbsp; 📱 Push</dd>
+              </dl>
+            </div>
+            <div class="dr-sec">
+              <h3>Người nhận (3)</h3>
+              <div>
+                <span class="rchip">silosocafe@food.com.sg <x>×</x></span>
+                <span class="rchip">ops@olabeach.com.sg <x>×</x></span>
+                <span class="rchip">john.doe@ranger.com.sg <x>×</x></span>
+              </div>
+              <div style="display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap">
+                <button class="btn btn-secondary btn-sm">+ Thêm</button>
+                <button class="btn btn-secondary btn-sm">↺ Khôi phục mặc định</button>
+                <span class="note">0 thêm thủ công · 0 đã gỡ khỏi nhóm gốc</span>
+              </div>
+            </div>
+            <div class="dr-sec" style="border-bottom:none">
+              <h3>Nội dung</h3>
+              <div class="ctabs">
+                <button class="ctab on" onclick="ctab(this,'e1')">Preview</button>
+                <button class="ctab" onclick="ctab(this,'e2')">Sửa</button>
+                <button class="ctab" onclick="ctab(this,'e3')">Diff</button>
+              </div>
+              <div id="e1" class="cbox">
+                <div class="mailcard">
+                  <div class="mailsubj"><em>Tiêu đề</em>[SDC] End-of-Day Interim Update: Demo: Siloso Beach Outage</div>
+                  <div class="mailbody">END-OF-DAY INTERIM UPDATE
+
+Case ID: CASE-DEMO-ONGOING
+Incident ID: SEN/IR/20260612/9004
+Title: Demo: Siloso Beach Outage
+Classification: Facilities — Power Outage
+Location: Siloso Beach Walk
+Crisis Level: Level 1
+Current Status: Live
+
+Summary of progress to date: Nguồn điện khu vực Siloso Beach Walk vẫn đang gián đoạn. Đội kỹ thuật SP Group có mặt tại hiện trường từ 16:40, dự kiến khôi phục trong đêm.
+
+This incident remains open and under management. Issued by the Duty Manager on duty.</div>
+                </div>
+                <div class="note" style="margin-top:8px">Inter 13.5px · ~70 ký tự/dòng · dòng <b>Tiêu đề</b> lấy từ <code>template.subject</code> (hiện code hardcode — gap G4)</div>
+              </div>
+              <div id="e2" class="cbox hide">
+                <div class="mailcard"><div class="mailbody src">END-OF-DAY INTERIM UPDATE
+
+Case ID: {case_id}
+Incident ID: {incident_id}
+Title: {incident_title}
+Crisis Level: {crisis_level}
+Current Status: {status}
+
+Summary of progress to date: {summary}</div></div>
+                <div class="warnbox">
+                  <b>Nội dung đã sửa khác mặc định (§10.4d)</b>
+                  <label><input type="checkbox"> Tôi (Duty Manager) xác nhận nội dung đã sửa không chứa thông tin nhạy cảm, đang điều tra, hoặc bị hạn chế ngoài template chuẩn — hoặc tôi được phép đưa vào.</label>
+                </div>
+              </div>
+              <div id="e3" class="cbox hide">
+                <div class="mailcard" style="padding:12px"><div class="diff">
+                  <span>&nbsp;Current Status: Live</span>
+                  <span class="del">− Summary of progress to date: N/A</span>
+                  <span class="add">+ Summary of progress to date: Nguồn điện khu vực Siloso Beach Walk vẫn đang gián đoạn.</span>
+                  <span class="add">+ Đội kỹ thuật SP Group có mặt tại hiện trường từ 16:40, dự kiến khôi phục trong đêm.</span>
+                  <span>&nbsp;This incident remains open and under management.</span>
+                </div></div>
+                <div class="note" style="margin-top:8px">Checkbox xác nhận đặt <b>ngay dưới diff</b> — cần lưu <code>contentDefault</code> (gap G6).</div>
+              </div>
+            </div>
+          </div>
+          <div class="p-foot">
+            <span class="note">Không có nút Từ chối — quyết định D6</span>
+            <button class="btn btn-primary">Duyệt &amp; Gửi →</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ══════════════ DRAWER 800px ══════════════ -->
+<div class="scrim" id="scrim" onclick="closeDrawer()"></div>
+<aside class="drawer" id="drawer">
+  <div class="dr-head">
+    <div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap">
+        <span class="badge b-type">Closure Broadcast</span><span class="lvl l2">2</span>
+        <span class="badge b-sent" id="drStatus">Đã gửi</span><span class="tag-edit">✎ nội dung đã sửa</span>
+      </div>
+      <h2>SEN/CI/20260621/002-BC001</h2>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center">
+      <button class="btn btn-secondary btn-sm">↗ Toàn trang</button>
+      <button class="btn btn-secondary btn-sm">🖨</button>
+      <button class="x" onclick="closeDrawer()">×</button>
+    </div>
+  </div>
+  <div class="dr-body">
+    <div class="dr-sec" id="drWarn" style="display:none">
+      <div class="warnbox" style="background:var(--color-critical-bg);border-color:var(--color-critical-border)">
+        <b>⚠ Không có người nhận — chưa khớp rule định tuyến nào</b>
+        Đã thử: Broadcast Type <b>Closure</b> · Incident Type <b>Environment</b> · Crisis Level <b>5</b>. Không rule Active nào khớp, hoặc nhóm nhận đã bị Deactivate.<br>
+        <span style="display:inline-block;margin-top:8px">→ Record này <b>không thể dispatch</b> cho tới khi sửa Broadcast Matrix hoặc thêm người nhận thủ công.
+        <button class="btn btn-secondary btn-sm" style="margin-left:6px">Mở Broadcast Matrix ↗</button></span>
+      </div>
+    </div>
+    <div class="dr-sec">
+      <h3>Định tuyến</h3>
+      <dl class="kv">
+        <dt>Rule khớp</dt><dd>mat-l2 <span style="font-weight:500;color:var(--text-muted)">· Level 2 · Any type</span></dd>
+        <dt>Template</dt><dd>Standard Closure Broadcast</dd>
+        <dt>Nhóm nhận</dt><dd>SDC Crisis Command</dd>
+        <dt>Kênh</dt><dd>✉ Email &nbsp; 📱 Push Notification</dd>
+        <dt>Sự việc</dt><dd><a href="#" style="color:var(--color-info)">SEN/IR/20260621/0001</a> — Siloso Beach Power Outage</dd>
+        <dt>Tạo lúc</dt><dd>21/07 23:58 · system</dd>
+      </dl>
+    </div>
+    <div class="dr-sec">
+      <h3>Người nhận (3)</h3>
+      <div>
+        <span class="rchip">silosocafe@food.com.sg <x>×</x></span>
+        <span class="rchip">ops@olabeach.com.sg <x>×</x></span>
+        <span class="rchip added">safety.lead@sdc.gov.sg <x>×</x></span>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap">
+        <button class="btn btn-secondary btn-sm">+ Thêm</button>
+        <button class="btn btn-secondary btn-sm">↺ Khôi phục mặc định</button>
+        <span class="note"><b>+1</b> thêm thủ công · <b>1</b> đã gỡ — không đổi cấu hình nhóm (§10.3d)</span>
+      </div>
+    </div>
+    <div class="dr-sec">
+      <h3>Nội dung &amp; giao nhận</h3>
+      <div class="ctabs">
+        <button class="ctab on" onclick="ctab(this,'d1')">Preview</button>
+        <button class="ctab" onclick="ctab(this,'d2')">Nguồn</button>
+        <button class="ctab" onclick="ctab(this,'d3')">Diff (3 dòng đổi)</button>
+      </div>
+      <div class="split">
+        <div>
+          <div id="d1" class="cbox">
+            <div class="mailcard">
+              <div class="mailsubj"><em>Tiêu đề</em>[SDC] Incident Closed: Siloso Beach Power Outage</div>
+              <div class="mailbody">INCIDENT CLOSURE NOTICE
+
+Case ID: SEN/CI/20260621/002
+Incident ID: SEN/IR/20260621/0001
+Title: Siloso Beach Power Outage
+Classification: Facilities — Power Outage
+Location: Siloso Beach Walk
+Crisis Level: Level 2
+Closed At: 2026-07-22 03:55
+Closed By: duty.manager.lim
+
+Summary: Sự cố mất điện đã được khắc phục lúc 03:40. Không có thương vong. Các đơn vị F&amp;B đã hoạt động trở lại bình thường.
+
+This is an automated closure dispatch from the Sentosa CMS.</div>
+            </div>
+          </div>
+          <div id="d2" class="cbox hide">
+            <div class="mailcard"><div class="mailbody src">INCIDENT CLOSURE NOTICE
+
+Case ID: {case_id}
+Incident ID: {incident_id}
+Title: {incident_title}
+Crisis Level: {crisis_level}
+Closed At: {closed_at}
+Closed By: {closed_by}
+
+Summary: {summary}</div></div>
+          </div>
+          <div id="d3" class="cbox hide">
+            <div class="mailcard" style="padding:12px"><div class="diff">
+              <span>&nbsp;Closed By: duty.manager.lim</span>
+              <span class="del">− Summary: N/A</span>
+              <span class="add">+ Summary: Sự cố mất điện đã được khắc phục lúc 03:40. Không có thương vong.</span>
+              <span class="add">+ Các đơn vị F&amp;B đã hoạt động trở lại bình thường.</span>
+              <span>&nbsp;This is an automated closure dispatch from the Sentosa CMS.</span>
+            </div></div>
+          </div>
+        </div>
+        <div>
+          <h3 style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px">Giao nhận (3)</h3>
+          <table class="dtab">
+            <tr><td>silosocafe@food.com.sg</td><td style="color:var(--color-active);font-weight:700;white-space:nowrap">✓ 05:45</td></tr>
+            <tr><td>ops@olabeach.com.sg</td><td style="color:var(--color-active);font-weight:700;white-space:nowrap">✓ 05:45</td></tr>
+            <tr><td>safety.lead@sdc.gov.sg<div style="color:var(--color-critical);font-family:var(--font-body);font-size:11px;margin-top:3px">mailbox full</div></td>
+                <td style="color:var(--color-critical);font-weight:700;white-space:nowrap">⚠ Lỗi<div style="margin-top:5px"><button class="btn btn-secondary btn-sm">Gửi lại</button></div></td></tr>
+          </table>
+          <div class="note" style="margin-top:8px"><b>2 / 3</b> thành công<br><span style="color:var(--text-faint)">Cần G11 — hiện luôn hiển thị “delivered 0”</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="dr-sec" style="border-bottom:none">
+      <h3>Hồ sơ</h3>
+      <dl class="kv">
+        <dt>Duyệt &amp; gửi</dt><dd>duty.manager.lim · 22/07 04:07</dd>
+        <dt>Nội dung</dt><dd style="color:var(--color-purple)">Đã sửa khác mặc định — có xác nhận</dd>
+        <dt>Audit</dt><dd><a href="#" style="color:var(--color-info)">Xem trong Audit Log ↗</a></dd>
+        <dt>Kết quả</dt><dd>2/3 giao thành công · 1 lỗi</dd>
+      </dl>
+    </div>
+  </div>
+  <div class="dr-foot">
+    <span class="note" id="drFootNote">Bản ghi đã gửi — chỉ đọc</span>
+    <button class="btn btn-primary hide" id="drSend">Duyệt &amp; Gửi →</button>
+  </div>
+</aside>
+
+<script>
+function setTab(n){
+  document.getElementById('pane1').classList.toggle('hide',n!==1);
+  document.getElementById('pane2').classList.toggle('hide',n!==2);
+  document.getElementById('tb1').classList.toggle('on',n===1);
+  document.getElementById('tb2').classList.toggle('on',n===2);
+  closeDrawer(); window.scrollTo({top:0,behavior:'smooth'});
+}
+function stab(b){[].forEach.call(b.parentElement.children,function(x){x.classList.remove('on')});b.classList.add('on');}
+function adv(){document.getElementById('advg').classList.toggle('hide');}
+function dd(id){document.getElementById(id).classList.toggle('hide');}
+function openDrawer(kind){
+  var w=kind==='warn';
+  document.getElementById('drWarn').style.display=w?'block':'none';
+  var st=document.getElementById('drStatus');
+  st.textContent=w?'Chờ xử lý':'Đã gửi'; st.className=w?'badge b-pend':'badge b-sent';
+  document.getElementById('drSend').classList.toggle('hide',!w);
+  document.getElementById('drFootNote').textContent=w
+    ?'Không có nút Từ chối (D6) · không thể gửi khi danh sách người nhận rỗng'
+    :'Bản ghi đã gửi — chỉ đọc';
+  document.getElementById('drawer').classList.add('on');
+  document.getElementById('scrim').classList.add('on');
+}
+function closeDrawer(){document.getElementById('drawer').classList.remove('on');document.getElementById('scrim').classList.remove('on');}
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeDrawer();});
+function ctab(btn,id){
+  var p=btn.parentElement;[].forEach.call(p.children,function(b){b.classList.remove('on')});btn.classList.add('on');
+  var h=p.parentElement;[].forEach.call(h.querySelectorAll('.cbox'),function(c){c.classList.add('hide')});
+  h.querySelector('#'+id).classList.remove('hide');
+}
+function pick(r){[].forEach.call(r.parentElement.querySelectorAll('.row'),function(x){x.classList.remove('on')});r.classList.add('on');}
+function cnt(){
+  var n=document.querySelectorAll('#pane2 .row input[type=checkbox]:checked').length;
+  document.getElementById('bulk').style.display=n?'flex':'none';
+  document.getElementById('bn').textContent=n;document.getElementById('bn2').textContent=n;
+}
+function clearSel(){[].forEach.call(document.querySelectorAll('#pane2 input[type=checkbox]'),function(c){c.checked=false});cnt();}
+function setDay(b){[].forEach.call(document.querySelectorAll('.days .day'),function(d){d.classList.remove('on')});b.classList.add('on');}
+</script>
+</body>
+</html>

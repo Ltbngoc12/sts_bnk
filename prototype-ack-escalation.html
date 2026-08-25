@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PROTOTYPE — Acknowledgement &amp; Escalation (Crisis Configuration)</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Inter:wght@400;500;600;700&family=Outfit:wght@600;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --color-primary:#FF8200; --color-primary-dark:#6D3500; --color-secondary:#008C95;
+  --color-tertiary:#4A148C; --color-critical:#B3261E; --color-critical-bg:#FDECEA;
+  --color-success:#2E7D32; --color-success-bg:#E8F5E9;
+  --bg-base:#F4F1EA; --bg-card:#FBFBFA; --bg-inset:#F4F1EA;
+  --text-main:#2B1F1D; --text-muted:#7C6E65; --text-sub:#5A4B44;
+  --border-color:#E6DFD5; --border-color-hover:#CBD2C5;
+  --font-title:'Playfair Display',Georgia,serif; --font-body:'Inter',sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg-base);font-family:var(--font-body);color:var(--text-main);font-size:13.5px;line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding:20px 24px 80px}
+.glass{background:var(--bg-card);border:1px solid var(--border-color);border-radius:12px;
+  box-shadow:0 4px 20px -2px rgba(43,31,29,.03),0 2px 6px -1px rgba(43,31,29,.02)}
+
+/* ── prototype banner ── */
+.proto-bar{background:var(--color-primary-dark);color:#fff;padding:11px 24px;font-size:12.5px;
+  display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.proto-bar b{font-family:var(--font-body);letter-spacing:.04em;text-transform:uppercase;font-size:11px;
+  background:var(--color-primary);padding:3px 9px;border-radius:10px;color:#2B1F1D;font-weight:800}
+
+/* ── app header ── */
+.appbar{padding:16px 24px;border-bottom:1px solid var(--border-color);background:var(--bg-card);
+  display:flex;justify-content:space-between;align-items:center;border-radius:12px 12px 0 0}
+h1{font-family:var(--font-title);font-size:20px;font-weight:800;letter-spacing:.03em;margin:0}
+.sub{font-size:12.5px;color:var(--text-muted);margin:2px 0 0}
+.pill{background:var(--bg-inset);color:var(--text-muted);padding:2px 10px;border-radius:10px;font-size:11px;font-weight:600}
+
+/* ── tabs ── */
+.tabs{display:flex;gap:10px;margin:12px 0 0;border-bottom:1px solid var(--border-color);padding-bottom:2px;flex-wrap:wrap}
+.tab{padding:10px 18px;border:none;background:none;border-bottom:3px solid transparent;color:var(--text-muted);
+  font-weight:500;font-size:13.5px;cursor:default;font-family:var(--font-body)}
+.tab.on{border-bottom-color:var(--color-primary);color:var(--color-primary-dark);font-weight:700}
+.screennav{display:flex;gap:8px;margin:16px 0}
+.screennav button{padding:8px 16px;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-card);
+  font-family:var(--font-body);font-size:12.5px;font-weight:600;color:var(--text-sub);cursor:pointer}
+.screennav button.on{background:var(--color-primary-dark);color:#fff;border-color:var(--color-primary-dark)}
+
+/* ── cards / sections ── */
+.card{padding:20px 22px;margin-top:14px}
+h2{font-family:var(--font-title);font-size:14px;font-weight:700;letter-spacing:.05em;margin:0 0 2px}
+h3{font-family:var(--font-title);font-size:13px;font-weight:700;letter-spacing:.05em;margin:0 0 2px}
+.sechead{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:14px}
+.divider{margin-top:22px;padding-top:16px;border-top:1px solid var(--border-color)}
+
+/* ── notes ── */
+.note{background:var(--bg-inset);border-left:4px solid var(--color-secondary);padding:10px 14px;border-radius:6px;
+  font-size:12px;color:var(--text-sub);line-height:1.55;margin-bottom:14px}
+.note.warn{border-left-color:var(--color-critical)}
+.note.new{border-left-color:var(--color-primary)}
+
+/* ── form ── */
+label.lbl{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;
+  color:var(--text-muted);margin-bottom:5px}
+input[type=text],input[type=number],select{width:100%;padding:8px 10px;border:1px solid var(--border-color);
+  border-radius:6px;background:#fff;font-family:var(--font-body);font-size:13px;color:var(--text-main)}
+input:disabled,select:disabled{background:#F0ECE4;color:var(--text-muted);cursor:not-allowed}
+input::placeholder{color:#B5A99F;font-style:italic}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;max-width:820px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;max-width:820px}
+.chk{display:flex;align-items:flex-start;gap:8px;font-size:12.5px;line-height:1.5}
+.chk input{margin-top:3px}
+.hint{font-size:11.5px;color:var(--text-muted);margin:5px 0 0}
+
+/* ── tables ── */
+table{width:100%;border-collapse:collapse;text-align:left;font-size:12.5px}
+th{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--text-muted);
+  padding:8px 10px;border-bottom:1px solid var(--border-color)}
+td{padding:8px 10px;border-bottom:1px solid var(--border-color);vertical-align:top}
+tbody tr:last-child td{border-bottom:none}
+
+/* ── badges ── */
+.b{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:700;white-space:nowrap;
+  letter-spacing:.02em}
+.b-new{background:#FFF0E0;color:#8A4B00}
+.b-ok{background:var(--color-success-bg);color:var(--color-success)}
+.b-gap{background:var(--color-critical-bg);color:var(--color-critical)}
+.b-todo{background:#EDE7F6;color:var(--color-tertiary)}
+.b-ops{background:#E0F2F1;color:#00695C}
+.b-empty{background:var(--bg-inset);color:var(--text-muted)}
+
+/* ── buttons ── */
+.btn{padding:8px 18px;border-radius:6px;font-size:12.5px;font-weight:600;cursor:pointer;
+  font-family:var(--font-body);border:1px solid transparent}
+.btn-primary{background:var(--color-primary-dark);color:#fff}
+.btn-secondary{background:var(--bg-inset);color:var(--text-sub);border-color:var(--border-color)}
+.btn-sm{padding:5px 12px;font-size:12px}
+
+/* ── timeline ── */
+.tl{list-style:none;margin:14px 0 0;padding:0;position:relative}
+.tl:before{content:'';position:absolute;left:64px;top:6px;bottom:6px;width:2px;background:var(--border-color)}
+.tl li{position:relative;padding:0 0 16px 92px;min-height:34px}
+.tl .t{position:absolute;left:0;top:0;width:52px;text-align:right;font-size:11.5px;font-weight:700;
+  color:var(--text-muted);font-variant-numeric:tabular-nums}
+.tl .dot{position:absolute;left:58px;top:3px;width:14px;height:14px;border-radius:50%;border:2px solid var(--bg-card)}
+.tl .ttl{font-weight:600;font-size:13px}
+.tl .dsc{font-size:11.5px;color:var(--text-muted);margin-top:1px}
+.tl .aud{font-size:11px;color:var(--color-tertiary);margin-top:3px;font-weight:600}
+.d-send{background:var(--color-secondary)}
+.d-rem{background:var(--color-primary)}
+.d-esc{background:var(--color-critical)}
+.d-win{background:var(--text-muted)}
+.d-end{background:var(--color-primary-dark)}
+
+.empty{padding:26px;text-align:center;color:var(--text-muted);font-size:12.5px;background:var(--bg-inset);border-radius:8px}
+.hide{display:none}
+.mono{font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:11.5px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:900px){.cols,.grid2{grid-template-columns:1fr}.grid3{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div class="proto-bar">
+  <b>Prototype</b>
+  <span>Bản dựng để review trước khi build — <strong>không phải hệ thống thật</strong>. Mục đích: chốt business rule với Ops trong workshop (Build plan §9) trước khi viết code.</span>
+</div>
+
+<div class="wrap">
+
+  <div class="glass" style="border-radius:12px">
+    <div class="appbar">
+      <div>
+        <h1>CRISIS CONFIGURATION</h1>
+        <p class="sub">Recall groups, message templates, routing rules, messaging provider và acknowledgement rules cho Crisis Management &amp; Emergency Recall (FSD §11.5).</p>
+      </div>
+      <span class="pill">Signed in as System Administrator</span>
+    </div>
+    <div style="padding:0 24px 14px">
+      <div class="tabs">
+        <button class="tab">Recall Groups</button>
+        <button class="tab">Message Templates</button>
+        <button class="tab">Routing Rules</button>
+        <button class="tab">Messaging Service</button>
+        <button class="tab on">Acknowledgement &amp; Escalation</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="screennav">
+    <button id="nav-cfg" class="on" onclick="showScreen('cfg')">1 · Màn hình cấu hình</button>
+    <button id="nav-sim" onclick="showScreen('sim')">2 · Mô phỏng luồng runtime</button>
+    <button id="nav-aud" onclick="showScreen('aud')">3 · Audit events dự kiến</button>
+  </div>
+
+<!-- ══════════════════════ SCREEN 1: CONFIG ══════════════════════ -->
+<div id="screen-cfg">
+
+  <div class="glass card">
+    <div class="sechead">
+      <div>
+        <h2>ACKNOWLEDGEMENT &amp; ESCALATION</h2>
+        <p class="sub">Người nhận xác nhận bằng cách nào, hệ thống nhắc ra sao, và làm gì khi họ im lặng.</p>
+      </div>
+    </div>
+
+    <div class="note warn">
+      <strong>Mọi giá trị thời gian trên màn này đang để trống — có chủ đích.</strong>
+      Ack window, khoảng nhắc và mốc escalation chưa được Ops thống nhất (Build plan §9, Q3). Prototype cố tình không điền số
+      để buổi workshop không bị neo vào con số do team dev tự nghĩ ra. Ops điền, BA ghi nhận, dev mới build.
+    </div>
+
+    <div class="note">
+      <strong>Delivered ≠ Acknowledged.</strong> Gateway báo tin nhắn tới máy không nói lên người đó đã đọc hay đang tới.
+      Acknowledgement cần một hành động chủ động từ người nhận, và đó là con số duy nhất cho Duty Manager biết bao nhiêu người
+      thật sự đang huy động. Hai trường này tách biệt xuyên suốt module và không bao giờ được gộp.
+    </div>
+  </div>
+
+  <!-- BLOCK 1 -->
+  <div class="glass card">
+    <div class="sechead">
+      <div>
+        <h3>1 · ACKNOWLEDGEMENT REQUIREMENTS <span class="b b-new">SỬA</span></h3>
+        <p class="sub">Yêu cầu xác nhận — và <em>áp dụng ở đâu</em>.</p>
+      </div>
+    </div>
+
+    <div class="note new">
+      <strong>Thay đổi so với bản hiện tại:</strong> requirement ghi <em>"acknowledgement requirements <u>where applicable</u>"</em>,
+      nhưng bản đang chạy chỉ có <span class="mono">AckEscalationRule</span> dạng singleton — một bộ rule duy nhất cho mọi crisis level,
+      mọi group, mọi template. Nghĩa là <strong>không có cách nào khai báo tin Stand-Down thì không cần ack</strong>.
+      Block dưới đây bổ sung phần scope còn thiếu.
+    </div>
+
+    <label class="lbl">Áp dụng bộ rule này cho <span class="b b-new">MỚI</span></label>
+    <div class="grid2" style="margin-bottom:14px">
+      <div>
+        <label class="lbl" style="font-weight:500;text-transform:none;font-size:11.5px">Crisis level</label>
+        <select>
+          <option>— Chọn level áp dụng —</option>
+          <option>Level 1 (nghiêm trọng nhất)</option>
+          <option>Level 2</option>
+          <option>Level 1 và Level 2 (dùng chung một bộ)</option>
+        </select>
+        <p class="hint">Câu hỏi cho Ops: L1 và L2 có <strong>cùng</strong> ack window và ladder không? Nếu khác thì cần rule theo từng level, không dùng chung được.</p>
+      </div>
+      <div>
+        <label class="lbl" style="font-weight:500;text-transform:none;font-size:11.5px">Bắt buộc acknowledgement</label>
+        <div style="padding-top:8px;display:flex;flex-direction:column;gap:7px">
+          <label class="chk"><input type="checkbox" checked> Tin recall (Standard / Detailed SMS Recall)</label>
+          <label class="chk"><input type="checkbox"> Tin stand-down — <em style="color:var(--text-muted)">thường không cần ack</em></label>
+        </div>
+        <p class="hint">Map tới field mới <span class="mono">requiresAck</span> trên Message Template. Template nào tắt thì không sinh ack token, không đếm vào quorum, không bị nhắc/escalate.</p>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div>
+        <label class="lbl">Acknowledgement window (phút)</label>
+        <input type="number" id="cfg-window" placeholder="Ops điền — vd 10" oninput="syncSim()">
+        <p class="hint">Quá mốc này mà chưa phản hồi → chuyển <span class="mono">NO_RESPONSE</span>. Đây là ngưỡng "cần gọi điện tay", khác với mốc escalation.</p>
+      </div>
+      <div>
+        <label class="lbl">Capture ETA khi acknowledge</label>
+        <label class="chk" style="padding-top:8px"><input type="checkbox" checked> Hỏi người phản hồi thời gian dự kiến có mặt</label>
+        <p class="hint">Chỉ khả dụng với phương thức tokenised link.</p>
+      </div>
+    </div>
+
+    <div style="margin-top:16px">
+      <label class="lbl">Phương thức acknowledgement</label>
+      <div style="display:flex;flex-direction:column;gap:9px">
+        <label class="chk"><input type="checkbox" id="m-link" checked onchange="toggleKw()">
+          <span><strong>Tokenised link</strong> — người nhận bấm link ngắn và xác nhận trên trang nhẹ. Timestamp chính xác, không phụ thuộc telco, hỗ trợ ETA.
+          <em>Mặc định và là phương thức duy nhất build được ở thời điểm này.</em></span></label>
+        <label class="chk"><input type="checkbox" id="m-kw" onchange="toggleKw()">
+          <span><strong>SMS reply keyword</strong> — người nhận trả lời YES/NO. Chạy trên mọi máy, không cần internet, nhưng cần
+          two-way long/short code mà dự án chưa có (Q7).</span></label>
+      </div>
+    </div>
+
+    <div class="grid2" style="margin-top:14px">
+      <div>
+        <label class="lbl">Acknowledge keywords</label>
+        <input type="text" id="kw-ack" value="YES, Y, ACK, OK" disabled>
+      </div>
+      <div>
+        <label class="lbl">Decline keywords</label>
+        <input type="text" id="kw-dec" value="NO, N, UNABLE" disabled>
+      </div>
+    </div>
+    <p class="hint" id="kw-hint">Hai field keyword bị khoá vì phương thức <strong>SMS reply keyword</strong> đang tắt — hiện không có
+      thành phần nào trong hệ thống đọc chúng. <span class="b b-new">SỬA</span> Bản hiện tại để chúng luôn editable, khiến admin cấu hình
+      một thứ không có tác dụng.</p>
+    <p class="hint">Giữ decline bật khi đã có two-way. Không có nó, DM phải chờ hết window mới biết một người không tới — mất 10–15 phút trong khủng hoảng.</p>
+  </div>
+
+  <!-- BLOCK 2 -->
+  <div class="glass card">
+    <div class="sechead">
+      <div>
+        <h3>2 · REMINDER RULES <span class="b b-new">MỚI HOÀN TOÀN</span></h3>
+        <p class="sub">Nhắc lại <strong>chính người đó</strong>, trong ack window, trước khi mở rộng ra người khác.</p>
+      </div>
+    </div>
+
+    <div class="note new">
+      <strong>Đây là phần thiếu lớn nhất so với requirement.</strong> Bản hiện tại không có khái niệm reminder — muốn nhắc 3 lần,
+      admin phải tự tạo 3 dòng <span class="mono">Resend SMS</span> trong escalation ladder. Hai thứ này khác nhau về bản chất:
+      <br>· <strong>Reminder</strong> = cùng một người, cùng nội dung, lặp theo chu kỳ, dừng khi họ phản hồi.
+      <br>· <strong>Escalation</strong> = đổi người / đổi kênh / đổi hành động, chạy một chiều, không lặp.
+      <br>Gộp chung khiến không cấu hình được "nhắc mỗi 3 phút, tối đa 2 lần" mà không đụng vào ladder.
+    </div>
+
+    <label class="chk" style="margin-bottom:14px"><input type="checkbox" id="rem-on" checked onchange="syncSim()">
+      <span><strong>Bật nhắc tự động</strong> cho người chưa phản hồi</span></label>
+
+    <div class="grid3">
+      <div>
+        <label class="lbl">Nhắc lần đầu sau (phút)</label>
+        <input type="number" id="cfg-rem-first" placeholder="Ops điền" oninput="syncSim()">
+        <p class="hint">Tính từ lúc gửi tin gốc.</p>
+      </div>
+      <div>
+        <label class="lbl">Khoảng cách giữa các lần nhắc (phút)</label>
+        <input type="number" id="cfg-rem-int" placeholder="Ops điền" oninput="syncSim()">
+      </div>
+      <div>
+        <label class="lbl">Số lần nhắc tối đa</label>
+        <input type="number" id="cfg-rem-max" placeholder="Ops điền" oninput="syncSim()">
+        <p class="hint">Hết số lần → bàn giao cho escalation ladder.</p>
+      </div>
+    </div>
+
+    <div class="grid2" style="margin-top:14px">
+      <div>
+        <label class="lbl">Template dùng cho tin nhắc <span class="b b-new">MỚI</span></label>
+        <select>
+          <option>— Chọn template nhắc —</option>
+          <option>Reminder SMS (cần tạo mới)</option>
+          <option>Dùng lại nội dung tin gốc (hành vi hiện tại)</option>
+        </select>
+        <p class="hint"><strong>Vấn đề hiện tại:</strong> <span class="mono">resendToRecipient()</span> gửi lại đúng
+          <span class="mono">dispatches[0].renderedMessage</span> — tin nhắc <strong>giống hệt</strong> tin gốc. Người nhận không
+          phân biệt được đây là nhắc hay tin bị gửi trùng. Tin nhắc nên có tiền tố kiểu <span class="mono">[NHẮC LẦN 2]</span>
+          và thời gian còn lại của window.</p>
+      </div>
+      <div>
+        <label class="lbl">Dừng nhắc khi</label>
+        <div style="display:flex;flex-direction:column;gap:7px;padding-top:6px">
+          <label class="chk"><input type="checkbox" checked disabled> Người nhận đã acknowledge <span class="b b-ok" style="margin-left:4px">luôn đúng</span></label>
+          <label class="chk"><input type="checkbox" checked> Người nhận đã decline</label>
+          <label class="chk"><input type="checkbox"> Delivery ở trạng thái FAILED — <em style="color:var(--text-muted)">nhắc thêm cũng vô ích</em></label>
+          <label class="chk"><input type="checkbox" checked> Quorum đã đạt</label>
+        </div>
+        <p class="hint">Câu hỏi cho Ops: khi quorum đã đạt, có nên ngừng nhắc những người còn lại không? Hay vẫn nhắc vì cần đủ mặt?</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- BLOCK 3 -->
+  <div class="glass card">
+    <div class="sechead">
+      <div>
+        <h3>3 · ESCALATION LADDER</h3>
+        <p class="sub">Hệ thống làm gì khi người nhận vẫn im lặng sau khi đã nhắc hết. Các bước chạy theo thứ tự thời gian.</p>
+      </div>
+      <button class="btn btn-secondary btn-sm">+ Thêm bước</button>
+    </div>
+
+    <div class="note warn">
+      <strong>Mốc thời gian tính từ đâu — phải chốt.</strong> Bản hiện tại tính <span class="mono">elapsed</span> từ
+      <span class="mono">sentAt</span>, mà mỗi lần resend lại ghi đè <span class="mono">sentAt = now</span>.
+      Hệ quả: đồng hồ escalation <strong>reset sau mỗi lần nhắc</strong>, mọi mốc Ops chốt sẽ bị trôi ra sau.
+      Xem tab <em>Mô phỏng luồng runtime</em> để thấy độ lệch.
+    </div>
+
+    <div class="grid2" style="margin-bottom:16px">
+      <div>
+        <label class="lbl">Mốc gốc tính thời gian <span class="b b-new">SỬA</span></label>
+        <select id="cfg-baseline" onchange="syncSim()">
+          <option value="dispatch">Từ thời điểm dispatch (cố định) — đề xuất</option>
+          <option value="lastsend">Từ lần gửi gần nhất — hành vi hiện tại (lỗi)</option>
+        </select>
+      </div>
+      <div></div>
+    </div>
+
+    <table>
+      <thead><tr>
+        <th style="width:130px">Sau (phút)</th><th style="width:230px">Hành động</th>
+        <th style="width:150px">Đối tượng</th><th>Ghi chú</th><th style="width:80px"></th>
+      </tr></thead>
+      <tbody>
+        <tr>
+          <td><input type="number" id="cfg-esc1" placeholder="Ops điền" oninput="syncSim()"></td>
+          <td><select id="cfg-esc1a" onchange="syncSim()">
+              <option value="tier">Escalate to next tier</option>
+              <option value="resend">Resend SMS</option>
+              <option value="voice">Voice call</option>
+              <option value="dm">Notify Duty Manager</option>
+            </select></td>
+          <td><select><option>Tier 2 — Secondary</option><option>Tier 3 — Standby</option></select></td>
+          <td><input type="text" placeholder="vd: Gọi Tier 2 vào cuộc"></td>
+          <td style="text-align:right"><button class="btn btn-secondary btn-sm">Xoá</button></td>
+        </tr>
+        <tr>
+          <td><input type="number" id="cfg-esc2" placeholder="Ops điền" oninput="syncSim()"></td>
+          <td><select id="cfg-esc2a" onchange="syncSim()">
+              <option value="dm">Notify Duty Manager</option>
+              <option value="tier">Escalate to next tier</option>
+              <option value="resend">Resend SMS</option>
+              <option value="voice">Voice call</option>
+            </select></td>
+          <td><select><option>Duty Manager</option></select></td>
+          <td><input type="text" placeholder="vd: DM gọi điện trực tiếp người còn im lặng"></td>
+          <td style="text-align:right"><button class="btn btn-secondary btn-sm">Xoá</button></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="note warn" style="margin-top:16px">
+      <strong>Trạng thái implement của từng hành động — cần biết trước khi Ops cấu hình:</strong>
+      <table style="margin-top:8px">
+        <thead><tr><th style="width:230px">Hành động</th><th style="width:130px">Runtime</th><th>Ghi chú</th></tr></thead>
+        <tbody>
+          <tr><td><span class="mono">Resend SMS</span></td><td><span class="b b-ok">Đã chạy</span></td>
+              <td>Bỏ qua âm thầm nếu member không có số mobile, nhưng audit vẫn ghi "executed".</td></tr>
+          <tr><td><span class="mono">Notify Duty Manager</span></td><td><span class="b b-ok">Đã chạy</span></td>
+              <td>Đẩy notification in-app cho role Duty Manager.</td></tr>
+          <tr><td><span class="mono">Escalate to next tier</span></td><td><span class="b b-gap">CHƯA CÓ CODE</span></td>
+              <td><strong>Có trong dropdown nhưng runtime không xử lý.</strong> Chỉ tăng <span class="mono">escalationLevel</span> rồi ghi audit "Escalation step executed" — audit đang báo sai. Đây chính là cơ chế kéo Tier 2 vào cuộc.</td></tr>
+          <tr><td><span class="mono">Voice call</span></td><td><span class="b b-gap">CHƯA CÓ CODE</span></td>
+              <td>Voice có trong scope release này hay không vẫn chưa chốt (Q4). Đề xuất: ẩn khỏi dropdown cho tới khi Q4 có câu trả lời, thay vì cho cấu hình một thứ không chạy.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- BLOCK 4 -->
+  <div class="glass card">
+    <div class="sechead">
+      <div>
+        <h3>4 · QUORUM</h3>
+        <p class="sub">"Đã đủ người chưa?" — một trong ba câu hỏi live dashboard phải trả lời trong 5 giây.</p>
+      </div>
+    </div>
+    <div class="note">
+      Quorum nằm ngoài câu chữ của requirement (ack / reminder / escalation / audit) nhưng phái sinh trực tiếp từ ack
+      và <strong>đã được wire thật</strong> (<span class="mono">evaluateQuorum()</span> + hiển thị trên dashboard). Đề xuất giữ lại,
+      nhưng cập nhật requirement để nó không còn là feature không có dòng requirement nào đỡ.
+    </div>
+    <label class="chk" style="margin-bottom:14px"><input type="checkbox" id="q-on" checked onchange="syncSim()"> Bật theo dõi quorum</label>
+    <div class="grid3">
+      <div><label class="lbl">Loại</label><select><option>Count of responders</option><option>Percentage of recipients</option></select></div>
+      <div><label class="lbl">Giá trị</label><input type="number" placeholder="Ops điền"></div>
+      <div><label class="lbl">Tier được tính</label><select><option>Tier 1 — Primary</option><option>All tiers</option><option>Tier 2 — Secondary</option></select></div>
+    </div>
+    <p class="hint">Validation cần thêm (hiện API không có): giá trị bắt buộc &gt; 0; nếu là Percentage thì phải trong khoảng 1–100.</p>
+  </div>
+
+  <div style="margin-top:18px;display:flex;gap:10px">
+    <button class="btn btn-primary">Lưu Acknowledgement, Reminder &amp; Escalation Rules</button>
+    <button class="btn btn-secondary">Huỷ</button>
+  </div>
+</div>
+
+<!-- ══════════════════════ SCREEN 2: SIMULATOR ══════════════════════ -->
+<div id="screen-sim" class="hide">
+  <div class="glass card">
+    <div class="sechead">
+      <div>
+        <h2>MÔ PHỎNG LUỒNG RUNTIME — MỘT NGƯỜI NHẬN</h2>
+        <p class="sub">Điền timing ở màn cấu hình (hoặc ngay tại đây), hệ thống dựng lại timeline thực tế của một recipient im lặng.</p>
+      </div>
+    </div>
+    <div class="note">
+      Mục đích màn này: để Ops <strong>nhìn thấy hệ quả của con số họ chọn</strong> trước khi chốt. Một ack window 10 phút với
+      3 lần nhắc nghe hợp lý trên giấy, nhưng khi trải ra timeline có thể thành 4 tin SMS trong 9 phút tới cùng một người —
+      đó là điều cần phát hiện ở workshop, không phải ở UAT.
+    </div>
+
+    <div class="grid3" style="max-width:100%">
+      <div><label class="lbl">Ack window (phút)</label><input type="number" id="s-window" placeholder="—" oninput="pushBack();render()"></div>
+      <div><label class="lbl">Nhắc lần đầu sau (phút)</label><input type="number" id="s-first" placeholder="—" oninput="pushBack();render()"></div>
+      <div><label class="lbl">Khoảng cách nhắc (phút)</label><input type="number" id="s-int" placeholder="—" oninput="pushBack();render()"></div>
+      <div><label class="lbl">Số lần nhắc tối đa</label><input type="number" id="s-max" placeholder="—" oninput="pushBack();render()"></div>
+      <div><label class="lbl">Escalate lên Tier 2 ở phút</label><input type="number" id="s-esc1" placeholder="—" oninput="pushBack();render()"></div>
+      <div><label class="lbl">Notify Duty Manager ở phút</label><input type="number" id="s-esc2" placeholder="—" oninput="pushBack();render()"></div>
+    </div>
+
+    <div style="margin-top:14px">
+      <label class="lbl">Mốc gốc tính thời gian</label>
+      <select id="s-baseline" onchange="render()" style="max-width:420px">
+        <option value="dispatch">Từ thời điểm dispatch (cố định) — đề xuất</option>
+        <option value="lastsend">Từ lần gửi gần nhất — hành vi hiện tại (lỗi)</option>
+      </select>
+    </div>
+
+    <div id="drift" class="note warn hide" style="margin-top:14px"></div>
+
+    <div class="cols" style="margin-top:20px">
+      <div>
+        <h3 style="margin-bottom:8px">TIMELINE NGƯỜI NHẬN</h3>
+        <p class="sub" style="margin-bottom:0">Kịch bản: một Tier 1 member không phản hồi lần nào.</p>
+        <div id="tl-wrap"></div>
+      </div>
+      <div>
+        <h3 style="margin-bottom:8px">SMS NGƯỜI NHẬN THỰC SỰ NHẬN ĐƯỢC</h3>
+        <p class="sub" style="margin-bottom:0">Kiểm tra xem có bị dội tin không.</p>
+        <div id="sms-wrap"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════ SCREEN 3: AUDIT ══════════════════════ -->
+<div id="screen-aud" class="hide">
+  <div class="glass card">
+    <div class="sechead">
+      <div>
+        <h2>AUDIT EVENTS DỰ KIẾN</h2>
+        <p class="sub">Requirement yêu cầu "related audit events". Bảng dưới đối chiếu từng sự kiện với trạng thái hiện tại trong code.</p>
+      </div>
+    </div>
+    <div class="note">
+      Nguyên tắc từ Build plan §302: <strong>mọi state change và mọi member edit đều phải được ghi lại kèm actor và timestamp</strong>.
+      Collection <span class="mono">crisisAuditLog</span> là append-only — không có đường update hay delete ở bất kỳ đâu trong codebase.
+    </div>
+
+    <h3 style="margin:18px 0 6px">A · Sự kiện cấu hình (ghi vào Admin Audit Log)</h3>
+    <table>
+      <thead><tr><th style="width:290px">Event</th><th style="width:130px">Trạng thái</th><th>Ghi chú</th></tr></thead>
+      <tbody>
+        <tr><td><span class="mono">Edit Acknowledgement &amp; Escalation Rules</span></td><td><span class="b b-ok">Đã có</span></td>
+            <td>Có before/after snapshot đầy đủ. Nhưng phần <span class="mono">details</span> chỉ ghi "Ack window X min, N step(s)" — nên liệt kê rõ field nào đổi.</td></tr>
+        <tr><td><span class="mono">Edit Reminder Rules</span></td><td><span class="b b-new">Mới</span></td>
+            <td>Đi kèm block Reminder Rules mới.</td></tr>
+        <tr><td><span class="mono">Acknowledgement method changed</span></td><td><span class="b b-todo">Nên tách</span></td>
+            <td>Hiện chỉ nằm trong snapshot chung. Bật/tắt reply-keyword là thay đổi rủi ro cao — đáng có event riêng để truy vết.</td></tr>
+        <tr><td><span class="mono">Ack requirement scope changed</span></td><td><span class="b b-new">Mới</span></td>
+            <td>Khi đổi template nào bắt buộc ack, hoặc đổi rule theo crisis level.</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="margin:22px 0 6px">B · Sự kiện runtime (ghi vào <span class="mono">crisisAuditLog</span>)</h3>
+    <table>
+      <thead><tr><th style="width:290px">Event</th><th style="width:130px">Trạng thái</th><th>Ghi chú</th></tr></thead>
+      <tbody>
+        <tr><td><span class="mono">Acknowledged</span> / <span class="mono">Declined</span></td><td><span class="b b-ok">Đã có</span></td>
+            <td>Ghi kèm phương thức và ETA nếu có.</td></tr>
+        <tr><td><span class="mono">Marked contacted</span></td><td><span class="b b-ok">Đã có</span></td>
+            <td>Ack duy nhất hệ thống không tự quan sát được — có ghi ai là người khẳng định.</td></tr>
+        <tr><td><span class="mono">Manual re-send</span></td><td><span class="b b-ok">Đã có</span></td>
+            <td></td></tr>
+        <tr><td><span class="mono">Escalation step executed</span></td><td><span class="b b-gap">Đang ghi SAI</span></td>
+            <td>Ghi cả với <span class="mono">Escalate to next tier</span> và <span class="mono">Voice call</span> — hai hành động runtime không hề thực thi. Audit log đang nói dối. Phải tách thành <span class="mono">executed</span> và <span class="mono">skipped</span> kèm lý do.</td></tr>
+        <tr><td><span class="mono">Ack window elapsed → NO_RESPONSE</span></td><td><span class="b b-gap">THIẾU</span></td>
+            <td>Runtime có đổi trạng thái nhưng <strong>không ghi audit nào</strong>. Đây là state change, vi phạm §302. Cũng là mốc quan trọng nhất trong after-action report: ai im lặng và từ lúc nào.</td></tr>
+        <tr><td><span class="mono">Reminder sent</span></td><td><span class="b b-new">Mới</span></td>
+            <td>Phải tách khỏi manual re-send để after-action report phân biệt được hệ thống nhắc bao nhiêu lần và người nhận phản hồi ở lần thứ mấy.</td></tr>
+        <tr><td><span class="mono">Reminder skipped</span></td><td><span class="b b-new">Mới</span></td>
+            <td>Kèm lý do: không có mobile / đã decline / delivery FAILED / quorum đã đạt.</td></tr>
+        <tr><td><span class="mono">Quorum met</span> / <span class="mono">Quorum lost</span></td><td><span class="b b-gap">THIẾU</span></td>
+            <td>Hiện chỉ hiển thị trên dashboard, không ghi lại. "Đủ người lúc mấy giờ" là câu hỏi chắc chắn xuất hiện trong after-action review.</td></tr>
+      </tbody>
+    </table>
+
+    <div class="note warn" style="margin-top:20px">
+      <strong>Validation còn thiếu ở API</strong> (<span class="mono">/api/admin/crisis-config/ack-escalation</span>):
+      route chỉ sort ladder theo <span class="mono">afterMinutes</span>, không kiểm tra gì thêm. Hiện có thể lưu
+      <span class="mono">ackWindowMinutes = 0</span> hoặc số âm, hai bước escalation trùng mốc phút, quorum percentage = 500.
+      Với module crisis thì đây là rủi ro thật, không phải nit-pick.
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script>
+function showScreen(k){
+  ['cfg','sim','aud'].forEach(function(s){
+    document.getElementById('screen-'+s).classList.toggle('hide', s!==k);
+    document.getElementById('nav-'+s).classList.toggle('on', s===k);
+  });
+  window.scrollTo(0,0);
+}
+
+function toggleKw(){
+  var on = document.getElementById('m-kw').checked;
+  document.getElementById('kw-ack').disabled = !on;
+  document.getElementById('kw-dec').disabled = !on;
+  document.getElementById('kw-hint').style.display = on ? 'none' : 'block';
+}
+
+/* đẩy giá trị từ màn config sang simulator */
+function syncSim(){
+  var map = [['cfg-window','s-window'],['cfg-rem-first','s-first'],['cfg-rem-int','s-int'],
+             ['cfg-rem-max','s-max'],['cfg-esc1','s-esc1'],['cfg-esc2','s-esc2']];
+  map.forEach(function(p){
+    var a=document.getElementById(p[0]), b=document.getElementById(p[1]);
+    if(a && b && a.value!=='') b.value=a.value;
+  });
+  var bl=document.getElementById('cfg-baseline'), sb=document.getElementById('s-baseline');
+  if(bl&&sb) sb.value=bl.value;
+  render();
+}
+function pushBack(){}
+
+function num(id){ var v=document.getElementById(id).value; return v===''?null:Number(v); }
+
+function render(){
+  var W=num('s-window'), F=num('s-first'), I=num('s-int'), M=num('s-max'),
+      E1=num('s-esc1'), E2=num('s-esc2'),
+      baseline=document.getElementById('s-baseline').value;
+
+  var tlw=document.getElementById('tl-wrap'), smw=document.getElementById('sms-wrap'),
+      drift=document.getElementById('drift');
+
+  if(W===null||F===null||I===null||M===null){
+    tlw.innerHTML='<div class="empty">Chưa đủ dữ liệu.<br>Điền ack window, mốc nhắc lần đầu, khoảng cách nhắc và số lần nhắc để dựng timeline.</div>';
+    smw.innerHTML='<div class="empty">—</div>';
+    drift.classList.add('hide');
+    return;
+  }
+
+  var ev=[], sms=[], lastSend=0;
+
+  ev.push({t:0,c:'d-send',ttl:'Dispatch — gửi SMS recall',
+    dsc:'deliveryStatus SENT · ackStatus AWAITING · escalationLevel 0',
+    aud:'audit: Crisis dispatched'});
+  sms.push({t:0,txt:'[CRISIS L1] Fire — Tower B. Report to Command Centre L1. Ack: sts.sg/a/7Kq2'});
+
+  /* reminders */
+  for(var n=1;n<=M;n++){
+    var t;
+    if(baseline==='dispatch'){ t = F + (n-1)*I; }
+    else { t = lastSend + (n===1 ? F : I); }
+    lastSend = t;
+    ev.push({t:t,c:'d-rem',ttl:'Nhắc lần '+n+' / '+M,
+      dsc:'Gửi lại cho chính người này. attempts +1' + (baseline==='lastsend'?' · sentAt bị ghi đè = mốc này':''),
+      aud:'audit: Reminder sent (lần '+n+')'});
+    sms.push({t:t,txt:'[NHẮC '+n+'] Bạn chưa xác nhận. [CRISIS L1] Fire — Tower B. Ack: sts.sg/a/7Kq2'});
+  }
+
+  /* ack window */
+  var wT = baseline==='dispatch' ? W : lastSend + W;
+  ev.push({t:wT,c:'d-win',ttl:'Hết acknowledgement window',
+    dsc:'ackStatus AWAITING → NO_RESPONSE. DM thấy người này là "cần gọi điện tay".',
+    aud:'audit: Ack window elapsed — NO_RESPONSE  ← HIỆN ĐANG THIẾU'});
+
+  /* escalation */
+  if(E1!==null){
+    var t1 = baseline==='dispatch' ? E1 : lastSend + E1;
+    ev.push({t:t1,c:'d-esc',ttl:'Escalate to next tier — gọi Tier 2 vào cuộc',
+      dsc:'escalationLevel → 1. Tier 2 nhận SMS recall.',
+      aud:'audit: Escalation step executed  ← hành động này RUNTIME CHƯA IMPLEMENT'});
+  }
+  if(E2!==null){
+    var t2 = baseline==='dispatch' ? E2 : lastSend + E2;
+    ev.push({t:t2,c:'d-esc',ttl:'Notify Duty Manager',
+      dsc:'Đẩy notification in-app: "X chưa xác nhận sau N phút — cần liên hệ trực tiếp."',
+      aud:'audit: Escalation step executed'});
+  }
+
+  ev.sort(function(a,b){return a.t-b.t});
+  sms.sort(function(a,b){return a.t-b.t});
+
+  tlw.innerHTML='<ul class="tl">'+ev.map(function(e){
+    return '<li><span class="t">T+'+e.t+'\''+'</span><span class="dot '+e.c+'"></span>'+
+      '<div class="ttl">'+e.ttl+'</div><div class="dsc">'+e.dsc+'</div>'+
+      (e.aud?'<div class="aud">'+e.aud+'</div>':'')+'</li>';
+  }).join('')+'</ul>';
+
+  var span = sms.length>1 ? (sms[sms.length-1].t - sms[0].t) : 0;
+  smw.innerHTML='<ul class="tl">'+sms.map(function(s){
+      return '<li><span class="t">T+'+s.t+'\''+'</span><span class="dot d-send"></span>'+
+        '<div class="dsc" style="color:var(--text-main);font-size:12px">'+s.txt+'</div></li>';
+    }).join('')+'</ul>'+
+    '<div class="note" style="margin-top:6px"><strong>'+sms.length+' tin SMS</strong> tới cùng một người trong '+
+    span+' phút. Ops xác nhận mức này có chấp nhận được không — vừa là chi phí, vừa là trải nghiệm của người đang lái xe tới hiện trường.</div>';
+
+  /* drift warning */
+  if(baseline==='lastsend' && E1!==null){
+    var correct=E1, actual=lastSend+E1;
+    drift.classList.remove('hide');
+    drift.innerHTML='<strong>Đây là lỗi đang tồn tại trong code.</strong> Ops cấu hình "escalate lên Tier 2 ở phút '+
+      correct+'", nhưng vì mốc gốc bị reset sau mỗi lần nhắc, thực tế bước này chỉ chạy ở <strong>phút '+actual+
+      '</strong> — trễ '+(actual-correct)+' phút. Càng nhiều lần nhắc, độ lệch càng lớn. '+
+      'Nguyên nhân: <span class="mono">resendToRecipient()</span> ghi <span class="mono">sentAt = now</span>, '+
+      'trong khi <span class="mono">evaluateEscalation()</span> lại tính elapsed từ chính <span class="mono">sentAt</span>.';
+  } else {
+    drift.classList.add('hide');
+  }
+}
+
+toggleKw();
+render();
+</script>
+</body>
+</html>

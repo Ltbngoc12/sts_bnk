@@ -1,0 +1,485 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum CaseStatus {
+  PENDING_TRIAGE
+  ACTIVE
+  NO_ACTION_REQUIRED
+  CLOSED
+}
+
+// Incident-level status (Controller-driven). Per-Responder progress used to live here
+// but has been split out into ResponderStatus below — see
+// Incident_Status_Model_Design_Updated.docx (Incident/Responder Status Split decision).
+// NOTE: this schema is not currently wired to a Prisma client at runtime (the live
+// datastore is MongoDB via src/lib/db.ts) — kept in sync here for documentation /
+// future-migration purposes only.
+enum IncidentStatus {
+  LIVE
+  LIVE_ASSIGNED
+  PENDING_ENDORSEMENT
+  RETURNED
+  CLOSED
+}
+
+// Responder-level status, tracked per assignment (IncidentResponder), running in
+// parallel for every Responder on an Incident.
+enum ResponderStatus {
+  ASSIGNED
+  ACKNOWLEDGED
+  ON_SITE
+  PENDING_CONTROLLER_REVIEW
+  LIVE_INCOMPLETE
+  COMPLETED
+}
+
+// Incident Category — FSD v0.5 §5.1.2. Drives default response/assignment/closure/
+// broadcast behaviour (see src/lib/incidentCategory.ts for the runtime equivalent —
+// this schema is doc-only, not wired at runtime; see note on IncidentStatus below).
+enum IncidentCategory {
+  OPERATIONAL
+  BACKDATED
+  INFORMATIONAL_EXERCISE
+}
+
+enum FaultStatus {
+  CREATED
+  SUBMITTED
+  IN_PROGRESS
+  PENDING_VENDOR
+  RESOLVED
+  CLOSED
+}
+
+enum TaskStatus {
+  CREATED
+  ASSIGNED
+  ACKNOWLEDGED
+  IN_PROGRESS
+  PENDING_FURTHER_ACTION
+  CLOSED
+}
+
+enum Priority {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
+}
+
+enum GuestType {
+  GUEST
+  STAFF
+  ISLAND_PARTNER
+  CONTRACTOR
+  RESIDENT
+  OTHERS
+}
+
+model Case {
+  id             String         @id
+  title          String
+  status         CaseStatus     @default(PENDING_TRIAGE)
+  cmmsTicketIds  String[]
+  createdAt      DateTime       @default(now())
+  createdBy      String
+  closedAt       DateTime?
+  closedBy       String?
+  incident       Incident?
+  faults         Fault[]
+  tasks          Task[]
+  eDiaryLogs     EDiaryEntry[]
+  broadcasts     BroadcastLog[]
+
+  @@index([createdAt])
+  @@map("cases")
+}
+
+model Incident {
+  id                String             @id
+  caseId            String             @unique
+  case              Case               @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  title             String
+  dateTime          DateTime           @default(now())
+  type              String
+  subType           String
+  category          IncidentCategory   @default(OPERATIONAL)
+  priority          Priority           @default(NORMAL)
+  crisisLevel       Int                @default(4)
+  reporterName      String
+  requestedBy       String
+  createdBy         String
+  status            IncidentStatus     @default(LIVE)
+  assignedTo        String[]           
+  lat               Float
+  lng               Float
+  road              String?
+  building          String?
+  levelSpace        String?
+  nearAt            String?
+  commonName        String?
+  postalCode        String?
+  locationTags      String[]
+  reportingSource        String?
+  linkedEDiaryIds        String[]
+  closureBroadcastStatus String?
+  closureBroadcastId     String?
+  isFalseAlarm           Boolean            @default(false)
+  editingBy              String?
+  editingStartedAt       DateTime?
+  crisisReminderDue      DateTime?
+  acknowledgedAt         DateTime?
+  onSiteAt               DateTime?
+  completedAt            DateTime?
+  closedAt               DateTime?
+  closedBy               String?
+  summary                String             @db.Text
+  completionRemarks      String?            @db.Text
+  version                Int                @default(1)
+  isDuplicate            Boolean            @default(false)
+  masterIncidentId       String?
+  logs                   IncidentLog[]
+  emergencyServices EmergencyService?
+  mediaInvolvement  MediaInvolvement?
+  propertyDamage    PropertyDamage?
+  vehicles          VehicleInvolved[]
+  personalInjuries  PersonalInjury[]
+  personsInvolved   PersonInvolved[]
+  cctvBwcFootage    CCTVBWC[]
+  attachments       Attachment[]
+  responders        IncidentResponder[]
+
+  @@map("incidents")
+}
+
+// Per-Responder assignment + lifecycle status (Assigned/Removed is the assignment
+// status; ResponderStatus is the parallel workflow progress). Replaces the old model
+// where Incident.status alone tracked every Responder's progress.
+model IncidentResponder {
+  id                String          @id @default(uuid())
+  incidentId        String
+  incident          Incident        @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  responderId       String          // Display name, e.g. "Ranger John"
+  assignedBy        String
+  assignedAt        DateTime        @default(now())
+  assignmentStatus  String          @default("Active") // "Active" | "Removed"
+  lifecycleStatus   ResponderStatus @default(ASSIGNED)
+  acknowledgedAt    DateTime?
+  onSiteAt          DateTime?
+  pendingReviewAt   DateTime?
+  completedAt       DateTime?
+  completionRemarks String?         @db.Text // Per-Responder remark, set on Return
+  returnedAt        DateTime?
+  returnedBy        String?
+
+  @@map("incident_responders")
+}
+
+model IncidentLog {
+  id          String   @id @default(uuid())
+  incidentId  String
+  incident    Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  eventNumber Int
+  timestamp   DateTime @default(now())
+  description String   @db.Text
+  recordedBy  String
+
+  @@map("incident_logs")
+}
+
+model EmergencyService {
+  id                      String    @id @default(uuid())
+  incidentId              String    @unique
+  incident                Incident  @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  policeAtScene           Boolean   @default(false)
+  officerNameRank         String?
+  policeIncidentNo        String?
+  classification          String?
+  respondingUnit          String?
+  ambulanceScdfType       String?  
+  ambulanceOfficerName    String?
+  ambulanceCallSign       String?
+  ambulanceRespondingUnit String?
+  ambulanceArrivalTime    DateTime?
+  hospitalConveyedTo      String?
+
+  @@map("emergency_services")
+}
+
+model MediaInvolvement {
+  id            String   @id @default(uuid())
+  incidentId    String   @unique
+  incident      Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  mediaAtScene  Boolean  @default(false)
+  mediaName     String?
+  commsNotified Boolean  @default(false)
+
+  @@map("media_involvement")
+}
+
+model PropertyDamage {
+  id                 String   @id @default(uuid())
+  incidentId         String   @unique
+  incident           Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  sdcPropertyDamaged Boolean  @default(false)
+  description        String?  @db.Text
+
+  @@map("property_damage")
+}
+
+model VehicleInvolved {
+  id                 String   @id @default(uuid())
+  incidentId         String
+  incident           Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  sdcVehicleInvolved Boolean  @default(false)
+  vehicleModel       String?
+  vehicleNumber      String?
+  driverName         String?
+  driverContact      String?
+  drivingLicenceNo   String?
+  driverAddress      String?
+  remarks            String?  @db.Text
+
+  @@map("vehicles_involved")
+}
+
+model PersonalInjury {
+  id                     String   @id @default(uuid())
+  incidentId             String
+  incident               Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  name                   String
+  address                String?
+  age                    Int
+  gender                 String
+  contactNumber          String?
+  clinicHospitalAttended String?
+  msigFormIssued         Boolean  @default(false)
+  msigSerialNo           String?
+  under16                Boolean  @default(false)
+  parentGuardianName     String?
+  parentGuardianContact  String?
+
+  @@map("personal_injuries")
+}
+
+model PersonInvolved {
+  id              String    @id @default(uuid())
+  incidentId      String
+  incident        Incident  @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  guestOrNonGuest String    
+  type            GuestType @default(GUEST)
+  name            String
+  address         String?
+  age             Int?
+  gender          String?
+  contactNumber   String?
+  roleInvolvement String
+  injuryDetails   String?   @db.Text
+
+  @@map("persons_involved")
+}
+
+model CCTVBWC {
+  id            String   @id @default(uuid())
+  incidentId    String
+  incident      Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  cameraNumber  String?
+  vmsTimestamp  String?
+  vmsBookmark   String?
+  bwcNumber     String?
+  bwcTimestamp  String?
+
+  @@map("cctv_bwc_footage")
+}
+
+model Attachment {
+  id         String   @id @default(uuid())
+  incidentId String
+  incident   Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  fileName   String
+  fileUrl    String
+  fileType   String
+  fileSize   Int
+  uploadedBy String
+  uploadedAt DateTime @default(now())
+
+  @@map("attachments")
+}
+
+model Fault {
+  id            String      @id
+  caseId        String
+  case          Case        @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  faultType     String
+  faultSubType  String
+  description   String      @db.Text
+  status        FaultStatus @default(CREATED)
+  cmmsTicketId  String?     @unique
+  createdBy     String
+  createdAt     DateTime    @default(now())
+  submittedAt   DateTime?
+  resolvedAt    DateTime?
+  closedBy      String?
+  closedAt      DateTime?
+
+  @@map("faults")
+}
+
+model Task {
+  id                String       @id
+  caseId            String
+  case              Case         @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  title             String
+  description       String?      @db.Text
+  assigneeId        String       
+  assigneeType      String       
+  priority          Priority     @default(NORMAL)
+  dueDate           DateTime?
+  status            TaskStatus   @default(CREATED)
+  closeReason       String?      @db.Text
+  createdBy         String
+  createdDate       DateTime     @default(now())
+  checklist         TaskCheck[]
+  comments          TaskComment[]
+  audits            TaskAudit[]
+
+  @@map("tasks")
+}
+
+model TaskCheck {
+  id          String @id @default(uuid())
+  taskId      String
+  task        Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  text        String
+  isCompleted Boolean @default(false)
+
+  @@map("task_checklists")
+}
+
+model TaskComment {
+  id        String   @id @default(uuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      String
+  timestamp DateTime @default(now())
+  text      String   @db.Text
+
+  @@map("task_comments")
+}
+
+model TaskAudit {
+  id          String   @id @default(uuid())
+  taskId      String
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  timestamp   DateTime @default(now())
+  operator    String
+  action      String   
+  details     String   @db.Text
+
+  @@map("task_audits")
+}
+
+model EDiaryEntry {
+  id          String             @id
+  caseId      String
+  case        Case               @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  createdBy   String
+  dateTime    DateTime           @default(now())
+  topic       String
+  entryText   String             @db.Text
+  amendments  EDiaryAmendment[]
+
+  @@map("e_diary_entries")
+}
+
+model EDiaryAmendment {
+  id             String      @id @default(uuid())
+  eDiaryEntryId  String
+  eDiaryEntry    EDiaryEntry @relation(fields: [eDiaryEntryId], references: [id], onDelete: Cascade)
+  timestamp      DateTime    @default(now())
+  amendedBy      String
+  originalText   String      @db.Text
+
+  @@map("e_diary_amendments")
+}
+
+// FSD v0.5 §8 — Events Master List. Not a Case sub-record (§4.1h/§8.1.1d); only
+// indirect link is via sourceEDiaryId -> e-Diary's own caseId (confirmed with
+// Shin Feng 2026-07-09, see QnA_FSD_v0.5_EventsMasterList.md item 2).
+// NOTE: datastore này chỉ để doc — runtime thật dùng MongoDB-style JSON qua src/lib/db.ts.
+model EventRecord {
+  id                  String    @id @default(uuid())
+  name                String
+  startDateTime       DateTime
+  endDateTime         DateTime
+  // Location — flattened Location shape (mirrors Incident/Fault), §8.2(a): hierarchy reference, not free text
+  lat                 Float
+  lng                 Float
+  road                String?
+  building            String?
+  levelSpace          String?
+  nearAt              String?
+  commonName          String?
+  postalCode          String?
+  locationTags        String[]
+  boundaryCoordinates String?   // JSON array of {lat,lng} — drawn boundary polygon, §8.2(c)
+  type                String    // Event Type — from Event taxonomy, §8.1.2
+  description         String?   @db.Text
+  sourceEDiaryId      String?   // §8.1.1(c) / §9.1.3(c) — reference to source e-Diary entry
+  createdBy           String
+  createdAt           DateTime  @default(now())
+
+  @@map("event_records")
+}
+
+model NOPRecord {
+  id                  String   @id @default(uuid())
+  applicantName       String
+  companyName         String
+  workDescription     String   @db.Text
+  startDateTime       DateTime
+  endDateTime         DateTime
+  status              String   
+  boundaryCoordinates String   
+
+  @@map("nop_records")
+}
+
+model BroadcastLog {
+  id                String   @id
+  caseId            String
+  case              Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  incidentId        String
+  type              String   
+  recipients        String[]
+  templateUsed      String
+  contentDispatched String   @db.Text
+  sentAt            DateTime @default(now())
+  sentBy            String
+  status            String   
+  deliveryAttempts  Int      @default(1)
+  lastErrorMessage  String?  @db.Text
+
+  @@map("broadcast_logs")
+}
+
+model AuditLog {
+  id             String   @id @default(uuid())
+  timestamp      DateTime @default(now())
+  user           String
+  action         String
+  module         String
+  details        String   @db.Text
+  beforeSnapshot String?  @db.Text 
+  afterSnapshot  String?  @db.Text 
+  correlationId  String   @unique
+  ipAddress      String?
+
+  @@map("audit_logs")
+}
