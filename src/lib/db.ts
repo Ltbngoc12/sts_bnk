@@ -577,6 +577,7 @@ export interface DbSchema {
 
 // Path to db.json — used only for one-time seeding when MongoDB is empty
 const DB_PATH = path.join(process.cwd(), 'src', 'lib', 'db.json');
+let inMemoryDbCache: NormalizedDbSchema | null = null;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -998,6 +999,9 @@ export async function getDb(options: GetDbOptions = {}): Promise<DbSchema> {
     return hydrated;
   } catch (err) {
     console.warn('MongoDB connection unavailable — falling back to bundled db.json:', (err as Error).message || err);
+    if (inMemoryDbCache) {
+      return hydrateDb(inMemoryDbCache);
+    }
     let parsed: any = initialSeedData;
     if (fs.existsSync(DB_PATH)) {
       try {
@@ -1007,7 +1011,7 @@ export async function getDb(options: GetDbOptions = {}): Promise<DbSchema> {
         console.error('Error reading local db.json fallback:', fileErr);
       }
     }
-    const normalizedDb: NormalizedDbSchema = {
+    inMemoryDbCache = {
       cases: parsed.cases || [],
       incidents: parsed.incidents || [],
       faults: parsed.faults || [],
@@ -1019,7 +1023,7 @@ export async function getDb(options: GetDbOptions = {}): Promise<DbSchema> {
       auditLogs: parsed.auditLogs || [],
       recurrenceSeries: parsed.recurrenceSeries || []
     };
-    return hydrateDb(normalizedDb);
+    return hydrateDb(inMemoryDbCache);
   }
 }
 
@@ -1048,13 +1052,13 @@ export async function saveDb(data: DbSchema): Promise<void> {
       saveCollection(mdb, 'recurrenceSeries', (normalizedDb.recurrenceSeries || []) as any[]),
     ]);
   } catch (err) {
-    console.warn('Error writing to MongoDB — saving to local db.json fallback:', (err as Error).message || err);
+    console.warn('MongoDB unavailable — saving to in-memory / local fallback:', (err as Error).message || err);
+    const normalizedDb = dehydrateDb(data);
+    inMemoryDbCache = normalizedDb;
     try {
-      const normalizedDb = dehydrateDb(data);
       fs.writeFileSync(DB_PATH, JSON.stringify(normalizedDb, null, 2), 'utf-8');
     } catch (fileErr) {
-      console.error('Failed to write to local db.json:', fileErr);
-      throw err;
+      // Serverless environments have read-only filesystems; cache is retained in-memory
     }
   }
 }

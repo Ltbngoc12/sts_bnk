@@ -36,30 +36,47 @@ async function mdb(): Promise<Db> {
   return client.db(process.env.MONGODB_DB_NAME || undefined);
 }
 
+// In-memory cache fallback when MongoDB is down/unreachable
+const inMemoryCache: Record<string, any[]> = {};
+
 async function readOrSeed<T extends { id: string }>(name: string, defaults: T[]): Promise<T[]> {
-  const db = await mdb();
-  const col = db.collection(name);
-  const docs = await col.find({}, { projection: { _id: 0 } }).toArray();
-  if (docs.length === 0 && defaults.length > 0) {
-    await col.insertMany(defaults.map((d) => ({ ...d })) as any[]);
-    return defaults;
+  try {
+    const db = await mdb();
+    const col = db.collection(name);
+    const docs = await col.find({}, { projection: { _id: 0 } }).toArray();
+    if (docs.length === 0 && defaults.length > 0) {
+      await col.insertMany(defaults.map((d) => ({ ...d })) as any[]);
+      inMemoryCache[name] = defaults.map((d) => ({ ...d }));
+      return defaults;
+    }
+    inMemoryCache[name] = docs as unknown as T[];
+    return docs as unknown as T[];
+  } catch (err: any) {
+    if (!inMemoryCache[name]) {
+      inMemoryCache[name] = defaults.map((d) => ({ ...d }));
+    }
+    return inMemoryCache[name] as T[];
   }
-  return docs as unknown as T[];
 }
 
 async function replaceAll<T extends { id: string }>(name: string, docs: T[]): Promise<void> {
-  const db = await mdb();
-  const col = db.collection(name);
-  if (docs.length === 0) {
-    await col.deleteMany({});
-    return;
+  inMemoryCache[name] = docs.map((d) => ({ ...d }));
+  try {
+    const db = await mdb();
+    const col = db.collection(name);
+    if (docs.length === 0) {
+      await col.deleteMany({});
+      return;
+    }
+    await col.bulkWrite(
+      docs.map((doc) => ({
+        replaceOne: { filter: { id: doc.id }, replacement: { ...doc }, upsert: true },
+      })) as any[]
+    );
+    await col.deleteMany({ id: { $nin: docs.map((d) => d.id) } });
+  } catch (err: any) {
+    // Ignore MongoDB write errors in offline fallback mode
   }
-  await col.bulkWrite(
-    docs.map((doc) => ({
-      replaceOne: { filter: { id: doc.id }, replacement: { ...doc }, upsert: true },
-    })) as any[]
-  );
-  await col.deleteMany({ id: { $nin: docs.map((d) => d.id) } });
 }
 
 // ── Recall Groups (FSD §11.5) ─────────────────────────────────────────────────
