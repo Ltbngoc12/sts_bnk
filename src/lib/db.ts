@@ -3,6 +3,7 @@ import path from 'path';
 import { Db } from 'mongodb';
 import clientPromise from './mongodb';
 import { normalizeIncidentCategory } from './incidentCategory';
+import initialSeedData from './db.json';
 
 // Core entities matching the normalized database structure
 
@@ -812,8 +813,13 @@ async function saveCollection(mdb: Db, collectionName: string, docs: any[]): Pro
 
 async function seedFromJson(mdb: Db): Promise<NormalizedDbSchema> {
   console.log('MongoDB empty — seeding from db.json...');
-  const raw = fs.readFileSync(DB_PATH, 'utf-8');
-  const parsed = JSON.parse(raw);
+  let parsed: any = initialSeedData;
+  if (fs.existsSync(DB_PATH)) {
+    try {
+      const raw = fs.readFileSync(DB_PATH, 'utf-8');
+      parsed = JSON.parse(raw);
+    } catch {}
+  }
 
   let normalizedDb: NormalizedDbSchema;
 
@@ -959,7 +965,7 @@ export async function getDb(options: GetDbOptions = {}): Promise<DbSchema> {
     let normalizedDb: NormalizedDbSchema;
 
     // Seed from db.json on first run
-    if (cases.length === 0 && fs.existsSync(DB_PATH)) {
+    if (cases.length === 0) {
       normalizedDb = await seedFromJson(mdb);
     } else {
       normalizedDb = {
@@ -991,29 +997,29 @@ export async function getDb(options: GetDbOptions = {}): Promise<DbSchema> {
 
     return hydrated;
   } catch (err) {
-    console.warn('MongoDB connection unavailable — falling back to local db.json:', (err as Error).message || err);
+    console.warn('MongoDB connection unavailable — falling back to bundled db.json:', (err as Error).message || err);
+    let parsed: any = initialSeedData;
     if (fs.existsSync(DB_PATH)) {
       try {
         const raw = fs.readFileSync(DB_PATH, 'utf-8');
-        const parsed = JSON.parse(raw);
-        const normalizedDb: NormalizedDbSchema = {
-          cases: parsed.cases || [],
-          incidents: parsed.incidents || [],
-          faults: parsed.faults || [],
-          tasks: parsed.tasks || [],
-          occurrences: parsed.occurrences || [],
-          events: parsed.events || [],
-          nops: parsed.nops || [],
-          broadcasts: parsed.broadcasts || [],
-          auditLogs: parsed.auditLogs || [],
-          recurrenceSeries: parsed.recurrenceSeries || []
-        };
-        return hydrateDb(normalizedDb);
+        parsed = JSON.parse(raw);
       } catch (fileErr) {
         console.error('Error reading local db.json fallback:', fileErr);
       }
     }
-    return { cases: [], tasks: [], occurrences: [] };
+    const normalizedDb: NormalizedDbSchema = {
+      cases: parsed.cases || [],
+      incidents: parsed.incidents || [],
+      faults: parsed.faults || [],
+      tasks: parsed.tasks || [],
+      occurrences: parsed.occurrences || [],
+      events: parsed.events || [],
+      nops: parsed.nops || [],
+      broadcasts: parsed.broadcasts || [],
+      auditLogs: parsed.auditLogs || [],
+      recurrenceSeries: parsed.recurrenceSeries || []
+    };
+    return hydrateDb(normalizedDb);
   }
 }
 
