@@ -33,7 +33,7 @@ import {
 
 async function mdb(): Promise<Db> {
   const client = await clientPromise;
-  return client.db('sentosa-cms');
+  return client.db(process.env.MONGODB_DB_NAME || undefined);
 }
 
 async function readOrSeed<T extends { id: string }>(name: string, defaults: T[]): Promise<T[]> {

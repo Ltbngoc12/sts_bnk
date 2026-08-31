@@ -28,7 +28,7 @@ import {
 
 async function mdb(): Promise<Db> {
   const client = await clientPromise;
-  return client.db('sentosa-cms');
+  return client.db(process.env.MONGODB_DB_NAME || undefined);
 }
 
 function id(prefix: string) {

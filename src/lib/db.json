@@ -1,227 +1,94 @@
 {
   "cases": [
     {
-      "id": "2026/06/0001",
-      "title": "VA: Abandoned Object @ Siloso Beach",
+      "id": "SEN/CI/20260828/001",
+      "title": "Medical Emergency: Heat Exhaustion @ Siloso Beach",
       "status": "Active",
-      "createdAt": "2026-06-05T08:15:00+07:00",
-      "createdBy": "system",
-      "closedAt": null,
-      "closedBy": null
-    },
-    {
-      "id": "2026/06/0002",
-      "title": "Medical Emergency @ Resorts World Sentosa",
-      "status": "Closed",
-      "createdAt": "2026-06-05T07:10:00+07:00",
-      "createdBy": "system",
-      "closedAt": "2026-06-05T08:45:00+07:00",
-      "closedBy": null
-    },
-    {
-      "id": "2026-06-05T08:00:00+07:00_TASK_1",
-      "title": "Setup crowd control barrier at Beach Station",
-      "status": "Created",
-      "createdAt": "2026-06-05T08:00:00+07:00",
-      "createdBy": "system",
-      "closedAt": null,
-      "closedBy": null
-    },
-    {
-      "id": "2026/06/0003",
-      "title": "12",
-      "status": "Active",
-      "createdAt": "2026-06-05T02:34:12.962Z",
-      "createdBy": "system",
-      "closedAt": null,
-      "closedBy": null
-    },
-    {
-      "id": "SEN/CI/20260605/005",
-      "title": "e-Diary: VIP Visit Advisory",
-      "status": "No Action Required",
-      "createdAt": "2026-06-05T08:30:00+07:00",
-      "createdBy": "controller_steve",
-      "closedAt": "2026-06-05T08:30:00+07:00",
-      "closedBy": "controller_steve"
-    },
-    {
-      "id": "SEN/CI/20260605/006",
-      "title": "e-Diary: Routine Siren Testing",
-      "status": "No Action Required",
-      "createdAt": "2026-06-05T09:00:00+07:00",
-      "createdBy": "controller_steve",
-      "closedAt": "2026-06-05T09:00:00+07:00",
-      "closedBy": "controller_steve"
-    },
-    {
-      "id": "SEN/CI/20260608/001",
-      "title": "hi",
-      "status": "Active",
-      "createdAt": "2026-06-08T13:51:21.389Z",
-      "createdBy": "system",
-      "closedAt": null
-    },
-    {
-      "id": "SEN/CI/20260611/001",
-      "title": "New Unnamed Case",
-      "status": "Pending Triage",
-      "createdAt": "2026-06-10T17:23:42.264Z",
-      "createdBy": "admin",
-      "closedAt": null,
-      "closedBy": null
-    },
-    {
-      "id": "SEN/CI/20260611/002",
-      "title": "New Unnamed Case",
-      "status": "Pending Triage",
-      "createdAt": "2026-06-10T17:24:53.444Z",
-      "createdBy": "DM Gan",
-      "closedAt": null,
-      "closedBy": null
-    },
-    {
-      "id": "SEN/CI/20260611/003",
-      "title": "New Unnamed Case",
-      "status": "Pending Triage",
-      "createdAt": "2026-06-10T17:25:03.375Z",
-      "createdBy": "DM Gan",
-      "closedAt": null,
-      "closedBy": null
-    },
-    {
-      "id": "SEN/CI/20260611/004",
-      "title": "Hie",
-      "status": "Active",
-      "createdAt": "2026-06-10T17:25:53.847Z",
+      "createdAt": "2026-08-28T09:15:00+07:00",
       "createdBy": "Controller Steve",
       "closedAt": null,
       "closedBy": null
     },
     {
-      "id": "SEN/CI/20260611/005",
-      "title": "New Unnamed Case",
+      "id": "SEN/CI/20260828/002",
+      "title": "Environmental: Fallen Branch blocking Imbiah Trail",
       "status": "Active",
-      "createdAt": "2026-06-11T15:36:35.017Z",
-      "createdBy": "Controller Steve",
-      "closedAt": null,
-      "closedBy": null
-    },
-    {
-      "id": "CASE-DEMO-STANDARD",
-      "title": "Demo: Beach Station Water Leak",
-      "status": "Closed",
-      "createdAt": "2026-06-12T08:00:00+07:00",
-      "createdBy": "system",
-      "closedAt": "2026-06-12T09:00:00+07:00",
-      "closedBy": "DM Gan"
-    },
-    {
-      "id": "CASE-DEMO-PROACTIVE",
-      "title": "Demo: Unattended Bag Spotted",
-      "status": "Closed",
-      "createdAt": "2026-06-12T09:00:00+07:00",
+      "createdAt": "2026-08-28T08:30:00+07:00",
       "createdBy": "Ranger Dave",
-      "closedAt": "2026-06-12T09:20:00+07:00",
-      "closedBy": "Ranger Dave"
+      "closedAt": null,
+      "closedBy": null
     },
     {
-      "id": "CASE-DEMO-BACKDATED",
-      "title": "Demo: Snake Encounter (Backdated)",
+      "id": "SEN/CI/20260828/003",
+      "title": "Security: Unattended Bag @ Beach Station Monorail",
+      "status": "Pending Triage",
+      "createdAt": "2026-08-28T10:45:00+07:00",
+      "createdBy": "Public Phone",
+      "closedAt": null,
+      "closedBy": null
+    },
+    {
+      "id": "SEN/CI/20260828/004",
+      "title": "Facilities: Water Leakage @ Palawan Restrooms",
+      "status": "Active",
+      "createdAt": "2026-08-28T07:20:00+07:00",
+      "createdBy": "Cleaner Supervisor",
+      "closedAt": null,
+      "closedBy": null
+    },
+    {
+      "id": "SEN/CI/20260828/005",
+      "title": "VIP Advisory: State Delegation Visit @ Capella",
       "status": "Closed",
-      "createdAt": "2026-06-12T08:30:00+07:00",
+      "createdAt": "2026-08-28T07:00:00+07:00",
       "createdBy": "Controller Steve",
-      "closedAt": "2026-06-12T08:35:00+07:00",
+      "closedAt": "2026-08-28T10:00:00+07:00",
+      "closedBy": "Duty Manager Gan"
+    },
+    {
+      "id": "SEN/CI/20260827/001",
+      "title": "Crowd Control @ Wings of Time Amphitheatre",
+      "status": "Closed",
+      "createdAt": "2026-08-27T19:00:00+07:00",
+      "createdBy": "Controller Steve",
+      "closedAt": "2026-08-27T21:30:00+07:00",
+      "closedBy": "Duty Manager Gan"
+    },
+    {
+      "id": "SEN/CI/20260827/002",
+      "title": "Minor Vehicle Scrape @ Sentosa Gateway B1",
+      "status": "Closed",
+      "createdAt": "2026-08-27T14:10:00+07:00",
+      "createdBy": "Traffic Warden",
+      "closedAt": "2026-08-27T15:00:00+07:00",
       "closedBy": "Controller Steve"
-    },
-    {
-      "id": "CASE-DEMO-ONGOING",
-      "title": "Demo: Siloso Beach Outage",
-      "status": "Active",
-      "createdAt": "2026-06-12T10:00:00+07:00",
-      "createdBy": "system",
-      "closedAt": null,
-      "closedBy": null
-    },
-    {
-      "id": "CASE-DEMO-OPERATIONAL",
-      "title": "Demo: SDC HQ Fire Drill",
-      "status": "Closed",
-      "createdAt": "2026-06-12T14:00:00+07:00",
-      "createdBy": "Safety Coordinator",
-      "closedAt": "2026-06-12T14:20:00+07:00",
-      "closedBy": "Safety Coordinator"
-    },
-    {
-      "id": "CASE-DEMO-RETURNED",
-      "title": "Demo: Missing Child (Returned)",
-      "status": "Active",
-      "createdAt": "2026-06-12T11:00:00+07:00",
-      "createdBy": "Controller Steve",
-      "closedAt": null,
-      "closedBy": null
-    },
-    {
-      "id": "SEN/CI/20260614/001",
-      "title": "Test 12",
-      "status": "Closed",
-      "createdAt": "2026-06-14T09:28:22.756Z",
-      "createdBy": "Controller Steve",
-      "closedAt": "2026-06-14T10:39:17.214Z",
-      "closedBy": "DM Gan"
-    },
-    {
-      "id": "SEN/CI/20260614/002",
-      "title": "Test 21",
-      "status": "Active",
-      "createdAt": "2026-06-14T13:28:47.650Z",
-      "createdBy": "DM Gan",
-      "closedAt": null,
-      "closedBy": null
-    },
-    {
-      "id": "SEN/CI/20260614/003",
-      "title": "Bue1",
-      "status": "Closed",
-      "createdAt": "2026-06-14T14:53:06.817Z",
-      "createdBy": "DM Gan",
-      "closedAt": "2026-06-14T14:53:35.938Z",
-      "closedBy": "Controller Steve"
-    },
-    {
-      "id": "SEN/CI/20260615/001",
-      "title": "Hie1",
-      "status": "Active",
-      "createdAt": "2026-06-15T08:36:37.507Z",
-      "createdBy": "Controller Steve",
-      "closedAt": null,
-      "closedBy": null
     }
   ],
   "incidents": [
     {
-      "id": "SEN/IR/20260605/0001",
-      "caseId": "2026/06/0001",
-      "title": "VA: Abandoned Object @ Siloso Beach",
-      "dateTime": "2026-06-05T08:15:00+07:00",
-      "type": "Security",
-      "subType": "Abandoned Property",
-      "priority": "Medium",
-      "crisisLevel": 4,
-      "reporterName": "Video Analytics System",
-      "requestedBy": "IIOC Controller",
-      "createdBy": "system_controller",
-      "status": "Live (On-Site)",
+      "id": "SEN/IR/20260828/0001",
+      "caseId": "SEN/CI/20260828/001",
+      "title": "Medical Emergency: Heat Exhaustion @ Siloso Beach",
+      "dateTime": "2026-08-28T09:15:00+07:00",
+      "type": "Safety / Medical",
+      "subType": "Heat Stroke / Exhaustion",
+      "priority": "High",
+      "crisisLevel": 3,
+      "reporterName": "Lifeguard Station 2",
+      "requestedBy": "Guest Call-in",
+      "createdBy": "Controller Steve",
+      "category": "Operational Incident",
+      "status": "Live (Assigned)",
       "location": {
         "road": "Siloso Beach Walk",
-        "building": "Emerald Pavilion",
-        "levelSpace": "Ground Area near Lifeguard Post 2",
-        "nearAt": "At the seating bench",
-        "commonName": "Siloso Lifeguard Post 2",
+        "building": "Siloso Beach Front",
+        "levelSpace": "Tower 2",
+        "nearAt": "Lifeguard Post",
+        "commonName": "Siloso Beach",
         "postalCode": "098997",
         "tags": [
-          "Siloso Zone",
-          "Beachfront"
+          "Beachfront",
+          "Public"
         ],
         "lat": 1.2562,
         "lng": 103.8124
@@ -229,175 +96,35 @@
       "log": [
         {
           "eventNumber": 1,
-          "date": "2026-06-05",
-          "time": "08:15:00",
-          "description": "Video Analytics alert VA-8092 triggered for abandoned black backpack near Siloso Beach seating benches."
+          "date": "2026-08-28",
+          "time": "09:15:00",
+          "description": "Guest collapsed near Tower 2 showing signs of severe heat exhaustion. First aid requested."
         },
         {
           "eventNumber": 2,
-          "date": "2026-06-05",
-          "time": "08:18:00",
-          "description": "Controller acknowledged VA alert and dispatch request. Assigned Ranger John as responder."
+          "date": "2026-08-28",
+          "time": "09:18:00",
+          "description": "Ranger John dispatched with trauma kit and AED."
         },
         {
           "eventNumber": 3,
-          "date": "2026-06-05",
-          "time": "08:25:00",
-          "description": "Ranger John acknowledged incident dispatch."
-        },
-        {
-          "eventNumber": 4,
-          "date": "2026-06-05",
-          "time": "08:32:00",
-          "description": "Ranger John arrived on site. Commencing initial cordon and scanning area for owner."
-        },
-        {
-          "eventNumber": 5,
-          "date": "2026-06-07",
-          "time": "23:48:15",
-          "description": "[Duplicate Detection] Linked duplicate (Slave) Incident DUP-001: \"1\" was added to this Master Incident."
+          "date": "2026-08-28",
+          "time": "09:25:00",
+          "description": "Ranger John arrived on-site. Patient conscious, receiving electrolyte hydration."
         }
       ],
       "emergencyServices": {
         "policeAtScene": false,
         "officerNameRank": "",
         "policeIncidentNo": "",
-        "classification": "",
-        "respondingUnit": "",
-        "ambulanceScdfType": "",
-        "ambulanceOfficerName": "",
-        "ambulanceCallSign": "",
-        "ambulanceRespondingUnit": "",
-        "ambulanceArrivalTime": "",
-        "hospitalConveyedTo": ""
-      },
-      "mediaInvolvement": {
-        "mediaAtScene": false,
-        "mediaName": "",
-        "commsNotified": false
-      },
-      "propertyDamage": {
-        "sdcPropertyDamaged": false,
-        "description": ""
-      },
-      "vehiclesInvolved": [],
-      "personalInjuries": [],
-      "personsInvolved": [],
-      "cctvBwc": [
-        {
-          "cameraNumber": "CAM-SIL-08",
-          "vmsTimestamp": "08:14:30",
-          "vmsBookmark": "VA-ABANDON-08",
-          "bwcNumber": "BWC-R12",
-          "bwcTimestamp": "08:32:00"
-        }
-      ],
-      "summary": "Suspicious black backpack left unattended under a seating bench near Emerald Pavilion. Ranger John deployed. Cordon set up.",
-      "completionRemarks": "",
-      "slaveIncidents": [
-        {
-          "id": "DUP-001",
-          "title": "1",
-          "dateTime": "2026-06-07T16:48:15.661Z",
-          "reporterName": "1",
-          "summary": "1",
-          "status": "Open"
-        }
-      ],
-      "category": "Standard Incident",
-      "attachments": [],
-      "responders": [
-        {
-          "responderId": "Ranger John",
-          "assignedBy": "system_controller",
-          "assignedAt": "2026-06-05T08:15:00+07:00",
-          "status": "Active"
-        }
-      ]
-    },
-    {
-      "id": "SEN/IR/20260605/0002",
-      "caseId": "2026/06/0002",
-      "title": "Medical Emergency @ Resorts World Sentosa",
-      "dateTime": "2026-06-05T07:10:00+07:00",
-      "type": "Safety / Medical",
-      "subType": "Fainting/Giddiness",
-      "priority": "High",
-      "crisisLevel": 4,
-      "reporterName": "Guest Services - RWS",
-      "requestedBy": "RWS Security Desk",
-      "createdBy": "controller_steve",
-      "status": "Closed",
-      "location": {
-        "road": "Sentosa Gateway",
-        "building": "RWS Casino Entrance",
-        "levelSpace": "Level 1 VIP Lobby",
-        "nearAt": "Beside taxi stand",
-        "commonName": "RWS Casino VIP Entrance",
-        "postalCode": "098269",
-        "tags": [
-          "Resort Zone",
-          "Indoor"
-        ],
-        "lat": 1.2585,
-        "lng": 103.821
-      },
-      "log": [
-        {
-          "eventNumber": 1,
-          "date": "2026-06-05",
-          "time": "07:10:00",
-          "description": "Received call from RWS Security reporting a guest fainted at VIP Casino lobby."
-        },
-        {
-          "eventNumber": 2,
-          "date": "2026-06-05",
-          "time": "07:12:00",
-          "description": "Ranger Sarah dispatched. Contacted SCDF Ambulance for emergency medical support."
-        },
-        {
-          "eventNumber": 3,
-          "date": "2026-06-05",
-          "time": "07:19:00",
-          "description": "Ranger Sarah arrived on-site. Guest is conscious but weak. Administering first aid."
-        },
-        {
-          "eventNumber": 4,
-          "date": "2026-06-05",
-          "time": "07:25:00",
-          "description": "SCDF Ambulance (Alpha 12) arrived on-site. Paramedics taking over care."
-        },
-        {
-          "eventNumber": 5,
-          "date": "2026-06-05",
-          "time": "07:42:00",
-          "description": "Guest conveyed to Singapore General Hospital by SCDF Ambulance."
-        },
-        {
-          "eventNumber": 6,
-          "date": "2026-06-05",
-          "time": "08:00:00",
-          "description": "Ranger Sarah completed ground activities. Submitting report for review."
-        },
-        {
-          "eventNumber": 7,
-          "date": "2026-06-05",
-          "time": "08:45:00",
-          "description": "Duty Manager reviewed and closed the incident."
-        }
-      ],
-      "emergencyServices": {
-        "policeAtScene": false,
-        "officerNameRank": "",
-        "policeIncidentNo": "",
-        "classification": "",
-        "respondingUnit": "",
+        "classification": "Medical",
+        "respondingUnit": "SCDF Ambulance 112",
         "ambulanceScdfType": "SCDF",
-        "ambulanceOfficerName": "Sergeant Lee",
-        "ambulanceCallSign": "A12",
-        "ambulanceRespondingUnit": "Bukit Merah Fire Stn",
-        "ambulanceArrivalTime": "07:25:00",
-        "hospitalConveyedTo": "Singapore General Hospital (SGH)"
+        "ambulanceOfficerName": "Staff Sgt. Lee",
+        "ambulanceCallSign": "AMB-112",
+        "ambulanceRespondingUnit": "Telok Blangah Fire Station",
+        "ambulanceArrivalTime": "09:32",
+        "hospitalConveyedTo": "Singapore General Hospital"
       },
       "mediaInvolvement": {
         "mediaAtScene": false,
@@ -411,1152 +138,103 @@
       "vehiclesInvolved": [],
       "personalInjuries": [
         {
-          "name": "Jane Doe",
-          "address": "123 Orchard Road, Singapore",
-          "age": 45,
+          "name": "Tan Mei Ling",
+          "address": "Block 124 Bukit Merah View",
+          "age": 28,
           "gender": "Female",
           "contactNumber": "+65 9123 4567",
-          "clinicHospitalAttended": "SGH Accident & Emergency",
-          "msigFormIssued": false,
-          "under16": false,
-          "parentGuardianName": "",
-          "parentGuardianContact": ""
+          "clinicHospitalAttended": "Singapore General Hospital",
+          "msigFormIssued": true,
+          "msigSerialNo": "MSIG-2026-8891",
+          "under16": false
         }
       ],
       "personsInvolved": [
         {
           "guestOrNonGuest": "Guest",
           "type": "Guest",
-          "name": "Jane Doe",
-          "address": "123 Orchard Road, Singapore",
-          "age": 45,
+          "name": "Tan Mei Ling",
+          "address": "Block 124 Bukit Merah View",
+          "age": 28,
           "gender": "Female",
           "contactNumber": "+65 9123 4567",
-          "roleInvolvement": "Victim (Fainted)",
-          "injuryDetails": "Loss of consciousness, dizziness"
+          "roleInvolvement": "Patient",
+          "injuryDetails": "Heat exhaustion, dehydration"
         }
       ],
       "cctvBwc": [
         {
-          "cameraNumber": "CAM-RWS-L1-02",
-          "vmsTimestamp": "07:09:50",
-          "vmsBookmark": "MED-RWS-VIP",
-          "bwcNumber": "BWC-R05",
-          "bwcTimestamp": "07:19:00"
+          "cameraNumber": "CAM-SIL-04",
+          "vmsTimestamp": "2026-08-28 09:14:30",
+          "vmsBookmark": "BM-0914-COLLAPSE",
+          "bwcNumber": "BWC-RNG-03",
+          "bwcTimestamp": "2026-08-28 09:25:00"
         }
       ],
-      "summary": "Female guest fainted at RWS Casino entrance lobby. Ranger Sarah responded. SCDF ambulance called and conveyed patient to SGH. Closed.",
-      "completionRemarks": "Ranger Sarah completed medical assist. SCDF Ambulance took over.",
-      "slaveIncidents": [],
-      "category": "Standard Incident",
-      "attachments": [],
-      "responders": [
-        {
-          "responderId": "Ranger Sarah",
-          "assignedBy": "controller_steve",
-          "assignedAt": "2026-06-05T07:10:00+07:00",
-          "status": "Active"
-        }
-      ]
-    },
-    {
-      "id": "SEN/IR/20260605/0003",
-      "caseId": "2026/06/0003",
-      "title": "12",
-      "dateTime": "2026-06-05T02:34:12.702Z",
-      "type": "Safety / Medical",
-      "subType": "Slip & Fall",
-      "priority": "Medium",
-      "crisisLevel": 4,
-      "reporterName": "12",
-      "requestedBy": "Guest Call-in",
-      "createdBy": "Controller Steve",
-      "status": "Live (Completed)",
-      "location": {
-        "road": "123",
-        "building": "1233",
-        "levelSpace": "312",
-        "nearAt": "123",
-        "commonName": "12",
-        "postalCode": "231",
-        "tags": [
-          "Beachfront"
-        ],
-        "lat": 1.25,
-        "lng": 103.83
-      },
-      "log": [
-        {
-          "eventNumber": 1,
-          "date": "2026-06-05",
-          "time": "09:34:12",
-          "description": "Incident logged under Case ID 2026/06/0003. Classification: Safety / Medical - Slip & Fall."
-        },
-        {
-          "eventNumber": 2,
-          "date": "2026-06-05",
-          "time": "09:42:29",
-          "description": "Responder assigned responder acknowledged the dispatch."
-        },
-        {
-          "eventNumber": 3,
-          "date": "2026-06-05",
-          "time": "09:42:29",
-          "description": "Responder assigned responder acknowledged the dispatch."
-        },
-        {
-          "eventNumber": 4,
-          "date": "2026-06-05",
-          "time": "09:42:30",
-          "description": "Responder assigned responder confirmed arrival on-site."
-        },
-        {
-          "eventNumber": 5,
-          "date": "2026-06-05",
-          "time": "09:42:33",
-          "description": "Responder assigned responder marked ground activities as completed. Remarks: csacs"
-        },
-        {
-          "eventNumber": 6,
-          "date": "2026-06-07",
-          "time": "23:44:47",
-          "description": "SDC Communications Team notified regarding media presence."
-        },
-        {
-          "eventNumber": 7,
-          "date": "2026-06-07",
-          "time": "23:45:09",
-          "description": "[Ranger Log] hi"
-        },
-        {
-          "eventNumber": 8,
-          "date": "2026-06-07",
-          "time": "23:45:12",
-          "description": "[Ranger Log] Area cleared and returned to standard operational state."
-        },
-        {
-          "eventNumber": 9,
-          "date": "2026-06-07",
-          "time": "23:45:17",
-          "description": "[Ranger Log] Commenced search operations in the immediate vicinity."
-        }
-      ],
-      "emergencyServices": {
-        "policeAtScene": false,
-        "officerNameRank": "",
-        "policeIncidentNo": "",
-        "classification": "",
-        "respondingUnit": "",
-        "ambulanceScdfType": "",
-        "ambulanceOfficerName": "",
-        "ambulanceCallSign": "",
-        "ambulanceRespondingUnit": "",
-        "ambulanceArrivalTime": "",
-        "hospitalConveyedTo": ""
-      },
-      "mediaInvolvement": {
-        "mediaAtScene": true,
-        "mediaName": "",
-        "commsNotified": true
-      },
-      "propertyDamage": {
-        "sdcPropertyDamaged": false,
-        "description": ""
-      },
-      "vehiclesInvolved": [],
-      "personalInjuries": [],
-      "personsInvolved": [],
-      "cctvBwc": [],
-      "summary": "123132",
+      "summary": "Female guest experienced heat exhaustion during beach run. Stabilized on site by Ranger John and conveyed to SGH via SCDF.",
       "completionRemarks": "",
-      "slaveIncidents": [],
-      "category": "Standard Incident",
-      "attachments": [],
-      "responders": []
-    },
-    {
-      "caseId": "SEN/CI/20260608/001",
-      "title": "hi",
-      "dateTime": "2026-06-08T13:51:21.374Z",
-      "type": "Safety / Medical",
-      "subType": "Cardiac Arrest",
-      "priority": "Low",
-      "reporterName": "Anonymous Guest",
-      "requestedBy": "Ranger Field Patrol",
-      "createdBy": "DM Gan",
-      "status": "Live (Assigned)",
-      "location": {
-        "road": "12",
-        "building": "12",
-        "levelSpace": "21",
-        "nearAt": "12",
-        "commonName": "12",
-        "postalCode": "312",
-        "tags": [
-          "Beachfront"
-        ],
-        "lat": 1.25,
-        "lng": 103.83
-      },
-      "log": [
-        {
-          "eventNumber": 1,
-          "date": "2026-06-08",
-          "time": "20:51:21",
-          "description": "Incident logged under Case ID SEN/CI/20260608/001. Classification: Safety / Medical - Cardiac Arrest."
-        },
-        {
-          "eventNumber": 2,
-          "date": "2026-06-08",
-          "time": "20:58:35",
-          "description": "Responder assigned: Ranger John (by Controller Steve)."
-        },
-        {
-          "eventNumber": 3,
-          "date": "2026-06-12",
-          "time": "11:13:25",
-          "description": "Media presence detected at scene."
-        },
-        {
-          "eventNumber": 4,
-          "date": "2026-06-12",
-          "time": "11:17:24",
-          "description": "SDC Communications Team notified regarding media presence."
-        },
-        {
-          "eventNumber": 5,
-          "date": "2026-06-12",
-          "time": "11:17:45",
-          "description": "[Ranger Log] v",
-          "attachments": [
-            "data:image/jpeg;base64,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"
-          ]
-        }
-      ],
-      "emergencyServices": {
-        "policeAtScene": false,
-        "officerNameRank": "",
-        "policeIncidentNo": "",
-        "classification": "",
-        "respondingUnit": "",
-        "ambulanceScdfType": "Ambulance",
-        "ambulanceOfficerName": "",
-        "ambulanceCallSign": "",
-        "ambulanceRespondingUnit": "",
-        "ambulanceArrivalTime": "",
-        "hospitalConveyedTo": ""
-      },
-      "mediaInvolvement": {
-        "mediaAtScene": true,
-        "mediaName": "",
-        "commsNotified": false
-      },
-      "propertyDamage": {
-        "sdcPropertyDamaged": true,
-        "description": "sss"
-      },
-      "vehiclesInvolved": [],
-      "personalInjuries": [
-        {
-          "name": "w",
-          "address": "TBD",
-          "age": 0,
-          "gender": "TBD",
-          "contactNumber": "",
-          "clinicHospitalAttended": "",
-          "msigFormIssued": false,
-          "under16": false,
-          "parentGuardianName": "",
-          "parentGuardianContact": ""
-        },
-        {
-          "name": "ww",
-          "address": "TBD",
-          "age": 0,
-          "gender": "TBD",
-          "contactNumber": "",
-          "clinicHospitalAttended": "",
-          "msigFormIssued": false,
-          "under16": false,
-          "parentGuardianName": "",
-          "parentGuardianContact": ""
-        }
-      ],
-      "personsInvolved": [],
-      "cctvBwc": [],
-      "summary": "12",
-      "completionRemarks": "",
-      "id": "SEN/IR/20260608/0004",
-      "category": "Standard Incident",
-      "attachments": [],
-      "responders": [
-        {
-          "responderId": "Ranger John",
-          "assignedBy": "DM Gan",
-          "assignedAt": "2026-06-08T13:51:21.374Z",
-          "status": "Active"
-        }
-      ]
-    },
-    {
-      "id": "SEN/IR/20260611/0001",
-      "caseId": "SEN/CI/20260611/005",
-      "title": "New Unnamed Case",
-      "dateTime": "2026-06-11T15:53:55.111Z",
-      "type": "Safety / Medical",
-      "subType": "Heat Stroke",
-      "priority": "High",
-      "crisisLevel": 4,
-      "reporterName": "1",
-      "requestedBy": "Guest Call-in",
-      "createdBy": "Controller Steve",
-      "status": "Closed",
-      "location": {
-        "road": "",
-        "building": "",
-        "levelSpace": "",
-        "nearAt": "",
-        "commonName": "1",
-        "postalCode": "000000",
-        "tags": [],
-        "lat": 1.25,
-        "lng": 103.83
-      },
-      "log": [
-        {
-          "eventNumber": 1,
-          "date": "2026-06-11",
-          "time": "22:53:55",
-          "description": "Incident logged under ID SEN/IR/20260611/0001 (Case ID SEN/CI/20260611/005). Classification: Safety / Medical - Heat Stroke."
-        },
-        {
-          "eventNumber": 2,
-          "date": "2026-06-12",
-          "time": "10:58:46",
-          "description": "Responder  acknowledged dispatch. Status changed to Live (Acknowledged)."
-        },
-        {
-          "eventNumber": 3,
-          "date": "2026-06-12",
-          "time": "10:58:51",
-          "description": "Responder  confirmed arrival on-site. Status changed to Live (On-Site)."
-        },
-        {
-          "eventNumber": 4,
-          "date": "2026-06-12",
-          "time": "10:58:55",
-          "description": "[MANUAL] [Ranger Log] Cordon established. — by Ranger John."
-        },
-        {
-          "eventNumber": 5,
-          "date": "2026-06-12",
-          "time": "10:58:57",
-          "description": "[MANUAL] [Ranger Log] First aid administered. — by Ranger John."
-        },
-        {
-          "eventNumber": 6,
-          "date": "2026-06-12",
-          "time": "10:58:59",
-          "description": "[MANUAL] [Ranger Log] Search operations commenced. — by Ranger John."
-        },
-        {
-          "eventNumber": 7,
-          "date": "2026-06-12",
-          "time": "10:59:12",
-          "description": "Responder  marked ground activities completed. Remarks: a Status changed to Live (Completed)."
-        },
-        {
-          "eventNumber": 8,
-          "date": "2026-06-12",
-          "time": "10:59:18",
-          "description": "Incident submitted for Duty Manager endorsement by Controller Steve."
-        },
-        {
-          "eventNumber": 9,
-          "date": "2026-06-12",
-          "time": "10:59:22",
-          "description": "Incident approved and closed by DO Shin Feng (Duty Manager). Record is now read-only."
-        }
-      ],
-      "emergencyServices": {
-        "policeAtScene": false,
-        "officerNameRank": "",
-        "policeIncidentNo": "",
-        "classification": "",
-        "respondingUnit": "",
-        "ambulanceScdfType": "",
-        "ambulanceOfficerName": "",
-        "ambulanceCallSign": "",
-        "ambulanceRespondingUnit": "",
-        "ambulanceArrivalTime": "",
-        "hospitalConveyedTo": ""
-      },
-      "mediaInvolvement": {
-        "mediaAtScene": false,
-        "mediaName": "",
-        "commsNotified": false
-      },
-      "propertyDamage": {
-        "sdcPropertyDamaged": false,
-        "description": ""
-      },
-      "vehiclesInvolved": [],
-      "personalInjuries": [],
-      "personsInvolved": [],
-      "cctvBwc": [],
-      "summary": "1",
-      "completionRemarks": "a",
-      "slaveIncidents": [],
-      "category": "Standard Incident",
-      "acknowledgedAt": "2026-06-12T03:58:46.186Z",
-      "onSiteAt": "2026-06-12T03:58:51.891Z",
-      "completedAt": "2026-06-12T03:59:12.817Z",
-      "attachments": [],
-      "responders": []
-    },
-    {
-      "id": "SEN/IR/20260612/9001",
-      "caseId": "CASE-DEMO-STANDARD",
-      "title": "Demo: Beach Station Water Leak",
-      "dateTime": "2026-06-12T08:00:00+07:00",
-      "type": "Facilities",
-      "subType": "Water Leak",
-      "priority": "Medium",
-      "crisisLevel": 4,
-      "reporterName": "Guest Services Desk",
-      "requestedBy": "Guest Call-in",
-      "createdBy": "system",
-      "status": "Closed",
-      "location": {
-        "road": "Siloso Beach Walk",
-        "building": "Beach Station",
-        "levelSpace": "Level 1 Escalator Area",
-        "postalCode": "098997",
-        "tags": [
-          "Beachfront"
-        ],
-        "lat": 1.25,
-        "lng": 103.83
-      },
-      "log": [
-        {
-          "eventNumber": 1,
-          "date": "2026-06-12",
-          "time": "08:00:00",
-          "description": "Incident logged under Case ID CASE-DEMO-STANDARD. Classification: Facilities - Water Leak."
-        },
-        {
-          "eventNumber": 2,
-          "date": "2026-06-12",
-          "time": "08:05:00",
-          "description": "Dispatch requested. Responder assigned: Ranger John."
-        },
-        {
-          "eventNumber": 3,
-          "date": "2026-06-12",
-          "time": "08:10:00",
-          "description": "Responder John acknowledged dispatch."
-        },
-        {
-          "eventNumber": 4,
-          "date": "2026-06-12",
-          "time": "08:15:00",
-          "description": "Responder John confirmed arrival on-site. Temporary wet floor sign deployed."
-        },
-        {
-          "eventNumber": 5,
-          "date": "2026-06-12",
-          "time": "08:45:00",
-          "description": "Cleaning crew cleared wet patch. Aircon technician patched pipe."
-        },
-        {
-          "eventNumber": 6,
-          "date": "2026-06-12",
-          "time": "08:50:00",
-          "description": "Responder John marked ground activities completed. Remarks: Leak isolated and area dried."
-        },
-        {
-          "eventNumber": 7,
-          "date": "2026-06-12",
-          "time": "09:00:00",
-          "description": "Incident approved and closed by Duty Manager Gan."
-        }
-      ],
-      "summary": "Water leakage from Level 2 air-conditioning duct at Beach Station, causing floor wetness. Closed after repair and review.",
-      "completionRemarks": "Leak isolated and area dried.",
-      "category": "Standard Incident",
-      "emergencyServices": {
-        "policeAtScene": false,
-        "officerNameRank": "",
-        "policeIncidentNo": "",
-        "classification": "",
-        "respondingUnit": "",
-        "ambulanceScdfType": "",
-        "ambulanceOfficerName": "",
-        "ambulanceCallSign": "",
-        "ambulanceRespondingUnit": "",
-        "ambulanceArrivalTime": "",
-        "hospitalConveyedTo": ""
-      },
-      "mediaInvolvement": {
-        "mediaAtScene": false,
-        "mediaName": "",
-        "commsNotified": false
-      },
-      "propertyDamage": {
-        "sdcPropertyDamaged": false,
-        "description": ""
-      },
-      "vehiclesInvolved": [],
-      "personalInjuries": [],
-      "personsInvolved": [],
-      "cctvBwc": [],
       "slaveIncidents": [],
       "attachments": [],
       "responders": [
         {
           "responderId": "Ranger John",
-          "assignedBy": "system",
-          "assignedAt": "2026-06-12T08:00:00+07:00",
-          "status": "Active"
+          "assignedBy": "Controller Steve",
+          "assignedAt": "2026-08-28T09:18:00+07:00",
+          "status": "Active",
+          "lifecycleStatus": "On-Site",
+          "acknowledgedAt": "2026-08-28T09:20:00+07:00",
+          "onSiteAt": "2026-08-28T09:25:00+07:00"
         }
+      ],
+      "assignedTo": [
+        "Ranger John"
       ]
     },
     {
-      "id": "SEN/IR/20260612/9002",
-      "caseId": "CASE-DEMO-PROACTIVE",
-      "title": "Demo: Unattended Bag Spotted",
-      "dateTime": "2026-06-12T09:00:00+07:00",
-      "type": "Security",
-      "subType": "Abandoned Property",
-      "priority": "Low",
+      "id": "SEN/IR/20260828/0002",
+      "caseId": "SEN/CI/20260828/002",
+      "title": "Environmental: Fallen Branch blocking Imbiah Trail",
+      "dateTime": "2026-08-28T08:30:00+07:00",
+      "type": "Environmental",
+      "subType": "Fallen Tree",
+      "priority": "Normal",
       "crisisLevel": 4,
       "reporterName": "Ranger Dave",
       "requestedBy": "Ranger Field Patrol",
       "createdBy": "Ranger Dave",
-      "status": "Closed",
+      "category": "Operational Incident",
+      "status": "Live (Assigned)",
       "location": {
-        "road": "Palawan Beach Walk",
-        "building": "Palawan Food Court",
-        "levelSpace": "Seating area",
-        "postalCode": "098997",
+        "road": "Imbiah Road",
+        "building": "Imbiah Nature Trail",
+        "levelSpace": "Trail Marker 4",
+        "nearAt": "Cable Car Station",
+        "commonName": "Imbiah Trail",
+        "postalCode": "099705",
         "tags": [
-          "Beachfront"
+          "Nature Area",
+          "Pedestrian"
         ],
-        "lat": 1.25,
-        "lng": 103.83
+        "lat": 1.255,
+        "lng": 103.818
       },
       "log": [
         {
           "eventNumber": 1,
-          "date": "2026-06-12",
-          "time": "09:00:00",
-          "description": "Spotted unattended backpack near Palawan Beach food court during routine patrol. Proactive case initialized."
-        },
-        {
-          "eventNumber": 2,
-          "date": "2026-06-12",
-          "time": "09:02:00",
-          "description": "Ranger Dave established safety cordon and monitored backpack."
-        },
-        {
-          "eventNumber": 3,
-          "date": "2026-06-12",
-          "time": "09:15:00",
-          "description": "Owner returned to claim backpack. Verified details and released property."
-        },
-        {
-          "eventNumber": 4,
-          "date": "2026-06-12",
-          "time": "09:20:00",
-          "description": "Incident marked completed and closed on-site."
-        }
-      ],
-      "summary": "Ranger Dave proactively spotted and resolved an unattended backpack near Palawan Beach on patrol. Returned bag to owner.",
-      "completionRemarks": "Bag returned to verified owner. Cordon removed.",
-      "category": "Proactive Incident",
-      "emergencyServices": {
-        "policeAtScene": false,
-        "officerNameRank": "",
-        "policeIncidentNo": "",
-        "classification": "",
-        "respondingUnit": "",
-        "ambulanceScdfType": "",
-        "ambulanceOfficerName": "",
-        "ambulanceCallSign": "",
-        "ambulanceRespondingUnit": "",
-        "ambulanceArrivalTime": "",
-        "hospitalConveyedTo": ""
-      },
-      "mediaInvolvement": {
-        "mediaAtScene": false,
-        "mediaName": "",
-        "commsNotified": false
-      },
-      "propertyDamage": {
-        "sdcPropertyDamaged": false,
-        "description": ""
-      },
-      "vehiclesInvolved": [],
-      "personalInjuries": [],
-      "personsInvolved": [],
-      "cctvBwc": [],
-      "slaveIncidents": [],
-      "attachments": [],
-      "responders": [
-        {
-          "responderId": "Ranger Dave",
-          "assignedBy": "Ranger Dave",
-          "assignedAt": "2026-06-12T09:00:00+07:00",
-          "status": "Active"
-        }
-      ]
-    },
-    {
-      "id": "SEN/IR/20260612/9003",
-      "caseId": "CASE-DEMO-BACKDATED",
-      "title": "Demo: Snake Encounter (Backdated)",
-      "dateTime": "2026-06-11T14:30:00+07:00",
-      "type": "Safety / Medical",
-      "subType": "Animal Encounter",
-      "priority": "Medium",
-      "crisisLevel": 4,
-      "reporterName": "Trail Ranger",
-      "requestedBy": "Ranger Field Patrol",
-      "createdBy": "Controller Steve",
-      "status": "Closed",
-      "location": {
-        "road": "Imbiah Trail",
-        "building": "Main footpath",
-        "levelSpace": "Near ticket booth",
-        "postalCode": "098997",
-        "tags": [
-          "Nature Area"
-        ],
-        "lat": 1.25,
-        "lng": 103.83
-      },
-      "log": [
-        {
-          "eventNumber": 1,
-          "date": "2026-06-11",
-          "time": "14:30:00",
-          "description": "[BACKDATED EVENT] Python spotted crossing footpath. Pest control vendor contacted."
-        },
-        {
-          "eventNumber": 2,
-          "date": "2026-06-11",
-          "time": "15:00:00",
-          "description": "[BACKDATED EVENT] Pest control arrived, successfully relocated snake, path cleared."
-        },
-        {
-          "eventNumber": 3,
-          "date": "2026-06-12",
+          "date": "2026-08-28",
           "time": "08:30:00",
-          "description": "Delayed log entry filed in CMS by Controller Steve. Justification: Late receipt of contractor capture report."
+          "description": "Large tree branch down across main walkway due to overnight wind. Pathway blocked."
         },
         {
-          "eventNumber": 4,
-          "date": "2026-06-12",
+          "eventNumber": 2,
+          "date": "2026-08-28",
           "time": "08:35:00",
-          "description": "Incident closed immediately as historical record."
+          "description": "Horticulture contractor and Ranger Alex dispatched for clearance."
         }
       ],
-      "summary": "Delayed log entry of yesterday's Python crossing Imbiah Trail. Relocated by pest control.",
-      "completionRemarks": "Relocated snake, path cleared.",
-      "category": "Backdated Incident",
       "emergencyServices": {
         "policeAtScene": false,
         "officerNameRank": "",
-        "policeIncidentNo": "",
-        "classification": "",
-        "respondingUnit": "",
-        "ambulanceScdfType": "",
-        "ambulanceOfficerName": "",
-        "ambulanceCallSign": "",
-        "ambulanceRespondingUnit": "",
-        "ambulanceArrivalTime": "",
-        "hospitalConveyedTo": ""
-      },
-      "mediaInvolvement": {
-        "mediaAtScene": false,
-        "mediaName": "",
-        "commsNotified": false
-      },
-      "propertyDamage": {
-        "sdcPropertyDamaged": false,
-        "description": ""
-      },
-      "vehiclesInvolved": [],
-      "personalInjuries": [],
-      "personsInvolved": [],
-      "cctvBwc": [],
-      "slaveIncidents": [],
-      "attachments": [],
-      "responders": [
-        {
-          "responderId": "External Pest Control",
-          "assignedBy": "Controller Steve",
-          "assignedAt": "2026-06-11T14:30:00+07:00",
-          "status": "Active"
-        }
-      ]
-    },
-    {
-      "id": "SEN/IR/20260612/9004",
-      "caseId": "CASE-DEMO-ONGOING",
-      "title": "Demo: Siloso Beach Outage",
-      "dateTime": "2026-06-12T10:00:00+07:00",
-      "type": "Facilities",
-      "subType": "Power Outage",
-      "priority": "High",
-      "crisisLevel": 4,
-      "reporterName": "UCS Alarm System",
-      "requestedBy": "UCS Power Feed",
-      "createdBy": "system",
-      "status": "Live (On-Site)",
-      "location": {
-        "road": "Siloso Beach Walk",
-        "building": "Kiosk Sector 3",
-        "levelSpace": "All kiosks",
-        "postalCode": "098997",
-        "tags": [
-          "Beachfront"
-        ],
-        "lat": 1.25,
-        "lng": 103.83
-      },
-      "log": [
-        {
-          "eventNumber": 1,
-          "date": "2026-06-12",
-          "time": "10:00:00",
-          "description": "Outage alert triggered for Siloso Kiosk zone. Incident created."
-        },
-        {
-          "eventNumber": 2,
-          "date": "2026-06-12",
-          "time": "10:05:00",
-          "description": "Ranger Sarah dispatched to kiosk site."
-        },
-        {
-          "eventNumber": 3,
-          "date": "2026-06-12",
-          "time": "10:12:00",
-          "description": "Ranger Sarah confirmed arrival. Blackout affecting 3 commercial retail stalls."
-        },
-        {
-          "eventNumber": 4,
-          "date": "2026-06-12",
-          "time": "10:20:00",
-          "description": "[MANUAL] [Ranger Log] Kiosk managers briefed, safety advisories issued."
-        },
-        {
-          "eventNumber": 5,
-          "date": "2026-06-12",
-          "time": "10:30:00",
-          "description": "Public sector warning broadcast issued to surrounding retail properties."
-        },
-        {
-          "eventNumber": 6,
-          "date": "2026-06-12",
-          "time": "11:00:00",
-          "description": "[MANUAL] [Ranger Log] SP Group electricians arrived on-site and began isolation checks."
-        }
-      ],
-      "summary": "Active power failure affecting multiple kiosks on Siloso Beach Walk. SP Group technicians investigating on-site.",
-      "completionRemarks": "",
-      "category": "Ongoing Incident",
-      "emergencyServices": {
-        "policeAtScene": false,
-        "officerNameRank": "",
-        "policeIncidentNo": "",
-        "classification": "",
-        "respondingUnit": "",
-        "ambulanceScdfType": "",
-        "ambulanceOfficerName": "",
-        "ambulanceCallSign": "",
-        "ambulanceRespondingUnit": "",
-        "ambulanceArrivalTime": "",
-        "hospitalConveyedTo": ""
-      },
-      "mediaInvolvement": {
-        "mediaAtScene": false,
-        "mediaName": "",
-        "commsNotified": false
-      },
-      "propertyDamage": {
-        "sdcPropertyDamaged": false,
-        "description": ""
-      },
-      "vehiclesInvolved": [],
-      "personalInjuries": [],
-      "personsInvolved": [],
-      "cctvBwc": [],
-      "slaveIncidents": [],
-      "attachments": [],
-      "responders": [
-        {
-          "responderId": "Ranger Sarah",
-          "assignedBy": "system",
-          "assignedAt": "2026-06-12T10:00:00+07:00",
-          "status": "Active"
-        }
-      ]
-    },
-    {
-      "id": "SEN/IR/20260612/9005",
-      "caseId": "CASE-DEMO-OPERATIONAL",
-      "title": "Demo: SDC HQ Fire Drill",
-      "dateTime": "2026-06-12T14:00:00+07:00",
-      "type": "Safety / Medical",
-      "subType": "Others",
-      "priority": "Low",
-      "crisisLevel": 4,
-      "reporterName": "Safety Dept",
-      "requestedBy": "IIOC Controller",
-      "createdBy": "Safety Coordinator",
-      "status": "Closed",
-      "location": {
-        "road": "Sentosa Gateway",
-        "building": "SDC HQ Building",
-        "levelSpace": "All floors",
-        "postalCode": "098269",
-        "tags": [
-          "Drill",
-          "Office"
-        ],
-        "lat": 1.25,
-        "lng": 103.83
-      },
-      "log": [
-        {
-          "eventNumber": 1,
-          "date": "2026-06-12",
-          "time": "14:00:00",
-          "description": "HQ Evacuation Drill siren triggered. Drill commenced."
-        },
-        {
-          "eventNumber": 2,
-          "date": "2026-06-12",
-          "time": "14:05:00",
-          "description": "Floor fire wardens cleared all offices. Assembly check started."
-        },
-        {
-          "eventNumber": 3,
-          "date": "2026-06-12",
-          "time": "14:15:00",
-          "description": "Drill completed successfully. Evacuation duration: 5m 12s."
-        },
-        {
-          "eventNumber": 4,
-          "date": "2026-06-12",
-          "time": "14:20:00",
-          "description": "Compliance report uploaded. Drill closed."
-        }
-      ],
-      "summary": "Evacuation fire drill conducted at SDC headquarters building. Evacuation time logged: 5m 12s.",
-      "completionRemarks": "Fire drill completed successfully. Evacuation time: 5m 12s.",
-      "category": "Operational Record",
-      "emergencyServices": {
-        "policeAtScene": false,
-        "officerNameRank": "",
-        "policeIncidentNo": "",
-        "classification": "",
-        "respondingUnit": "",
-        "ambulanceScdfType": "",
-        "ambulanceOfficerName": "",
-        "ambulanceCallSign": "",
-        "ambulanceRespondingUnit": "",
-        "ambulanceArrivalTime": "",
-        "hospitalConveyedTo": ""
-      },
-      "mediaInvolvement": {
-        "mediaAtScene": false,
-        "mediaName": "",
-        "commsNotified": false
-      },
-      "propertyDamage": {
-        "sdcPropertyDamaged": false,
-        "description": ""
-      },
-      "vehiclesInvolved": [],
-      "personalInjuries": [],
-      "personsInvolved": [],
-      "cctvBwc": [],
-      "slaveIncidents": [],
-      "attachments": [],
-      "responders": [
-        {
-          "responderId": "HQ Fire Wardens",
-          "assignedBy": "Safety Coordinator",
-          "assignedAt": "2026-06-12T14:00:00+07:00",
-          "status": "Active"
-        }
-      ]
-    },
-    {
-      "id": "SEN/IR/20260612/9006",
-      "caseId": "CASE-DEMO-RETURNED",
-      "title": "Demo: Missing Child (Returned)",
-      "dateTime": "2026-06-12T11:00:00+07:00",
-      "type": "Safety / Medical",
-      "subType": "Others",
-      "priority": "High",
-      "crisisLevel": 3,
-      "reporterName": "Mother (Mrs. Tan)",
-      "requestedBy": "Walk-in Guest",
-      "createdBy": "Controller Steve",
-      "status": "Returned",
-      "location": {
-        "road": "Siloso Beach Walk",
-        "building": "Siloso Restrooms",
-        "levelSpace": "Immediate vicinity",
-        "postalCode": "098997",
-        "tags": [
-          "Beachfront"
-        ],
-        "lat": 1.25,
-        "lng": 103.83
-      },
-      "log": [
-        {
-          "eventNumber": 1,
-          "date": "2026-06-12",
-          "time": "11:00:00",
-          "description": "Mrs. Tan reported 6-year-old son missing near restrooms. Search dispatch initiated."
-        },
-        {
-          "eventNumber": 2,
-          "date": "2026-06-12",
-          "time": "11:02:00",
-          "description": "Ranger John dispatched for foot patrol sweep."
-        },
-        {
-          "eventNumber": 3,
-          "date": "2026-06-12",
-          "time": "11:08:00",
-          "description": "Ranger John acknowledged dispatch."
-        },
-        {
-          "eventNumber": 4,
-          "date": "2026-06-12",
-          "time": "11:15:00",
-          "description": "Ranger John arrived on-site and commenced sweeps."
-        },
-        {
-          "eventNumber": 5,
-          "date": "2026-06-12",
-          "time": "11:45:00",
-          "description": "Child located safe by Ranger John and reunited with mother."
-        },
-        {
-          "eventNumber": 6,
-          "date": "2026-06-12",
-          "time": "11:50:00",
-          "description": "Ranger John submitted ground resolution report."
-        },
-        {
-          "eventNumber": 7,
-          "date": "2026-06-12",
-          "time": "11:55:00",
-          "description": "Incident RETURNED by Duty Manager Gan. Reason: Please attach BWC footage bookmark and confirm police reporting status."
-        }
-      ],
-      "summary": "A 6-year-old child reported missing near the Siloso Beach restrooms. The report was returned by supervisor for missing BWC footage bookmarks.",
-      "completionRemarks": "Child reunited safe. Report returned by DM for BWC attachment.",
-      "category": "Standard Incident",
-      "emergencyServices": {
-        "policeAtScene": false,
-        "officerNameRank": "",
-        "policeIncidentNo": "",
-        "classification": "",
-        "respondingUnit": "",
-        "ambulanceScdfType": "",
-        "ambulanceOfficerName": "",
-        "ambulanceCallSign": "",
-        "ambulanceRespondingUnit": "",
-        "ambulanceArrivalTime": "",
-        "hospitalConveyedTo": ""
-      },
-      "mediaInvolvement": {
-        "mediaAtScene": false,
-        "mediaName": "",
-        "commsNotified": false
-      },
-      "propertyDamage": {
-        "sdcPropertyDamaged": false,
-        "description": ""
-      },
-      "vehiclesInvolved": [],
-      "personalInjuries": [],
-      "personsInvolved": [],
-      "cctvBwc": [],
-      "slaveIncidents": [],
-      "attachments": [],
-      "responders": [
-        {
-          "responderId": "Ranger John",
-          "assignedBy": "Controller Steve",
-          "assignedAt": "2026-06-12T11:00:00+07:00",
-          "status": "Active"
-        }
-      ]
-    },
-    {
-      "id": "SEN/IR/20260614/0001",
-      "caseId": "SEN/CI/20260614/001",
-      "title": "Test 12",
-      "dateTime": "2026-06-14T02:26:00.000Z",
-      "type": "Environmental",
-      "subType": "Fallen Tree",
-      "priority": "High",
-      "crisisLevel": 4,
-      "reporterName": "HH",
-      "requestedBy": "Email",
-      "createdBy": "Controller Steve",
-      "category": "Standard Incident",
-      "status": "Closed",
-      "location": {
-        "road": "Siloso Beach Walk",
-        "building": "Siloso Beach Station",
-        "levelSpace": "Level 1 - Control Room",
-        "nearAt": "",
-        "commonName": "Control Room",
-        "postalCode": "000000",
-        "tags": [
-          "Operational",
-          "Restricted"
-        ],
-        "lat": 1.2562,
-        "lng": 103.8124
-      },
-      "log": [
-        {
-          "eventNumber": 1,
-          "date": "2026-06-14",
-          "time": "16:28:22",
-          "description": "Incident logged under ID SEN/IR/20260614/0001 (Case ID SEN/CI/20260614/001). Classification: Environmental - Fallen Tree."
-        },
-        {
-          "eventNumber": 2,
-          "date": "2026-06-14",
-          "time": "16:52:10",
-          "description": "Responder Ranger John acknowledged dispatch. Status changed to Live (Acknowledged)."
-        },
-        {
-          "eventNumber": 3,
-          "date": "2026-06-14",
-          "time": "16:52:11",
-          "description": "Responder Ranger John confirmed arrival on-site. Status changed to Live (On-Site)."
-        },
-        {
-          "eventNumber": 4,
-          "date": "2026-06-14",
-          "time": "16:52:14",
-          "description": "Responder Ranger John marked ground activities completed. Remarks: sss Status changed to Live (Completed)."
-        },
-        {
-          "eventNumber": 5,
-          "date": "2026-06-14",
-          "time": "16:52:20",
-          "description": "Incident submitted for Duty Manager endorsement by Controller Steve."
-        },
-        {
-          "eventNumber": 6,
-          "date": "2026-06-14",
-          "time": "16:52:40",
-          "description": "Incident approved and closed by DM Gan (Duty Manager). Closure remarks: qqq Record is now read-only."
-        },
-        {
-          "eventNumber": 7,
-          "date": "2026-06-14",
-          "time": "17:21:13",
-          "description": "Incident reopened by System Administrator (Admin Root). Status reset to Live."
-        },
-        {
-          "eventNumber": 8,
-          "date": "2026-06-14",
-          "time": "17:21:15",
-          "description": "Responder added: Ranger Alex — assigned by Admin Root."
-        },
-        {
-          "eventNumber": 9,
-          "date": "2026-06-14",
-          "time": "17:21:43",
-          "description": "Responder removed: Ranger John — unassigned by Admin Root."
-        },
-        {
-          "eventNumber": 10,
-          "date": "2026-06-14",
-          "time": "17:22:30",
-          "description": "Responder added: Ranger John — assigned by Admin Root."
-        },
-        {
-          "eventNumber": 11,
-          "date": "2026-06-14",
-          "time": "17:22:32",
-          "description": "Responder removed: Ranger Alex — unassigned by Admin Root."
-        },
-        {
-          "eventNumber": 12,
-          "date": "2026-06-14",
-          "time": "17:25:27",
-          "description": "Responder added: Ranger Alex — assigned by Admin Root."
-        },
-        {
-          "eventNumber": 13,
-          "date": "2026-06-14",
-          "time": "17:38:30",
-          "description": "Responder Ranger John, Ranger Alex acknowledged dispatch. Status changed to Live (Acknowledged)."
-        },
-        {
-          "eventNumber": 14,
-          "date": "2026-06-14",
-          "time": "17:38:32",
-          "description": "Responder Ranger John, Ranger Alex confirmed arrival on-site. Status changed to Live (On-Site)."
-        },
-        {
-          "eventNumber": 15,
-          "date": "2026-06-14",
-          "time": "17:38:34",
-          "description": "Responder Ranger John, Ranger Alex marked ground activities completed. Status changed to Live (Completed)."
-        },
-        {
-          "eventNumber": 16,
-          "date": "2026-06-14",
-          "time": "17:38:43",
-          "description": "Incident submitted for Duty Manager endorsement by Controller Steve."
-        },
-        {
-          "eventNumber": 17,
-          "date": "2026-06-14",
-          "time": "17:38:47",
-          "description": "[MANUAL] scascas — by Controller Steve.",
-          "attachments": []
-        },
-        {
-          "eventNumber": 18,
-          "date": "2026-06-14",
-          "time": "17:39:01",
-          "description": "Incident returned to Controller by DM Gan. Reason: sssss"
-        },
-        {
-          "eventNumber": 19,
-          "date": "2026-06-14",
-          "time": "17:39:10",
-          "description": "Incident submitted for Duty Manager endorsement by Controller Steve."
-        },
-        {
-          "eventNumber": 20,
-          "date": "2026-06-14",
-          "time": "17:39:17",
-          "description": "Incident approved and closed by DM Gan (Duty Manager). Closure remarks: scascâ Record is now read-only."
-        }
-      ],
-      "emergencyServices": {
-        "policeAtScene": true,
-        "officerNameRank": "Tan",
         "policeIncidentNo": "",
         "classification": "",
         "respondingUnit": "",
@@ -1568,488 +246,79 @@
         "hospitalConveyedTo": ""
       },
       "mediaInvolvement": {
-        "mediaAtScene": true,
-        "mediaName": "Aw",
+        "mediaAtScene": false,
+        "mediaName": "",
         "commsNotified": false
       },
       "propertyDamage": {
         "sdcPropertyDamaged": true,
-        "description": "qqqw"
+        "description": "Minor fence dent along trail perimeter"
       },
       "vehiclesInvolved": [],
-      "personalInjuries": [
-        {
-          "name": "Bie",
-          "address": "",
-          "age": 12,
-          "gender": "Male",
-          "contactNumber": "",
-          "clinicHospitalAttended": "",
-          "msigFormIssued": false,
-          "msigSerialNo": "",
-          "under16": true,
-          "parentGuardianName": "12",
-          "parentGuardianContact": "12"
-        }
-      ],
-      "personsInvolved": [
-        {
-          "guestOrNonGuest": "Guest",
-          "type": "Guest",
-          "name": "1",
-          "address": "2",
-          "age": 3,
-          "gender": "Male",
-          "contactNumber": "2",
-          "roleInvolvement": "",
-          "injuryDetails": ""
-        }
-      ],
+      "personalInjuries": [],
+      "personsInvolved": [],
       "cctvBwc": [],
-      "summary": "sss",
-      "completionRemarks": "scascâ",
+      "summary": "Fallen branch blocking pedestrian footpath at Imbiah Trail. Horticulture team currently cutting and removing debris.",
+      "completionRemarks": "",
       "slaveIncidents": [],
       "attachments": [],
-      "acknowledgedAt": "2026-06-14T10:38:30.999Z",
-      "onSiteAt": "2026-06-14T10:38:32.360Z",
-      "completedAt": "2026-06-14T10:38:34.032Z",
       "responders": [
         {
-          "responderId": "Ranger John",
+          "responderId": "Ranger Alex",
           "assignedBy": "Controller Steve",
-          "assignedAt": "2026-06-14T02:26:00.000Z",
-          "status": "Removed"
-        },
-        {
-          "responderId": "Ranger Alex",
-          "assignedBy": "Admin Root",
-          "assignedAt": "2026-06-14T10:21:15.899Z",
-          "status": "Removed"
-        },
-        {
-          "responderId": "Ranger John",
-          "assignedBy": "Admin Root",
-          "assignedAt": "2026-06-14T10:22:30.482Z",
-          "status": "Active"
-        },
-        {
-          "responderId": "Ranger Alex",
-          "assignedBy": "Admin Root",
-          "assignedAt": "2026-06-14T10:25:27.321Z",
-          "status": "Active"
+          "assignedAt": "2026-08-28T08:35:00+07:00",
+          "status": "Active",
+          "lifecycleStatus": "On-Site",
+          "acknowledgedAt": "2026-08-28T08:37:00+07:00",
+          "onSiteAt": "2026-08-28T08:45:00+07:00"
         }
+      ],
+      "assignedTo": [
+        "Ranger Alex"
       ]
     },
     {
-      "id": "SEN/IR/20260614/0002",
-      "caseId": "SEN/CI/20260614/002",
-      "title": "Test 21",
-      "dateTime": "2026-06-14T06:28:00.000Z",
+      "id": "SEN/IR/20260828/0003",
+      "caseId": "SEN/CI/20260828/003",
+      "title": "Security: Unattended Bag @ Beach Station Monorail",
+      "dateTime": "2026-08-28T10:45:00+07:00",
       "type": "Security",
-      "subType": "Public Nuisance",
-      "priority": "Normal",
-      "crisisLevel": 4,
-      "reporterName": "Anonymous Guest",
-      "requestedBy": "Public Phone",
-      "createdBy": "DM Gan",
-      "category": "Standard Incident",
-      "status": "Live (Assigned)",
-      "location": {
-        "road": "Siloso Beach Walk",
-        "building": "Costa Sands Resort",
-        "levelSpace": "Ground Floor - Hotel Lobby",
-        "nearAt": "1",
-        "commonName": "Hotel Lobby",
-        "postalCode": "000000",
-        "tags": [
-          "Resort",
-          "Public"
-        ],
-        "lat": 1.2505,
-        "lng": 103.815
-      },
-      "log": [
-        {
-          "eventNumber": 1,
-          "date": "2026-06-14",
-          "time": "20:28:47",
-          "description": "Incident logged under ID SEN/IR/20260614/0002 (Case ID SEN/CI/20260614/002). Classification: Security - Public Nuisance."
-        },
-        {
-          "eventNumber": 2,
-          "date": "2026-06-14",
-          "time": "20:29:18",
-          "description": "Responder added: Ranger John — assigned by Controller Steve."
-        },
-        {
-          "eventNumber": 3,
-          "date": "2026-06-14",
-          "time": "20:29:19",
-          "description": "Responder added: Ranger Alex — assigned by Controller Steve."
-        },
-        {
-          "eventNumber": 4,
-          "date": "2026-06-14",
-          "time": "20:29:26",
-          "description": "[MANUAL] Hello — by Controller Steve.",
-          "attachments": []
-        },
-        {
-          "eventNumber": 5,
-          "date": "2026-06-14",
-          "time": "20:29:28",
-          "description": "[MANUAL] w — by Controller Steve.",
-          "attachments": []
-        },
-        {
-          "eventNumber": 6,
-          "date": "2026-06-14",
-          "time": "20:29:34",
-          "description": "[MANUAL] wxxx  — by Controller Steve.",
-          "attachments": [
-            "data:image/jpeg;base64,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"
-          ],
-          "edited": true,
-          "editedBy": "Controller Steve",
-          "editedAt": "2026-06-14T13:47:32.654Z",
-          "deleted": true,
-          "deletedBy": "Controller Steve",
-          "deletedAt": "2026-06-14T13:47:40.645Z"
-        },
-        {
-          "eventNumber": 7,
-          "date": "2026-06-14",
-          "time": "20:30:42",
-          "description": "Responder Ranger John, Ranger Alex acknowledged dispatch. Status changed to Live (Acknowledged)."
-        },
-        {
-          "eventNumber": 8,
-          "date": "2026-06-14",
-          "time": "20:30:44",
-          "description": "Responder Ranger John, Ranger Alex confirmed arrival on-site. Status changed to Live (On-Site)."
-        },
-        {
-          "eventNumber": 9,
-          "date": "2026-06-14",
-          "time": "20:39:16",
-          "description": "Incident marked as Incomplete by Ranger John. Remarks: sss"
-        },
-        {
-          "eventNumber": 10,
-          "date": "2026-06-14",
-          "time": "20:45:44",
-          "description": "[MANUAL] sss — by Controller Steve.",
-          "attachments": []
-        },
-        {
-          "eventNumber": 11,
-          "date": "2026-06-14",
-          "time": "20:46:38",
-          "description": "[MANUAL] Ground patrol started at Beach Area B and C — by PatrolSteve.",
-          "attachments": [],
-          "edited": true,
-          "editedBy": "PatrolSteve",
-          "editedAt": "2026-06-14T13:46:38.783Z",
-          "deleted": true,
-          "deletedBy": "PatrolSteve",
-          "deletedAt": "2026-06-14T13:46:38.811Z"
-        },
-        {
-          "eventNumber": 12,
-          "date": "2026-06-14",
-          "time": "21:23:19",
-          "description": "[MANUAL] Ground patrol started at Beach Area B and C — by PatrolSteve.",
-          "attachments": [],
-          "edited": true,
-          "editedBy": "PatrolSteve",
-          "editedAt": "2026-06-14T14:23:19.937Z",
-          "deleted": true,
-          "deletedBy": "PatrolSteve",
-          "deletedAt": "2026-06-14T14:23:19.958Z"
-        },
-        {
-          "eventNumber": 13,
-          "date": "2026-06-14",
-          "time": "21:25:40",
-          "description": "Responder removed: Ranger John — unassigned by Controller Steve."
-        },
-        {
-          "eventNumber": 14,
-          "date": "2026-06-14",
-          "time": "21:25:43",
-          "description": "Responder added: Ranger John — assigned by Controller Steve."
-        },
-        {
-          "eventNumber": 15,
-          "date": "2026-06-14",
-          "time": "21:36:17",
-          "description": "[MANUAL] sss — by Controller Steve.",
-          "attachments": []
-        },
-        {
-          "eventNumber": 16,
-          "date": "2026-06-14",
-          "time": "21:36:22",
-          "description": "[MANUAL] huu — by Controller Steve.",
-          "attachments": [
-            "data:image/jpeg;base64,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"
-          ]
-        },
-        {
-          "eventNumber": 17,
-          "date": "2026-06-14",
-          "time": "21:36:39",
-          "description": "Responder Ranger Alex, Ranger John marked ground activities completed. Status changed to Live (Completed)."
-        },
-        {
-          "eventNumber": 18,
-          "date": "2026-06-14",
-          "time": "21:36:50",
-          "description": "Incident submitted for Duty Manager endorsement by Controller Steve."
-        },
-        {
-          "eventNumber": 19,
-          "date": "2026-06-14",
-          "time": "21:39:16",
-          "description": "Incident returned to Controller by DM Gan. Reason: Hii"
-        },
-        {
-          "eventNumber": 20,
-          "date": "2026-06-14",
-          "time": "21:42:56",
-          "description": "Incident submitted for Duty Manager endorsement by Controller Steve."
-        },
-        {
-          "eventNumber": 21,
-          "date": "2026-06-14",
-          "time": "21:43:03",
-          "description": "Incident returned to Controller by DM Gan. Reason: te"
-        },
-        {
-          "eventNumber": 22,
-          "date": "2026-06-14",
-          "time": "21:58:07",
-          "description": "Incident submitted for Duty Manager endorsement by Controller Steve."
-        },
-        {
-          "eventNumber": 23,
-          "date": "2026-06-14",
-          "time": "21:58:21",
-          "description": "Incident returned to Controller by DM Gan. Reason: w"
-        },
-        {
-          "eventNumber": 24,
-          "date": "2026-06-14",
-          "time": "21:59:07",
-          "description": "Incident submitted for Duty Manager endorsement by Controller Steve."
-        },
-        {
-          "eventNumber": 25,
-          "date": "2026-06-14",
-          "time": "21:59:13",
-          "description": "Incident approved and closed by DM Gan (Duty Manager). Closure remarks: ok Record is now read-only."
-        },
-        {
-          "eventNumber": 26,
-          "date": "2026-06-14",
-          "time": "21:59:48",
-          "description": "Incident reopened by System Administrator (Admin Root). Status reset to Live."
-        }
-      ],
-      "emergencyServices": {
-        "policeAtScene": false,
-        "officerNameRank": "",
-        "policeIncidentNo": "",
-        "classification": "",
-        "respondingUnit": "",
-        "ambulanceScdfType": "None",
-        "ambulanceOfficerName": "",
-        "ambulanceCallSign": "",
-        "ambulanceRespondingUnit": "",
-        "ambulanceArrivalTime": "",
-        "hospitalConveyedTo": ""
-      },
-      "mediaInvolvement": {
-        "mediaAtScene": false,
-        "mediaName": "",
-        "commsNotified": false
-      },
-      "propertyDamage": {
-        "sdcPropertyDamaged": false,
-        "description": ""
-      },
-      "vehiclesInvolved": [],
-      "personalInjuries": [],
-      "personsInvolved": [],
-      "cctvBwc": [],
-      "summary": "",
-      "completionRemarks": "ok",
-      "slaveIncidents": [],
-      "attachments": [],
-      "responders": [
-        {
-          "responderId": "Ranger John",
-          "assignedBy": "Controller Steve",
-          "assignedAt": "2026-06-14T13:29:18.570Z",
-          "status": "Removed"
-        },
-        {
-          "responderId": "Ranger Alex",
-          "assignedBy": "Controller Steve",
-          "assignedAt": "2026-06-14T13:29:19.957Z",
-          "status": "Active"
-        },
-        {
-          "responderId": "Ranger John",
-          "assignedBy": "Controller Steve",
-          "assignedAt": "2026-06-14T14:25:43.400Z",
-          "status": "Active"
-        }
-      ],
-      "acknowledgedAt": "2026-06-14T13:30:42.724Z",
-      "onSiteAt": "2026-06-14T13:30:44.985Z",
-      "completedAt": "2026-06-14T14:36:39.955Z"
-    },
-    {
-      "id": "SEN/IR/20260614/0003",
-      "caseId": "SEN/CI/20260614/003",
-      "title": "Bue1",
-      "dateTime": "2026-06-14T14:53:06.804Z",
-      "type": "Environmental",
-      "subType": "Oil Spill",
-      "priority": "Normal",
-      "crisisLevel": 4,
-      "reporterName": "1",
-      "requestedBy": "Guest Call-in",
-      "createdBy": "DM Gan",
-      "category": "Standard Incident",
-      "status": "Closed",
-      "location": {
-        "road": "",
-        "building": "",
-        "levelSpace": "",
-        "nearAt": "",
-        "commonName": "xx",
-        "postalCode": "000000",
-        "tags": [
-          "Beachfront"
-        ],
-        "lat": 1.25,
-        "lng": 103.83
-      },
-      "log": [
-        {
-          "eventNumber": 1,
-          "date": "2026-06-14",
-          "time": "21:53:06",
-          "description": "Incident logged under ID SEN/IR/20260614/0003 (Case ID SEN/CI/20260614/003). Classification: Environmental - Oil Spill."
-        },
-        {
-          "eventNumber": 2,
-          "date": "2026-06-14",
-          "time": "21:53:26",
-          "description": "Responder added: Ranger John — assigned by Controller Steve."
-        },
-        {
-          "eventNumber": 3,
-          "date": "2026-06-14",
-          "time": "21:53:27",
-          "description": "Responder added: Ranger Alex — assigned by Controller Steve."
-        },
-        {
-          "eventNumber": 4,
-          "date": "2026-06-14",
-          "time": "21:53:35",
-          "description": "Incident approved and closed by Controller Steve (Duty Manager). Closure remarks: Closed as False Alarm Record is now read-only."
-        }
-      ],
-      "emergencyServices": {
-        "policeAtScene": false,
-        "officerNameRank": "",
-        "policeIncidentNo": "",
-        "classification": "",
-        "respondingUnit": "",
-        "ambulanceScdfType": "",
-        "ambulanceOfficerName": "",
-        "ambulanceCallSign": "",
-        "ambulanceRespondingUnit": "",
-        "ambulanceArrivalTime": "",
-        "hospitalConveyedTo": ""
-      },
-      "mediaInvolvement": {
-        "mediaAtScene": false,
-        "mediaName": "",
-        "commsNotified": false
-      },
-      "propertyDamage": {
-        "sdcPropertyDamaged": false,
-        "description": ""
-      },
-      "vehiclesInvolved": [],
-      "personalInjuries": [],
-      "personsInvolved": [],
-      "cctvBwc": [],
-      "summary": "",
-      "completionRemarks": "Closed as False Alarm",
-      "slaveIncidents": [],
-      "attachments": [],
-      "responders": [
-        {
-          "responderId": "Ranger John",
-          "assignedBy": "Controller Steve",
-          "assignedAt": "2026-06-14T14:53:26.004Z",
-          "status": "Active"
-        },
-        {
-          "responderId": "Ranger Alex",
-          "assignedBy": "Controller Steve",
-          "assignedAt": "2026-06-14T14:53:27.879Z",
-          "status": "Active"
-        }
-      ]
-    },
-    {
-      "id": "SEN/IR/20260615/0001",
-      "caseId": "SEN/CI/20260615/001",
-      "title": "Hie1",
-      "dateTime": "2026-06-15T01:36:00.000Z",
-      "type": "Environmental",
-      "subType": "Fallen Tree",
+      "subType": "Suspicious Object",
       "priority": "High",
-      "crisisLevel": 4,
-      "reporterName": "1",
+      "crisisLevel": 3,
+      "reporterName": "Station Master Kumar",
       "requestedBy": "Public Phone",
       "createdBy": "Controller Steve",
-      "category": "Standard Incident",
+      "category": "Operational Incident",
       "status": "Live",
       "location": {
-        "road": "Siloso Beach Walk",
-        "building": "Costa Sands Resort",
-        "levelSpace": "Ground Floor - Hotel Lobby",
-        "nearAt": "",
-        "commonName": "Hotel Lobby",
-        "postalCode": "000000",
+        "road": "Beach View",
+        "building": "Beach Station",
+        "levelSpace": "Platform 1",
+        "nearAt": "Bench 3",
+        "commonName": "Beach Station Monorail",
+        "postalCode": "098604",
         "tags": [
-          "Resort",
+          "Transit",
           "Public"
         ],
-        "lat": 1.2505,
-        "lng": 103.815
+        "lat": 1.2515,
+        "lng": 103.8175
       },
       "log": [
         {
           "eventNumber": 1,
-          "date": "2026-06-15",
-          "time": "15:36:37",
-          "description": "Incident logged under ID SEN/IR/20260615/0001 (Case ID SEN/CI/20260615/001). Classification: Environmental - Fallen Tree."
+          "date": "2026-08-28",
+          "time": "10:45:00",
+          "description": "Black backpack left unattended on platform bench for > 15 mins. Safety cordon established."
         }
       ],
       "emergencyServices": {
-        "policeAtScene": false,
-        "officerNameRank": "",
-        "policeIncidentNo": "",
-        "classification": "",
-        "respondingUnit": "",
+        "policeAtScene": true,
+        "officerNameRank": "Insp. David Wong",
+        "policeIncidentNo": "SPF-2026-90412",
+        "classification": "Security Check",
+        "respondingUnit": "TransCom Patrol",
         "ambulanceScdfType": "None",
         "ambulanceOfficerName": "",
         "ambulanceCallSign": "",
@@ -2069,377 +338,437 @@
       "vehiclesInvolved": [],
       "personalInjuries": [],
       "personsInvolved": [],
-      "cctvBwc": [],
-      "summary": "",
+      "cctvBwc": [
+        {
+          "cameraNumber": "CAM-BST-01",
+          "vmsTimestamp": "2026-08-28 10:30:00",
+          "vmsBookmark": "BM-1030-BAG",
+          "bwcNumber": "",
+          "bwcTimestamp": ""
+        }
+      ],
+      "summary": "Security cordon placed at Beach Station Platform 1. SPF TransCom and SDC Security conducting 5W screening.",
       "completionRemarks": "",
-      "slaveIncidents": []
-    }
-  ],
-  "faults": [
-    {
-      "id": "SEN/FR/20260605/001",
-      "caseId": "2026/06/0001",
-      "faultType": "Security",
-      "faultSubType": "Abandoned Property",
-      "location": {
-        "road": "Siloso Beach Walk",
-        "building": "Emerald Pavilion",
-        "levelSpace": "Ground Area near Lifeguard Post 2",
-        "nearAt": "At the seating bench",
-        "commonName": "Siloso Lifeguard Post 2",
-        "postalCode": "098997",
-        "tags": [
-          "Siloso Zone",
-          "Beachfront"
-        ],
-        "lat": 1.2562,
-        "lng": 103.8124
-      },
-      "description": "Suspicious black backpack left unattended under a seating bench near Emerald Pavilion. Ranger John deployed. Cordon set up.",
+      "slaveIncidents": [],
       "attachments": [],
-      "status": "Closed",
-      "cmmsTicketId": "CMMS-90812",
-      "createdBy": "system",
-      "createdAt": "2026-06-05T08:15:00+07:00",
-      "submittedAt": "2026-06-05T08:15:00+07:00"
-    },
-    {
-      "id": "SEN/FR/20260605/002",
-      "caseId": "2026-06-05T08:00:00+07:00_TASK_1",
-      "faultType": "Facilities",
-      "faultSubType": "Others",
-      "location": {
-        "road": "",
-        "building": "",
-        "levelSpace": "",
-        "nearAt": "",
-        "commonName": "",
-        "postalCode": "000000",
-        "tags": [],
-        "lat": 1.25,
-        "lng": 103.83
-      },
-      "description": "Setup crowd control barrier at Beach Station",
-      "attachments": [],
-      "status": "Closed",
-      "cmmsTicketId": "CMMS-77976",
-      "createdBy": "system",
-      "createdAt": "2026-06-05T08:00:00+07:00",
-      "submittedAt": "2026-06-05T08:00:00+07:00"
-    },
-    {
-      "id": "SEN/FR/20260612/9001",
-      "caseId": "CASE-DEMO-STANDARD",
-      "faultType": "Facilities",
-      "faultSubType": "Water Leak",
-      "location": {
-        "road": "Siloso Beach Walk",
-        "building": "Beach Station",
-        "levelSpace": "Level 1 Escalator Area",
-        "postalCode": "098997",
-        "tags": [
-          "Beachfront"
-        ],
-        "lat": 1.25,
-        "lng": 103.83
-      },
-      "description": "Water leakage from Level 2 air-conditioning duct at Beach Station.",
-      "attachments": [],
-      "status": "Closed",
-      "cmmsTicketId": "CMMS-DEMO-9001",
-      "createdBy": "system",
-      "createdAt": "2026-06-12T08:00:00+07:00",
-      "submittedAt": "2026-06-12T08:00:00+07:00"
-    },
-    {
-      "id": "SEN/FR/20260614/004",
-      "caseId": "SEN/CI/20260614/002",
-      "faultType": "Security",
-      "faultSubType": "Public Nuisance",
-      "location": {
-        "road": "Siloso Beach Walk",
-        "building": "Costa Sands Resort",
-        "levelSpace": "Ground Floor - Hotel Lobby",
-        "nearAt": "1",
-        "commonName": "Hotel Lobby",
-        "postalCode": "000000",
-        "tags": [
-          "Resort",
-          "Public"
-        ],
-        "lat": 1.2505,
-        "lng": 103.815
-      },
-      "description": "Test 2",
-      "attachments": [],
-      "status": "Closed",
-      "cmmsTicketId": "CMMS-20260614-40179",
-      "createdBy": "DM Gan",
-      "createdAt": "2026-06-14T13:28:47.650Z",
-      "submittedAt": "2026-06-14T14:15:48.452Z"
+      "responders": [],
+      "assignedTo": []
     }
   ],
   "tasks": [
     {
-      "id": "TASK-001",
-      "caseId": "2026/06/0001",
-      "title": "Setup crowd control barrier at Beach Station",
-      "description": "Ranger is requested to setup temporary crowd barriers near Beach Station bus terminal to prepare for afternoon weekend surge.",
-      "assignee": "Ranger Alex",
-      "priority": "Medium",
-      "dueDate": "2026-06-05T12:00:00",
-      "status": "Pending",
-      "createdBy": "controller_steve",
-      "createdDate": "2026-06-05T08:00:00+07:00",
-      "attachments": []
-    },
-    {
-      "id": "TASK-002",
-      "caseId": "SEN/CI/20260611/004",
-      "title": "2",
-      "description": "1",
-      "assignee": "Ranger Sarah",
-      "priority": "High",
-      "dueDate": "",
-      "status": "In Progress",
-      "createdBy": "Controller Steve",
-      "createdDate": "2026-06-10T17:26:04.245Z",
-      "attachments": []
-    },
-    {
-      "id": "TASK-003",
-      "caseId": "SEN/CI/20260611/005",
-      "title": "1",
-      "description": "1",
-      "assignee": "Ranger Sarah",
-      "priority": "Medium",
-      "dueDate": "2026-06-18T10:54",
-      "status": "Created",
-      "createdBy": "Controller Steve",
-      "createdDate": "2026-06-11T15:54:08.889Z",
-      "attachments": []
-    },
-    {
-      "id": "TASK-DEMO-9004",
-      "caseId": "CASE-DEMO-ONGOING",
-      "title": "Notify Retail Operations team",
-      "description": "Call operations lead to verify backups for cold-storage facilities at affected kiosks.",
-      "assignee": "Ranger Sarah",
-      "priority": "High",
-      "dueDate": "2026-06-12T12:00:00+07:00",
-      "status": "In Progress",
-      "createdBy": "Controller Steve",
-      "createdDate": "2026-06-12T10:05:00+07:00",
-      "attachments": []
-    },
-    {
-      "id": "TASK-004",
-      "caseId": "SEN/CI/20260614/002",
-      "title": "Hii",
-      "description": "",
+      "id": "SEN/TA/20260828/001",
+      "caseId": "SEN/CI/20260828/001",
+      "title": "Set up safety cordon and direct ambulance access",
+      "description": "Ensure emergency vehicle lane from Siloso Carpark to Tower 2 remains free of pedestrian traffic.",
       "assignee": "Ranger John",
-      "priority": "Normal",
-      "dueDate": "2026-06-14T21:16",
-      "status": "Closed",
+      "assigneeType": "user",
+      "assignees": [
+        {
+          "type": "user",
+          "id": "user_ranger_john",
+          "name": "Ranger John"
+        }
+      ],
+      "priority": "High",
+      "dueDate": "2026-08-28T12:00:00+07:00",
+      "status": "In Progress",
+      "checklist": [
+        {
+          "id": "1",
+          "text": "Place traffic cones at Beach Walk junction",
+          "isCompleted": true
+        },
+        {
+          "id": "2",
+          "text": "Guide SCDF ambulance to Tower 2",
+          "isCompleted": true
+        },
+        {
+          "id": "3",
+          "text": "Clear cordon after ambulance departs",
+          "isCompleted": false
+        }
+      ],
+      "comments": [
+        {
+          "id": "c1",
+          "user": "Ranger John",
+          "timestamp": "2026-08-28T09:30:00+07:00",
+          "text": "Ambulance on-site, guiding paramedics now."
+        }
+      ],
+      "attachments": [],
       "createdBy": "Controller Steve",
-      "createdDate": "2026-06-14T14:16:16.034Z",
-      "attachments": []
+      "createdDate": "2026-08-28T09:20:00+07:00",
+      "acknowledgedAt": "2026-08-28T09:22:00+07:00",
+      "startedAt": "2026-08-28T09:25:00+07:00"
+    },
+    {
+      "id": "SEN/TA/20260828/002",
+      "caseId": "SEN/CI/20260828/002",
+      "title": "Horticulture chainsaw clearance & wood disposal",
+      "description": "Cut fallen branch into portable logs and haul away to composting facility.",
+      "assignee": "Ranger Alex",
+      "assigneeType": "user",
+      "assignees": [
+        {
+          "type": "user",
+          "id": "user_ranger_alex",
+          "name": "Ranger Alex"
+        }
+      ],
+      "priority": "Normal",
+      "dueDate": "2026-08-28T11:00:00+07:00",
+      "status": "In Progress",
+      "checklist": [
+        {
+          "id": "1",
+          "text": "Post temporary detour signs at trail entrance",
+          "isCompleted": true
+        },
+        {
+          "id": "2",
+          "text": "Complete chainsaw cutting",
+          "isCompleted": false
+        },
+        {
+          "id": "3",
+          "text": "Sweep sawdust and reopen path",
+          "isCompleted": false
+        }
+      ],
+      "comments": [],
+      "attachments": [],
+      "createdBy": "Controller Steve",
+      "createdDate": "2026-08-28T08:35:00+07:00",
+      "acknowledgedAt": "2026-08-28T08:37:00+07:00",
+      "startedAt": "2026-08-28T08:45:00+07:00"
+    },
+    {
+      "id": "SEN/TA/20260828/003",
+      "caseId": "SEN/CI/20260828/003",
+      "title": "Review CCTV footage from 10:00 to 10:45",
+      "description": "Identify person who placed the black backpack at Platform 1.",
+      "assignee": "CCTV Team",
+      "assigneeType": "group",
+      "assignees": [
+        {
+          "type": "group",
+          "id": "grp_cctv",
+          "name": "CCTV Team"
+        }
+      ],
+      "priority": "Critical",
+      "dueDate": "2026-08-28T11:30:00+07:00",
+      "status": "Assigned",
+      "checklist": [
+        {
+          "id": "1",
+          "text": "Retrieve video clip CAM-BST-01",
+          "isCompleted": false
+        },
+        {
+          "id": "2",
+          "text": "Extract high-resolution still of suspect/owner",
+          "isCompleted": false
+        }
+      ],
+      "comments": [],
+      "attachments": [],
+      "createdBy": "Controller Steve",
+      "createdDate": "2026-08-28T10:48:00+07:00"
+    },
+    {
+      "id": "SEN/TA/20260828/004",
+      "caseId": "SEN/CI/20260828/004",
+      "title": "Plumber pipe repair at Palawan Restrooms",
+      "description": "Isolate valve B4 and replace cracked copper joint.",
+      "assignee": "Facilities Team",
+      "assigneeType": "group",
+      "assignees": [
+        {
+          "type": "group",
+          "id": "grp_fac",
+          "name": "Facilities Team"
+        }
+      ],
+      "priority": "Normal",
+      "dueDate": "2026-08-28T14:00:00+07:00",
+      "status": "Created",
+      "checklist": [],
+      "comments": [],
+      "attachments": [],
+      "createdBy": "Cleaner Supervisor",
+      "createdDate": "2026-08-28T07:25:00+07:00"
     }
   ],
   "occurrences": [
     {
-      "id": "OCC-2026-0001",
-      "caseId": "SEN/CI/20260605/005",
-      "user": "controller_steve",
-      "dateTime": "2026-06-05T08:30:00+07:00",
-      "topic": "VIP Visit Advisory",
-      "content": "Received notification that diplomatic envoys will visit Palawan Beach Bridge from 14:00 to 15:30. Liaison patrol advised. No active incident required."
-    },
-    {
-      "id": "OCC-2026-0002",
-      "caseId": "SEN/CI/20260605/006",
-      "user": "controller_steve",
-      "dateTime": "2026-06-05T09:00:00+07:00",
-      "topic": "Routine Siren Testing",
-      "content": "Completed weekly IIOC warning siren system self-test. All sirens responsive and returned positive self-diagnostic logs."
-    },
-    {
-      "id": "OCC-DEMO-9001",
-      "caseId": "CASE-DEMO-STANDARD",
-      "user": "Ranger John",
-      "dateTime": "2026-06-12T08:50:00+07:00",
-      "topic": "Escalator leak resolved",
-      "content": "Assisted cleaning crew and isolated AC duct leak at Beach Station L1 escalator. Cleaned up water."
-    },
-    {
-      "id": "OCC-DEMO-9002",
-      "caseId": "CASE-DEMO-PROACTIVE",
-      "user": "Ranger Dave",
-      "dateTime": "2026-06-12T09:20:00+07:00",
-      "topic": "Patrol: Unattended Bag Released",
-      "content": "Released unattended backpack containing snorkeling gear to verified owner during Palawan Beach patrol."
-    },
-    {
-      "id": "OCC-DEMO-9003",
-      "caseId": "CASE-DEMO-BACKDATED",
+      "id": "SEN/ED/20260828/001",
+      "caseId": "SEN/CI/20260828/005",
       "user": "Controller Steve",
-      "dateTime": "2026-06-12T08:30:00+07:00",
-      "topic": "Backdated Python Capture Logged",
-      "content": "Pest control relocated a python yesterday afternoon at Imbiah footpath. Logged historical entry in system."
+      "dateTime": "2026-08-28T07:00:00+07:00",
+      "topic": "Morning Shift Briefing & VIP Movement Coordination",
+      "content": "Duty Controller Steve took over morning shift. Weather forecast: Fair in morning, 40% chance of showers at 16:00. VIP convoy scheduled at Capella at 08:00.",
+      "attachments": []
     },
     {
-      "id": "OCC-DEMO-9005",
-      "caseId": "CASE-DEMO-OPERATIONAL",
-      "user": "Safety Coordinator",
-      "dateTime": "2026-06-12T14:20:00+07:00",
-      "topic": "SDC HQ Evacuation Drill Completed",
-      "content": "SDC headquarters building successfully completed annual evacuation drill. All fire wardens cleared floors in 5m 12s."
+      "id": "SEN/ED/20260828/002",
+      "caseId": "SEN/CI/20260828/001",
+      "user": "Controller Steve",
+      "dateTime": "2026-08-28T09:15:00+07:00",
+      "topic": "Heat advisory warning broadcasted to beach kiosks",
+      "content": "Temperature reached 34.5°C at Siloso. All hydration points refilled, lifeguards on high alert for heat symptoms.",
+      "attachments": []
     },
     {
-      "id": "OCC-DEMO-9006",
-      "caseId": "CASE-DEMO-RETURNED",
-      "user": "DM Gan",
-      "dateTime": "2026-06-12T11:55:00+07:00",
-      "topic": "Report Returned: Missing Child",
-      "content": "Returned Ranger report for Mrs Tan's missing child case due to missing BWC backup video bookmarks."
+      "id": "SEN/ED/20260828/003",
+      "caseId": "SEN/CI/20260828/003",
+      "user": "Duty Manager Gan",
+      "dateTime": "2026-08-28T10:50:00+07:00",
+      "topic": "Beach Station Monorail Cordon Update",
+      "content": "Platform 1 temporary boarding bypass active. Trains running on 5-minute headway with minimal delay to passengers.",
+      "attachments": []
     }
   ],
-  "events": [],
-  "nops": [],
+  "events": [
+    {
+      "id": "EVT-2026-0001",
+      "name": "Sentosa Sunset Music Festival 2026",
+      "startDateTime": "2026-08-28T15:00:00+07:00",
+      "endDateTime": "2026-08-28T23:00:00+07:00",
+      "type": "Concert / Festival",
+      "description": "Live outdoor music festival on Siloso Beach. Projected attendance: 4,500 guests.",
+      "location": {
+        "road": "Siloso Beach Walk",
+        "building": "Siloso Beach Arena",
+        "levelSpace": "Zone A & B",
+        "nearAt": "Rumours Beach Club",
+        "commonName": "Siloso Beach Arena",
+        "postalCode": "098997",
+        "tags": [
+          "Festival",
+          "Music",
+          "Major"
+        ],
+        "lat": 1.2545,
+        "lng": 103.8145
+      },
+      "boundaryCoordinates": [
+        {
+          "lat": 1.2555,
+          "lng": 103.8135
+        },
+        {
+          "lat": 1.256,
+          "lng": 103.816
+        },
+        {
+          "lat": 1.2535,
+          "lng": 103.8165
+        },
+        {
+          "lat": 1.253,
+          "lng": 103.814
+        }
+      ],
+      "createdBy": "Events Lead",
+      "createdAt": "2026-08-28T08:00:00+07:00"
+    },
+    {
+      "id": "EVT-2026-0002",
+      "name": "Palawan Kids Water Splash Challenge",
+      "startDateTime": "2026-08-28T10:00:00+07:00",
+      "endDateTime": "2026-08-28T17:00:00+07:00",
+      "type": "Family & Community",
+      "description": "Family inflatable obstacle course at Palawan Green.",
+      "location": {
+        "road": "Palawan Beach Walk",
+        "building": "Palawan Green",
+        "levelSpace": "Lawn Area",
+        "nearAt": "Beach Station",
+        "commonName": "Palawan Green",
+        "postalCode": "098997",
+        "tags": [
+          "Kids",
+          "Community"
+        ],
+        "lat": 1.2505,
+        "lng": 103.8205
+      },
+      "boundaryCoordinates": [
+        {
+          "lat": 1.2515,
+          "lng": 103.8195
+        },
+        {
+          "lat": 1.252,
+          "lng": 103.8215
+        },
+        {
+          "lat": 1.2495,
+          "lng": 103.8215
+        },
+        {
+          "lat": 1.2495,
+          "lng": 103.8195
+        }
+      ],
+      "createdBy": "Events Lead",
+      "createdAt": "2026-08-28T08:00:00+07:00"
+    }
+  ],
+  "nops": [
+    {
+      "id": "NOP-2026-0001",
+      "applicantName": "Keppel Infrastructure Pte Ltd",
+      "companyName": "Keppel F&S Ltd",
+      "workDescription": "Underground optical fiber and power grid replacement along Sentosa Gateway.",
+      "startDateTime": "2026-08-28T08:00:00+07:00",
+      "endDateTime": "2026-08-28T18:00:00+07:00",
+      "status": "Active",
+      "boundaryCoordinates": [
+        {
+          "lat": 1.258,
+          "lng": 103.824
+        },
+        {
+          "lat": 1.259,
+          "lng": 103.826
+        },
+        {
+          "lat": 1.257,
+          "lng": 103.827
+        }
+      ],
+      "documents": [
+        {
+          "name": "Safety_Permit_KP2026.pdf",
+          "type": "PDF",
+          "fileUrl": "#"
+        }
+      ]
+    },
+    {
+      "id": "NOP-2026-0002",
+      "applicantName": "HortPark Landscaping Ltd",
+      "companyName": "GreenSentosa Services",
+      "workDescription": "Tree pruning and slope stabilization along Imbiah Road.",
+      "startDateTime": "2026-08-28T07:00:00+07:00",
+      "endDateTime": "2026-08-28T15:00:00+07:00",
+      "status": "Active",
+      "boundaryCoordinates": [
+        {
+          "lat": 1.254,
+          "lng": 103.817
+        },
+        {
+          "lat": 1.256,
+          "lng": 103.819
+        },
+        {
+          "lat": 1.253,
+          "lng": 103.8185
+        }
+      ],
+      "documents": [
+        {
+          "name": "Horticulture_WorkOrder_88.pdf",
+          "type": "PDF",
+          "fileUrl": "#"
+        }
+      ]
+    }
+  ],
+  "faults": [
+    {
+      "id": "SEN/FR/20260828/001",
+      "caseId": "SEN/CI/20260828/004",
+      "faultType": "Facilities",
+      "faultSubType": "Plumbing / Water",
+      "location": {
+        "road": "Palawan Beach Walk",
+        "building": "Palawan Restrooms Block B",
+        "levelSpace": "Male Toilet",
+        "nearAt": "Cubicle 2",
+        "commonName": "Palawan Restrooms",
+        "postalCode": "098997",
+        "tags": [
+          "Facilities",
+          "Plumbing"
+        ],
+        "lat": 1.2505,
+        "lng": 103.8205
+      },
+      "description": "Severe water leak from flush valve causing puddle near entrance.",
+      "attachments": [],
+      "status": "In Progress",
+      "cmmsTicketId": "CMMS-20260828-1042",
+      "createdBy": "Cleaner Supervisor",
+      "createdAt": "2026-08-28T07:20:00+07:00",
+      "submittedAt": "2026-08-28T07:22:00+07:00"
+    },
+    {
+      "id": "SEN/FR/20260828/002",
+      "caseId": "SEN/CI/20260828/001",
+      "faultType": "Electrical",
+      "faultSubType": "Floodlight",
+      "location": {
+        "road": "Siloso Beach Walk",
+        "building": "Lifeguard Tower 2",
+        "levelSpace": "Rooftop Pole",
+        "nearAt": "Beach",
+        "commonName": "Siloso Tower 2",
+        "postalCode": "098997",
+        "tags": [
+          "Electrical"
+        ],
+        "lat": 1.2562,
+        "lng": 103.8124
+      },
+      "description": "Tower 2 floodlight flickering intermittently.",
+      "attachments": [],
+      "status": "Pending Submission",
+      "cmmsTicketId": "CMMS-20260828-1099",
+      "createdBy": "Controller Steve",
+      "createdAt": "2026-08-28T09:30:00+07:00"
+    }
+  ],
   "broadcasts": [
     {
-      "id": "BC-DEMO-9004",
-      "caseId": "CASE-DEMO-ONGOING",
-      "templateName": "Retail Outage Notice",
-      "channel": "SMS / Email",
-      "recipientGroup": "Siloso Beach Retailers",
-      "subject": "Siloso Beach Walk Outage Warning",
-      "message": "Dear tenants, a sectional power outage is currently under investigation in Siloso Beach Walk. Power restoration is expected within 2 hours. Thank you.",
+      "id": "SEN/BC/20260828/001",
+      "caseId": "SEN/CI/20260828/001",
+      "incidentId": "SEN/IR/20260828/0001",
+      "type": "Weather Advisory",
+      "recipients": [
+        "operations@sentosa.gov.sg",
+        "beach_rangers@sentosa.gov.sg"
+      ],
+      "templateUsed": "High Heat & UV Index Alert",
+      "contentDispatched": "High Temperature Advisory: Heat index exceeds 34°C. First aid posts fully equipped. Stay hydrated.",
+      "sentAt": "2026-08-28T10:00:00+07:00",
+      "sentBy": "Duty Manager Gan",
       "status": "SENT",
-      "sentBy": "Controller Steve",
-      "sentAt": "2026-06-12T10:30:00+07:00"
+      "deliveryAttempts": 1,
+      "deliveryCounts": {
+        "sent": 2,
+        "delivered": 2,
+        "failed": 0,
+        "pending": 0
+      }
     }
   ],
   "auditLogs": [
     {
-      "id": "AUD-seed-1",
-      "timestamp": "2026-06-13T10:15:00.000Z",
-      "user": "Admin Root",
-      "module": "User Management",
-      "action": "Create User",
-      "details": "Provisioned WOG SSO account for DO Shin Feng (shin.feng@sdc.gov.sg)",
-      "beforeSnapshot": "",
-      "afterSnapshot": "{\"name\":\"DO Shin Feng\",\"email\":\"shin.feng@sdc.gov.sg\",\"role\":\"Duty Officer\",\"status\":\"Active\",\"authSource\":\"WOG SSO\"}",
-      "correlationId": "CORR-seed-1",
-      "ipAddress": "192.168.1.10"
-    },
-    {
-      "id": "AUD-seed-2",
-      "timestamp": "2026-06-13T11:20:00.000Z",
-      "user": "Admin Root",
-      "module": "Taxonomy",
-      "action": "Create Taxonomy",
-      "details": "Added new Incident Type taxonomy item: Transport (subtypes: Cable Car Stoppage, Tram Incident, Road Obstruction)",
-      "beforeSnapshot": "",
-      "afterSnapshot": "{\"name\":\"Transport\",\"subTypes\":[\"Cable Car Stoppage\",\"Tram Incident\",\"Road Obstruction\"],\"category\":\"Incident\"}",
-      "correlationId": "CORR-seed-2",
-      "ipAddress": "192.168.1.10"
-    },
-    {
-      "id": "AUD-seed-3",
-      "timestamp": "2026-06-13T12:05:00.000Z",
-      "user": "Admin Root",
-      "module": "Routing Matrix",
-      "action": "Disable Routing Rule",
-      "details": "Disabled Fault Routing rule targeting Civil Works Express Crew for Structural defects",
-      "beforeSnapshot": "{\"condition\":\"Fault Type = \\\"Structural\\\" AND Severity = \\\"High\\\"\",\"destinationTeam\":\"Civil Works Express Crew\",\"status\":\"Active\"}",
-      "afterSnapshot": "{\"condition\":\"Fault Type = \\\"Structural\\\" AND Severity = \\\"High\\\"\",\"destinationTeam\":\"Civil Works Express Crew\",\"status\":\"Disabled\"}",
-      "correlationId": "CORR-seed-3",
-      "ipAddress": "192.168.1.10"
-    },
-    {
-      "id": "AUD-seed-4",
-      "timestamp": "2026-06-13T14:40:00.000Z",
-      "user": "Admin Root",
-      "module": "System Settings",
-      "action": "Update System Settings",
-      "details": "Modified operational timeout constants: Auto Save Interval set to 30s, Record Lock Timeout set to 15m",
-      "beforeSnapshot": "{\"autoSaveInterval\":\"60s\",\"recordLockTimeout\":\"10m\"}",
-      "afterSnapshot": "{\"autoSaveInterval\":\"30s\",\"recordLockTimeout\":\"15m\"}",
-      "correlationId": "CORR-seed-4",
-      "ipAddress": "192.168.1.10"
-    },
-    {
-      "id": "AUD-seed-5",
-      "timestamp": "2026-06-13T15:10:00.000Z",
-      "user": "Admin Root",
-      "module": "Broadcast Configuration",
-      "action": "Update Template",
-      "details": "Modified subject header string for Standard Incident Notification template",
-      "beforeSnapshot": "{\"name\":\"Standard Incident Notification\",\"subject\":\"[ALERT] Incident Reported\",\"body\":\"...\"}",
-      "afterSnapshot": "{\"name\":\"Standard Incident Notification\",\"subject\":\"[ALERT] SDC Operational Alert: {incident_title}\",\"body\":\"...\"}",
-      "correlationId": "CORR-seed-5",
-      "ipAddress": "192.168.1.10"
-    },
-    {
-      "id": "AUD-1781369691860-517",
-      "timestamp": "2026-06-13T16:54:51.860Z",
-      "user": "Admin Root",
-      "action": "Deactivate User",
-      "module": "User Management",
-      "details": "Deactivated account: gan.sh@sdc.gov.sg",
-      "beforeSnapshot": "{\"id\":\"2\",\"name\":\"DM Gan\",\"email\":\"gan.sh@sdc.gov.sg\",\"department\":\"IIOC Management\",\"orgUnit\":\"IOH Duty Managers\",\"authSource\":\"WOG SSO\",\"role\":\"Duty Manager\",\"status\":\"Active\",\"lastLogin\":\"2026-06-13T23:05:00Z\"}",
-      "afterSnapshot": "{\"id\":\"2\",\"name\":\"DM Gan\",\"email\":\"gan.sh@sdc.gov.sg\",\"department\":\"IIOC Management\",\"orgUnit\":\"IOH Duty Managers\",\"authSource\":\"WOG SSO\",\"role\":\"Duty Manager\",\"status\":\"Deactivated\",\"lastLogin\":\"2026-06-13T23:05:00Z\"}",
-      "correlationId": "USR-1781369691810",
-      "ipAddress": "127.0.0.1"
-    },
-    {
-      "id": "AUD-1781369692992-2",
-      "timestamp": "2026-06-13T16:54:52.992Z",
-      "user": "Admin Root",
-      "action": "Reactivate User",
-      "module": "User Management",
-      "details": "Reactivated account: gan.sh@sdc.gov.sg",
-      "beforeSnapshot": "{\"id\":\"2\",\"name\":\"DM Gan\",\"email\":\"gan.sh@sdc.gov.sg\",\"department\":\"IIOC Management\",\"orgUnit\":\"IOH Duty Managers\",\"authSource\":\"WOG SSO\",\"role\":\"Duty Manager\",\"status\":\"Deactivated\",\"lastLogin\":\"2026-06-13T23:05:00Z\"}",
-      "afterSnapshot": "{\"id\":\"2\",\"name\":\"DM Gan\",\"email\":\"gan.sh@sdc.gov.sg\",\"department\":\"IIOC Management\",\"orgUnit\":\"IOH Duty Managers\",\"authSource\":\"WOG SSO\",\"role\":\"Duty Manager\",\"status\":\"Active\",\"lastLogin\":\"2026-06-13T23:05:00Z\"}",
-      "correlationId": "USR-1781369692985",
-      "ipAddress": "127.0.0.1"
-    },
-    {
-      "id": "AUD-1781369696632-980",
-      "timestamp": "2026-06-13T16:54:56.632Z",
-      "user": "Admin Root",
-      "action": "Edit User",
-      "module": "User Management",
-      "details": "Modified user account: gan.sh@sdc.gov.sg",
-      "beforeSnapshot": "{\"id\":\"2\",\"name\":\"DM Gan\",\"email\":\"gan.sh@sdc.gov.sg\",\"department\":\"IIOC Management\",\"orgUnit\":\"IOH Duty Managers\",\"authSource\":\"WOG SSO\",\"role\":\"Duty Manager\",\"status\":\"Active\",\"lastLogin\":\"2026-06-13T23:05:00Z\"}",
-      "afterSnapshot": "{\"id\":\"2\",\"name\":\"DM Ganxa\",\"email\":\"gan.sh@sdc.gov.sg\",\"department\":\"IIOC Management\",\"orgUnit\":\"IOH Duty Managers\",\"authSource\":\"WOG SSO\",\"role\":\"Duty Manager\",\"status\":\"Active\",\"lastLogin\":\"2026-06-13T23:05:00Z\"}",
-      "correlationId": "USR-1781369696622",
-      "ipAddress": "127.0.0.1"
-    },
-    {
-      "id": "AUD-1781369812698-674",
-      "timestamp": "2026-06-13T16:56:52.698Z",
-      "user": "Admin Root",
-      "action": "Update Taxonomy",
-      "module": "Taxonomy",
-      "details": "Updated Incident taxonomy: Security",
-      "beforeSnapshot": "{\"id\":\"inc-1\",\"category\":\"Incident\",\"name\":\"Security\",\"subTypes\":[\"Trespassing\",\"Theft\",\"Vandalism\",\"Public Nuisance\"],\"status\":\"Active\"}",
-      "afterSnapshot": "{\"id\":\"inc-1\",\"category\":\"Incident\",\"name\":\"Security\",\"subTypes\":[\"Trespassing\",\"Theft\",\"Vandalism\",\"Public Nuisance\"],\"status\":\"Active\",\"description\":\"\"}",
-      "correlationId": "REF-1781369812689",
-      "ipAddress": "127.0.0.1"
-    },
-    {
-      "id": "AUD-1781432420775-869",
-      "timestamp": "2026-06-14T10:20:20.775Z",
-      "user": "Admin Root",
-      "action": "Create User",
-      "module": "User Management",
-      "details": "Created user account: alex.tan@ranger.com.sg",
-      "beforeSnapshot": "null",
-      "afterSnapshot": "{\"id\":\"1781432420704\",\"name\":\"Ranger Alex\",\"email\":\"alex.tan@ranger.com.sg\",\"department\":\"ODC\",\"orgUnit\":\"1\",\"authSource\":\"Non-SSO\",\"role\":\"Responder\",\"status\":\"Active\",\"lastLogin\":\"Never\"}",
-      "correlationId": "USR-1781432420704",
-      "ipAddress": "127.0.0.1"
+      "id": "AUD-20260828-001",
+      "timestamp": "2026-08-28T09:15:00+07:00",
+      "user": "Controller Steve",
+      "action": "INCIDENT_CREATED",
+      "module": "Incidents",
+      "details": "Created Incident SEN/IR/20260828/0001 for Case SEN/CI/20260828/001",
+      "correlationId": "CORR-0828-9901"
     }
-  ]
+  ],
+  "recurrenceSeries": []
 }

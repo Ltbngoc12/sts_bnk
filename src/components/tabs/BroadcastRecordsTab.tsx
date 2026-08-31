@@ -17,6 +17,7 @@ import {
   fmtRelative, fmtDateTime, deliverySummary, typeAccentColor,
 } from '@/components/broadcasts/broadcastUi';
 import { BroadcastDrawer } from '@/components/broadcasts/BroadcastDrawer';
+import { NewBroadcastModal } from '@/components/broadcasts/NewBroadcastModal';
 
 const LEVELS_UI = ['Level 1', 'Level 2', 'Level 3', 'Level 4', 'Level 5'];
 const TYPES_UI = ['End-of-Day', 'Closure', 'Manual', 'Weather Advisory'];
@@ -45,16 +46,13 @@ export function BroadcastRecordsTab() {
   const [endDate, setEndDate] = useState('');
   const [levels, setLevels] = useState<string[]>([]);
   const [showLevelDropdown, setShowLevelDropdown] = useState(false);
-  const [types, setTypes] = useState<string[]>(['Closure']);
+  const [types, setTypes] = useState<string[]>([]);
   const [showTypeDropdown, setShowTypeDropdown] = useState(false);
 
   const levelDropdownRef = useRef<HTMLDivElement>(null);
   const typeDropdownRef = useRef<HTMLDivElement>(null);
 
   const [showNew, setShowNew] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [newError, setNewError] = useState<string | null>(null);
-  const [newForm, setNewForm] = useState({ type: 'Manual', caseId: '', incidentId: '', recipients: '', content: '', location: '' });
 
   const drawerId = searchParams.get('id');
   const setDrawerId = (id: string | null) => {
@@ -126,9 +124,9 @@ export function BroadcastRecordsTab() {
   useEffect(() => { if (canView) load(); }, [canView, load]);
 
   const clearFilters = () => {
-    setStartDate(''); setEndDate(''); setLevels([]); setTypes(['Closure']); setPage(1);
+    setStartDate(''); setEndDate(''); setLevels([]); setTypes([]); setPage(1);
   };
-  const hasActiveFilters = !!(startDate || endDate || levels.length || types.length !== 1 || types[0] !== 'Closure');
+  const hasActiveFilters = !!(startDate || endDate || levels.length || types.length > 0);
 
   const exportCsv = () => {
     const header = ['Broadcast ID', 'Type', 'Level', 'Case ID', 'Incident ID', 'Incident', 'Status', 'Recipient Count', 'Group', 'Channel', 'Template', 'Content Edited', 'Sent By', 'Created At', 'Sent At'];
@@ -145,34 +143,7 @@ export function BroadcastRecordsTab() {
     URL.revokeObjectURL(url);
   };
 
-  const createManual = async () => {
-    setBusy(true);
-    setNewError(null);
-    try {
-      const res = await fetch('/api/broadcasts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          caseId: newForm.caseId.trim() || undefined,
-          incidentId: newForm.incidentId.trim() || undefined,
-          type: newForm.type,
-          recipients: newForm.recipients.split(',').map((s) => s.trim()).filter(Boolean),
-          content: newForm.content,
-          location: newForm.location,
-          summary: newForm.content,
-          user: username,
-        }),
-      });
-      const created = await res.json();
-      if (!res.ok) { setNewError(created.error || 'Creation failed.'); return; }
-      setShowNew(false);
-      setNewForm({ type: 'Manual', caseId: '', incidentId: '', recipients: '', content: '', location: '' });
-      await load();
-      setDrawerId(created.id);
-    } finally {
-      setBusy(false);
-    }
-  };
+
 
   if (!canView) {
     return (
@@ -441,57 +412,17 @@ export function BroadcastRecordsTab() {
         onChanged={load}
       />
 
-      {showNew && (
-        <div className="modal-overlay" onClick={() => { setShowNew(false); setNewError(null); }}>
-          <div className="modal-box" style={{ maxWidth: 560 }} onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ fontFamily: 'var(--font-headline)', fontSize: 17, fontWeight: 700, color: 'var(--text-main)', marginBottom: 4 }}>New Broadcast</h2>
-            <p className="sub-desc" style={{ marginBottom: 18 }}>
-              Manually create a broadcast for a confirmed operational need (FSD §10.1d). Created as PENDING for review &amp; dispatch.
-            </p>
-            {newError && (
-              <div style={{ background: 'var(--color-critical-bg)', border: '1px solid var(--color-critical-border)', color: '#991B1B', borderRadius: 'var(--radius-md)', padding: '10px 12px', fontSize: 12.5, marginBottom: 14 }}>
-                {newError}
-              </div>
-            )}
-            <div className="form-group">
-              <label>Type</label>
-              <select value={newForm.type} onChange={(e) => setNewForm({ ...newForm, type: e.target.value })} className="form-control select-dark">
-                <option>Manual</option>
-                <option>Weather Advisory</option>
-              </select>
-            </div>
-            {newForm.type === 'Weather Advisory' ? (
-              <div className="form-group">
-                <label>Affected area</label>
-                <input value={newForm.location} onChange={(e) => setNewForm({ ...newForm, location: e.target.value })} className="form-control" placeholder="e.g. Whole of Sentosa Island" />
-              </div>
-            ) : (
-              <>
-                <div className="form-group">
-                  <label>Case ID (optional)</label>
-                  <input value={newForm.caseId} onChange={(e) => setNewForm({ ...newForm, caseId: e.target.value })} className="form-control" placeholder="SEN/CI/20260722/001" />
-                </div>
-                <div className="form-group">
-                  <label>Incident ID (optional)</label>
-                  <input value={newForm.incidentId} onChange={(e) => setNewForm({ ...newForm, incidentId: e.target.value })} className="form-control" />
-                </div>
-              </>
-            )}
-            <div className="form-group">
-              <label>Recipients (comma-separated emails — leave blank to auto-fill from the Broadcast Matrix for Weather Advisory)</label>
-              <textarea value={newForm.recipients} onChange={(e) => setNewForm({ ...newForm, recipients: e.target.value })} rows={2} className="form-control" />
-            </div>
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label>{newForm.type === 'Weather Advisory' ? 'Advisory content' : 'Content'}</label>
-              <textarea value={newForm.content} onChange={(e) => setNewForm({ ...newForm, content: e.target.value })} rows={6} className="form-control" style={{ fontFamily: 'var(--font-mono)' }} />
-            </div>
-            <div className="modal-actions">
-              <button type="button" onClick={() => { setShowNew(false); setNewError(null); }} disabled={busy} className="btn btn-secondary">Cancel</button>
-              <button type="button" onClick={createManual} disabled={busy} className="btn btn-primary">{busy ? 'Creating…' : 'Create'}</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <NewBroadcastModal
+        isOpen={showNew}
+        onClose={() => setShowNew(false)}
+        onCreated={async (created) => {
+          await load();
+          if (created?.id) {
+            setDrawerId(created.id);
+          }
+        }}
+        username={username}
+      />
     </>
   );
 }

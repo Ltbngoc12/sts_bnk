@@ -27,35 +27,53 @@ import {
 
 async function mdb(): Promise<Db> {
   const client = await clientPromise;
-  return client.db('sentosa-cms');
+  return client.db(process.env.MONGODB_DB_NAME || undefined);
 }
+
+// In-memory cache fallback when MongoDB is down/unreachable
+const inMemoryCache: Record<string, any[]> = {};
+let inMemoryNotifications: NotificationRecord[] = [];
 
 // Read a collection; if empty, seed it with the provided defaults and return those.
 async function readOrSeed<T extends { id: string }>(name: string, defaults: T[]): Promise<T[]> {
-  const db = await mdb();
-  const col = db.collection(name);
-  const docs = await col.find({}, { projection: { _id: 0 } }).toArray();
-  if (docs.length === 0 && defaults.length > 0) {
-    await col.insertMany(defaults.map((d) => ({ ...d })) as any[]);
-    return defaults;
+  try {
+    const db = await mdb();
+    const col = db.collection(name);
+    const docs = await col.find({}, { projection: { _id: 0 } }).toArray();
+    if (docs.length === 0 && defaults.length > 0) {
+      await col.insertMany(defaults.map((d) => ({ ...d })) as any[]);
+      inMemoryCache[name] = defaults.map((d) => ({ ...d }));
+      return defaults;
+    }
+    inMemoryCache[name] = docs as unknown as T[];
+    return docs as unknown as T[];
+  } catch (err: any) {
+    if (!inMemoryCache[name]) {
+      inMemoryCache[name] = defaults.map((d) => ({ ...d }));
+    }
+    return inMemoryCache[name] as T[];
   }
-  return docs as unknown as T[];
 }
 
 // Replace the entire collection with `docs` (upsert-by-id, prune removed).
 async function replaceAll<T extends { id: string }>(name: string, docs: T[]): Promise<void> {
-  const db = await mdb();
-  const col = db.collection(name);
-  if (docs.length === 0) {
-    await col.deleteMany({});
-    return;
+  inMemoryCache[name] = docs.map((d) => ({ ...d }));
+  try {
+    const db = await mdb();
+    const col = db.collection(name);
+    if (docs.length === 0) {
+      await col.deleteMany({});
+      return;
+    }
+    await col.bulkWrite(
+      docs.map((doc) => ({
+        replaceOne: { filter: { id: doc.id }, replacement: { ...doc }, upsert: true },
+      })) as any[]
+    );
+    await col.deleteMany({ id: { $nin: docs.map((d) => d.id) } });
+  } catch (err: any) {
+    // Ignore MongoDB write errors in offline fallback mode
   }
-  await col.bulkWrite(
-    docs.map((doc) => ({
-      replaceOne: { filter: { id: doc.id }, replacement: { ...doc }, upsert: true },
-    })) as any[]
-  );
-  await col.deleteMany({ id: { $nin: docs.map((d) => d.id) } });
 }
 
 // ── Distribution Groups — Task module (FSD §10.3) ──────────────────────────────
@@ -139,16 +157,20 @@ export async function recordEodRun(eodDate: string): Promise<void> {
 
 // ── Notifications mailbox (server-side; FSD §10.5) ─────────────────────────────
 export async function getNotifications(): Promise<NotificationRecord[]> {
-  const db = await mdb();
-  const docs = await db
-    .collection('notifications')
-    .find({}, { projection: { _id: 0 } })
-    .toArray();
-  return docs as unknown as NotificationRecord[];
+  try {
+    const db = await mdb();
+    const docs = await db
+      .collection('notifications')
+      .find({}, { projection: { _id: 0 } })
+      .toArray();
+    inMemoryNotifications = docs as unknown as NotificationRecord[];
+    return docs as unknown as NotificationRecord[];
+  } catch (err: any) {
+    return inMemoryNotifications;
+  }
 }
 
 export async function addNotification(n: Omit<NotificationRecord, 'id' | 'timestamp' | 'read'> & { read?: boolean }): Promise<NotificationRecord> {
-  const db = await mdb();
   const rec: NotificationRecord = {
     id: `NTF-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
     timestamp: new Date().toISOString(),
@@ -160,31 +182,68 @@ export async function addNotification(n: Omit<NotificationRecord, 'id' | 'timest
     message: n.message,
     link: n.link,
   };
-  await db.collection('notifications').insertOne({ ...rec } as any);
+  inMemoryNotifications.unshift(rec);
+  try {
+    const db = await mdb();
+    await db.collection('notifications').insertOne({ ...rec } as any);
+  } catch (err: any) {
+    // Ignore offline error
+  }
   return rec;
 }
 
 export async function markNotificationRead(id: string, read = true): Promise<void> {
-  const db = await mdb();
-  await db.collection('notifications').updateOne({ id }, { $set: { read } });
+  const item = inMemoryNotifications.find((x) => x.id === id);
+  if (item) item.read = read;
+  try {
+    const db = await mdb();
+    await db.collection('notifications').updateOne({ id }, { $set: { read } });
+  } catch (err: any) {
+    // Ignore offline error
+  }
 }
 
 export async function markAllNotificationsRead(recipientRole?: string): Promise<void> {
-  const db = await mdb();
-  const filter = recipientRole ? { $or: [{ recipientRole }, { recipientRole: 'All' }] } : {};
-  await db.collection('notifications').updateMany(filter as any, { $set: { read: true } });
+  inMemoryNotifications.forEach((x) => {
+    if (!recipientRole || x.recipientRole === recipientRole || x.recipientRole === 'All') {
+      x.read = true;
+    }
+  });
+  try {
+    const db = await mdb();
+    const filter = recipientRole ? { $or: [{ recipientRole }, { recipientRole: 'All' }] } : {};
+    await db.collection('notifications').updateMany(filter as any, { $set: { read: true } });
+  } catch (err: any) {
+    // Ignore offline error
+  }
 }
 
 // Bulk-insert seed/records (used once to seed the mailbox on first read).
 export async function insertNotifications(records: NotificationRecord[]): Promise<void> {
   if (records.length === 0) return;
-  const db = await mdb();
-  await db.collection('notifications').insertMany(records.map((r) => ({ ...r })) as any[]);
+  inMemoryNotifications = [...records, ...inMemoryNotifications];
+  try {
+    const db = await mdb();
+    await db.collection('notifications').insertMany(records.map((r) => ({ ...r })) as any[]);
+  } catch (err: any) {
+    // Ignore offline error
+  }
 }
 
 // Clear notifications for a role (and 'All'); no role = clear everything.
 export async function clearNotifications(recipientRole?: string): Promise<void> {
-  const db = await mdb();
-  const filter = recipientRole ? { $or: [{ recipientRole }, { recipientRole: 'All' }] } : {};
-  await db.collection('notifications').deleteMany(filter as any);
+  if (recipientRole) {
+    inMemoryNotifications = inMemoryNotifications.filter(
+      (x) => x.recipientRole !== recipientRole && x.recipientRole !== 'All'
+    );
+  } else {
+    inMemoryNotifications = [];
+  }
+  try {
+    const db = await mdb();
+    const filter = recipientRole ? { $or: [{ recipientRole }, { recipientRole: 'All' }] } : {};
+    await db.collection('notifications').deleteMany(filter as any);
+  } catch (err: any) {
+    // Ignore offline error
+  }
 }

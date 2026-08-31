@@ -6,8 +6,10 @@ import {
   resolveWeatherBroadcast,
   crisisLevelKey,
   encodeIdPath,
+  initialDeliveryCounts,
 } from '@/lib/broadcast';
 import { getDistributionGroups, getBroadcastTemplates, getBroadcastMatrix, addNotification } from '@/lib/broadcastStore';
+import { sendEmailMockBatch } from '@/lib/emailMock';
 
 // FSD §10.9 — Broadcast Record list / detail, and §10.1(d) manual broadcast creation.
 //
@@ -64,8 +66,15 @@ export async function GET(request: Request) {
     const endDate = searchParams.get('endDate');
 
     if (typeParam) {
-      const types = typeParam.split(',').filter(Boolean);
-      broadcasts = broadcasts.filter((b) => types.includes(b.type));
+      const types = typeParam.split(',').map((t) => t.trim()).filter(Boolean);
+      broadcasts = broadcasts.filter((b) =>
+        types.some(
+          (t) =>
+            b.type === t ||
+            b.type.toLowerCase().startsWith(t.toLowerCase()) ||
+            t.toLowerCase().startsWith(b.type.toLowerCase())
+        )
+      );
     }
     if (statusParam) {
       const statuses = statusParam.split(',').filter(Boolean);
@@ -193,12 +202,14 @@ export async function POST(request: Request) {
 
     let recipients: string[] = Array.isArray(body.recipients) ? body.recipients : [];
     let templateUsed = body.templateUsed || 'Manual Broadcast';
-    let templateId: string | undefined;
-    let matrixRuleId: string | undefined;
-    let recipientGroups: string[] | undefined;
+    let templateId: string | undefined = body.templateId;
+    let matrixRuleId: string | undefined = body.matrixRuleId;
+    let recipientGroups: string[] | undefined = Array.isArray(body.recipientGroups)
+      ? body.recipientGroups
+      : (body.recipientGroup ? [body.recipientGroup] : undefined);
     let subject: string | undefined = body.subject;
     let content = body.content || body.contentDispatched || '';
-    let channels: string[] | undefined = Array.isArray(body.channels) ? body.channels : undefined;
+    let channels: string[] | undefined = Array.isArray(body.channels) ? body.channels : ['Email'];
     let resolutionWarning: string | undefined;
 
     if (isWeather && recipients.length === 0) {
@@ -226,6 +237,19 @@ export async function POST(request: Request) {
       resolutionWarning = resolved.resolutionWarning;
     }
 
+    let parsedCrisisLevel: string | undefined;
+    if (body.crisisLevel) {
+      if (typeof body.crisisLevel === 'string' && body.crisisLevel.startsWith('Level ')) {
+        parsedCrisisLevel = body.crisisLevel;
+      } else {
+        const num = parseInt(String(body.crisisLevel).replace(/\D/g, ''), 10);
+        parsedCrisisLevel = isNaN(num) ? undefined : crisisLevelKey(num);
+      }
+    }
+
+    const isSent = body.status === 'SENT' || body.sendNow === true;
+    const actor = body.user || 'system';
+
     const record: BroadcastRecord = {
       id,
       caseId: body.caseId || '',
@@ -238,20 +262,44 @@ export async function POST(request: Request) {
       recipientGroups,
       subject,
       contentDispatched: content,
-      contentDefault: content,
+      contentDefault: body.contentDefault || content,
       channels,
-      crisisLevel: body.crisisLevel ? crisisLevelKey(parseInt(body.crisisLevel, 10)) : undefined,
+      crisisLevel: parsedCrisisLevel,
       incidentType: body.incidentType,
+      incidentSubType: body.incidentSubType,
       incidentTitle: body.incidentTitle,
       createdAt: nowIso,
-      queuedBy: body.user || 'system',
+      queuedBy: actor,
       resolutionWarning,
-      sentAt: null as any,
-      sentBy: body.user || 'system',
-      status: 'PENDING',
-      deliveryAttempts: 0,
+      sentAt: isSent ? nowIso : (null as any),
+      sentBy: isSent ? actor : (body.user || 'system'),
+      dispatchedAt: isSent ? nowIso : undefined,
+      dispatchedBy: isSent ? actor : undefined,
+      status: isSent ? 'SENT' : 'PENDING',
+      deliveryAttempts: isSent ? 1 : 0,
+      deliveryCounts: isSent ? initialDeliveryCounts(recipients.length) : undefined,
     };
     db.broadcasts.push(record);
+
+    // If sent immediately and type is Closure, sync closure broadcast on linked incident
+    if (isSent && (record.type === 'Closure' || record.type?.toLowerCase().includes('closure')) && record.incidentId) {
+      const linkedCase = db.cases.find((c) => c.incident && c.incident.id === record.incidentId);
+      if (linkedCase?.incident) {
+        (linkedCase.incident as any).closureBroadcastStatus = 'dispatched';
+        (linkedCase.incident as any).closureBroadcastId = id;
+      }
+    }
+
+    // If sent immediately and email channel is active, dispatch via mock gateway
+    if (isSent && (!channels || channels.includes('Email')) && recipients.length > 0) {
+      await sendEmailMockBatch({
+        recipients,
+        subject: record.subject || `[SDC] ${record.type} Broadcast — ${id}`,
+        body: record.contentDispatched,
+        caseId: record.caseId,
+        broadcastId: id,
+      });
+    }
 
     // Audit trail — entityId lets the broadcast detail page's Audit Log section
     // (added 2026-07-27) filter the shared /api/admin/audit log down to just this
@@ -260,10 +308,10 @@ export async function POST(request: Request) {
     db.auditLogs.push({
       id: `AUD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
       timestamp: nowIso,
-      user: record.queuedBy || 'system',
+      user: actor,
       module: 'Broadcast',
-      action: 'Queue Broadcast',
-      details: `Queued ${record.type} broadcast ${id} for ${recipients.length} recipient(s).`,
+      action: isSent ? 'Send Broadcast' : 'Queue Broadcast',
+      details: `${isSent ? 'Created and sent' : 'Queued'} ${record.type} broadcast ${id} for ${recipients.length} recipient(s).`,
       correlationId: `CORR-${Date.now()}`,
       ipAddress: '127.0.0.1',
       entityId: id,

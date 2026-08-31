@@ -42,7 +42,7 @@ const client = new MongoClient(uri, { serverSelectionTimeoutMS: 20_000 });
 
 try {
   await client.connect();
-  const db = client.db('sentosa-cms');
+  const db = client.db(process.env.MONGODB_DB_NAME || undefined);
   let created = 0;
 
   for (const [collection, specs] of Object.entries(INDEXES)) {

@@ -38,7 +38,7 @@ const client = new MongoClient(uri, { serverSelectionTimeoutMS: 20_000 });
 
 try {
   await client.connect();
-  const db = client.db('sentosa-cms');
+  const db = client.db(process.env.MONGODB_DB_NAME || undefined);
 
   let totalRemoved = 0, totalBytes = 0, docsTouched = 0;
 

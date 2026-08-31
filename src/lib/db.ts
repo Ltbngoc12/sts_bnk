@@ -788,7 +788,7 @@ function dehydrateDb(data: DbSchema): NormalizedDbSchema {
 
 async function getMongoDB(): Promise<Db> {
   const client = await clientPromise;
-  return client.db('sentosa-cms');
+  return client.db(process.env.MONGODB_DB_NAME || undefined);
 }
 
 async function saveCollection(mdb: Db, collectionName: string, docs: any[]): Promise<void> {
@@ -991,7 +991,28 @@ export async function getDb(options: GetDbOptions = {}): Promise<DbSchema> {
 
     return hydrated;
   } catch (err) {
-    console.error('Error reading from MongoDB:', err);
+    console.warn('MongoDB connection unavailable — falling back to local db.json:', (err as Error).message || err);
+    if (fs.existsSync(DB_PATH)) {
+      try {
+        const raw = fs.readFileSync(DB_PATH, 'utf-8');
+        const parsed = JSON.parse(raw);
+        const normalizedDb: NormalizedDbSchema = {
+          cases: parsed.cases || [],
+          incidents: parsed.incidents || [],
+          faults: parsed.faults || [],
+          tasks: parsed.tasks || [],
+          occurrences: parsed.occurrences || [],
+          events: parsed.events || [],
+          nops: parsed.nops || [],
+          broadcasts: parsed.broadcasts || [],
+          auditLogs: parsed.auditLogs || [],
+          recurrenceSeries: parsed.recurrenceSeries || []
+        };
+        return hydrateDb(normalizedDb);
+      } catch (fileErr) {
+        console.error('Error reading local db.json fallback:', fileErr);
+      }
+    }
     return { cases: [], tasks: [], occurrences: [] };
   }
 }
@@ -1021,8 +1042,14 @@ export async function saveDb(data: DbSchema): Promise<void> {
       saveCollection(mdb, 'recurrenceSeries', (normalizedDb.recurrenceSeries || []) as any[]),
     ]);
   } catch (err) {
-    console.error('Error writing to MongoDB:', err);
-    throw err;
+    console.warn('Error writing to MongoDB — saving to local db.json fallback:', (err as Error).message || err);
+    try {
+      const normalizedDb = dehydrateDb(data);
+      fs.writeFileSync(DB_PATH, JSON.stringify(normalizedDb, null, 2), 'utf-8');
+    } catch (fileErr) {
+      console.error('Failed to write to local db.json:', fileErr);
+      throw err;
+    }
   }
 }
 
