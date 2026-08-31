@@ -1,10 +1,6 @@
 import { MongoClient, MongoClientOptions } from 'mongodb';
 
-const uri = process.env.MONGODB_URI as string;
-
-if (!uri) {
-  throw new Error('Please define MONGODB_URI in .env.local');
-}
+const uri = process.env.MONGODB_URI;
 
 /**
  * Serverless-friendly pool settings.
@@ -35,14 +31,18 @@ declare global {
  * Cache the connection promise on globalThis in EVERY environment, not just
  * development.
  *
- * The previous version only cached in development, so in production the module
- * scope was the only thing holding the client. Any re-evaluation of this module
- * (route isolation, a new lambda instance) started a brand new connection and
- * paid the handshake again. Caching on globalThis makes warm invocations reuse
- * whatever connection already exists.
+ * If MONGODB_URI is not configured (e.g. initial Vercel build before adding env vars),
+ * defer error to when MongoDB is actually queried so static page generation / build
+ * does not crash and can use the local JSON fallback.
  */
 if (!global._mongoClientPromise) {
-  global._mongoClientPromise = new MongoClient(uri, options).connect();
+  if (!uri) {
+    const rejectedPromise = Promise.reject(new Error('MONGODB_URI is not defined in environment variables'));
+    rejectedPromise.catch(() => {}); // Prevent unhandled rejection warning
+    global._mongoClientPromise = rejectedPromise;
+  } else {
+    global._mongoClientPromise = new MongoClient(uri, options).connect();
+  }
 }
 
 const clientPromise: Promise<MongoClient> = global._mongoClientPromise;
