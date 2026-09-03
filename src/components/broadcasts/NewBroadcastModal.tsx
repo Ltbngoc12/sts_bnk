@@ -21,8 +21,6 @@ interface NewBroadcastModalProps {
 
 export const BROADCAST_TYPE_OPTIONS = [
   { value: 'Closure', label: 'Closure', category: 'Closure Broadcast' },
-  { value: 'END_OF_DAY', label: 'END_OF_DAY', category: 'End-of-Day Interim Broadcast' },
-  { value: 'Weather Advisory', label: 'Weather Advisory', category: 'Weather Advisory Broadcast' },
 ] as const;
 
 export function NewBroadcastModal({
@@ -39,7 +37,7 @@ export function NewBroadcastModal({
   const [loadingData, setLoadingData] = useState(false);
 
   // Form Selections
-  const [selectedBroadcastType, setSelectedBroadcastType] = useState<string>('');
+  const [selectedBroadcastType, setSelectedBroadcastType] = useState<string>('Closure');
   const [selectedIncidentId, setSelectedIncidentId] = useState<string>('');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
@@ -53,12 +51,75 @@ export function NewBroadcastModal({
   // Subject & Content
   const [subject, setSubject] = useState<string>('');
   const [content, setContent] = useState<string>('');
-  const [contentTab, setContentTab] = useState<'preview' | 'edit'>('preview');
+  const [contentTab, setContentTab] = useState<'preview' | 'edit'>('edit');
 
   // Submission & Validation state
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Helper: Build vars object for variable substitution
+  const buildVars = (incidentOpt: IncidentOption | null, customIncId?: string): Record<string, string | undefined> => {
+    const nowIso = new Date().toISOString();
+    const inc = incidentOpt?.incident;
+    const caseId = incidentOpt?.caseId || inc?.caseId || '';
+    const incId = inc?.id || customIncId || selectedIncidentId || 'N/A';
+
+    if (!inc) {
+      return {
+        case_id: 'N/A',
+        incident_id: incId,
+        incident_title: (customIncId || selectedIncidentId) ? `Incident ${incId}` : 'Manual Broadcast Notice',
+        incident_datetime: nowIso,
+        incident_type: 'Operational',
+        incident_subtype: 'General',
+        priority: 'Normal',
+        location: 'Sentosa Island',
+        crisis_level: 'Level 4',
+        reporting_source: 'Duty Manager',
+        status: 'Live',
+        closed_at: nowIso,
+        closed_by: username || 'Duty Manager',
+        time: nowIso,
+        summary: 'Operational broadcast notice issued manually.',
+      };
+    }
+
+    return {
+      case_id: caseId,
+      incident_id: inc.id || incId,
+      incident_title: inc.title || '',
+      incident_datetime: inc.dateTime || '',
+      incident_type: inc.type || '',
+      incident_subtype: inc.subType || '',
+      priority: inc.priority || '',
+      location:
+        typeof inc.location === 'string'
+          ? inc.location
+          : inc.location?.commonName || inc.location?.road || inc.location?.building || 'Sentosa Island',
+      crisis_level: inc.crisisLevel ? crisisLevelKey(inc.crisisLevel) : 'Level 4',
+      reporting_source: inc.reportingSource || 'N/A',
+      status: inc.status || 'Live',
+      closed_at: inc.closedAt || nowIso,
+      closed_by: inc.closedBy || username || 'Duty Manager',
+      time: nowIso,
+      summary: inc.summary || inc.completionRemarks || 'N/A',
+    };
+  };
+
+  // Re-render template content when Template or Incident changes
+  const applyTemplateToContent = (tpl: BroadcastTemplate | null, incOpt: IncidentOption | null, customIncId?: string) => {
+    if (!tpl) {
+      setSubject('');
+      setContent('');
+      return;
+    }
+    const vars = buildVars(incOpt, customIncId);
+    const renderedSubj = renderTemplate(tpl.subject, vars);
+    const renderedBody = renderTemplate(tpl.body, vars);
+    setSubject(renderedSubj);
+    setContent(renderedBody);
+  };
 
   // Fetch all prerequisites on modal open (fetch all available incidents on the system)
   useEffect(() => {
@@ -104,6 +165,15 @@ export function NewBroadcastModal({
         const grps: DistributionGroup[] = Array.isArray(groupsRes) ? groupsRes : [];
         const activeGrps = grps.filter((g) => g.status === 'Active');
         setDistributionGroups(activeGrps);
+
+        // Auto-select matching closure template if available
+        const closureTpl = activeTpls.find(
+          (t) => t.category === 'Closure Broadcast' || t.name.toLowerCase().includes('closure')
+        ) || activeTpls[0];
+        if (closureTpl) {
+          setSelectedTemplateId(closureTpl.id);
+          applyTemplateToContent(closureTpl, null);
+        }
       })
       .catch((err) => {
         console.error('Failed to load broadcast modal prerequisites:', err);
@@ -117,7 +187,7 @@ export function NewBroadcastModal({
   // Reset form when modal closes or opens
   useEffect(() => {
     if (!isOpen) {
-      setSelectedBroadcastType('');
+      setSelectedBroadcastType('Closure');
       setSelectedIncidentId('');
       setSelectedTemplateId('');
       setSelectedGroupId('');
@@ -127,7 +197,7 @@ export function NewBroadcastModal({
       setNewEmailInput('');
       setSubject('');
       setContent('');
-      setContentTab('preview');
+      setContentTab('edit');
       setError(null);
       setSubmitted(false);
     }
@@ -167,8 +237,9 @@ export function NewBroadcastModal({
   }, [incidents, selectedBroadcastType, existingBroadcasts]);
 
   // Find currently selected incident
+  // Find currently selected incident (supports case-insensitive matching)
   const currentIncidentOpt = useMemo(() => {
-    return incidents.find((opt) => opt.incident.id === selectedIncidentId) || null;
+    return incidents.find((opt) => opt.incident.id.toLowerCase() === selectedIncidentId.trim().toLowerCase()) || null;
   }, [incidents, selectedIncidentId]);
 
   // Find currently selected template
@@ -181,76 +252,10 @@ export function NewBroadcastModal({
     return distributionGroups.find((g) => g.id === selectedGroupId) || null;
   }, [distributionGroups, selectedGroupId]);
 
-  // Helper: Build vars object for variable substitution
-  const buildVars = (incidentOpt: IncidentOption | null): Record<string, string | undefined> => {
-    const nowIso = new Date().toISOString();
-    const inc = incidentOpt?.incident;
-    const caseId = incidentOpt?.caseId || inc?.caseId || '';
-
-    if (!inc) {
-      return {
-        case_id: 'N/A',
-        incident_id: 'N/A',
-        incident_title: 'Manual Broadcast Notice',
-        incident_datetime: nowIso,
-        incident_type: 'Operational',
-        incident_subtype: 'General',
-        priority: 'Normal',
-        location: 'Sentosa Island',
-        crisis_level: 'Level 4',
-        reporting_source: 'Duty Manager',
-        status: 'Live',
-        closed_at: nowIso,
-        closed_by: username || 'Duty Manager',
-        time: nowIso,
-        summary: 'Operational broadcast notice issued manually.',
-      };
-    }
-
-    return {
-      case_id: caseId,
-      incident_id: inc.id || '',
-      incident_title: inc.title || '',
-      incident_datetime: inc.dateTime || '',
-      incident_type: inc.type || '',
-      incident_subtype: inc.subType || '',
-      priority: inc.priority || '',
-      location:
-        typeof inc.location === 'string'
-          ? inc.location
-          : inc.location?.commonName || inc.location?.road || inc.location?.building || 'Sentosa Island',
-      crisis_level: inc.crisisLevel ? crisisLevelKey(inc.crisisLevel) : 'Level 4',
-      reporting_source: inc.reportingSource || 'N/A',
-      status: inc.status || 'Live',
-      closed_at: inc.closedAt || nowIso,
-      closed_by: inc.closedBy || username || 'Duty Manager',
-      time: nowIso,
-      summary: inc.summary || inc.completionRemarks || 'N/A',
-    };
-  };
-
-  // Re-render template content when Template or Incident changes
-  const applyTemplateToContent = (tpl: BroadcastTemplate | null, incOpt: IncidentOption | null) => {
-    if (!tpl) {
-      setSubject('');
-      setContent('');
-      return;
-    }
-    const vars = buildVars(incOpt);
-    const renderedSubj = renderTemplate(tpl.subject, vars);
-    const renderedBody = renderTemplate(tpl.body, vars);
-    setSubject(renderedSubj);
-    setContent(renderedBody);
-  };
-
   // Handle Broadcast Type change
   const handleBroadcastTypeChange = (typeVal: string) => {
     setSelectedBroadcastType(typeVal);
-
-    // Channel constraint: Closure and END_OF_DAY are ALWAYS Email only
-    if (typeVal === 'Closure' || typeVal === 'END_OF_DAY') {
-      setSelectedChannels(['Email']);
-    }
+    setSelectedChannels(['Email']);
 
     const typeObj = BROADCAST_TYPE_OPTIONS.find((t) => t.value === typeVal);
     let matchedTpl: BroadcastTemplate | null = null;
@@ -265,17 +270,7 @@ export function NewBroadcastModal({
       }
     }
 
-    // If switching to Closure, check if current selected incident is eligible
-    if (typeVal === 'Closure') {
-      const currentIsEligible = filteredIncidents.some((opt) => opt.incident.id === selectedIncidentId);
-      if (!currentIsEligible) {
-        setSelectedIncidentId('');
-        applyTemplateToContent(matchedTpl, null);
-        return;
-      }
-    }
-
-    applyTemplateToContent(matchedTpl, currentIncidentOpt);
+    applyTemplateToContent(matchedTpl, currentIncidentOpt, selectedIncidentId.trim());
   };
 
   // Handle template selection change
@@ -283,24 +278,21 @@ export function NewBroadcastModal({
     setSelectedTemplateId(templateId);
     const tpl = templates.find((t) => t.id === templateId) || null;
     if (tpl) {
-      // If broadcast type isn't set yet or doesn't match, sync it
       const matchedType = BROADCAST_TYPE_OPTIONS.find((t) => t.category === tpl.category);
       if (matchedType && selectedBroadcastType !== matchedType.value) {
         setSelectedBroadcastType(matchedType.value);
-        if (matchedType.value === 'Closure' || matchedType.value === 'END_OF_DAY') {
-          setSelectedChannels(['Email']);
-        }
+        setSelectedChannels(['Email']);
       }
     }
-    applyTemplateToContent(tpl, currentIncidentOpt);
+    applyTemplateToContent(tpl, currentIncidentOpt, selectedIncidentId.trim());
   };
 
-  // Handle incident selection change
+  // Handle incident selection change or free text input
   const handleIncidentChange = (incidentId: string) => {
     setSelectedIncidentId(incidentId);
-    const incOpt = incidents.find((opt) => opt.incident.id === incidentId) || null;
+    const incOpt = incidents.find((opt) => opt.incident.id.toLowerCase() === incidentId.trim().toLowerCase()) || null;
     if (currentTemplate) {
-      applyTemplateToContent(currentTemplate, incOpt);
+      applyTemplateToContent(currentTemplate, incOpt, incidentId.trim());
     }
   };
 
@@ -313,21 +305,6 @@ export function NewBroadcastModal({
     } else {
       setActiveGroupMembers([]);
     }
-  };
-
-  // Channel toggle handler (for Weather Advisory)
-  const toggleChannel = (channel: string) => {
-    if (selectedBroadcastType === 'Closure' || selectedBroadcastType === 'END_OF_DAY') {
-      return; // Locked to Email only
-    }
-    setSelectedChannels((prev) => {
-      if (prev.includes(channel)) {
-        const next = prev.filter((c) => c !== channel);
-        return next.length === 0 ? [channel] : next; // Keep at least one
-      } else {
-        return [...prev, channel];
-      }
-    });
   };
 
   // Recipient management actions
@@ -386,7 +363,7 @@ export function NewBroadcastModal({
   const validationErrors = useMemo(() => {
     const errs: Record<string, string> = {};
     if (!selectedBroadcastType) errs.broadcastType = 'Broadcast Type is required.';
-    if (!selectedIncidentId) errs.incidentId = 'Incident ID is required.';
+    if (!selectedIncidentId.trim()) errs.incidentId = 'Incident ID is required.';
     if (!selectedTemplateId) errs.templateId = 'Template is required.';
     if (!selectedGroupId && allRecipientEmails.length === 0) {
       errs.distributionGroup = 'Distribution Group or at least one recipient is required.';
@@ -406,7 +383,7 @@ export function NewBroadcastModal({
 
     const missingFields: string[] = [];
     if (!selectedBroadcastType) missingFields.push('Broadcast Type');
-    if (!selectedIncidentId) missingFields.push('Incident ID');
+    if (!selectedIncidentId.trim()) missingFields.push('Incident ID');
     if (!selectedTemplateId) missingFields.push('Template');
     if (!selectedGroupId && allRecipientEmails.length === 0) missingFields.push('Distribution Group / Recipients');
     if (selectedChannels.length === 0) missingFields.push('Delivery Channel');
@@ -423,6 +400,7 @@ export function NewBroadcastModal({
       const inc = currentIncidentOpt?.incident;
       const tpl = currentTemplate;
       const grp = currentGroup;
+      const cleanIncId = inc?.id || selectedIncidentId.trim() || undefined;
 
       let canonicalType = selectedBroadcastType;
       if (selectedBroadcastType === 'END_OF_DAY') canonicalType = 'End-of-Day';
@@ -430,8 +408,8 @@ export function NewBroadcastModal({
       const payload = {
         type: canonicalType,
         caseId: currentIncidentOpt?.caseId || inc?.caseId || undefined,
-        incidentId: inc?.id || undefined,
-        incidentTitle: inc?.title || undefined,
+        incidentId: cleanIncId,
+        incidentTitle: inc?.title || (cleanIncId ? `Incident ${cleanIncId}` : undefined),
         incidentType: inc?.type || undefined,
         incidentSubType: inc?.subType || undefined,
         crisisLevel: inc?.crisisLevel ? crisisLevelKey(inc.crisisLevel) : undefined,
@@ -442,7 +420,7 @@ export function NewBroadcastModal({
         channels: selectedChannels,
         subject: subject.trim() || undefined,
         content: content.trim(),
-        contentDefault: tpl ? renderTemplate(tpl.body, buildVars(currentIncidentOpt)) : content.trim(),
+        contentDefault: tpl ? renderTemplate(tpl.body, buildVars(currentIncidentOpt, cleanIncId)) : content.trim(),
         user: username,
         status: 'SENT',
         sendNow: true,
@@ -605,7 +583,7 @@ export function NewBroadcastModal({
                   )}
                 </div>
 
-                {/* Incident ID Field (Required) */}
+                {/* Incident ID Field (Required - Free text input + list suggestions) */}
                 <div className="form-group" style={{ margin: 0 }}>
                   <label
                     style={{
@@ -631,44 +609,57 @@ export function NewBroadcastModal({
                       }}
                     >
                       {selectedBroadcastType === 'Closure'
-                        ? `Closed without broadcast (${filteredIncidents.length})`
+                        ? `Closed incidents (${filteredIncidents.length})`
                         : `${filteredIncidents.length} available`}
                     </span>
                   </label>
-                  <select
-                    value={selectedIncidentId}
-                    onChange={(e) => handleIncidentChange(e.target.value)}
-                    className="form-control select-dark"
-                    style={{
-                      height: 38,
-                      fontSize: 13,
-                      borderColor: submitted && validationErrors.incidentId ? 'var(--color-critical, #DC2626)' : undefined,
-                    }}
-                  >
-                    <option value="">
-                      {selectedBroadcastType === 'Closure' && filteredIncidents.length === 0
-                        ? '-- No Closed incidents without broadcast available --'
-                        : '-- Select Incident --'}
-                    </option>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input
+                      type="text"
+                      list="incident-datalist-options"
+                      value={selectedIncidentId}
+                      onChange={(e) => handleIncidentChange(e.target.value)}
+                      placeholder="Type incident ID or pick from list..."
+                      className="form-control"
+                      style={{
+                        height: 38,
+                        fontSize: 13,
+                        flexGrow: 1,
+                        borderColor: submitted && validationErrors.incidentId ? 'var(--color-critical, #DC2626)' : undefined,
+                      }}
+                    />
+                    {filteredIncidents.length > 0 && (
+                      <select
+                        value={filteredIncidents.some((opt) => opt.incident.id === selectedIncidentId) ? selectedIncidentId : ''}
+                        onChange={(e) => {
+                          if (e.target.value) handleIncidentChange(e.target.value);
+                        }}
+                        className="form-control select-dark"
+                        style={{ width: 'auto', maxWidth: 175, height: 38, fontSize: 12.5 }}
+                        title="Pick an incident from the available list"
+                      >
+                        <option value="">-- Pick from list --</option>
+                        {filteredIncidents.map((opt) => (
+                          <option key={opt.incident.id} value={opt.incident.id}>
+                            {opt.incident.id}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                  <datalist id="incident-datalist-options">
                     {filteredIncidents.map((opt) => (
                       <option key={opt.incident.id} value={opt.incident.id}>
-                        {opt.incident.id} — {opt.incident.title} (Level {opt.incident.crisisLevel || 4} · {opt.incident.status || 'Live'})
+                        {opt.incident.id} — {opt.incident.title} (Level {opt.incident.crisisLevel || 4})
                       </option>
                     ))}
-                  </select>
+                  </datalist>
                   {submitted && validationErrors.incidentId && (
                     <div style={{ color: '#DC2626', fontSize: 11, marginTop: 4, fontWeight: 500 }}>
                       {validationErrors.incidentId}
                     </div>
                   )}
-                  {selectedBroadcastType === 'Closure' && (
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, fontStyle: 'italic' }}>
-                      {filteredIncidents.length === 0
-                        ? '⚠ All closed incidents currently have broadcasts, or no incidents are in Closed status.'
-                        : 'ℹ Showing closed incidents that have not had a closure broadcast created yet.'}
-                    </div>
-                  )}
-                  {currentIncidentOpt && (
+                  {currentIncidentOpt ? (
                     <div
                       style={{
                         marginTop: 6,
@@ -699,58 +690,7 @@ export function NewBroadcastModal({
                         <b>Status:</b> {currentIncidentOpt.incident.status || 'Live'}
                       </span>
                     </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Row 2: Template & Delivery Channel Section */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                {/* Template Field (Required) */}
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label
-                    style={{
-                      fontSize: 11.5,
-                      fontWeight: 700,
-                      textTransform: 'uppercase',
-                      color: 'var(--text-muted)',
-                      letterSpacing: '0.04em',
-                      marginBottom: 6,
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <span>
-                      Template Field <span style={{ color: 'var(--color-primary)' }}>*</span>
-                    </span>
-                    {selectedBroadcastType && (
-                      <span style={{ fontSize: 11, color: 'var(--color-primary)', fontWeight: 600 }}>
-                        Filtered by {selectedBroadcastType}
-                      </span>
-                    )}
-                  </label>
-                  <select
-                    value={selectedTemplateId}
-                    onChange={(e) => handleTemplateChange(e.target.value)}
-                    className="form-control select-dark"
-                    style={{
-                      height: 38,
-                      fontSize: 13,
-                      borderColor: submitted && validationErrors.templateId ? 'var(--color-critical, #DC2626)' : undefined,
-                    }}
-                  >
-                    <option value="">-- Select Configured Template --</option>
-                    {filteredTemplates.map((tpl) => (
-                      <option key={tpl.id} value={tpl.id}>
-                        {tpl.name} ({tpl.category})
-                      </option>
-                    ))}
-                  </select>
-                  {submitted && validationErrors.templateId && (
-                    <div style={{ color: '#DC2626', fontSize: 11, marginTop: 4, fontWeight: 500 }}>
-                      {validationErrors.templateId}
-                    </div>
-                  )}
-                  {currentTemplate && (
+                  ) : selectedIncidentId.trim() ? (
                     <div
                       style={{
                         marginTop: 6,
@@ -761,89 +701,77 @@ export function NewBroadcastModal({
                         borderRadius: 6,
                       }}
                     >
-                      <b>Category:</b> {currentTemplate.category}
+                      <span>
+                        <b>Custom Incident ID:</b> {selectedIncidentId.trim()}
+                      </span>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, fontStyle: 'italic' }}>
+                      ℹ Type any Incident ID manually or choose from the closed incidents list.
                     </div>
                   )}
                 </div>
+              </div>
 
-                {/* Delivery Channel Section (Required) */}
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label
-                    style={{
-                      fontSize: 11.5,
-                      fontWeight: 700,
-                      textTransform: 'uppercase',
-                      color: 'var(--text-muted)',
-                      letterSpacing: '0.04em',
-                      marginBottom: 6,
-                      display: 'block',
-                    }}
-                  >
-                    Delivery Channel <span style={{ color: 'var(--color-primary)' }}>*</span>
-                  </label>
+              {/* Row 2: Template Field (Required) */}
+              <div className="form-group" style={{ margin: 0 }}>
+                <label
+                  style={{
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    color: 'var(--text-muted)',
+                    letterSpacing: '0.04em',
+                    marginBottom: 6,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <span>
+                    Template Field <span style={{ color: 'var(--color-primary)' }}>*</span>
+                  </span>
+                  {selectedBroadcastType && (
+                    <span style={{ fontSize: 11, color: 'var(--color-primary)', fontWeight: 600 }}>
+                      Filtered by {selectedBroadcastType}
+                    </span>
+                  )}
+                </label>
+                <select
+                  value={selectedTemplateId}
+                  onChange={(e) => handleTemplateChange(e.target.value)}
+                  className="form-control select-dark"
+                  style={{
+                    height: 38,
+                    fontSize: 13,
+                    borderColor: submitted && validationErrors.templateId ? 'var(--color-critical, #DC2626)' : undefined,
+                  }}
+                >
+                  <option value="">-- Select Configured Template --</option>
+                  {filteredTemplates.map((tpl) => (
+                    <option key={tpl.id} value={tpl.id}>
+                      {tpl.name} ({tpl.category})
+                    </option>
+                  ))}
+                </select>
+                {submitted && validationErrors.templateId && (
+                  <div style={{ color: '#DC2626', fontSize: 11, marginTop: 4, fontWeight: 500 }}>
+                    {validationErrors.templateId}
+                  </div>
+                )}
+                {currentTemplate && (
                   <div
                     style={{
-                      height: 38,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 20,
-                      padding: '0 12px',
-                      background: 'var(--bg-card)',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: 'var(--radius-md, 8px)',
-                      borderColor: submitted && validationErrors.channels ? 'var(--color-critical, #DC2626)' : undefined,
+                      marginTop: 6,
+                      fontSize: 11.5,
+                      color: 'var(--text-muted)',
+                      background: 'var(--bg-inset)',
+                      padding: '6px 10px',
+                      borderRadius: 6,
                     }}
                   >
-                    {/* Email Option */}
-                    <label
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 7,
-                        fontSize: 13,
-                        fontWeight: 600,
-                        cursor: selectedBroadcastType === 'Closure' || selectedBroadcastType === 'END_OF_DAY' ? 'default' : 'pointer',
-                        color: 'var(--text-main)',
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedChannels.includes('Email')}
-                        disabled={selectedBroadcastType === 'Closure' || selectedBroadcastType === 'END_OF_DAY'}
-                        onChange={() => toggleChannel('Email')}
-                        style={{ accentColor: 'var(--color-primary)', width: 15, height: 15 }}
-                      />
-                      <span>Email</span>
-                    </label>
-
-                    {/* SMS Option */}
-                    <label
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 7,
-                        fontSize: 13,
-                        fontWeight: 600,
-                        cursor: selectedBroadcastType === 'Closure' || selectedBroadcastType === 'END_OF_DAY' ? 'not-allowed' : 'pointer',
-                        color: selectedBroadcastType === 'Closure' || selectedBroadcastType === 'END_OF_DAY' ? 'var(--text-faint)' : 'var(--text-main)',
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedChannels.includes('SMS')}
-                        disabled={selectedBroadcastType === 'Closure' || selectedBroadcastType === 'END_OF_DAY'}
-                        onChange={() => toggleChannel('SMS')}
-                        style={{ accentColor: 'var(--color-primary)', width: 15, height: 15 }}
-                      />
-                      <span>SMS</span>
-                    </label>
+                    <b>Category:</b> {currentTemplate.category}
                   </div>
-                  {submitted && validationErrors.channels && (
-                    <div style={{ color: '#DC2626', fontSize: 11, marginTop: 4, fontWeight: 500 }}>
-                      {validationErrors.channels}
-                    </div>
-                  )}
-                </div>
+                )}
               </div>
 
               {/* Row 3: Distribution Group Selector & Recipient List */}
@@ -1141,28 +1069,6 @@ export function NewBroadcastModal({
                   <div style={{ display: 'flex', gap: 6 }}>
                     <button
                       type="button"
-                      onClick={() => setContentTab('preview')}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        borderBottom:
-                          contentTab === 'preview'
-                            ? '2px solid var(--color-primary)'
-                            : '2px solid transparent',
-                        color:
-                          contentTab === 'preview'
-                            ? 'var(--color-primary)'
-                            : 'var(--text-muted)',
-                        padding: '6px 14px',
-                        fontSize: 13,
-                        fontWeight: contentTab === 'preview' ? 700 : 500,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      ✉ Content Preview
-                    </button>
-                    <button
-                      type="button"
                       onClick={() => setContentTab('edit')}
                       style={{
                         background: 'transparent',
@@ -1182,6 +1088,28 @@ export function NewBroadcastModal({
                       }}
                     >
                       ✎ Edit Content
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setContentTab('preview')}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        borderBottom:
+                          contentTab === 'preview'
+                            ? '2px solid var(--color-primary)'
+                            : '2px solid transparent',
+                        color:
+                          contentTab === 'preview'
+                            ? 'var(--color-primary)'
+                            : 'var(--text-muted)',
+                        padding: '6px 14px',
+                        fontSize: 13,
+                        fontWeight: contentTab === 'preview' ? 700 : 500,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      ✉ Content Preview
                     </button>
                   </div>
 
@@ -1228,7 +1156,7 @@ export function NewBroadcastModal({
                         <b>SUBJECT:</b> {subject || <span style={{ color: 'var(--text-faint)' }}>(No Subject)</span>}
                       </div>
                       <div style={{ color: 'var(--text-faint)', fontSize: 11 }}>
-                        <b>TO ({selectedChannels.join(', ')}):</b> {allRecipientEmails.length ? allRecipientEmails.join(', ') : '(No recipients)'}
+                        <b>TO (Email):</b> {allRecipientEmails.length ? allRecipientEmails.join(', ') : '(No recipients)'}
                       </div>
                     </div>
                     <div
