@@ -788,6 +788,7 @@ function dehydrateDb(data: DbSchema): NormalizedDbSchema {
 
 async function getMongoDB(): Promise<Db> {
   const client = await clientPromise;
+  if (!client) throw new Error('MongoDB client is not initialized');
   return client.db('sentosa-cms');
 }
 
@@ -900,6 +901,26 @@ function caseMeta_fallback(db: NormalizedDbSchema, o: any): string {
 
 export async function getDb(): Promise<DbSchema> {
   try {
+    if (!clientPromise) {
+      if (fs.existsSync(DB_PATH)) {
+        const raw = fs.readFileSync(DB_PATH, 'utf-8');
+        const parsed = JSON.parse(raw);
+        return hydrateDb({
+          cases: parsed.cases || [],
+          incidents: parsed.incidents || [],
+          faults: parsed.faults || [],
+          tasks: parsed.tasks || [],
+          occurrences: parsed.occurrences || [],
+          events: parsed.events || [],
+          nops: parsed.nops || [],
+          broadcasts: parsed.broadcasts || [],
+          auditLogs: parsed.auditLogs || [],
+          recurrenceSeries: parsed.recurrenceSeries || [],
+        });
+      }
+      return { cases: [], tasks: [], occurrences: [] };
+    }
+
     const mdb = await getMongoDB();
 
     const [cases, incidents, faults, tasks, occurrences, events, nops, broadcasts, auditLogs, recurrenceSeries] = await Promise.all([
@@ -937,13 +958,39 @@ export async function getDb(): Promise<DbSchema> {
 
     return hydrateDb(normalizedDb);
   } catch (err) {
-    console.error('Error reading from MongoDB:', err);
+    console.error('Error reading from DB:', err);
+    if (fs.existsSync(DB_PATH)) {
+      try {
+        const raw = fs.readFileSync(DB_PATH, 'utf-8');
+        const parsed = JSON.parse(raw);
+        return hydrateDb({
+          cases: parsed.cases || [],
+          incidents: parsed.incidents || [],
+          faults: parsed.faults || [],
+          tasks: parsed.tasks || [],
+          occurrences: parsed.occurrences || [],
+          events: parsed.events || [],
+          nops: parsed.nops || [],
+          broadcasts: parsed.broadcasts || [],
+          auditLogs: parsed.auditLogs || [],
+          recurrenceSeries: parsed.recurrenceSeries || [],
+        });
+      } catch (e) {
+        // ignore
+      }
+    }
     return { cases: [], tasks: [], occurrences: [] };
   }
 }
 
 export async function saveDb(data: DbSchema): Promise<void> {
   try {
+    if (!clientPromise) {
+      const normalizedDb = dehydrateDb(data);
+      fs.writeFileSync(DB_PATH, JSON.stringify(normalizedDb, null, 2), 'utf-8');
+      return;
+    }
+
     const mdb = await getMongoDB();
     const normalizedDb = dehydrateDb(data);
 
@@ -960,8 +1007,14 @@ export async function saveDb(data: DbSchema): Promise<void> {
       saveCollection(mdb, 'recurrenceSeries', (normalizedDb.recurrenceSeries || []) as any[]),
     ]);
   } catch (err) {
-    console.error('Error writing to MongoDB:', err);
-    throw err;
+    console.error('Error writing to DB, falling back to db.json:', err);
+    try {
+      const normalizedDb = dehydrateDb(data);
+      fs.writeFileSync(DB_PATH, JSON.stringify(normalizedDb, null, 2), 'utf-8');
+    } catch (writeErr) {
+      console.error('Failed to write db.json fallback:', writeErr);
+      throw writeErr;
+    }
   }
 }
 

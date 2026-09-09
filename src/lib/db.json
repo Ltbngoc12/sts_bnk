@@ -211,7 +211,7 @@
       "reporterName": "Video Analytics System",
       "requestedBy": "IIOC Controller",
       "createdBy": "system_controller",
-      "status": "Live (On-Site)",
+      "status": "Live (Assigned)",
       "location": {
         "road": "Siloso Beach Walk",
         "building": "Emerald Pavilion",
@@ -304,14 +304,15 @@
           "status": "Open"
         }
       ],
-      "category": "Standard Incident",
+      "category": "Operational Incident",
       "attachments": [],
       "responders": [
         {
           "responderId": "Ranger John",
           "assignedBy": "system_controller",
           "assignedAt": "2026-06-05T08:15:00+07:00",
-          "status": "Active"
+          "status": "Active",
+          "lifecycleStatus": "On-Site"
         }
       ]
     },
@@ -448,14 +449,15 @@
       "summary": "Female guest fainted at RWS Casino entrance lobby. Ranger Sarah responded. SCDF ambulance called and conveyed patient to SGH. Closed.",
       "completionRemarks": "Ranger Sarah completed medical assist. SCDF Ambulance took over.",
       "slaveIncidents": [],
-      "category": "Standard Incident",
+      "category": "Operational Incident",
       "attachments": [],
       "responders": [
         {
           "responderId": "Ranger Sarah",
           "assignedBy": "controller_steve",
           "assignedAt": "2026-06-05T07:10:00+07:00",
-          "status": "Active"
+          "status": "Active",
+          "lifecycleStatus": "Completed"
         }
       ]
     },
@@ -471,7 +473,7 @@
       "reporterName": "12",
       "requestedBy": "Guest Call-in",
       "createdBy": "Controller Steve",
-      "status": "Live (Completed)",
+      "status": "Live (Assigned)",
       "location": {
         "road": "123",
         "building": "1233",
@@ -570,7 +572,7 @@
       "summary": "123132",
       "completionRemarks": "",
       "slaveIncidents": [],
-      "category": "Standard Incident",
+      "category": "Operational Incident",
       "attachments": [],
       "responders": []
     },
@@ -687,14 +689,15 @@
       "summary": "12",
       "completionRemarks": "",
       "id": "SEN/IR/20260608/0004",
-      "category": "Standard Incident",
+      "category": "Operational Incident",
       "attachments": [],
       "responders": [
         {
           "responderId": "Ranger John",
           "assignedBy": "DM Gan",
           "assignedAt": "2026-06-08T13:51:21.374Z",
-          "status": "Active"
+          "status": "Active",
+          "lifecycleStatus": "Assigned"
         }
       ]
     },
@@ -807,7 +810,7 @@
       "summary": "1",
       "completionRemarks": "a",
       "slaveIncidents": [],
-      "category": "Standard Incident",
+      "category": "Operational Incident",
       "acknowledgedAt": "2026-06-12T03:58:46.186Z",
       "onSiteAt": "2026-06-12T03:58:51.891Z",
       "completedAt": "2026-06-12T03:59:12.817Z",
@@ -884,7 +887,7 @@
       ],
       "summary": "Water leakage from Level 2 air-conditioning duct at Beach Station, causing floor wetness. Closed after repair and review.",
       "completionRemarks": "Leak isolated and area dried.",
-      "category": "Standard Incident",
+      "category": "Operational Incident",
       "emergencyServices": {
         "policeAtScene": false,
         "officerNameRank": "",
@@ -918,7 +921,8 @@
           "responderId": "Ranger John",
           "assignedBy": "system",
           "assignedAt": "2026-06-12T08:00:00+07:00",
-          "status": "Active"
+          "status": "Active",
+          "lifecycleStatus": "Completed"
         }
       ]
     },
@@ -974,7 +978,7 @@
       ],
       "summary": "Ranger Dave proactively spotted and resolved an unattended backpack near Palawan Beach on patrol. Returned bag to owner.",
       "completionRemarks": "Bag returned to verified owner. Cordon removed.",
-      "category": "Proactive Incident",
+      "category": "Operational Incident",
       "emergencyServices": {
         "policeAtScene": false,
         "officerNameRank": "",
@@ -1008,7 +1012,8 @@
           "responderId": "Ranger Dave",
           "assignedBy": "Ranger Dave",
           "assignedAt": "2026-06-12T09:00:00+07:00",
-          "status": "Active"
+          "status": "Active",
+          "lifecycleStatus": "Completed"
         }
       ]
     },
@@ -1098,7 +1103,8 @@
           "responderId": "External Pest Control",
           "assignedBy": "Controller Steve",
           "assignedAt": "2026-06-11T14:30:00+07:00",
-          "status": "Active"
+          "status": "Active",
+          "lifecycleStatus": "Completed"
         }
       ]
     },
@@ -1114,7 +1120,7 @@
       "reporterName": "UCS Alarm System",
       "requestedBy": "UCS Power Feed",
       "createdBy": "system",
-      "status": "Live (On-Site)",
+      "status": "Live (Assigned)",
       "location": {
         "road": "Siloso Beach Walk",
         "building": "Kiosk Sector 3",
@@ -1166,7 +1172,7 @@
       ],
       "summary": "Active power failure affecting multiple kiosks on Siloso Beach Walk. SP Group technicians investigating on-site.",
       "completionRemarks": "",
-      "category": "Ongoing Incident",
+      "category": "Operational Incident",
       "emergencyServices": {
         "policeAtScene": false,
         "officerNameRank": "",
@@ -1200,7 +1206,8 @@
           "responderId": "Ranger Sarah",
           "assignedBy": "system",
           "assignedAt": "2026-06-12T10:00:00+07:00",
-          "status": "Active"
+          "status": "Active",
+          "lifecycleStatus": "On-Site"
         }
       ]
     },
@@ -1257,7 +1264,7 @@
       ],
       "summary": "Evacuation fire drill conducted at SDC headquarters building. Evacuation time logged: 5m 12s.",
       "completionRemarks": "Fire drill completed successfully. Evacuation time: 5m 12s.",
-      "category": "Operational Record",
+      "category": "Informational / Exercise Records",
       "emergencyServices": {
         "policeAtScene": false,
         "officerNameRank": "",
@@ -1291,7 +1298,8 @@
           "responderId": "HQ Fire Wardens",
           "assignedBy": "Safety Coordinator",
           "assignedAt": "2026-06-12T14:00:00+07:00",
-          "status": "Active"
+          "status": "Active",
+          "lifecycleStatus": "Completed"
         }
       ]
     },
@@ -1365,7 +1373,7 @@
       ],
       "summary": "A 6-year-old child reported missing near the Siloso Beach restrooms. The report was returned by supervisor for missing BWC footage bookmarks.",
       "completionRemarks": "Child reunited safe. Report returned by DM for BWC attachment.",
-      "category": "Standard Incident",
+      "category": "Operational Incident",
       "emergencyServices": {
         "policeAtScene": false,
         "officerNameRank": "",
@@ -1399,7 +1407,8 @@
           "responderId": "Ranger John",
           "assignedBy": "Controller Steve",
           "assignedAt": "2026-06-12T11:00:00+07:00",
-          "status": "Active"
+          "status": "Active",
+          "lifecycleStatus": "Completed"
         }
       ]
     },
@@ -1415,7 +1424,7 @@
       "reporterName": "HH",
       "requestedBy": "Email",
       "createdBy": "Controller Steve",
-      "category": "Standard Incident",
+      "category": "Operational Incident",
       "status": "Closed",
       "location": {
         "road": "Siloso Beach Walk",
@@ -1618,25 +1627,29 @@
           "responderId": "Ranger John",
           "assignedBy": "Controller Steve",
           "assignedAt": "2026-06-14T02:26:00.000Z",
-          "status": "Removed"
+          "status": "Removed",
+          "lifecycleStatus": "Completed"
         },
         {
           "responderId": "Ranger Alex",
           "assignedBy": "Admin Root",
           "assignedAt": "2026-06-14T10:21:15.899Z",
-          "status": "Removed"
+          "status": "Removed",
+          "lifecycleStatus": "Completed"
         },
         {
           "responderId": "Ranger John",
           "assignedBy": "Admin Root",
           "assignedAt": "2026-06-14T10:22:30.482Z",
-          "status": "Active"
+          "status": "Active",
+          "lifecycleStatus": "Completed"
         },
         {
           "responderId": "Ranger Alex",
           "assignedBy": "Admin Root",
           "assignedAt": "2026-06-14T10:25:27.321Z",
-          "status": "Active"
+          "status": "Active",
+          "lifecycleStatus": "Completed"
         }
       ]
     },
@@ -1652,7 +1665,7 @@
       "reporterName": "Anonymous Guest",
       "requestedBy": "Public Phone",
       "createdBy": "DM Gan",
-      "category": "Standard Incident",
+      "category": "Operational Incident",
       "status": "Live (Assigned)",
       "location": {
         "road": "Siloso Beach Walk",
@@ -1891,19 +1904,22 @@
           "responderId": "Ranger John",
           "assignedBy": "Controller Steve",
           "assignedAt": "2026-06-14T13:29:18.570Z",
-          "status": "Removed"
+          "status": "Removed",
+          "lifecycleStatus": "Assigned"
         },
         {
           "responderId": "Ranger Alex",
           "assignedBy": "Controller Steve",
           "assignedAt": "2026-06-14T13:29:19.957Z",
-          "status": "Active"
+          "status": "Active",
+          "lifecycleStatus": "Assigned"
         },
         {
           "responderId": "Ranger John",
           "assignedBy": "Controller Steve",
           "assignedAt": "2026-06-14T14:25:43.400Z",
-          "status": "Active"
+          "status": "Active",
+          "lifecycleStatus": "Assigned"
         }
       ],
       "acknowledgedAt": "2026-06-14T13:30:42.724Z",
@@ -1922,7 +1938,7 @@
       "reporterName": "1",
       "requestedBy": "Guest Call-in",
       "createdBy": "DM Gan",
-      "category": "Standard Incident",
+      "category": "Operational Incident",
       "status": "Closed",
       "location": {
         "road": "",
@@ -1998,13 +2014,15 @@
           "responderId": "Ranger John",
           "assignedBy": "Controller Steve",
           "assignedAt": "2026-06-14T14:53:26.004Z",
-          "status": "Active"
+          "status": "Active",
+          "lifecycleStatus": "Completed"
         },
         {
           "responderId": "Ranger Alex",
           "assignedBy": "Controller Steve",
           "assignedAt": "2026-06-14T14:53:27.879Z",
-          "status": "Active"
+          "status": "Active",
+          "lifecycleStatus": "Completed"
         }
       ]
     },
@@ -2020,7 +2038,7 @@
       "reporterName": "1",
       "requestedBy": "Public Phone",
       "createdBy": "Controller Steve",
-      "category": "Standard Incident",
+      "category": "Operational Incident",
       "status": "Live",
       "location": {
         "road": "Siloso Beach Walk",
@@ -2072,7 +2090,9 @@
       "cctvBwc": [],
       "summary": "",
       "completionRemarks": "",
-      "slaveIncidents": []
+      "slaveIncidents": [],
+      "attachments": [],
+      "responders": []
     }
   ],
   "faults": [
@@ -2188,7 +2208,7 @@
       "assignee": "Ranger Alex",
       "priority": "Medium",
       "dueDate": "2026-06-05T12:00:00",
-      "status": "Pending",
+      "status": "Pending Further Action",
       "createdBy": "controller_steve",
       "createdDate": "2026-06-05T08:00:00+07:00",
       "attachments": []
@@ -2304,7 +2324,308 @@
       "content": "Returned Ranger report for Mrs Tan's missing child case due to missing BWC backup video bookmarks."
     }
   ],
-  "events": [],
+  "events": [
+    {
+      "id": "EVT-2026-0001",
+      "name": "Sentosa Test Festival",
+      "startDateTime": "2026-09-15T09:00:00.000Z",
+      "endDateTime": "2026-09-15T18:00:00.000Z",
+      "location": {
+        "road": "Siloso Beach Walk",
+        "building": "Siloso Beach Station",
+        "levelSpace": "",
+        "nearAt": "",
+        "commonName": "Siloso Beach Station",
+        "postalCode": "",
+        "tags": [],
+        "lat": 1.25,
+        "lng": 103.83
+      },
+      "type": "Sports & Recreation",
+      "createdBy": "system",
+      "createdAt": "2026-09-08T09:09:08.288Z"
+    },
+    {
+      "id": "EVT-2026-0002",
+      "name": "Bulk Event 1",
+      "startDateTime": "2026-09-20T08:00:00.000Z",
+      "endDateTime": "2026-09-20T18:00:00.000Z",
+      "location": {
+        "road": "Siloso Beach Walk",
+        "building": "Costa Sands Resort",
+        "levelSpace": "",
+        "nearAt": "",
+        "commonName": "Costa Sands Resort",
+        "postalCode": "",
+        "tags": [],
+        "lat": 1.25,
+        "lng": 103.83
+      },
+      "type": "Sports & Recreation",
+      "createdBy": "system",
+      "createdAt": "2026-09-08T09:12:04.064Z"
+    },
+    {
+      "id": "EVT-2026-0003",
+      "name": "Bulk Event 2",
+      "startDateTime": "2026-09-21T10:00:00.000Z",
+      "endDateTime": "2026-09-21T16:00:00.000Z",
+      "location": {
+        "road": "Palawan Beach Walk",
+        "building": "Palawan Food Court",
+        "levelSpace": "",
+        "nearAt": "",
+        "commonName": "Palawan Food Court",
+        "postalCode": "",
+        "tags": [],
+        "lat": 1.25,
+        "lng": 103.83
+      },
+      "type": "Sports & Recreation",
+      "createdBy": "system",
+      "createdAt": "2026-09-08T09:12:04.064Z"
+    },
+    {
+      "id": "EVT-2026-0004",
+      "name": "Sentosa Beach Volleyball Open",
+      "startDateTime": "2026-09-20T01:00:00.000Z",
+      "endDateTime": "2026-09-20T11:00:00.000Z",
+      "location": {
+        "road": "Siloso Beach Walk",
+        "building": "Siloso Beach Station",
+        "levelSpace": "Level 1 - Ticket Counter",
+        "nearAt": "",
+        "commonName": "Siloso Beach Station",
+        "postalCode": "",
+        "tags": [],
+        "lat": 1.25,
+        "lng": 103.83
+      },
+      "type": "Sports & Recreation",
+      "createdBy": "Controller Steve",
+      "createdAt": "2026-09-08T09:14:21.511Z"
+    },
+    {
+      "id": "EVT-2026-0005",
+      "name": "Palawan Sunset Acoustic Chill",
+      "startDateTime": "2026-09-21T10:30:00.000Z",
+      "endDateTime": "2026-09-21T14:00:00.000Z",
+      "location": {
+        "road": "Palawan Beach Walk",
+        "building": "Palawan Food Court",
+        "levelSpace": "Level 1 - Stall 1 (Drinks)",
+        "nearAt": "",
+        "commonName": "Palawan Food Court",
+        "postalCode": "",
+        "tags": [],
+        "lat": 1.25,
+        "lng": 103.83
+      },
+      "type": "Sports & Recreation",
+      "createdBy": "Controller Steve",
+      "createdAt": "2026-09-08T09:14:21.511Z"
+    },
+    {
+      "id": "EVT-2026-0006",
+      "name": "Imbiah Night Forest Light Trail",
+      "startDateTime": "2026-09-22T12:00:00.000Z",
+      "endDateTime": "2026-09-22T16:00:00.000Z",
+      "location": {
+        "road": "Imbiah Road",
+        "building": "Cable Car Station",
+        "levelSpace": "Ground Level - Entrance Gate",
+        "nearAt": "",
+        "commonName": "Cable Car Station",
+        "postalCode": "",
+        "tags": [],
+        "lat": 1.25,
+        "lng": 103.83
+      },
+      "type": "Sports & Recreation",
+      "createdBy": "Controller Steve",
+      "createdAt": "2026-09-08T09:14:21.511Z"
+    },
+    {
+      "id": "EVT-2026-0007",
+      "name": "Mega Adventure Zip Tour",
+      "startDateTime": "2026-09-25T03:00:00.000Z",
+      "endDateTime": "2026-09-25T09:00:00.000Z",
+      "location": {
+        "road": "Siloso Beach Walk",
+        "building": "Costa Sands Resort",
+        "levelSpace": "Ground Floor - Hotel Lobby",
+        "nearAt": "",
+        "commonName": "Costa Sands Resort",
+        "postalCode": "",
+        "tags": [],
+        "lat": 1.25,
+        "lng": 103.83
+      },
+      "type": "Sports & Recreation",
+      "createdBy": "Controller Steve",
+      "createdAt": "2026-09-08T09:16:35.808Z"
+    },
+    {
+      "id": "EVT-2026-0008",
+      "name": "Sentosa Beach Volleyball Championship",
+      "startDateTime": "2026-09-15T01:00:00.000Z",
+      "endDateTime": "2026-09-15T11:00:00.000Z",
+      "location": {
+        "road": "Siloso Beach Walk",
+        "building": "Siloso Beach Station",
+        "levelSpace": "Level 1 - Ticket Counter",
+        "nearAt": "",
+        "commonName": "Siloso Beach Station",
+        "postalCode": "",
+        "tags": [],
+        "lat": 1.25,
+        "lng": 103.83
+      },
+      "type": "Sports & Recreation",
+      "createdBy": "Controller Steve",
+      "createdAt": "2026-09-08T09:54:15.247Z"
+    },
+    {
+      "id": "EVT-2026-0009",
+      "name": "Palawan Sunset Food Festival",
+      "startDateTime": "2026-09-16T09:00:00.000Z",
+      "endDateTime": "2026-09-16T15:30:00.000Z",
+      "location": {
+        "road": "Palawan Beach Walk",
+        "building": "Palawan Food Court",
+        "levelSpace": "Level 1 - Stall 1 (Drinks)",
+        "nearAt": "",
+        "commonName": "Palawan Food Court",
+        "postalCode": "",
+        "tags": [],
+        "lat": 1.25,
+        "lng": 103.83
+      },
+      "type": "Sports & Recreation",
+      "createdBy": "Controller Steve",
+      "createdAt": "2026-09-08T09:54:15.309Z"
+    },
+    {
+      "id": "EVT-2026-0010",
+      "name": "Cable Car Maintenance & Inspection",
+      "startDateTime": "2026-09-17T23:00:00.000Z",
+      "endDateTime": "2026-09-18T03:00:00.000Z",
+      "location": {
+        "road": "Imbiah Road",
+        "building": "Cable Car Station",
+        "levelSpace": "Ground Level - Entrance Gate",
+        "nearAt": "",
+        "commonName": "Cable Car Station",
+        "postalCode": "",
+        "tags": [],
+        "lat": 1.25,
+        "lng": 103.83
+      },
+      "type": "Sports & Recreation",
+      "createdBy": "Controller Steve",
+      "createdAt": "2026-09-08T09:54:15.360Z"
+    },
+    {
+      "id": "EVT-2026-0011",
+      "name": "Costa Sands Hospitality Workshop",
+      "startDateTime": "2026-09-19T03:00:00.000Z",
+      "endDateTime": "2026-09-19T08:00:00.000Z",
+      "location": {
+        "road": "Siloso Beach Walk",
+        "building": "Costa Sands Resort",
+        "levelSpace": "Ground Floor - Hotel Lobby",
+        "nearAt": "",
+        "commonName": "Costa Sands Resort",
+        "postalCode": "",
+        "tags": [],
+        "lat": 1.25,
+        "lng": 103.83
+      },
+      "type": "Sports & Recreation",
+      "createdBy": "Controller Steve",
+      "createdAt": "2026-09-08T09:54:15.403Z"
+    },
+    {
+      "id": "EVT-2026-0012",
+      "name": "Siloso Rooftop Networking Night",
+      "startDateTime": "2026-09-20T11:30:00.000Z",
+      "endDateTime": "2026-09-20T14:30:00.000Z",
+      "location": {
+        "road": "Siloso Beach Walk",
+        "building": "Siloso Beach Station",
+        "levelSpace": "Level 2 - Rooftop Cafe",
+        "nearAt": "",
+        "commonName": "Siloso Beach Station",
+        "postalCode": "",
+        "tags": [],
+        "lat": 1.25,
+        "lng": 103.83
+      },
+      "type": "Sports & Recreation",
+      "createdBy": "Controller Steve",
+      "createdAt": "2026-09-08T09:54:15.419Z"
+    },
+    {
+      "id": "EVT-2026-0013",
+      "name": "Sentosa Sunset Beach Volleyball Cup",
+      "startDateTime": "2026-09-28T01:00:00.000Z",
+      "endDateTime": "2026-09-28T11:00:00.000Z",
+      "location": {
+        "road": "Siloso Beach Walk",
+        "building": "Siloso Beach Station",
+        "levelSpace": "Level 1",
+        "nearAt": "",
+        "commonName": "Siloso Beach Station",
+        "postalCode": "",
+        "tags": [],
+        "lat": 1.25,
+        "lng": 103.83
+      },
+      "type": "Sports & Recreation",
+      "createdBy": "Controller Steve",
+      "createdAt": "2026-09-09T03:50:24.490Z"
+    },
+    {
+      "id": "EVT-2026-0014",
+      "name": "Palawan Island Food Carnival",
+      "startDateTime": "2026-09-29T09:00:00.000Z",
+      "endDateTime": "2026-09-29T15:30:00.000Z",
+      "location": {
+        "road": "Palawan Beach Walk",
+        "building": "Palawan Food Court",
+        "levelSpace": "Level 1",
+        "nearAt": "",
+        "commonName": "Palawan Food Court",
+        "postalCode": "",
+        "tags": [],
+        "lat": 1.25,
+        "lng": 103.83
+      },
+      "type": "F&B",
+      "createdBy": "Controller Steve",
+      "createdAt": "2026-09-09T03:50:24.533Z"
+    },
+    {
+      "id": "EVT-2026-0015",
+      "name": "VIP Dignitary Infrastructure Review",
+      "startDateTime": "2026-05-10T06:59:00.000Z",
+      "endDateTime": "2026-05-10T09:59:00.000Z",
+      "location": {
+        "road": "Siloso Beach Walk",
+        "building": "Costa Sands Resort",
+        "levelSpace": "Ground Floor",
+        "nearAt": "",
+        "commonName": "Costa Sands Resort",
+        "postalCode": "",
+        "tags": [],
+        "lat": 1.25,
+        "lng": 103.83
+      },
+      "type": "VIP / Dignitary",
+      "createdBy": "Controller Steve",
+      "createdAt": "2026-09-09T03:50:24.569Z"
+    }
+  ],
   "nops": [],
   "broadcasts": [
     {
@@ -2441,5 +2762,6 @@
       "correlationId": "USR-1781432420704",
       "ipAddress": "127.0.0.1"
     }
-  ]
+  ],
+  "recurrenceSeries": []
 }

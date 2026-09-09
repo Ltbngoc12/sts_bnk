@@ -28,6 +28,7 @@ import {
 
 async function mdb(): Promise<Db> {
   const client = await clientPromise;
+  if (!client) throw new Error('MongoDB client is not initialized');
   return client.db('sentosa-cms');
 }
 

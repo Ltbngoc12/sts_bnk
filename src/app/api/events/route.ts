@@ -55,19 +55,61 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, startDateTime, endDateTime, location, boundaryCoordinates, type, description, sourceEDiaryId, username } = body;
 
-    if (!name || !startDateTime || !endDateTime || !type) {
+    // Bulk creation support
+    if (Array.isArray(body.events) || Array.isArray(body)) {
+      const list = Array.isArray(body.events) ? body.events : body;
+      const db = await getDb();
+      if (!db.events) db.events = [];
+      const createdList: EventRecord[] = [];
+      const now = new Date().toISOString();
+
+      for (const item of list) {
+        const { name, startDateTime, endDateTime, location, boundaryCoordinates, type, description, sourceEDiaryId, username } = item;
+        if (!name || !startDateTime || !endDateTime) continue;
+
+        const newEvent: EventRecord = {
+          id: generateEventId(db),
+          name: name.trim(),
+          startDateTime,
+          endDateTime,
+          location: {
+            road: location?.road || '',
+            building: location?.building || '',
+            levelSpace: location?.levelSpace || '',
+            nearAt: location?.nearAt || '',
+            commonName: location?.commonName || location?.road || location?.building || '',
+            postalCode: location?.postalCode || '',
+            tags: location?.tags || [],
+            lat: location?.lat ?? 1.2500,
+            lng: location?.lng ?? 103.8300,
+          },
+          boundaryCoordinates: Array.isArray(boundaryCoordinates) && boundaryCoordinates.length > 0 ? boundaryCoordinates : undefined,
+          type: type || 'Sports & Recreation',
+          description: description || undefined,
+          sourceEDiaryId: sourceEDiaryId || undefined,
+          createdBy: username || 'system',
+          createdAt: now,
+        };
+
+        db.events.push(newEvent);
+        createdList.push(newEvent);
+      }
+
+      await saveDb(db);
+      return NextResponse.json({ events: createdList, count: createdList.length }, { status: 201 });
+    }
+
+    const { name, startDateTime, endDateTime, location, boundaryCoordinates, type, description, sourceEDiaryId, username } = body;
+    const eventType = type || 'Sports & Recreation';
+
+    if (!name || !startDateTime || !endDateTime) {
       return NextResponse.json(
-        { error: 'name, startDateTime, endDateTime, and type are required' },
+        { error: 'name, startDateTime, and endDateTime are required' },
         { status: 400 }
       );
     }
 
-    // §8.2(a)/(b) — location must reference the location hierarchy, not free text.
-    // (Full hierarchy-match validation happens client-side against LocationSelector's
-    // data, same limitation as Fault/Incident — the hierarchy itself is only available
-    // via localStorage on the client, not the server. See EVENTS_MASTER_LIST_MODULE_PLAN.md §6.)
     const locationName = location?.commonName || location?.road || location?.building;
     if (!locationName) {
       return NextResponse.json(
@@ -100,7 +142,7 @@ export async function POST(request: NextRequest) {
         lng: location?.lng ?? 103.8300,
       },
       boundaryCoordinates: Array.isArray(boundaryCoordinates) && boundaryCoordinates.length > 0 ? boundaryCoordinates : undefined,
-      type,
+      type: eventType,
       description: description || undefined,
       sourceEDiaryId: sourceEDiaryId || undefined,
       createdBy: username || 'system',
