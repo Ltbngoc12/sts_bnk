@@ -15,11 +15,12 @@ import { useRole } from '@/context/RoleContext';
 import {
   ChecklistTemplate,
   ChecklistTemplateItem,
+  DEFAULT_CHECKLIST_TEMPLATES,
   getChecklistTemplates,
   saveChecklistTemplates,
 } from '@/lib/checklistTemplates';
 import { getTaskPriorityTaxonomy } from '@/lib/taxonomy';
-import { DistributionGroup, DEFAULT_GROUPS, GROUPS_STORAGE_KEY } from '@/lib/groups';
+import { DistributionGroup, DEFAULT_GROUPS, GROUPS_STORAGE_KEY, getGroups, saveGroups } from '@/lib/groups';
 
 type TabKey = 'templates' | 'distribution';
 
@@ -224,6 +225,22 @@ function TaskConfigurationPageInner() {
   const labelStyle: React.CSSProperties = { display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '5px', textTransform: 'uppercase' };
   const inputStyle: React.CSSProperties = { width: '100%', padding: '8px 12px', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '13px', boxSizing: 'border-box' };
 
+  const handleResetDefaults = () => {
+    if (activeTab === 'templates') {
+      if (confirm('Reset all checklist templates to system production defaults (8 operational templates)?')) {
+        persistTemplates(DEFAULT_CHECKLIST_TEMPLATES);
+        logAudit('Task Checklist Templates', 'Reset Checklist Templates', templates, DEFAULT_CHECKLIST_TEMPLATES, 'Reset checklist templates to system production defaults', 'TPL');
+        alert('Checklist templates successfully reset to defaults!');
+      }
+    } else {
+      if (confirm('Reset all task distribution groups to system production defaults (8 operational groups)?')) {
+        saveGroupsState(DEFAULT_GROUPS);
+        logAudit('Distribution Groups', 'Reset Distribution Groups', groups, DEFAULT_GROUPS, 'Reset distribution groups to system production defaults', 'DST');
+        alert('Task distribution groups successfully reset to defaults!');
+      }
+    }
+  };
+
   return (
     <AdminGuard pageTitle="Task Configuration">
       <div className="admin-header-bar glass" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-card)' }}>
@@ -233,15 +250,20 @@ function TaskConfigurationPageInner() {
             Checklist templates and assignee distribution groups Controllers use when creating and dispatching Tasks.
           </p>
         </div>
-        {activeTab === 'templates' ? (
-          <button onClick={openCreateTemplate} className="btn btn-primary" style={{ padding: '8px 16px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--color-primary-dark)', border: 'none', color: '#fff', cursor: 'pointer' }}>
-            <span>+</span> Create Template
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button onClick={handleResetDefaults} className="btn btn-secondary" style={{ padding: '8px 16px', borderRadius: '6px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', border: '1px solid #fca5a5', color: '#dc2626', background: '#fef2f2' }} title="Reset to production defaults">
+            <span>🔄</span> Reset to Defaults
           </button>
-        ) : (
-          <button onClick={openCreateGroup} className="btn btn-primary" style={{ padding: '8px 16px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--color-primary-dark)', border: 'none', color: '#fff', cursor: 'pointer' }}>
-            <span>+</span> Create Group
-          </button>
-        )}
+          {activeTab === 'templates' ? (
+            <button onClick={openCreateTemplate} className="btn btn-primary" style={{ padding: '8px 16px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--color-primary-dark)', border: 'none', color: '#fff', cursor: 'pointer' }}>
+              <span>+</span> Create Template
+            </button>
+          ) : (
+            <button onClick={openCreateGroup} className="btn btn-primary" style={{ padding: '8px 16px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--color-primary-dark)', border: 'none', color: '#fff', cursor: 'pointer' }}>
+              <span>+</span> Create Group
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Tabs */}

@@ -42,19 +42,27 @@ export const DEFAULT_USERS: UserAccount[] = [
   { id: '21', name: 'Electrical Lead Kelvin', email: 'electrical.lead@spgroup.com.sg', phone: '+65 9122 3344', department: 'Power Grid Infrastructure', orgUnit: 'SP Group On-Site', authSource: 'Non-SSO', role: 'Non-SDC Term Contractor', status: 'Active', lastLogin: '2026-06-09T14:00:00Z' }
 ];
 
+export const USERS_VERSION = '2026.09.10.v1';
+
 export function getUsers(): UserAccount[] {
   if (typeof window === 'undefined') {
+    return DEFAULT_USERS;
+  }
+  const ver = localStorage.getItem('admin_users_ver');
+  if (ver !== USERS_VERSION) {
+    localStorage.setItem('admin_users', JSON.stringify(DEFAULT_USERS));
+    localStorage.setItem('admin_users_ver', USERS_VERSION);
     return DEFAULT_USERS;
   }
   const stored = localStorage.getItem('admin_users');
   if (stored) {
     try {
-      return JSON.parse(stored);
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     } catch {
       return DEFAULT_USERS;
     }
   }
-  // Initialize on first retrieval
   localStorage.setItem('admin_users', JSON.stringify(DEFAULT_USERS));
   return DEFAULT_USERS;
 }
@@ -62,5 +70,6 @@ export function getUsers(): UserAccount[] {
 export function saveUsers(users: UserAccount[]): void {
   if (typeof window !== 'undefined') {
     localStorage.setItem('admin_users', JSON.stringify(users));
+    localStorage.setItem('admin_users_ver', USERS_VERSION);
   }
 }

@@ -3,85 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { AdminGuard } from '@/components/AdminGuard';
 import { useRole } from '@/context/RoleContext';
-
-interface LocationNode {
-  id: string;
-  name: string;
-  type: 'Road' | 'Building' | 'Level' | 'Space';
-  parentId: string | null;
-  lat?: number;
-  lng?: number;
-  tags?: string[];
-  postalCode?: string;
-  commonName?: string;
-  status: 'Active' | 'Deactivated';
-}
-
-const DEFAULT_NODES: LocationNode[] = [
-  // ── Roads ──
-  { id: 'road-siloso', name: 'Siloso Beach Walk', type: 'Road', parentId: null, status: 'Active' },
-  { id: 'road-palawan', name: 'Palawan Beach Walk', type: 'Road', parentId: null, status: 'Active' },
-  { id: 'road-tanjong', name: 'Tanjong Beach Walk', type: 'Road', parentId: null, status: 'Active' },
-  { id: 'road-imbiah', name: 'Imbiah Road', type: 'Road', parentId: null, status: 'Active' },
-  { id: 'road-gateway', name: 'Sentosa Gateway', type: 'Road', parentId: null, status: 'Active' },
-  { id: 'road-artillery', name: 'Artillery Avenue', type: 'Road', parentId: null, status: 'Active' },
-  { id: 'road-ocean', name: 'Ocean Way', type: 'Road', parentId: null, status: 'Active' },
-  { id: 'road-cove', name: 'Cove Drive', type: 'Road', parentId: null, status: 'Active' },
-  { id: 'road-allanbrooke', name: 'Allanbrooke Road', type: 'Road', parentId: null, status: 'Active' },
-
-  // ── Buildings & Major Venues ──
-  { id: 'bld-siloso-station', name: 'Siloso Beach Station', type: 'Building', parentId: 'road-siloso', postalCode: '098991', commonName: 'Siloso Beach Station', status: 'Active' },
-  { id: 'bld-fort-siloso', name: 'Fort Siloso Skywalk & Museum', type: 'Building', parentId: 'road-siloso', postalCode: '099981', commonName: 'Fort Siloso', status: 'Active' },
-  { id: 'bld-costa-sands', name: 'Costa Sands Resort', type: 'Building', parentId: 'road-siloso', postalCode: '099982', commonName: 'Costa Sands Resort', status: 'Active' },
-  { id: 'bld-skypark', name: 'Skypark Sentosa by AJ Hackett', type: 'Building', parentId: 'road-siloso', postalCode: '099983', commonName: 'Skypark Bungy', status: 'Active' },
-  { id: 'bld-trapizza', name: 'Trapizza Pavilion', type: 'Building', parentId: 'road-siloso', postalCode: '098996', commonName: 'Trapizza', status: 'Active' },
-
-  { id: 'bld-palawan-green', name: 'Palawan Green Event Lawn', type: 'Building', parentId: 'road-palawan', postalCode: '098236', commonName: 'Palawan Green', status: 'Active' },
-  { id: 'bld-palawan-court', name: 'Palawan Food Court', type: 'Building', parentId: 'road-palawan', postalCode: '098500', commonName: 'Palawan Food Court', status: 'Active' },
-  { id: 'bld-hydrodash', name: 'HydroDash Waterpark', type: 'Building', parentId: 'road-palawan', postalCode: '098498', commonName: 'HydroDash', status: 'Active' },
-  { id: 'bld-ultragolf', name: 'UltraGolf Sentosa', type: 'Building', parentId: 'road-palawan', postalCode: '098499', commonName: 'UltraGolf', status: 'Active' },
-
-  { id: 'bld-tanjong-club', name: 'Tanjong Beach Club', type: 'Building', parentId: 'road-tanjong', postalCode: '098942', commonName: 'Tanjong Beach Club', status: 'Active' },
-  { id: 'bld-tanjong-carpark', name: 'Tanjong Carpark Complex', type: 'Building', parentId: 'road-tanjong', postalCode: '098943', commonName: 'Tanjong Carpark', status: 'Active' },
-
-  { id: 'bld-cable-station', name: 'Cable Car Station (Imbiah)', type: 'Building', parentId: 'road-imbiah', postalCode: '099238', commonName: 'Cable Car Station', status: 'Active' },
-  { id: 'bld-luge-station', name: 'Skyline Luge Sentosa', type: 'Building', parentId: 'road-imbiah', postalCode: '099239', commonName: 'Skyline Luge', status: 'Active' },
-  { id: 'bld-madame-tussauds', name: 'Madame Tussauds Sentosa', type: 'Building', parentId: 'road-imbiah', postalCode: '099240', commonName: 'Madame Tussauds', status: 'Active' },
-  { id: 'bld-mega-adventure', name: 'Mega Adventure Park', type: 'Building', parentId: 'road-imbiah', postalCode: '099241', commonName: 'Mega Adventure', status: 'Active' },
-
-  { id: 'bld-rws-uss', name: 'Universal Studios Singapore', type: 'Building', parentId: 'road-gateway', postalCode: '098269', commonName: 'Universal Studios Singapore', status: 'Active' },
-  { id: 'bld-rws-sea', name: 'S.E.A. Aquarium', type: 'Building', parentId: 'road-gateway', postalCode: '098269', commonName: 'S.E.A. Aquarium', status: 'Active' },
-  { id: 'bld-rws-forum', name: 'Festive Walk & Forum RWS', type: 'Building', parentId: 'road-gateway', postalCode: '098269', commonName: 'Festive Walk', status: 'Active' },
-  { id: 'bld-ioh-hq', name: 'Sentosa Operations HQ (IOH)', type: 'Building', parentId: 'road-artillery', postalCode: '099981', commonName: 'Sentosa Operations HQ', status: 'Active' },
-
-  { id: 'bld-golf-club', name: 'Sentosa Golf Club Clubhouse', type: 'Building', parentId: 'road-artillery', postalCode: '099858', commonName: 'Sentosa Golf Club', status: 'Active' },
-  { id: 'bld-w-hotel', name: 'W Singapore Sentosa Cove', type: 'Building', parentId: 'road-ocean', postalCode: '098374', commonName: 'W Singapore', status: 'Active' },
-  { id: 'bld-one15', name: 'ONE°15 Marina Sentosa Cove', type: 'Building', parentId: 'road-cove', postalCode: '098497', commonName: 'ONE°15 Marina', status: 'Active' },
-
-  // ── Levels ──
-  { id: 'lvl-siloso-st-1', name: 'Level 1', type: 'Level', parentId: 'bld-siloso-station', status: 'Active' },
-  { id: 'lvl-siloso-st-2', name: 'Level 2', type: 'Level', parentId: 'bld-siloso-station', status: 'Active' },
-  { id: 'lvl-costa-ground', name: 'Ground Floor', type: 'Level', parentId: 'bld-costa-sands', status: 'Active' },
-  { id: 'lvl-palawan-court-1', name: 'Level 1', type: 'Level', parentId: 'bld-palawan-court', status: 'Active' },
-  { id: 'lvl-palawan-green-ground', name: 'Ground Level', type: 'Level', parentId: 'bld-palawan-green', status: 'Active' },
-  { id: 'lvl-cable-ground', name: 'Ground Level', type: 'Level', parentId: 'bld-cable-station', status: 'Active' },
-  { id: 'lvl-tanjong-main', name: 'Main Deck', type: 'Level', parentId: 'bld-tanjong-club', status: 'Active' },
-  { id: 'lvl-uss-globe', name: 'Entrance Plaza', type: 'Level', parentId: 'bld-rws-uss', status: 'Active' },
-  { id: 'lvl-ioh-ctrl', name: 'Command Level 2', type: 'Level', parentId: 'bld-ioh-hq', status: 'Active' },
-
-  // ── Spaces ──
-  { id: 'spc-siloso-ticket', name: 'Ticket Counter', type: 'Space', parentId: 'lvl-siloso-st-1', lat: 1.2512, lng: 103.8180, tags: ['Ticket', 'IOH-Cam'], status: 'Active' },
-  { id: 'spc-siloso-ctrl', name: 'Control Room', type: 'Space', parentId: 'lvl-siloso-st-1', lat: 1.2514, lng: 103.8182, tags: ['Operational', 'Restricted'], status: 'Active' },
-  { id: 'spc-siloso-cafe', name: 'Rooftop Cafe', type: 'Space', parentId: 'lvl-siloso-st-2', lat: 1.2515, lng: 103.8185, tags: ['F&B', 'Public'], status: 'Active' },
-  { id: 'spc-siloso-stage', name: 'Main Event Stage', type: 'Space', parentId: 'lvl-siloso-st-1', lat: 1.2518, lng: 103.8188, tags: ['Event', 'Stage', 'Public'], status: 'Active' },
-  { id: 'spc-costa-lobby', name: 'Hotel Lobby', type: 'Space', parentId: 'lvl-costa-ground', lat: 1.2505, lng: 103.8150, tags: ['Resort', 'Public'], status: 'Active' },
-  { id: 'spc-palawan-stall1', name: 'Stall 1 (Drinks)', type: 'Space', parentId: 'lvl-palawan-court-1', lat: 1.2501, lng: 103.8242, tags: ['F&B', 'Public'], status: 'Active' },
-  { id: 'spc-palawan-lawn', name: 'Main Event Lawn', type: 'Space', parentId: 'lvl-palawan-green-ground', lat: 1.2503, lng: 103.8245, tags: ['Lawn', 'Event', 'Public'], status: 'Active' },
-  { id: 'spc-cable-gate', name: 'Entrance Gate', type: 'Space', parentId: 'lvl-cable-ground', lat: 1.2541, lng: 103.8190, tags: ['Entrance', 'Transit'], status: 'Active' },
-  { id: 'spc-tanjong-pool', name: 'Beachfront Pool & Daybeds', type: 'Space', parentId: 'lvl-tanjong-main', lat: 1.2460, lng: 103.8285, tags: ['Beach Club', 'F&B'], status: 'Active' },
-  { id: 'spc-uss-turnstile', name: 'Main Turnstile Gate', type: 'Space', parentId: 'lvl-uss-globe', lat: 1.2540, lng: 103.8238, tags: ['Theme Park', 'Entrance'], status: 'Active' },
-  { id: 'spc-ioh-warroom', name: 'Crisis Command War Room', type: 'Space', parentId: 'lvl-ioh-ctrl', lat: 1.2530, lng: 103.8210, tags: ['Command', 'Restricted', 'CCTV'], status: 'Active' }
-];
+import { LocationNode, DEFAULT_NODES, getLocationNodes, saveLocationNodes } from '@/components/LocationSelector';
 
 export default function LocationHierarchyPage() {
   const { username } = useRole();
@@ -104,13 +26,7 @@ export default function LocationHierarchyPage() {
   const [formTags, setFormTags] = useState<string[]>([]);
 
   useEffect(() => {
-    const stored = localStorage.getItem('admin_location_hierarchy');
-    if (stored) {
-      setNodes(JSON.parse(stored));
-    } else {
-      setNodes(DEFAULT_NODES);
-      localStorage.setItem('admin_location_hierarchy', JSON.stringify(DEFAULT_NODES));
-    }
+    setNodes(getLocationNodes());
     // Expand top roads by default
     setExpandedNodes({
       'road-siloso': true,
@@ -122,7 +38,16 @@ export default function LocationHierarchyPage() {
 
   const saveLocationState = (updated: LocationNode[]) => {
     setNodes(updated);
-    localStorage.setItem('admin_location_hierarchy', JSON.stringify(updated));
+    saveLocationNodes(updated as any);
+  };
+
+  const handleResetDefaults = () => {
+    if (confirm('Reset all location hierarchy data to system production defaults?')) {
+      saveLocationNodes(DEFAULT_NODES as any);
+      setNodes(DEFAULT_NODES);
+      logAudit('Reset Location Hierarchy', nodes, DEFAULT_NODES, 'Reset location hierarchy to system production defaults');
+      alert('Location hierarchy successfully reset to system defaults!');
+    }
   };
 
   const logAudit = async (action: string, before: any, after: any, details: string) => {
@@ -227,10 +152,10 @@ export default function LocationHierarchyPage() {
   };
 
   const handleToggleStatus = (node: LocationNode) => {
-    const newStatus = node.status === 'Active' ? 'Deactivated' : 'Active';
-    const updated = nodes.map(n => {
+    const newStatus: 'Active' | 'Inactive' = node.status === 'Active' ? 'Inactive' : 'Active';
+    const updated: LocationNode[] = nodes.map(n => {
       if (n.id === node.id) {
-        return { ...n, status: newStatus as 'Active' | 'Deactivated' };
+        return { ...n, status: newStatus };
       }
       return n;
     });
@@ -352,9 +277,14 @@ export default function LocationHierarchyPage() {
 
   return (
     <AdminGuard pageTitle="Location Hierarchy">
-      <div className="admin-header-bar glass" style={{ padding: '16px 24px', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-card)' }}>
-        <h1 style={{ fontFamily: 'var(--font-headline)', fontSize: '20px', fontWeight: 700, color: 'var(--text-main)' }}>LOCATION HIERARCHY</h1>
-        <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginTop: '2px' }}>Configure the spatial mapping tree. Coordinates dictate 2D map locations on the main Operations dashboard.</p>
+      <div className="admin-header-bar glass" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-card)' }}>
+        <div>
+          <h1 style={{ fontFamily: 'var(--font-headline)', fontSize: '20px', fontWeight: 700, color: 'var(--text-main)' }}>LOCATION HIERARCHY</h1>
+          <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginTop: '2px' }}>Configure the spatial mapping tree. Coordinates dictate 2D map locations on the main Operations dashboard.</p>
+        </div>
+        <button onClick={handleResetDefaults} className="btn btn-secondary" style={{ padding: '8px 16px', borderRadius: '6px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', border: '1px solid #fca5a5', color: '#dc2626', background: '#fef2f2' }} title="Reset all location hierarchy to production defaults">
+          <span>🔄</span> Reset to Defaults
+        </button>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '20px', marginTop: '20px', minHeight: '520px', alignItems: 'start' }}>

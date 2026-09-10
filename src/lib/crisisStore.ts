@@ -45,6 +45,14 @@ async function readOrSeed<T extends { id: string }>(name: string, defaults: T[])
     await col.insertMany(defaults.map((d) => ({ ...d })) as any[]);
     return defaults;
   }
+  if (defaults.length > 0) {
+    const existingIds = new Set(docs.map((d: any) => d.id));
+    const missing = defaults.filter((d) => !existingIds.has(d.id));
+    if (missing.length > 0) {
+      await col.insertMany(missing.map((d) => ({ ...d })) as any[]);
+      return [...(docs as unknown as T[]), ...missing];
+    }
+  }
   return docs as unknown as T[];
 }
 

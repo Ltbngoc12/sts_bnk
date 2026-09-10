@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { AdminGuard } from '@/components/AdminGuard';
 import { useRole } from '@/context/RoleContext';
-import { UserAccount, getUsers, saveUsers } from '@/lib/users';
+import { UserAccount, DEFAULT_USERS, getUsers, saveUsers } from '@/lib/users';
 
 const ROLES_DETAILS: Record<string, { desc: string; scope: string }> = {
   'System Administrator': { desc: 'Full system management rights including user provisioning, configuration, taxonomy editing, and system settings.', scope: 'Global Administrative access.' },
@@ -48,6 +48,15 @@ export default function UserManagementPage() {
   const saveUsersState = (updated: UserAccount[]) => {
     setUsers(updated);
     saveUsers(updated);
+  };
+
+  const handleResetDefaults = () => {
+    if (confirm('Reset all users back to system production defaults (21 staff accounts)?')) {
+      saveUsers(DEFAULT_USERS);
+      setUsers(DEFAULT_USERS);
+      logAudit('Reset Users', users, DEFAULT_USERS, 'Reset all users to system production defaults');
+      alert('Users successfully reset to system defaults!');
+    }
   };
 
   const logAudit = async (action: string, before: any, after: any, details: string) => {
@@ -176,9 +185,14 @@ export default function UserManagementPage() {
           <h1 style={{ fontFamily: 'var(--font-headline)', fontSize: '20px', fontWeight: 700, color: 'var(--text-main)' }}>USER ACCOUNTS</h1>
           <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginTop: '2px' }}>Supervise user onboarding, SSO provisioning, and operational roles mapping.</p>
         </div>
-        <button onClick={openCreate} className="btn btn-primary" style={{ padding: '8px 16px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--color-primary-dark)', border: 'none', color: '#fff', cursor: 'pointer' }}>
-          <span>+</span> Create User
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button onClick={handleResetDefaults} className="btn btn-secondary" style={{ padding: '8px 16px', borderRadius: '6px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', border: '1px solid #fca5a5', color: '#dc2626', background: '#fef2f2' }} title="Reset all users to production default accounts">
+            <span>🔄</span> Reset to Defaults
+          </button>
+          <button onClick={openCreate} className="btn btn-primary" style={{ padding: '8px 16px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--color-primary-dark)', border: 'none', color: '#fff', cursor: 'pointer' }}>
+            <span>+</span> Create User
+          </button>
+        </div>
       </div>
 
       <div className="glass" style={{ padding: '20px', background: 'var(--bg-card)', marginTop: '20px' }}>

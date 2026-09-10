@@ -35,6 +35,9 @@ import {
   CRISIS_LEVELS,
   DEFAULT_BROADCAST_CONFIG,
   DEFAULT_BROADCAST_PROMPT_RULES,
+  DEFAULT_BROADCAST_TEMPLATES,
+  DEFAULT_BROADCAST_MATRIX,
+  DEFAULT_BROADCAST_DISTRIBUTION_GROUPS,
 } from '@/lib/broadcastConfig';
 import type {
   BroadcastTemplate,
@@ -192,6 +195,27 @@ export default function BroadcastConfigPage() {
     );
   }
 
+  const handleResetBroadcastDefaults = async () => {
+    if (!confirm('Reset all broadcast templates, matrix rules, prompt rules and distribution groups to system production defaults?')) return;
+    try {
+      await Promise.all([
+        fetch('/api/admin/broadcast-templates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(DEFAULT_BROADCAST_TEMPLATES) }),
+        fetch('/api/admin/broadcast-matrix', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(DEFAULT_BROADCAST_MATRIX) }),
+        fetch('/api/admin/broadcast-distribution-groups', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(DEFAULT_BROADCAST_DISTRIBUTION_GROUPS) }),
+        fetch('/api/admin/broadcast-prompt-rules', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(DEFAULT_BROADCAST_PROMPT_RULES) }),
+        fetch('/api/admin/broadcast-config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(DEFAULT_BROADCAST_CONFIG) }),
+      ]);
+      setTemplates(DEFAULT_BROADCAST_TEMPLATES);
+      setMatrix(DEFAULT_BROADCAST_MATRIX);
+      setGroups(DEFAULT_BROADCAST_DISTRIBUTION_GROUPS);
+      setPromptRules(DEFAULT_BROADCAST_PROMPT_RULES);
+      setConfig(DEFAULT_BROADCAST_CONFIG);
+      alert('Broadcast configuration successfully reset to system defaults!');
+    } catch (err: any) {
+      alert('Failed to reset: ' + err.message);
+    }
+  };
+
   return (
     <AdminGuard pageTitle="Broadcast Configuration" permissionCheck={(r) => hasBroadcastPermission(r, 'broadcast.config')}>
       <div className="admin-header-bar glass" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-card)' }}>
@@ -199,9 +223,14 @@ export default function BroadcastConfigPage() {
           <h1 style={{ fontFamily: 'var(--font-headline)', fontSize: '20px', fontWeight: 700, color: 'var(--text-main)' }}>BROADCAST CONFIGURATION</h1>
           <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginTop: '2px' }}>Templates, routing matrix, end-of-day timing, action prompt rules and distribution groups for the Broadcast &amp; Notification Framework.</p>
         </div>
-        <button onClick={openAudit} className="btn btn-secondary" style={{ padding: '8px 16px', borderRadius: '6px', fontSize: '12.5px' }}>
-          View Change History
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button onClick={handleResetBroadcastDefaults} className="btn btn-secondary" style={{ padding: '8px 16px', borderRadius: '6px', fontSize: '12.5px', border: '1px solid #fca5a5', color: '#dc2626', background: '#fef2f2' }} title="Reset all broadcast settings to production defaults">
+            <span>🔄</span> Reset to Defaults
+          </button>
+          <button onClick={openAudit} className="btn btn-secondary" style={{ padding: '8px 16px', borderRadius: '6px', fontSize: '12.5px' }}>
+            View Change History
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}

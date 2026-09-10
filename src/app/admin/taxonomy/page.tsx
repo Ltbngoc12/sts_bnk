@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { AdminGuard } from '@/components/AdminGuard';
 import { useRole } from '@/context/RoleContext';
-import { TaxonomyItem, DEFAULT_REFERENCE_DATA } from '@/lib/taxonomy';
+import { TaxonomyItem, DEFAULT_REFERENCE_DATA, getReferenceData, saveReferenceData } from '@/lib/taxonomy';
 
 export default function TaxonomyPage() {
   const { username } = useRole();
@@ -26,18 +26,21 @@ export default function TaxonomyPage() {
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
 
   useEffect(() => {
-    const stored = localStorage.getItem('admin_reference_data');
-    if (stored) {
-      setItems(JSON.parse(stored));
-    } else {
-      setItems(DEFAULT_REFERENCE_DATA);
-      localStorage.setItem('admin_reference_data', JSON.stringify(DEFAULT_REFERENCE_DATA));
-    }
+    setItems(getReferenceData());
   }, []);
 
   const saveReferenceState = (updated: TaxonomyItem[]) => {
     setItems(updated);
-    localStorage.setItem('admin_reference_data', JSON.stringify(updated));
+    saveReferenceData(updated);
+  };
+
+  const handleResetDefaults = () => {
+    if (confirm('Reset all taxonomy data to system production defaults?')) {
+      saveReferenceData(DEFAULT_REFERENCE_DATA);
+      setItems(DEFAULT_REFERENCE_DATA);
+      logAudit('Reset Taxonomy', items, DEFAULT_REFERENCE_DATA, 'Reset taxonomy to system production defaults');
+      alert('Taxonomy successfully reset to system defaults!');
+    }
   };
 
   const logAudit = async (action: string, before: any, after: any, details: string) => {
@@ -198,6 +201,9 @@ export default function TaxonomyPage() {
             <span>{TAB_GUIDES[activeTab]}</span>
           </div>
           <div style={{ display: 'flex', gap: '10px', flexShrink: 0 }}>
+            <button onClick={handleResetDefaults} className="btn btn-secondary" style={{ padding: '8px 16px', borderRadius: '6px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', border: '1px solid #fca5a5', color: '#dc2626', background: '#fef2f2' }} title="Reset all taxonomy back to production defaults">
+              <span>🔄</span> Reset to Defaults
+            </button>
             <button onClick={loadAuditHistory} className="btn btn-secondary" style={{ padding: '8px 16px', borderRadius: '6px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span>📜</span> View Audit History
             </button>

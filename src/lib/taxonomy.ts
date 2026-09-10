@@ -55,23 +55,41 @@ export const DEFAULT_REFERENCE_DATA: TaxonomyItem[] = [
   { id: 'evt-12', category: 'Event', name: 'Exhibitions & MICE', description: 'Trade exhibitions, showcases and convention center events', status: 'Active' },
 ];
 
-export function getFaultTaxonomy(): Record<string, string[]> {
+export const TAXONOMY_VERSION = '2026.09.10.v1';
+
+export function getReferenceData(): TaxonomyItem[] {
   if (typeof window === 'undefined') {
-    const mapping: Record<string, string[]> = {};
-    DEFAULT_REFERENCE_DATA
-      .filter(item => item.category === 'Fault' && item.status === 'Active')
-      .forEach(item => {
-        mapping[item.name] = item.subTypes || [];
-      });
-    return mapping;
+    return DEFAULT_REFERENCE_DATA;
   }
-
+  const ver = localStorage.getItem('admin_reference_data_ver');
+  if (ver !== TAXONOMY_VERSION) {
+    localStorage.setItem('admin_reference_data', JSON.stringify(DEFAULT_REFERENCE_DATA));
+    localStorage.setItem('admin_reference_data_ver', TAXONOMY_VERSION);
+    return DEFAULT_REFERENCE_DATA;
+  }
   const stored = localStorage.getItem('admin_reference_data');
-  const items: TaxonomyItem[] = stored ? JSON.parse(stored) : [];
+  if (stored) {
+    try {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    } catch {
+      // fallback
+    }
+  }
+  localStorage.setItem('admin_reference_data', JSON.stringify(DEFAULT_REFERENCE_DATA));
+  return DEFAULT_REFERENCE_DATA;
+}
 
-  const activeFaultItems = (items.length > 0 ? items : DEFAULT_REFERENCE_DATA)
-    .filter(item => item.category === 'Fault' && item.status === 'Active');
+export function saveReferenceData(data: TaxonomyItem[]): void {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('admin_reference_data', JSON.stringify(data));
+    localStorage.setItem('admin_reference_data_ver', TAXONOMY_VERSION);
+  }
+}
 
+export function getFaultTaxonomy(): Record<string, string[]> {
+  const items = getReferenceData();
+  const activeFaultItems = items.filter(item => item.category === 'Fault' && item.status === 'Active');
   const mapping: Record<string, string[]> = {};
   activeFaultItems.forEach(item => {
     mapping[item.name] = item.subTypes || [];
@@ -80,69 +98,29 @@ export function getFaultTaxonomy(): Record<string, string[]> {
 }
 
 export function getEventTaxonomy(): string[] {
-  if (typeof window === 'undefined') {
-    return DEFAULT_REFERENCE_DATA
-      .filter(item => item.category === 'Event' && item.status === 'Active')
-      .map(item => item.name);
-  }
-
-  const stored = localStorage.getItem('admin_reference_data');
-  const items: TaxonomyItem[] = stored ? JSON.parse(stored) : [];
-
-  return (items.length > 0 ? items : DEFAULT_REFERENCE_DATA)
+  const items = getReferenceData();
+  return items
     .filter(item => item.category === 'Event' && item.status === 'Active')
     .map(item => item.name);
 }
 
 export function getEDiaryTaxonomy(): string[] {
-  if (typeof window === 'undefined') {
-    return DEFAULT_REFERENCE_DATA
-      .filter(item => item.category === 'eDiary' && item.status === 'Active')
-      .map(item => item.name);
-  }
-
-  const stored = localStorage.getItem('admin_reference_data');
-  const items: TaxonomyItem[] = stored ? JSON.parse(stored) : [];
-
-  return (items.length > 0 ? items : DEFAULT_REFERENCE_DATA)
+  const items = getReferenceData();
+  return items
     .filter(item => item.category === 'eDiary' && item.status === 'Active')
     .map(item => item.name);
 }
 
 export function getTaskPriorityTaxonomy(): string[] {
-  if (typeof window === 'undefined') {
-    return DEFAULT_REFERENCE_DATA
-      .filter(item => item.category === 'Priority' && item.status === 'Active')
-      .map(item => item.name);
-  }
-
-  const stored = localStorage.getItem('admin_reference_data');
-  const items: TaxonomyItem[] = stored ? JSON.parse(stored) : [];
-
-  return (items.length > 0 ? items : DEFAULT_REFERENCE_DATA)
+  const items = getReferenceData();
+  return items
     .filter(item => item.category === 'Priority' && item.status === 'Active')
     .map(item => item.name);
 }
 
 export function getIncidentTaxonomy(): Record<string, string[]> {
-  if (typeof window === 'undefined') {
-    // Return default mapping if server-side rendered
-    const mapping: Record<string, string[]> = {};
-    DEFAULT_REFERENCE_DATA
-      .filter(item => item.category === 'Incident' && item.status === 'Active')
-      .forEach(item => {
-        mapping[item.name] = item.subTypes || [];
-      });
-    return mapping;
-  }
-
-  const stored = localStorage.getItem('admin_reference_data');
-  const items: TaxonomyItem[] = stored ? JSON.parse(stored) : [];
-  
-  // Filter for Active Incident types
-  const activeIncidentItems = (items.length > 0 ? items : DEFAULT_REFERENCE_DATA)
-    .filter(item => item.category === 'Incident' && item.status === 'Active');
-
+  const items = getReferenceData();
+  const activeIncidentItems = items.filter(item => item.category === 'Incident' && item.status === 'Active');
   const mapping: Record<string, string[]> = {};
   activeIncidentItems.forEach(item => {
     mapping[item.name] = item.subTypes || [];

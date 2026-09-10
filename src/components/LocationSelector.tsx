@@ -134,6 +134,36 @@ function SuggestionItem({ children, onSelect }: { children: React.ReactNode; onS
   );
 }
 
+export const LOCATION_VERSION = '2026.09.10.v1';
+
+export function getLocationNodes(): LocationNode[] {
+  if (typeof window === 'undefined') return DEFAULT_NODES;
+  const ver = localStorage.getItem('admin_location_hierarchy_ver');
+  if (ver !== LOCATION_VERSION) {
+    localStorage.setItem('admin_location_hierarchy', JSON.stringify(DEFAULT_NODES));
+    localStorage.setItem('admin_location_hierarchy_ver', LOCATION_VERSION);
+    return DEFAULT_NODES;
+  }
+  const stored = localStorage.getItem('admin_location_hierarchy');
+  if (stored) {
+    try {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    } catch {
+      return DEFAULT_NODES;
+    }
+  }
+  localStorage.setItem('admin_location_hierarchy', JSON.stringify(DEFAULT_NODES));
+  return DEFAULT_NODES;
+}
+
+export function saveLocationNodes(nodes: LocationNode[]): void {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('admin_location_hierarchy', JSON.stringify(nodes));
+    localStorage.setItem('admin_location_hierarchy_ver', LOCATION_VERSION);
+  }
+}
+
 export default function LocationSelector({
   onLocationSelect,
   initialRoad = '',
@@ -167,8 +197,7 @@ export default function LocationSelector({
   const searchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const stored = localStorage.getItem('admin_location_hierarchy');
-    setNodes(stored ? JSON.parse(stored) : DEFAULT_NODES);
+    setNodes(getLocationNodes());
   }, []);
 
   // Click-outside closes all dropdowns

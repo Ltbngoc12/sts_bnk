@@ -138,14 +138,23 @@ export const DEFAULT_GROUPS: DistributionGroup[] = [
   }
 ];
 
+export const GROUPS_VERSION = '2026.09.10.v1';
+
 export function getGroups(): DistributionGroup[] {
   if (typeof window === 'undefined') {
+    return DEFAULT_GROUPS;
+  }
+  const ver = localStorage.getItem('admin_dist_groups_ver');
+  if (ver !== GROUPS_VERSION) {
+    localStorage.setItem(GROUPS_STORAGE_KEY, JSON.stringify(DEFAULT_GROUPS));
+    localStorage.setItem('admin_dist_groups_ver', GROUPS_VERSION);
     return DEFAULT_GROUPS;
   }
   const stored = localStorage.getItem(GROUPS_STORAGE_KEY);
   if (stored) {
     try {
-      return JSON.parse(stored);
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     } catch {
       return DEFAULT_GROUPS;
     }
@@ -157,6 +166,7 @@ export function getGroups(): DistributionGroup[] {
 export function saveGroups(groups: DistributionGroup[]): void {
   if (typeof window !== 'undefined') {
     localStorage.setItem(GROUPS_STORAGE_KEY, JSON.stringify(groups));
+    localStorage.setItem('admin_dist_groups_ver', GROUPS_VERSION);
   }
 }
 

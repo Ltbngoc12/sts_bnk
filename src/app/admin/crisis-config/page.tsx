@@ -37,6 +37,11 @@ import {
   mobileWarning,
   isValidSgMobile,
   senderIdIsAlphanumeric,
+  DEFAULT_RECALL_GROUPS,
+  DEFAULT_RECALL_TEMPLATES,
+  DEFAULT_RECALL_ROUTING_RULES,
+  DEFAULT_MESSAGING_SERVICE_CONFIG,
+  DEFAULT_ACK_ESCALATION_RULE,
 } from '@/lib/crisisConfig';
 import type {
   RecallGroup,
@@ -192,6 +197,27 @@ export default function CrisisConfigPage() {
     );
   }
 
+  const handleResetCrisisDefaults = async () => {
+    if (!confirm('Reset all crisis recall groups, message templates and routing rules to system production defaults?')) return;
+    try {
+      await Promise.all([
+        fetch('/api/admin/crisis-config/recall-groups', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(DEFAULT_RECALL_GROUPS) }),
+        fetch('/api/admin/crisis-config/templates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(DEFAULT_RECALL_TEMPLATES) }),
+        fetch('/api/admin/crisis-config/routing-rules', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(DEFAULT_RECALL_ROUTING_RULES) }),
+        fetch('/api/admin/crisis-config/messaging-service', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(DEFAULT_MESSAGING_SERVICE_CONFIG) }),
+        fetch('/api/admin/crisis-config/ack-escalation', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(DEFAULT_ACK_ESCALATION_RULE) }),
+      ]);
+      setGroups(DEFAULT_RECALL_GROUPS);
+      setTemplates(DEFAULT_RECALL_TEMPLATES);
+      setRules(DEFAULT_RECALL_ROUTING_RULES);
+      setProvider(DEFAULT_MESSAGING_SERVICE_CONFIG);
+      setAck(DEFAULT_ACK_ESCALATION_RULE);
+      alert('Crisis configuration successfully reset to system defaults!');
+    } catch (err: any) {
+      alert('Failed to reset: ' + err.message);
+    }
+  };
+
   return (
     <AdminGuard pageTitle="Crisis Configuration" permissionCheck={(r) => hasCrisisPermission(r, 'crisis.config')}>
       <div
@@ -204,7 +230,12 @@ export default function CrisisConfigPage() {
             Recall groups, message templates, routing rules, messaging provider and acknowledgement rules for Crisis Management &amp; Emergency Recall (FSD §11.5).
           </p>
         </div>
-        <Pill text={`Signed in as ${role}`} tone="muted" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button onClick={handleResetCrisisDefaults} className="btn btn-secondary" style={{ padding: '8px 16px', borderRadius: '6px', fontSize: '12.5px', border: '1px solid #fca5a5', color: '#dc2626', background: '#fef2f2' }} title="Reset all crisis settings to production defaults">
+            <span>🔄</span> Reset to Defaults
+          </button>
+          <Pill text={`Signed in as ${role}`} tone="muted" />
+        </div>
       </div>
 
       <div style={{ display: 'flex', gap: '10px', marginTop: '12px', borderBottom: '1px solid var(--border-color)', paddingBottom: '2px' }}>

@@ -148,12 +148,21 @@ export const DEFAULT_CHECKLIST_TEMPLATES: ChecklistTemplate[] = [
   },
 ];
 
+export const CHECKLIST_TEMPLATES_VERSION = '2026.09.10.v1';
+
 export function getChecklistTemplates(): ChecklistTemplate[] {
   if (typeof window === 'undefined') return DEFAULT_CHECKLIST_TEMPLATES;
+  const ver = localStorage.getItem('admin_task_checklist_templates_ver');
+  if (ver !== CHECKLIST_TEMPLATES_VERSION) {
+    localStorage.setItem(CHECKLIST_TEMPLATES_STORAGE_KEY, JSON.stringify(DEFAULT_CHECKLIST_TEMPLATES));
+    localStorage.setItem('admin_task_checklist_templates_ver', CHECKLIST_TEMPLATES_VERSION);
+    return DEFAULT_CHECKLIST_TEMPLATES;
+  }
   const stored = localStorage.getItem(CHECKLIST_TEMPLATES_STORAGE_KEY);
   if (stored) {
     try {
-      return JSON.parse(stored);
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     } catch {
       return DEFAULT_CHECKLIST_TEMPLATES;
     }
@@ -165,6 +174,7 @@ export function getChecklistTemplates(): ChecklistTemplate[] {
 export function saveChecklistTemplates(templates: ChecklistTemplate[]): void {
   if (typeof window !== 'undefined') {
     localStorage.setItem(CHECKLIST_TEMPLATES_STORAGE_KEY, JSON.stringify(templates));
+    localStorage.setItem('admin_task_checklist_templates_ver', CHECKLIST_TEMPLATES_VERSION);
   }
 }
 

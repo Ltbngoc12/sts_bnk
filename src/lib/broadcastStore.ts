@@ -31,7 +31,7 @@ async function mdb(): Promise<Db> {
   return client.db('sentosa-cms');
 }
 
-// Read a collection; if empty, seed it with the provided defaults and return those.
+// Read a collection; if empty or missing new seed items, seed/merge them into Mongo.
 async function readOrSeed<T extends { id: string }>(name: string, defaults: T[]): Promise<T[]> {
   const db = await mdb();
   const col = db.collection(name);
@@ -39,6 +39,14 @@ async function readOrSeed<T extends { id: string }>(name: string, defaults: T[])
   if (docs.length === 0 && defaults.length > 0) {
     await col.insertMany(defaults.map((d) => ({ ...d })) as any[]);
     return defaults;
+  }
+  if (defaults.length > 0) {
+    const existingIds = new Set(docs.map((d: any) => d.id));
+    const missing = defaults.filter((d) => !existingIds.has(d.id));
+    if (missing.length > 0) {
+      await col.insertMany(missing.map((d) => ({ ...d })) as any[]);
+      return [...(docs as unknown as T[]), ...missing];
+    }
   }
   return docs as unknown as T[];
 }
