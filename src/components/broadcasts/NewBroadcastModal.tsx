@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { BroadcastTemplate } from '@/lib/broadcastConfig';
-import { DistributionGroup, GroupMember } from '@/lib/groups';
+import { BroadcastTemplate, DEFAULT_BROADCAST_TEMPLATES } from '@/lib/broadcastConfig';
+import { DistributionGroup, GroupMember, DEFAULT_GROUPS } from '@/lib/groups';
 import { Case, Incident } from '@/lib/db';
 import { renderTemplate, crisisLevelKey } from '@/lib/broadcast';
 
@@ -20,7 +20,10 @@ interface NewBroadcastModalProps {
 }
 
 export const BROADCAST_TYPE_OPTIONS = [
-  { value: 'Closure', label: 'Closure', category: 'Closure Broadcast' },
+  { value: 'Closure', label: 'Closure Broadcast', category: 'Closure Broadcast' },
+  { value: 'End-of-Day', label: 'End-of-Day Interim Broadcast', category: 'End-of-Day Interim Broadcast' },
+  { value: 'Weather Advisory', label: 'Weather Advisory Broadcast', category: 'Weather Advisory Broadcast' },
+  { value: 'General Notice', label: 'General / Incident Broadcast', category: 'General Notice' },
 ] as const;
 
 export function NewBroadcastModal({
@@ -156,28 +159,33 @@ export function NewBroadcastModal({
         const bcs = Array.isArray(broadcastsRes) ? broadcastsRes : broadcastsRes?.data || [];
         setExistingBroadcasts(bcs);
 
-        // Active templates only
-        const tpls: BroadcastTemplate[] = Array.isArray(templatesRes) ? templatesRes : [];
-        const activeTpls = tpls.filter((t) => t.status === 'Active');
+        // Active templates only (fallback to defaults if empty)
+        const rawTpls: BroadcastTemplate[] = Array.isArray(templatesRes) && templatesRes.length > 0 ? templatesRes : DEFAULT_BROADCAST_TEMPLATES;
+        const activeTpls = rawTpls.filter((t) => t.status === 'Active');
         setTemplates(activeTpls);
 
-        // Active distribution groups only
-        const grps: DistributionGroup[] = Array.isArray(groupsRes) ? groupsRes : [];
-        const activeGrps = grps.filter((g) => g.status === 'Active');
+        // Active distribution groups only (fallback to defaults if empty)
+        const rawGrps: DistributionGroup[] = Array.isArray(groupsRes) && groupsRes.length > 0 ? groupsRes : DEFAULT_GROUPS;
+        const activeGrps = rawGrps.filter((g) => g.status === 'Active');
         setDistributionGroups(activeGrps);
 
-        // Auto-select matching closure template if available
-        const closureTpl = activeTpls.find(
-          (t) => t.category === 'Closure Broadcast' || t.name.toLowerCase().includes('closure')
-        ) || activeTpls[0];
-        if (closureTpl) {
-          setSelectedTemplateId(closureTpl.id);
-          applyTemplateToContent(closureTpl, null);
+        // Auto-select template if none selected
+        if (activeTpls.length > 0) {
+          const defaultTpl = activeTpls.find(
+            (t) => t.category === 'Closure Broadcast' || t.name.toLowerCase().includes('closure')
+          ) || activeTpls[0];
+          setSelectedTemplateId(defaultTpl.id);
+          applyTemplateToContent(defaultTpl, null);
+        }
+        if (activeGrps.length > 0) {
+          setSelectedGroupId(activeGrps[0].id);
+          setActiveGroupMembers([...activeGrps[0].members]);
         }
       })
       .catch((err) => {
         console.error('Failed to load broadcast modal prerequisites:', err);
-        setError('Failed to load incident, template, or group configurations.');
+        setTemplates(DEFAULT_BROADCAST_TEMPLATES.filter((t) => t.status === 'Active'));
+        setDistributionGroups(DEFAULT_GROUPS.filter((g) => g.status === 'Active'));
       })
       .finally(() => {
         setLoadingData(false);
@@ -203,40 +211,16 @@ export function NewBroadcastModal({
     }
   }, [isOpen]);
 
-  // Filter templates matching selected Broadcast Type (if selected)
+  // Filter templates: Always show all templates, or prioritize category
   const filteredTemplates = useMemo(() => {
-    if (!selectedBroadcastType) return templates;
-    const typeObj = BROADCAST_TYPE_OPTIONS.find((t) => t.value === selectedBroadcastType);
-    if (!typeObj) return templates;
-    const matching = templates.filter((t) => t.category === typeObj.category);
-    return matching.length > 0 ? matching : templates;
-  }, [templates, selectedBroadcastType]);
+    return templates;
+  }, [templates]);
 
-  // Filter incidents: For 'Closure', only show incidents that are status 'Closed' AND do not have a closure broadcast created yet
+  // Filter incidents: Show all incidents available on the system
   const filteredIncidents = useMemo(() => {
-    if (selectedBroadcastType === 'Closure') {
-      return incidents.filter((opt) => {
-        const inc = opt.incident;
-        // 1. Status must be Closed
-        const isClosed = inc.status?.toLowerCase() === 'closed';
-        if (!isClosed) return false;
-
-        // 2. Must NOT have had a closure broadcast created yet
-        if (inc.closureBroadcastId) return false;
-        if (inc.closureBroadcastStatus === 'pending' || inc.closureBroadcastStatus === 'dispatched') return false;
-
-        const hasClosure = existingBroadcasts.some(
-          (b) =>
-            (b.incidentId === inc.id || (b.caseId && b.caseId === opt.caseId)) &&
-            (b.type === 'Closure' || b.type === 'Closure Broadcast' || b.type?.toLowerCase().includes('closure'))
-        );
-        return !hasClosure;
-      });
-    }
     return incidents;
-  }, [incidents, selectedBroadcastType, existingBroadcasts]);
+  }, [incidents]);
 
-  // Find currently selected incident
   // Find currently selected incident (supports case-insensitive matching)
   const currentIncidentOpt = useMemo(() => {
     return incidents.find((opt) => opt.incident.id.toLowerCase() === selectedIncidentId.trim().toLowerCase()) || null;
@@ -258,19 +242,17 @@ export function NewBroadcastModal({
     setSelectedChannels(['Email']);
 
     const typeObj = BROADCAST_TYPE_OPTIONS.find((t) => t.value === typeVal);
-    let matchedTpl: BroadcastTemplate | null = null;
     if (typeObj) {
-      // Find matching template in this category
-      const t = templates.find((tpl) => tpl.category === typeObj.category);
-      if (t) {
-        matchedTpl = t;
-        setSelectedTemplateId(t.id);
-      } else {
-        setSelectedTemplateId('');
+      const matching = templates.find((tpl) => tpl.category === typeObj.category);
+      if (matching) {
+        setSelectedTemplateId(matching.id);
+        applyTemplateToContent(matching, currentIncidentOpt, selectedIncidentId.trim());
+        return;
       }
     }
-
-    applyTemplateToContent(matchedTpl, currentIncidentOpt, selectedIncidentId.trim());
+    if (currentTemplate) {
+      applyTemplateToContent(currentTemplate, currentIncidentOpt, selectedIncidentId.trim());
+    }
   };
 
   // Handle template selection change
@@ -291,8 +273,14 @@ export function NewBroadcastModal({
   const handleIncidentChange = (incidentId: string) => {
     setSelectedIncidentId(incidentId);
     const incOpt = incidents.find((opt) => opt.incident.id.toLowerCase() === incidentId.trim().toLowerCase()) || null;
+    
+    // When Incident ID is chosen, immediately apply it to current template or default template
     if (currentTemplate) {
       applyTemplateToContent(currentTemplate, incOpt, incidentId.trim());
+    } else if (templates.length > 0) {
+      const firstTpl = templates[0];
+      setSelectedTemplateId(firstTpl.id);
+      applyTemplateToContent(firstTpl, incOpt, incidentId.trim());
     }
   };
 
@@ -605,12 +593,10 @@ export function NewBroadcastModal({
                       style={{
                         fontSize: 10.5,
                         fontWeight: 600,
-                        color: selectedBroadcastType === 'Closure' ? 'var(--color-primary)' : 'var(--text-faint)',
+                        color: 'var(--color-primary)',
                       }}
                     >
-                      {selectedBroadcastType === 'Closure'
-                        ? `Closed incidents (${filteredIncidents.length})`
-                        : `${filteredIncidents.length} available`}
+                      {filteredIncidents.length} incidents available
                     </span>
                   </label>
                   <div style={{ display: 'flex', gap: 8 }}>
@@ -630,27 +616,44 @@ export function NewBroadcastModal({
                     />
                     {filteredIncidents.length > 0 && (
                       <select
-                        value={filteredIncidents.some((opt) => opt.incident.id === selectedIncidentId) ? selectedIncidentId : ''}
+                        value={filteredIncidents.some((opt) => opt.incident.id.toLowerCase() === selectedIncidentId.trim().toLowerCase()) ? selectedIncidentId : ''}
                         onChange={(e) => {
                           if (e.target.value) handleIncidentChange(e.target.value);
                         }}
                         className="form-control select-dark"
-                        style={{ width: 'auto', maxWidth: 175, height: 38, fontSize: 12.5 }}
+                        style={{ width: 'auto', maxWidth: 220, height: 38, fontSize: 12.5 }}
                         title="Pick an incident from the available list"
                       >
-                        <option value="">-- Pick from list --</option>
-                        {filteredIncidents.map((opt) => (
-                          <option key={opt.incident.id} value={opt.incident.id}>
-                            {opt.incident.id}
-                          </option>
-                        ))}
+                        <option value="">-- Pick from list ({filteredIncidents.length}) --</option>
+                        {filteredIncidents.filter((o) => o.incident.status?.toLowerCase() === 'closed').length > 0 && (
+                          <optgroup label="Closed Incidents">
+                            {filteredIncidents
+                              .filter((o) => o.incident.status?.toLowerCase() === 'closed')
+                              .map((opt) => (
+                                <option key={opt.incident.id} value={opt.incident.id}>
+                                  {opt.incident.id} — {opt.incident.title || 'Untitled'} (L{opt.incident.crisisLevel || 4})
+                                </option>
+                              ))}
+                          </optgroup>
+                        )}
+                        {filteredIncidents.filter((o) => o.incident.status?.toLowerCase() !== 'closed').length > 0 && (
+                          <optgroup label="Active / Live Incidents">
+                            {filteredIncidents
+                              .filter((o) => o.incident.status?.toLowerCase() !== 'closed')
+                              .map((opt) => (
+                                <option key={opt.incident.id} value={opt.incident.id}>
+                                  {opt.incident.id} — {opt.incident.title || 'Untitled'} (L{opt.incident.crisisLevel || 4})
+                                </option>
+                              ))}
+                          </optgroup>
+                        )}
                       </select>
                     )}
                   </div>
                   <datalist id="incident-datalist-options">
                     {filteredIncidents.map((opt) => (
                       <option key={opt.incident.id} value={opt.incident.id}>
-                        {opt.incident.id} — {opt.incident.title} (Level {opt.incident.crisisLevel || 4})
+                        {opt.incident.id} — {opt.incident.title} (Status: {opt.incident.status || 'Live'} | Level {opt.incident.crisisLevel || 4})
                       </option>
                     ))}
                   </datalist>
@@ -707,7 +710,7 @@ export function NewBroadcastModal({
                     </div>
                   ) : (
                     <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, fontStyle: 'italic' }}>
-                      ℹ Type any Incident ID manually or choose from the closed incidents list.
+                      ℹ Type any Incident ID manually or choose from the list.
                     </div>
                   )}
                 </div>
@@ -730,11 +733,9 @@ export function NewBroadcastModal({
                   <span>
                     Template Field <span style={{ color: 'var(--color-primary)' }}>*</span>
                   </span>
-                  {selectedBroadcastType && (
-                    <span style={{ fontSize: 11, color: 'var(--color-primary)', fontWeight: 600 }}>
-                      Filtered by {selectedBroadcastType}
-                    </span>
-                  )}
+                  <span style={{ fontSize: 11, color: 'var(--color-primary)', fontWeight: 600 }}>
+                    {templates.length} templates available
+                  </span>
                 </label>
                 <select
                   value={selectedTemplateId}
@@ -746,11 +747,17 @@ export function NewBroadcastModal({
                     borderColor: submitted && validationErrors.templateId ? 'var(--color-critical, #DC2626)' : undefined,
                   }}
                 >
-                  <option value="">-- Select Configured Template --</option>
-                  {filteredTemplates.map((tpl) => (
-                    <option key={tpl.id} value={tpl.id}>
-                      {tpl.name} ({tpl.category})
-                    </option>
+                  <option value="">-- Select Template ({templates.length} available) --</option>
+                  {Array.from(new Set(templates.map((t) => t.category || 'General'))).map((cat) => (
+                    <optgroup key={cat} label={`📂 ${cat}`}>
+                      {templates
+                        .filter((t) => (t.category || 'General') === cat)
+                        .map((tpl) => (
+                          <option key={tpl.id} value={tpl.id}>
+                            {tpl.name}
+                          </option>
+                        ))}
+                    </optgroup>
                   ))}
                 </select>
                 {submitted && validationErrors.templateId && (
@@ -793,10 +800,17 @@ export function NewBroadcastModal({
                       color: 'var(--text-muted)',
                       letterSpacing: '0.04em',
                       marginBottom: 6,
-                      display: 'block',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
                     }}
                   >
-                    Distribution Group Field <span style={{ color: 'var(--color-primary)' }}>*</span>
+                    <span>
+                      Distribution Group Field <span style={{ color: 'var(--color-primary)' }}>*</span>
+                    </span>
+                    <span style={{ fontSize: 11, color: 'var(--color-primary)', fontWeight: 600 }}>
+                      {distributionGroups.length} groups available
+                    </span>
                   </label>
                   <select
                     value={selectedGroupId}
@@ -804,7 +818,7 @@ export function NewBroadcastModal({
                     className="form-control select-dark"
                     style={{ height: 38, fontSize: 13 }}
                   >
-                    <option value="">-- Select Distribution Group --</option>
+                    <option value="">-- Select Distribution Group ({distributionGroups.length} available) --</option>
                     {distributionGroups.map((grp) => (
                       <option key={grp.id} value={grp.id}>
                         {grp.name} ({grp.members.length} members)
