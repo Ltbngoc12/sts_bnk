@@ -4,7 +4,7 @@ import React, { useState, useRef } from 'react';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import { getEventTaxonomy } from '@/lib/taxonomy';
-import { DEFAULT_NODES, LocationNode } from '@/components/LocationSelector';
+import { DEFAULT_NODES, LocationNode, getLocationNodes } from '@/components/LocationSelector';
 import { EventRecord } from '@/lib/db';
 
 interface Props {
@@ -161,11 +161,7 @@ function parseAndValidateDateTime(dateTimeStr: string): {
   return { valid: false, error: 'Invalid format. Expected DD/MM/YYYY HH:mm' };
 }
 
-function getLocationNodes(): LocationNode[] {
-  if (typeof window === 'undefined') return DEFAULT_NODES;
-  const stored = localStorage.getItem('admin_location_hierarchy');
-  return stored ? JSON.parse(stored) : DEFAULT_NODES;
-}
+
 
 function resolveLocationPath(node: LocationNode, nodes: LocationNode[]): { road: string; building: string; levelSpace: string; commonName: string; lat: number; lng: number } {
   let cur: LocationNode | undefined = node;
