@@ -288,6 +288,7 @@ export const DEFAULT_RECALL_GROUPS: RecallGroup[] = [
       { id: 'rgm-5', name: 'Fire Safety Manager', roleInGroup: 'Response Lead', mobile: '+6597001122', email: 'fsm@sdc.gov.sg', tier: 'Tier 1 — Primary', membershipStatus: 'Active' },
       { id: 'rgm-6', name: 'Duty Ranger — North', roleInGroup: 'Responder', mobile: '+6598223344', email: 'ranger.north@sdc.gov.sg', tier: 'Tier 2 — Secondary', membershipStatus: 'Active' },
       { id: 'rgm-7', name: 'Duty Ranger — South', roleInGroup: 'Responder', mobile: '+6598334455', email: 'ranger.south@sdc.gov.sg', tier: 'Tier 2 — Secondary', membershipStatus: 'Active' },
+      { id: 'rgm-8', name: 'SCDF Sentosa Station Officer', roleInGroup: 'External SCDF Liaison', mobile: '+6598445566', email: 'scdf.sentosa@scdf.gov.sg', tier: 'Tier 1 — Primary', membershipStatus: 'Active' },
     ],
   },
   {
@@ -296,10 +297,33 @@ export const DEFAULT_RECALL_GROUPS: RecallGroup[] = [
     description: 'Recalled for drowning, water-related and beach mass-casualty incidents.',
     status: 'Active',
     members: [
-      { id: 'rgm-8', name: 'Lifeguard Supervisor', roleInGroup: 'Response Lead', mobile: '+6596445566', email: 'lifeguard.sup@sdc.gov.sg', tier: 'Tier 1 — Primary', membershipStatus: 'Active' },
-      { id: 'rgm-9', name: 'Beach Patrol Lead', roleInGroup: 'Responder', mobile: '+6596556677', email: 'beach.patrol@sdc.gov.sg', tier: 'Tier 2 — Secondary', membershipStatus: 'Active' },
+      { id: 'rgm-9', name: 'Lifeguard Supervisor', roleInGroup: 'Response Lead', mobile: '+6596445566', email: 'lifeguard.sup@sdc.gov.sg', tier: 'Tier 1 — Primary', membershipStatus: 'Active' },
+      { id: 'rgm-10', name: 'Beach Patrol Lead', roleInGroup: 'Responder', mobile: '+6596556677', email: 'beach.patrol@sdc.gov.sg', tier: 'Tier 2 — Secondary', membershipStatus: 'Active' },
+      { id: 'rgm-11', name: 'Inshore Lifeboat Coxswain', roleInGroup: 'Water Rescue Specialist', mobile: '+6596667788', email: 'coxswain@sdc.gov.sg', tier: 'Tier 1 — Primary', membershipStatus: 'Active' },
     ],
   },
+  {
+    id: 'rg-4',
+    name: 'Engineering & Infrastructure Recovery',
+    description: 'Recalled for electrical substation failure, cable car stall, tram breakdown or structural collapse.',
+    status: 'Active',
+    members: [
+      { id: 'rgm-12', name: 'Chief Electrical Engineer', roleInGroup: 'Power Systems Lead', mobile: '+6591223344', email: 'electrical.lead@spgroup.com.sg', tier: 'Tier 1 — Primary', membershipStatus: 'Active' },
+      { id: 'rgm-13', name: 'Cable Car Rescue Specialist', roleInGroup: 'High Element Rescue', mobile: '+6592334455', email: 'cablecar.specialist@mountfaber.com.sg', tier: 'Tier 1 — Primary', membershipStatus: 'Active' },
+      { id: 'rgm-14', name: 'Structural Integrity Assessor', roleInGroup: 'Technical Assessor', mobile: '+6593445566', email: 'structures@sdc.gov.sg', tier: 'Tier 2 — Secondary', membershipStatus: 'Active' },
+    ],
+  },
+  {
+    id: 'rg-5',
+    name: 'Emergency Medical & Mass Casualty Response',
+    description: 'Paramedics, first-aid officers and triage personnel recalled for mass-casualty incidents.',
+    status: 'Active',
+    members: [
+      { id: 'rgm-15', name: 'Medical Incident Officer (SGH/SCDF)', roleInGroup: 'Triage Commander', mobile: '+6594556677', email: 'mio@sgh.com.sg', tier: 'Tier 1 — Primary', membershipStatus: 'Active' },
+      { id: 'rgm-16', name: 'First Aid Post Lead Alpha', roleInGroup: 'Medic Lead', mobile: '+6595667788', email: 'medic.alpha@sdc.gov.sg', tier: 'Tier 1 — Primary', membershipStatus: 'Active' },
+      { id: 'rgm-17', name: 'Beach First Aid Coordinator', roleInGroup: 'Medic Responder', mobile: '+6596778899', email: 'medic.beach@sdc.gov.sg', tier: 'Tier 2 — Secondary', membershipStatus: 'Active' },
+    ],
+  }
 ];
 
 export const DEFAULT_RECALL_TEMPLATES: RecallMessageTemplate[] = [
@@ -308,7 +332,6 @@ export const DEFAULT_RECALL_TEMPLATES: RecallMessageTemplate[] = [
     name: 'Standard SMS Recall',
     channel: 'SMS',
     subject: '',
-    // Build plan §6.3: readable in three seconds, no prose.
     body: '[CRISIS {{crisis_level}}] {{incident_type}} - {{location}}. Report to {{reporting_point}}. Ack: {{ack_link}}',
     applicableLevels: ['Level 1', 'Level 2'],
     status: 'Active',
@@ -331,6 +354,24 @@ export const DEFAULT_RECALL_TEMPLATES: RecallMessageTemplate[] = [
     applicableLevels: [],
     status: 'Active',
   },
+  {
+    id: 'rt-4',
+    name: 'Critical Infrastructure & Evacuation Recall',
+    channel: 'SMS',
+    subject: '',
+    body: '[CRISIS {{crisis_level}} - URGENT] Infrastructure failure at {{location}}. Incident {{incident_no}}. Report to {{reporting_point}} immediately. Ack: {{ack_link}}',
+    applicableLevels: ['Level 1', 'Level 2'],
+    status: 'Active',
+  },
+  {
+    id: 'rt-5',
+    name: 'Medical Triage & Mass Casualty Recall',
+    channel: 'SMS',
+    subject: '',
+    body: '[CRISIS {{crisis_level}} - MASS CASUALTY] {{incident_type}} at {{location}}. Triage area established at {{reporting_point}}. Ack: {{ack_link}}',
+    applicableLevels: ['Level 1', 'Level 2'],
+    status: 'Active',
+  },
 ];
 
 export const DEFAULT_RECALL_ROUTING_RULES: RecallRoutingRule[] = [
@@ -351,7 +392,7 @@ export const DEFAULT_RECALL_ROUTING_RULES: RecallRoutingRule[] = [
     id: 'rr-2',
     name: 'Fire / hazmat — recall Fire & Rescue',
     crisisLevels: ['Level 1', 'Level 2'],
-    incidentTypes: ['Fire'],
+    incidentTypes: ['Fire', 'Hazardous Materials'],
     incidentSubTypes: [],
     zones: [],
     timeOfDay: 'Any',
@@ -364,13 +405,39 @@ export const DEFAULT_RECALL_ROUTING_RULES: RecallRoutingRule[] = [
     id: 'rr-3',
     name: 'Water incident — recall Beach & Water Rescue',
     crisisLevels: ['Level 1', 'Level 2'],
-    incidentTypes: ['Drowning'],
+    incidentTypes: ['Drowning', 'Maritime / Beach Incident'],
     incidentSubTypes: [],
     zones: [],
     timeOfDay: 'Any',
     targetGroupIds: ['rg-3'],
     templateId: 'rt-1',
     priority: 20,
+    status: 'Active',
+  },
+  {
+    id: 'rr-4',
+    name: 'Major Infrastructure / Power Failure — recall Engineering Recovery',
+    crisisLevels: ['Level 1', 'Level 2'],
+    incidentTypes: ['Infrastructure Failure', 'Transport / Monorail Failure'],
+    incidentSubTypes: [],
+    zones: [],
+    timeOfDay: 'Any',
+    targetGroupIds: ['rg-4'],
+    templateId: 'rt-4',
+    priority: 30,
+    status: 'Active',
+  },
+  {
+    id: 'rr-5',
+    name: 'Mass Casualty / Medical Emergency — recall Emergency Medical Team',
+    crisisLevels: ['Level 1', 'Level 2'],
+    incidentTypes: ['Medical Emergency / Mass Casualty', 'Major Accident / Structural Collapse'],
+    incidentSubTypes: [],
+    zones: [],
+    timeOfDay: 'Any',
+    targetGroupIds: ['rg-5', 'rg-1'],
+    templateId: 'rt-5',
+    priority: 15,
     status: 'Active',
   },
 ];

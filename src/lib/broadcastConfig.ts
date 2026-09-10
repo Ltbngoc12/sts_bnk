@@ -176,6 +176,15 @@ export const DEFAULT_BROADCAST_TEMPLATES: BroadcastTemplate[] = [
     status: 'Active',
   },
   {
+    id: 'tpl-closure-urgent',
+    category: 'Closure Broadcast',
+    name: 'Urgent Facility / Beach Closure Broadcast',
+    subject: '[URGENT] Area / Facility Re-opened: {incident_title}',
+    body:
+      'FACILITY RE-OPENING NOTICE\n\nCase ID: {case_id}\nIncident ID: {incident_id}\nTitle: {incident_title}\nLocation: {location}\nCrisis Level: {crisis_level}\n\nFollowing inspection and clearance by Sentosa Operations, normal operations have resumed at {location}.\n\nRemarks: {summary}\nClosed At: {closed_at}',
+    status: 'Active',
+  },
+  {
     id: 'tpl-eod',
     category: 'End-of-Day Interim Broadcast',
     name: 'End-of-Day Interim Broadcast',
@@ -185,48 +194,58 @@ export const DEFAULT_BROADCAST_TEMPLATES: BroadcastTemplate[] = [
     status: 'Active',
   },
   {
+    id: 'tpl-eod-critical',
+    category: 'End-of-Day Interim Broadcast',
+    name: 'Critical Incident Overnight Handover Summary',
+    subject: '[SDC OVERNIGHT] High Priority Incident Status: {incident_title}',
+    body:
+      'OVERNIGHT CRITICAL STATUS HANDOVER\n\nCase ID: {case_id} | Priority: {crisis_level}\nTitle: {incident_title}\nLocation: {location}\nOn-scene Commander: {closed_by}\n\nKey Open Actions:\n{summary}\n\nNight shift patrols and Duty Manager have taken over operational monitoring.',
+    status: 'Active',
+  },
+  {
     id: 'tpl-weather',
     category: 'Weather Advisory Broadcast',
-    name: 'Weather Advisory Broadcast',
+    name: 'Weather Advisory Broadcast (General)',
     subject: '[SDC] Weather Advisory: {incident_title}',
     body:
       'WEATHER ADVISORY\n\n{summary}\n\nLocation(s) affected: {location}\nIssued At: {time}\n\nPlease take appropriate precautions. Issued by the authorised Duty Officer.',
     status: 'Active',
   },
+  {
+    id: 'tpl-weather-cat1',
+    category: 'Weather Advisory Broadcast',
+    name: 'CAT 1 Lightning Warning & Water Suspension',
+    subject: '[WEATHER ALERT] CAT 1 Lightning Warning Active — Clear All Beach & Outdoor Activities',
+    body:
+      'CATEGORY 1 LIGHTNING WARNING\n\nNational Environment Agency (NEA) has detected cloud-to-ground lightning activity within 5km of Sentosa Island.\n\nAffected Zones: Siloso, Palawan, Tanjong Beaches, HydroDash, Cable Car, Outdoor Attractions.\nActions Required:\n1. All water activities and open beach areas must be vacated immediately.\n2. Cable car and high-element outdoor attractions suspended until clearance.\n3. Visitors directed to nearest sheltered pavilions and stations.\n\nIssued by Sentosa IIOC Operations at {time}.',
+    status: 'Active',
+  },
+  {
+    id: 'tpl-weather-haze',
+    category: 'Weather Advisory Broadcast',
+    name: 'Haze & Air Quality Advisory',
+    subject: '[SDC ADVISORY] Elevated PSI / Air Quality Notice',
+    body:
+      'HAZE & AIR QUALITY ADVISORY\n\n24-hr PSI has crossed operational threshold (Moderate / Unhealthy).\nLocations: Island-wide Sentosa\n\nOutdoor staff are advised to drink plenty of water and utilize N95 masks provided at station hubs.\nIssued At: {time}',
+    status: 'Active',
+  },
 ];
 
-// Matrix seed keyed by crisis level → recipient group + channels (§10.6, TBC in FSD;
-// this is a working draft using the seeded distribution groups from groups.ts).
-// templateId points at the seeded template for that broadcast type. Every rule
-// (seed and admin-created) now names one explicitly — the old category+incidentType
-// "auto-select" fallback was removed the same day templateId became mandatory in
-// the admin UI (Option B → mandatory, 2026-07-25).
-//
-// NOTE: resolveMatrixRule() now scopes by `broadcastType` (2026-07-25 fix — see
-// comment on resolveMatrixRule in broadcast.ts) so that a Closure rule's templateId
-// can never leak into an End-of-Day resolution. Previously the same 5 rows were
-// silently reused for both Closure and End-of-Day since nothing filtered on
-// broadcastType — this seed now has an explicit End-of-Day set (same recipient/
-// channel mapping, tpl-eod instead of tpl-closure) so EOD keeps resolving a
-// recipient group exactly as it did before this fix.
 export const DEFAULT_BROADCAST_MATRIX: BroadcastMatrixRule[] = [
-  { id: 'mat-l1', crisisLevels: ['Level 1'], broadcastType: 'Closure Broadcast', incidentTypes: ['Any'], recipientGroups: ['SDC Crisis Command'], deliveryChannels: ['Email', 'Push Notification'], templateId: 'tpl-closure', status: 'Active' },
-  { id: 'mat-l2', crisisLevels: ['Level 2'], broadcastType: 'Closure Broadcast', incidentTypes: ['Any'], recipientGroups: ['SDC Crisis Command'], deliveryChannels: ['Email', 'Push Notification'], templateId: 'tpl-closure', status: 'Active' },
-  { id: 'mat-l3', crisisLevels: ['Level 3'], broadcastType: 'Closure Broadcast', incidentTypes: ['Any'], recipientGroups: ['SDC Crisis Command'], deliveryChannels: ['Email', 'Push Notification'], templateId: 'tpl-closure', status: 'Active' },
+  { id: 'mat-l1', crisisLevels: ['Level 1'], broadcastType: 'Closure Broadcast', incidentTypes: ['Any'], recipientGroups: ['SDC Crisis Command', 'Corporate Communications & Media Team'], deliveryChannels: ['Email', 'Push Notification'], templateId: 'tpl-closure', status: 'Active' },
+  { id: 'mat-l2', crisisLevels: ['Level 2'], broadcastType: 'Closure Broadcast', incidentTypes: ['Any'], recipientGroups: ['SDC Crisis Command', 'Ground Ranger Team'], deliveryChannels: ['Email', 'Push Notification'], templateId: 'tpl-closure', status: 'Active' },
+  { id: 'mat-l3', crisisLevels: ['Level 3'], broadcastType: 'Closure Broadcast', incidentTypes: ['Any'], recipientGroups: ['SDC Crisis Command', 'Beach Operators & F&B Tenants'], deliveryChannels: ['Email', 'Push Notification'], templateId: 'tpl-closure', status: 'Active' },
   { id: 'mat-l4', crisisLevels: ['Level 4'], broadcastType: 'Closure Broadcast', incidentTypes: ['Any'], recipientGroups: ['Beach Operators & F&B Tenants'], deliveryChannels: ['Email'], templateId: 'tpl-closure', status: 'Active' },
   { id: 'mat-l5', crisisLevels: ['Level 5'], broadcastType: 'Closure Broadcast', incidentTypes: ['Any'], recipientGroups: ['Beach Operators & F&B Tenants'], deliveryChannels: ['Email'], templateId: 'tpl-closure', status: 'Active' },
-  { id: 'mat-eod-l1', crisisLevels: ['Level 1'], broadcastType: 'End-of-Day Interim Broadcast', incidentTypes: ['Any'], recipientGroups: ['SDC Crisis Command'], deliveryChannels: ['Email', 'Push Notification'], templateId: 'tpl-eod', status: 'Active' },
-  { id: 'mat-eod-l2', crisisLevels: ['Level 2'], broadcastType: 'End-of-Day Interim Broadcast', incidentTypes: ['Any'], recipientGroups: ['SDC Crisis Command'], deliveryChannels: ['Email', 'Push Notification'], templateId: 'tpl-eod', status: 'Active' },
+  
+  { id: 'mat-eod-l1', crisisLevels: ['Level 1'], broadcastType: 'End-of-Day Interim Broadcast', incidentTypes: ['Any'], recipientGroups: ['SDC Crisis Command', 'Corporate Communications & Media Team'], deliveryChannels: ['Email', 'Push Notification'], templateId: 'tpl-eod-critical', status: 'Active' },
+  { id: 'mat-eod-l2', crisisLevels: ['Level 2'], broadcastType: 'End-of-Day Interim Broadcast', incidentTypes: ['Any'], recipientGroups: ['SDC Crisis Command', 'Ground Ranger Team'], deliveryChannels: ['Email', 'Push Notification'], templateId: 'tpl-eod-critical', status: 'Active' },
   { id: 'mat-eod-l3', crisisLevels: ['Level 3'], broadcastType: 'End-of-Day Interim Broadcast', incidentTypes: ['Any'], recipientGroups: ['SDC Crisis Command'], deliveryChannels: ['Email', 'Push Notification'], templateId: 'tpl-eod', status: 'Active' },
   { id: 'mat-eod-l4', crisisLevels: ['Level 4'], broadcastType: 'End-of-Day Interim Broadcast', incidentTypes: ['Any'], recipientGroups: ['Beach Operators & F&B Tenants'], deliveryChannels: ['Email'], templateId: 'tpl-eod', status: 'Active' },
   { id: 'mat-eod-l5', crisisLevels: ['Level 5'], broadcastType: 'End-of-Day Interim Broadcast', incidentTypes: ['Any'], recipientGroups: ['Beach Operators & F&B Tenants'], deliveryChannels: ['Email'], templateId: 'tpl-eod', status: 'Active' },
-  // Weather Advisory Broadcast (2026-07-26, Phase 3 gap G1) — previously had NO
-  // matrix rule at all, so resolveMatrixRule() always returned undefined and every
-  // "Weather Advisory" broadcast went out with 0 pre-filled recipients regardless
-  // of what was configured in Admin. Island-wide notice, not tied to a single
-  // incident's crisis level/type, so this rule is scoped 'Any'/'Any' and fires
-  // for any crisisLevel resolveWeatherBroadcast() is called with.
-  { id: 'mat-weather-1', crisisLevels: ['Any'], broadcastType: 'Weather Advisory Broadcast', incidentTypes: ['Any'], recipientGroups: ['Beach Operators & F&B Tenants', 'Sentosa Cove Residents'], deliveryChannels: ['Email'], templateId: 'tpl-weather', status: 'Active' },
+  
+  { id: 'mat-weather-1', crisisLevels: ['Any'], broadcastType: 'Weather Advisory Broadcast', incidentTypes: ['Any'], recipientGroups: ['Beach Operators & F&B Tenants', 'Sentosa Cove Residents', 'Sentosa Beach Lifeguards & Water Rescue', 'Transport & Infrastructure Operators'], deliveryChannels: ['Email', 'Push Notification'], templateId: 'tpl-weather-cat1', status: 'Active' },
+  { id: 'mat-weather-2', crisisLevels: ['Any'], broadcastType: 'Weather Advisory Broadcast', incidentTypes: ['Environmental'], recipientGroups: ['Sentosa Cove Residents', 'Beach Operators & F&B Tenants'], deliveryChannels: ['Email'], templateId: 'tpl-weather-haze', status: 'Active' },
 ];
 
 // FSD §10.2 delivery channels: Email + Push Notification. (SMS is reserved for
